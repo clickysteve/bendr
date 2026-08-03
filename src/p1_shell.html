@@ -122,6 +122,36 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
 .secreset{margin-left:auto; padding:1px 6px; font-size:8px; color:var(--dim); border-color:var(--line); letter-spacing:1px;}
 .secreset:hover{color:var(--red); border-color:var(--red);}
 #spd.hot::-webkit-slider-thumb{background:var(--red); box-shadow:0 0 6px var(--red);}
+/* channel selector */
+#chanbar{
+  display:flex; gap:6px; padding:8px 10px; border-bottom:1px solid var(--line);
+  background:var(--panel2); position:sticky; top:0; z-index:6; flex-wrap:wrap;
+}
+.chanbtn{
+  flex:1 1 40%; padding:10px 6px; text-align:center; border-radius:4px;
+  background:var(--panel); border:1px solid var(--line); cursor:pointer; line-height:1.15;
+}
+.chanbtn b{font-size:17px; letter-spacing:2px; display:block; color:var(--dim);}
+.chanbtn small{font-size:7.5px; letter-spacing:2px; color:#4a4a56; display:block;}
+.chanbtn.chA.on{background:rgba(255,122,24,.16); border-color:var(--amber);}
+.chanbtn.chA.on b{color:var(--amber);} .chanbtn.chA.on small{color:var(--amber); opacity:.7;}
+.chanbtn.chB.on{background:rgba(46,230,214,.16); border-color:var(--cyan);}
+.chanbtn.chB.on b{color:var(--cyan);} .chanbtn.chB.on small{color:var(--cyan); opacity:.7;}
+.chantools{display:flex; gap:6px; flex:1 1 100%;}
+.chantools button{flex:1; padding:5px 4px; font-size:8.5px;}
+.sectag{
+  margin-left:6px; font-size:7px; letter-spacing:1.5px; padding:1px 4px; border-radius:2px;
+  border:1px solid var(--line); color:var(--dim);
+}
+.sectag.master{color:var(--dim);}
+.sectag.chan::after{content:"CH A"; }
+body.chan-b .sectag.chan::after{content:"CH B";}
+.sectag.chan{color:var(--amber); border-color:#3a2a1a;}
+body.chan-b .sectag.chan{color:var(--cyan); border-color:#1d4d48;}
+/* channel-tinted panel edge so you always know where you are */
+#panel{border-left:3px solid var(--amber);}
+body.chan-b #panel{border-left-color:var(--cyan);}
+.mrow .rch{width:46px;}
 /* ---------- mobile tab bar (hidden on desktop) ---------- */
 #mtabs{display:none;}
 /* ---------- stage ---------- */
@@ -286,7 +316,7 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version — check this matches what you expect after a deploy">v9.1</span>
+  <span id="ver" title="Build version — check this matches what you expect after a deploy">v10.0</span>
   <div class="hsep"></div>
   <div class="hgrp">
     <button id="btnFile" title="Load channel A video (any size — it streams from disk)">FILE A</button>
@@ -388,10 +418,12 @@ audio,video{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v9.1</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v10.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
+  <h3>TWO CHANNELS</h3>
+  <p>BENDR is a two-channel mixer: <b>A</b> and <b>B</b> each have their own input <i>and</i> their own complete set of effects. The big A / B buttons at the top of the panel choose which channel you're editing — everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits both at once, <b>COPY</b> pushes the current channel onto the other, <b>SWAP</b> exchanges them. Sections tagged MASTER (the mixer, morph and CRT) are shared. Then the <b>INPUT MIXER</b> combines the two finished channels with the A&gt;B fader, wipes, keys and blends.</p>
   <h3>INPUT</h3>
-  <p><b>FILE</b> loads any video your browser can play (drag &amp; drop works too — files stream from disk, so size doesn't matter). <b>CAM</b> uses your webcam. <b>PATTERN</b> is a built-in test signal — pick BARS, TESTCARD, OSCILLATOR (video-synth colour waves), GRID, RAMP or STATIC from the dropdown.</p>
+  <p>Each channel takes its own source. <b>FILE</b> loads any video your browser can play into the selected channel (drag &amp; drop works too — files stream from disk, so size doesn't matter). <b>CAM</b> uses your webcam. <b>PATTERN</b> is a built-in test signal — pick BARS, TESTCARD, OSCILLATOR (video-synth colour waves), GRID, RAMP or STATIC from the dropdown.</p>
   <h3>SIGNAL CHAIN</h3>
   <p>The rail above the picture is the live signal path. <b>Drag the pills to reorder</b> the four processing stages, and click a pill to switch it off. Order changes the result completely: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.</p>
   <h3>SIGNAL PATH</h3>

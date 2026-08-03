@@ -12,14 +12,20 @@ Works on phones and tablets too: the picture stays pinned at the top, controls /
 
 ![BENDR interface](docs/doc_ui.png)
 
+## Two channels
+
+BENDR is a two-channel mixer. **A** and **B** each have their own input *and* their own complete set of effects — different footage, different framing, different glitch chain, running at the same time. The big A / B buttons at the top of the panel choose which channel you're editing; LINK edits both at once, COPY and SWAP move settings between them. Sections tagged MASTER (mixer, morph, CRT) are shared. The mixer then combines the two finished channels with a fader, twelve wipe patterns, key transitions and blend modes.
+
+![Two channels mixed through a circle wipe](docs/doc_mixer.png)
+
 ## Signal chain
 
 The rail above the picture is the live signal path. **Drag the pills to reorder the stages, click one to bypass it.** Order changes everything: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.
 
 ```
-INPUT (A/B mixer · framing) → FEEDBACK / RESCAN → frame store
-  → [ TAPE/SYNC · COLOUR/ENHANCER · GLITCH LAB · FLOW/MOSH ]  ← reorderable
-  → CRT OUT
+per channel:  INPUT → framing → FEEDBACK / RESCAN → frame store
+                → [ TAPE/SYNC · COLOUR/ENH · GLITCH LAB · FLOW/MOSH ]  ← reorderable
+        both:  → MIXER (fader · wipes · keys · blends) → CRT OUT
 ```
 
 - **Tape / sync** — a per-scanline PLL simulation runs on the CPU every frame: correlated drift, loss-of-lock shear with exponential re-lock, a drifting tracking band, head-switch skew, AGC breathing, a rolling blanking bar when v-hold slips. Composite rot on top: chroma bleed and delay, directional luma bleed, vertical colour bleed, rainbow fringing, dot crawl, ringing, streaky bandwidth-limited noise, comet-tail dropouts.
@@ -28,7 +34,7 @@ INPUT (A/B mixer · framing) → FEEDBACK / RESCAN → frame store
 - **Flow / mosh** — holds its own history and advects it: mosh hold freezes frames while motion keeps pushing them, melt drips brightness downward, swirl advects through a noise field, vector trash shoves macroblocks like corrupted motion vectors, time shear smears top and bottom differently.
 - **Feedback / rescan** — zoom/rotate/hue-spin feedback; RESCAN: FULL feeds the CRT output (scanlines, curvature and all) back through the entire chain.
 - **Keyer** — luma or chroma key with a matte viewer; masks the glitch chain and/or the feedback.
-- **Mixer** — two video channels with independent framing, a fader plus twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and movable origin, key transitions, and add/difference/multiply/screen/lighten blends.
+- **Mixer** — combines the two fully-processed channels: a fader plus twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and movable origin, key transitions, and add/difference/multiply/screen/lighten blends.
 - **Preset morph** — snapshot two whole panel states and blend every slider between them.
 
 | ![Datamosh](docs/doc_out_datamosh.png) | ![Halftone](docs/doc_out_dots.png) | ![Liquid melt](docs/doc_out_melt.png) |

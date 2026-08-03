@@ -23,31 +23,13 @@ const KEYFN =
 "  float k = smoothstep(th-soft*0.5-0.001, th+soft*0.5+0.001, v);\n" +
 "  return mix(k, 1.0-k, clamp(inv,0.0,1.0));\n}\n";
 
-/* pass 1: A/B mix + feedback + frame-store echo */
+/* pass 1 (per channel): source framing + feedback + frame-store echo */
 const FS_FB = COMMON + KEYFN +
-"uniform sampler2D u_src; uniform sampler2D u_srcB; uniform sampler2D u_prev; uniform sampler2D u_delayT;\n" +
-"uniform float u_srcAspect,u_srcBAspect,u_hasSrc,u_hasB,u_hasDelay,u_time,u_mixMode,u_keyMode;\n" +
+"uniform sampler2D u_src; uniform sampler2D u_prev; uniform sampler2D u_delayT;\n" +
+"uniform float u_srcAspect,u_hasSrc,u_hasDelay,u_time,u_keyMode;\n" +
 "uniform float u_fbAmount,u_fbZoom,u_fbRotate,u_fbHue,u_fbShiftX,u_fbShiftY,u_fbMode;\n" +
-"uniform float u_abMix,u_echo,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFb;\n" +
-"uniform float u_wipeSoft,u_wipeDetail,u_wipeX,u_wipeY,u_wipeInv;\n" +
+"uniform float u_echo,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFb;\n" +
 "uniform float u_srcZoom,u_srcX,u_srcY,u_srcRot,u_edgeMode;\n" +
-"uniform float u_bZoom,u_bX,u_bY,u_bRot,u_linkB;\n" +
-"float wipeField(vec2 uv, float mode, float outA){\n" +
-"  vec2 c = uv - 0.5 - vec2(u_wipeX, u_wipeY)*0.5;\n" +
-"  float n = 2.0 + floor(u_wipeDetail*14.0);\n" +
-"  if(mode<1.5) return uv.x;\n" +                                  /* 1 WIPE H */
-"  if(mode<2.5) return 1.0-uv.y;\n" +                              /* 2 WIPE V */
-"  if(mode<3.5) return (uv.x + (1.0-uv.y))*0.5;\n" +               /* 3 DIAGONAL */
-"  if(mode<4.5) return max(abs(c.x)*2.0/max(outA/outA,1.0), abs(c.y)*2.0);\n" + /* 4 BOX */
-"  if(mode<5.5) return clamp(length(c*vec2(outA/(outA),1.0))*1.9, 0.0, 1.0);\n" + /* 5 CIRCLE */
-"  if(mode<6.5) return abs(c.x)*2.0;\n" +                          /* 6 CENTRE SPLIT H */
-"  if(mode<7.5) return abs(c.y)*2.0;\n" +                          /* 7 CENTRE SPLIT V */
-"  if(mode<8.5) return fract(uv.x*n);\n" +                         /* 8 BLINDS V */
-"  if(mode<9.5) return fract(uv.y*n);\n" +                         /* 9 BLINDS H */
-"  if(mode<10.5){ float a = atan(c.y, c.x)/6.2832 + 0.5; return fract(a); }\n" + /* 10 CLOCK */
-"  if(mode<11.5) return fract((uv.x + uv.y)*n*0.5);\n" +           /* 11 DIAG BARS */
-"  if(mode<12.5) return h21(floor(uv*vec2(n*2.0, n)));\n" +        /* 12 RANDOM BLOCKS */
-"  return 0.0;\n}\n" +
 "vec2 frameXf(vec2 uv, float rot, float zoom, float px, float py){\n" +
 "  vec2 q = uv-0.5;\n" +
 "  float a = rot*3.14159;\n" +
@@ -66,31 +48,8 @@ const FS_FB = COMMON + KEYFN +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  float outA = u_res.x/u_res.y;\n" +
-"  /* frame transform: position / zoom / rotate the picture inside the raster */\n" +
 "  vec2 fuv = frameXf(uv, u_srcRot, u_srcZoom, u_srcX, u_srcY);\n" +
-"  vec3 a = (u_hasSrc>0.5) ? fitSample(u_src, fuv, u_srcAspect, outA) : vec3(0.0);\n" +
-"  vec3 src = a;\n" +
-"  if(u_hasB>0.5 && u_abMix>0.001){\n" +
-"    vec2 buv = (u_linkB>0.5) ? fuv : frameXf(uv, u_bRot, u_bZoom, u_bX, u_bY);\n" +
-"    vec3 b = fitSample(u_srcB, buv, u_srcBAspect, outA);\n" +
-"    float mm = u_mixMode;\n" +
-"    if(mm < 0.5){ src = mix(a, b, u_abMix); }\n" +                                    /* 0 FADE */
-"    else if(mm < 12.5){\n" +                                                          /* 1-12 WIPES */
-"      float d = wipeField(uv, mm, outA);\n" +
-"      if(u_wipeInv>0.5) d = 1.0-d;\n" +
-"      float sw = max(u_wipeSoft*0.5, 0.002);\n" +
-"      float m = smoothstep(d-sw, d+sw, u_abMix*(1.0+2.0*sw)-sw);\n" +
-"      src = mix(a, b, m);\n" +
-"    }\n" +
-"    else if(mm < 13.5){ src = mix(a, b, u_abMix*keyOf(a,0.0,u_keyHue,u_keyThresh,u_keySoft,u_keyInv)); }\n" +  /* 13 LUMA KEY */
-"    else if(mm < 14.5){ src = mix(a, b, u_abMix*keyOf(a,1.0,u_keyHue,u_keyThresh,u_keySoft,u_keyInv)); }\n" +  /* 14 CHROMA KEY */
-"    else if(mm < 15.5){ src = a + b*u_abMix; }\n" +                                   /* 15 ADD */
-"    else if(mm < 16.5){ src = mix(a, abs(a-b), u_abMix); }\n" +                        /* 16 DIFFERENCE */
-"    else if(mm < 17.5){ src = mix(a, a*b*1.6, u_abMix); }\n" +                         /* 17 MULTIPLY */
-"    else if(mm < 18.5){ src = mix(a, 1.0-(1.0-a)*(1.0-b), u_abMix); }\n" +             /* 18 SCREEN */
-"    else { src = mix(a, max(a,b), u_abMix); }\n" +                                     /* 19 LIGHTEN */
-"    src = clamp(src, 0.0, 1.6);\n" +
-"  }\n" +
+"  vec3 src = (u_hasSrc>0.5) ? fitSample(u_src, fuv, u_srcAspect, outA) : vec3(0.0);\n" +
 "  vec2 p = uv-0.5;\n" +
 "  float ang = u_fbRotate*1.0;\n" +
 "  float ca = cos(ang), sa = sin(ang);\n" +
@@ -109,6 +68,53 @@ const FS_FB = COMMON + KEYFN +
 "  else col = mix(src, prev, fbA);\n" +
 "  if(u_hasDelay>0.5) col = mix(col, texture(u_delayT, uv).rgb, u_echo);\n" +
 "  O = vec4(col,1.0);\n}\n";
+
+/* mixer: combines the two fully-processed channels — fader, wipes, keys, blends */
+const FS_MIX = COMMON + KEYFN +
+"uniform sampler2D u_texA; uniform sampler2D u_texB;\n" +
+"uniform float u_mixMode,u_hasB,u_abMix;\n" +
+"uniform float u_wipeSoft,u_wipeDetail,u_wipeX,u_wipeY,u_wipeInv;\n" +
+"uniform float u_mixKeyThresh,u_mixKeySoft,u_mixKeyInv,u_mixKeyHue;\n" +
+"float wipeField(vec2 uv, float mode, float outA){\n" +
+"  vec2 c = uv - 0.5 - vec2(u_wipeX, u_wipeY)*0.5;\n" +
+"  float n = 2.0 + floor(u_wipeDetail*14.0);\n" +
+"  if(mode<1.5) return uv.x;\n" +
+"  if(mode<2.5) return 1.0-uv.y;\n" +
+"  if(mode<3.5) return (uv.x + (1.0-uv.y))*0.5;\n" +
+"  if(mode<4.5) return max(abs(c.x)*2.0, abs(c.y)*2.0);\n" +
+"  if(mode<5.5) return clamp(length(c*vec2(outA,1.0))*1.9, 0.0, 1.0);\n" +
+"  if(mode<6.5) return abs(c.x)*2.0;\n" +
+"  if(mode<7.5) return abs(c.y)*2.0;\n" +
+"  if(mode<8.5) return fract(uv.x*n);\n" +
+"  if(mode<9.5) return fract(uv.y*n);\n" +
+"  if(mode<10.5){ float a = atan(c.y, c.x)/6.2832 + 0.5; return fract(a); }\n" +
+"  if(mode<11.5) return fract((uv.x + uv.y)*n*0.5);\n" +
+"  if(mode<12.5) return h21(floor(uv*vec2(n*2.0, n)));\n" +
+"  return 0.0;\n}\n" +
+"void main(){\n" +
+"  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  float outA = u_res.x/u_res.y;\n" +
+"  vec3 a = texture(u_texA, uv).rgb;\n" +
+"  if(u_hasB<0.5 || u_abMix<0.0005){ O = vec4(a,1.0); return; }\n" +
+"  vec3 b = texture(u_texB, uv).rgb;\n" +
+"  vec3 src;\n" +
+"  float mm = u_mixMode;\n" +
+"  if(mm < 0.5){ src = mix(a, b, u_abMix); }\n" +
+"  else if(mm < 12.5){\n" +
+"    float d = wipeField(uv, mm, outA);\n" +
+"    if(u_wipeInv>0.5) d = 1.0-d;\n" +
+"    float sw = max(u_wipeSoft*0.5, 0.002);\n" +
+"    float m = smoothstep(d-sw, d+sw, u_abMix*(1.0+2.0*sw)-sw);\n" +
+"    src = mix(a, b, m);\n" +
+"  }\n" +
+"  else if(mm < 13.5){ src = mix(a, b, u_abMix*keyOf(a,0.0,u_mixKeyHue,u_mixKeyThresh,u_mixKeySoft,u_mixKeyInv)); }\n" +
+"  else if(mm < 14.5){ src = mix(a, b, u_abMix*keyOf(a,1.0,u_mixKeyHue,u_mixKeyThresh,u_mixKeySoft,u_mixKeyInv)); }\n" +
+"  else if(mm < 15.5){ src = a + b*u_abMix; }\n" +
+"  else if(mm < 16.5){ src = mix(a, abs(a-b), u_abMix); }\n" +
+"  else if(mm < 17.5){ src = mix(a, a*b*1.6, u_abMix); }\n" +
+"  else if(mm < 18.5){ src = mix(a, 1.0-(1.0-a)*(1.0-b), u_abMix); }\n" +
+"  else { src = mix(a, max(a,b), u_abMix); }\n" +
+"  O = vec4(clamp(src,0.0,1.6),1.0);\n}\n";
 
 /* pass 2: the bent signal path — physical sync model + NTSC + tape */
 const FS_SIG = COMMON + KEYFN +
@@ -425,16 +431,16 @@ const PDEF = [
   ["wipeDetail","WIPE DETAIL","mixer",0,1,0.3],
   ["wipeX","WIPE CTR X","mixer",-1,1,0],
   ["wipeY","WIPE CTR Y","mixer",-1,1,0],
+  ["mixKeyThresh","KEY THRESH","mixer",0,1,0.5],
+  ["mixKeySoft","KEY SOFT","mixer",0.01,1,0.2],
+  ["mixKeyInv","KEY INVERT","mixer",0,1,0],
+  ["mixKeyHue","KEY HUE","mixer",0,1,0.33],
   ["morph","MORPH A>B","morph",0,1,0],
 
   ["srcZoom","ZOOM","frame",-1,1,0],
   ["srcX","POS X","frame",-1,1,0],
   ["srcY","POS Y","frame",-1,1,0],
   ["srcRot","ROTATE","frame",-1,1,0],
-  ["bZoom","B ZOOM","frame",-1,1,0],
-  ["bX","B POS X","frame",-1,1,0],
-  ["bY","B POS Y","frame",-1,1,0],
-  ["bRot","B ROTATE","frame",-1,1,0],
 
   ["echo","ECHO","time",0,1,0],
   ["delayF","DELAY FRM","time",1,29,3],
@@ -519,12 +525,38 @@ const PDEF = [
   ["curvature","CURVATURE","crt",0,1,0.3],
   ["vignette","VIGNETTE","crt",0,1,0.35],
 ];
-const P = {};           // id -> param object
-const PLIST = [];
+/* Master sections are single-instance; everything else exists once per channel. */
+const MASTER_SECS = new Set(["mixer","crt","morph"]);
+const CHANNELS = ["A","B"];
+const P = {};           // id -> param descriptor
+const PLIST = [];       // all params
+const CLIST = [];       // per-channel params
+const MLIST = [];       // master params
 for(const [id,name,sec,min,max,def] of PDEF){
-  const p = {id,name,sec,min,max,def,base:def,cur:def};
+  const p = {id,name,sec,min,max,def,master:MASTER_SECS.has(sec)};
   P[id]=p; PLIST.push(p);
+  (p.master ? MLIST : CLIST).push(p);
 }
+/* values */
+const chanBase = {A:{}, B:{}}, chanCur = {A:{}, B:{}};
+const mBase = {}, mCur = {};
+for(const ch of CHANNELS) for(const p of CLIST){ chanBase[ch][p.id]=p.def; chanCur[ch][p.id]=p.def; }
+for(const p of MLIST){ mBase[p.id]=p.def; mCur[p.id]=p.def; }
+
+let activeChan = "A";      // which channel the panel is editing
+let linkChans = false;     // edit both channels at once
+
+function getBase(id, ch){ const p=P[id]; return p.master ? mBase[id] : chanBase[ch||activeChan][id]; }
+function setBase(id, v, ch){
+  const p=P[id]; if(!p) return;
+  v = Math.min(p.max, Math.max(p.min, v));
+  if(p.master){ mBase[id]=v; return; }
+  if(ch){ chanBase[ch][id]=v; return; }
+  if(linkChans){ chanBase.A[id]=v; chanBase.B[id]=v; }
+  else chanBase[activeChan][id]=v;
+}
+function getCur(id, ch){ const p=P[id]; return p.master ? mCur[id] : chanCur[ch||activeChan][id]; }
+function copyChannel(from, to){ for(const p of CLIST) chanBase[to][p.id] = chanBase[from][p.id]; }
 let fbTrailMode = false;   // false=MIX  true=TRAIL(lighten)
 let rescanMode = false;    // true = feedback taps the CRT-processed output (full rescan)
 let chainOrder = ["sig","col","glitch","flow"];    // drag-to-reorder signal chain
@@ -533,7 +565,6 @@ let keyChroma = false;     // keyer mode: false=luma true=chroma
 let mixMode = 0;           // A/B mixer transition/blend mode (see MIXMODES)
 let wipeInv = false;
 let edgeMode = 0;          // frame edge: 0=black 1=tile 2=mirror
-let linkB = true;          // B follows A's frame transform
 let showKeyMatte = false;  // keyer matte viewer
 
 /* ---------------- GL engine ---------------- */
@@ -566,6 +597,7 @@ function U(pr, name){
 }
 const progFB = makeProg(FS_FB), progSIG = makeProg(FS_SIG), progCOL = makeProg(FS_COL), progCRT = makeProg(FS_CRT);
 const progGLITCH = makeProg(FS_GLITCH), progFLOW = makeProg(FS_FLOW), progCOPY = makeProg(FS_COPY);
+const progMIX = makeProg(FS_MIX);
 
 function makeRT(w,h){
   const tex = gl.createTexture();
@@ -581,23 +613,37 @@ function makeRT(w,h){
   return {tex, fbo, w, h};
 }
 let procW=1280, procH=720;
-let rtA, rtB, rtC, finalA, finalB, rtCRT, flowA, flowB;
-let ring=null, ringW=0, ringFilled=0;
 const RING_N = 30;
-function clearRing(){
-  if(ring){ for(const rt of ring){ gl.deleteTexture(rt.tex); gl.deleteFramebuffer(rt.fbo); } }
-  ring=null; ringW=0; ringFilled=0;
+
+/* Each channel owns its feedback history, flow history and frame ring;
+   scratch buffers are shared because channels render one after the other. */
+function newChanRT(){
+  return {fbPrev:null, fbNext:null, crt:null, flowA:null, flowB:null, out:null,
+          ring:null, ringW:0, ringFilled:0};
 }
-function ensureRing(){
-  if(!ring){ ring=[]; for(let i=0;i<RING_N;i++) ring.push(makeRT(procW,procH)); ringW=0; ringFilled=0; }
+const chanRT = {A:newChanRT(), B:newChanRT()};
+let scratch1, scratch2, mixOut;
+
+function freeRT(rt){ if(rt){ gl.deleteTexture(rt.tex); gl.deleteFramebuffer(rt.fbo); } }
+function clearRing(c){
+  if(c.ring) for(const rt of c.ring) freeRT(rt);
+  c.ring=null; c.ringW=0; c.ringFilled=0;
+}
+function ensureRing(c){
+  if(!c.ring){ c.ring=[]; for(let i=0;i<RING_N;i++) c.ring.push(makeRT(procW,procH)); c.ringW=0; c.ringFilled=0; }
 }
 function allocRTs(){
-  for(const rt of [rtA,rtB,rtC,finalA,finalB,rtCRT,flowA,flowB]) if(rt){ gl.deleteTexture(rt.tex); gl.deleteFramebuffer(rt.fbo); }
-  rtA = makeRT(procW,procH); rtB = makeRT(procW,procH); rtC = makeRT(procW,procH);
-  finalA = makeRT(procW,procH); finalB = makeRT(procW,procH);
-  rtCRT = makeRT(procW,procH);
-  flowA = makeRT(procW,procH); flowB = makeRT(procW,procH);
-  clearRing();
+  for(const ch of CHANNELS){
+    const c = chanRT[ch];
+    for(const k of ["fbPrev","fbNext","crt","flowA","flowB","out"]) freeRT(c[k]);
+    clearRing(c);
+    c.fbPrev = makeRT(procW,procH); c.fbNext = makeRT(procW,procH);
+    c.crt    = makeRT(procW,procH);
+    c.flowA  = makeRT(procW,procH); c.flowB  = makeRT(procW,procH);
+    c.out    = makeRT(procW,procH);
+  }
+  freeRT(scratch1); freeRT(scratch2); freeRT(mixOut);
+  scratch1 = makeRT(procW,procH); scratch2 = makeRT(procW,procH); mixOut = makeRT(procW,procH);
 }
 function setProcRes(h){
   procH = h; procW = Math.round(h*16/9/2)*2;
@@ -615,8 +661,7 @@ function makeSrcTex(){
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   return t;
 }
-const srcTex = makeSrcTex();
-const srcTexB = makeSrcTex();
+const srcTex = {A: makeSrcTex(), B: makeSrcTex()};
 
 /* per-scanline sync model texture (written by CPU each frame) */
 const SROWS = 576;
@@ -628,14 +673,15 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-function setParamUniforms(pr){
+function setParamUniforms(pr, ch){
+  const cc = chanCur[ch||"A"];
   for(const p of PLIST){
     const loc = U(pr, "u_"+p.id);
-    if(loc) gl.uniform1f(loc, p.cur);
+    if(loc) gl.uniform1f(loc, p.master ? mCur[p.id] : cc[p.id]);
   }
 }
 function draw(){ gl.drawArrays(gl.TRIANGLES, 0, 3); }
 
 /* animated signal state */
-let vrollpos=0, trackpos=0.7, humpos=0, frameNo=0, bypass=0;
-let srcAspect=16/9, hasSrc=0;
+const vrollpos={A:0,B:0}, humpos={A:0,B:0};
+let frameNo=0, bypass=0;

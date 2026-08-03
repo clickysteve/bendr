@@ -100,32 +100,66 @@ function morphModExtra(){
   for(const r of routes) if(r.dst === "morph") v += r.amt*(P.morph.max-P.morph.min)*modVal[r.src];
   return v;
 }
+function snapshotAll(){
+  const st = {chan:{A:{},B:{}}, master:{}};
+  for(const ch of CHANNELS) for(const p of CLIST) st.chan[ch][p.id] = chanBase[ch][p.id];
+  for(const p of MLIST) st.master[p.id] = mBase[p.id];
+  return st;
+}
 function applyParams(dt){
-  for(const p of PLIST) p.cur = p.base;
-  /* preset morph: interpolate every param between two stored states */
+  /* start from the stored base values for both channels and the master set */
+  for(const ch of CHANNELS){ const cb=chanBase[ch], cc=chanCur[ch]; for(const p of CLIST) cc[p.id]=cb[p.id]; }
+  for(const p of MLIST) mCur[p.id]=mBase[p.id];
+
+  /* preset morph: interpolate the whole rig between two stored snapshots */
   if(morphA && morphB){
-    const m = Math.min(1, Math.max(0, P.morph.base + morphModExtra()));
-    for(const p of PLIST){
-      if(p.id === "morph" || morphOverride.has(p.id)) continue;
-      if(morphA[p.id] !== undefined && morphB[p.id] !== undefined)
-        p.cur = morphA[p.id] + (morphB[p.id]-morphA[p.id])*m;
+    const m = Math.min(1, Math.max(0, mBase.morph + morphModExtra()));
+    for(const ch of CHANNELS){
+      const a = morphA.chan && morphA.chan[ch], b = morphB.chan && morphB.chan[ch];
+      if(!a || !b) continue;
+      for(const p of CLIST){
+        if(morphOverride.has(ch+":"+p.id)) continue;
+        if(a[p.id] !== undefined && b[p.id] !== undefined) chanCur[ch][p.id] = a[p.id] + (b[p.id]-a[p.id])*m;
+      }
+    }
+    if(morphA.master && morphB.master){
+      for(const p of MLIST){
+        if(p.id === "morph" || morphOverride.has("M:"+p.id)) continue;
+        const av = morphA.master[p.id], bv = morphB.master[p.id];
+        if(av !== undefined && bv !== undefined) mCur[p.id] = av + (bv-av)*m;
+      }
     }
   }
+
+  /* mod routes */
   for(const r of routes){
     const p = P[r.dst]; if(!p) continue;
-    p.cur += r.amt * (p.max-p.min) * modVal[r.src];
+    const d = r.amt * (p.max-p.min) * modVal[r.src];
+    if(p.master){ mCur[p.id] += d; }
+    else {
+      const rc = r.ch || "A";
+      if(rc === "AB"){ chanCur.A[p.id] += d; chanCur.B[p.id] += d; }
+      else chanCur[rc][p.id] += d;
+    }
   }
+
+  /* bend pads hit the channel you're performing on */
+  const bendTargets = linkChans ? CHANNELS : [activeChan];
   for(const b in bendMix){
     const target = bendHeld[b] ? 1 : 0;
     bendMix[b] += (target-bendMix[b]) * Math.min(1, dt*(target? 24 : 7));
     if(bendMix[b] > 0.002){
       for(const pid in BENDS[b]){
-        const p = P[pid];
-        p.cur = p.cur + (BENDS[b][pid]-p.cur)*bendMix[b];
+        const p = P[pid]; if(!p) continue;
+        if(p.master){ mCur[pid] = mCur[pid] + (BENDS[b][pid]-mCur[pid])*bendMix[b]; }
+        else for(const ch of bendTargets) chanCur[ch][pid] = chanCur[ch][pid] + (BENDS[b][pid]-chanCur[ch][pid])*bendMix[b];
       }
     }
   }
-  for(const p of PLIST) p.cur = Math.min(p.max, Math.max(p.min, p.cur));
+
+  /* clamp */
+  for(const ch of CHANNELS){ const cc=chanCur[ch]; for(const p of CLIST) cc[p.id] = Math.min(p.max, Math.max(p.min, cc[p.id])); }
+  for(const p of MLIST) mCur[p.id] = Math.min(p.max, Math.max(p.min, mCur[p.id]));
 }
 
 /* ---------------- audio ---------------- */
@@ -237,12 +271,63 @@ let midiLearnMode = false, midiLearnTarget = null;
 const midiMap = {};  // "ch:cc" -> paramId
 
 function fmt(p, v){ return (Math.abs(v)<10 ? v.toFixed(2) : v.toFixed(1)); }
+function buildChanBar(){
+  const bar = document.createElement("div");
+  bar.id = "chanbar";
+  const mk = (ch)=>{
+    const b = document.createElement("button");
+    b.className = "chanbtn ch"+ch;
+    b.dataset.chan = ch;
+    b.innerHTML = "<b>"+ch+"</b><small>CHANNEL</small>";
+    b.title = "Edit channel "+ch+"'s inputs and effects";
+    b.onclick = ()=>{ setActiveChan(ch); };
+    return b;
+  };
+  bar.appendChild(mk("A"));
+  bar.appendChild(mk("B"));
+  const tools = document.createElement("div");
+  tools.className = "chantools";
+  const lk = document.createElement("button");
+  lk.id = "btnLinkChans"; lk.textContent = "LINK";
+  lk.title = "Edit both channels at once";
+  lk.onclick = ()=>{ linkChans = !linkChans; lk.classList.toggle("on", linkChans); };
+  const cp = document.createElement("button");
+  cp.textContent = "COPY \u2192";
+  cp.title = "Copy this channel's settings to the other channel";
+  cp.onclick = ()=>{
+    pushHistory();
+    const other = activeChan === "A" ? "B" : "A";
+    copyChannel(activeChan, other);
+    toast("Copied channel "+activeChan+" \u2192 "+other);
+  };
+  const sw = document.createElement("button");
+  sw.textContent = "SWAP";
+  sw.title = "Swap the two channels' settings";
+  sw.onclick = ()=>{
+    pushHistory();
+    for(const p of CLIST){ const t = chanBase.A[p.id]; chanBase.A[p.id] = chanBase.B[p.id]; chanBase.B[p.id] = t; }
+    refreshUI(); toast("Channels swapped");
+  };
+  tools.appendChild(lk); tools.appendChild(cp); tools.appendChild(sw);
+  bar.appendChild(tools);
+  panel.appendChild(bar);
+}
+function setActiveChan(ch){
+  activeChan = ch;
+  document.querySelectorAll(".chanbtn").forEach(b=>b.classList.toggle("on", b.dataset.chan===ch));
+  document.body.classList.toggle("chan-b", ch==="B");
+  refreshUI();
+  if(window.__syncChanInputUI) window.__syncChanInputUI();
+}
 function buildPanel(){
+  buildChanBar();
   for(const sec of SECTIONS){
     const d = document.createElement("div");
     d.className = "sec "+sec.cls;
     const h = document.createElement("h3");
-    h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+sec.name;
+    const tag = MASTER_SECS.has(sec.id) ? "<span class='sectag master'>MASTER</span>"
+                                        : "<span class='sectag chan'></span>";
+    h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+sec.name+tag;
     const rb = document.createElement("button");
     rb.className = "secreset"; rb.textContent = "RESET";
     rb.title = "Reset this section to defaults";
@@ -262,18 +347,24 @@ function buildPanel(){
       lab.onclick = ()=>{ if(midiLearnMode){ setLearnTarget(p.id); } };
       const wrap = document.createElement("div"); wrap.className="sldwrap";
       const s = document.createElement("input");
-      s.type="range"; s.min=p.min; s.max=p.max; s.step=(p.max-p.min)/400; s.value=p.base;
+      s.type="range"; s.min=p.min; s.max=p.max; s.step=(p.max-p.min)/400; s.value=getBase(p.id);
       s.addEventListener("input", ()=>{
-        p.base = parseFloat(s.value); val.textContent = fmt(p,p.base);
-        morphOverride.add(p.id);
-        if(p.id==="abMix" && p.base>0.03 && !window.__bLoaded){
-          if(!window.__abHintT || performance.now()-window.__abHintT>6000){ window.__abHintT=performance.now(); toast("A>B MIX blends in channel B — load a second video with LOAD B first"); }
+        const v = parseFloat(s.value);
+        setBase(p.id, v); val.textContent = fmt(p,v);
+        if(p.master) morphOverride.add("M:"+p.id);
+        else if(linkChans){ morphOverride.add("A:"+p.id); morphOverride.add("B:"+p.id); }
+        else morphOverride.add(activeChan+":"+p.id);
+        if(p.id==="abMix" && v>0.03 && !window.__chanHasSource("B")){
+          if(!window.__abHintT || performance.now()-window.__abHintT>6000){
+            window.__abHintT=performance.now();
+            toast("A>B FADER brings in channel B — give channel B a source first (switch to B and pick FILE / CAM / PATTERN)");
+          }
         }
       });
-      s.addEventListener("dblclick", ()=>{ p.base = p.def; s.value=p.def; val.textContent = fmt(p,p.def); });
+      s.addEventListener("dblclick", ()=>{ setBase(p.id, p.def); s.value=p.def; val.textContent = fmt(p,p.def); });
       const tick = document.createElement("div"); tick.className="modtick";
       wrap.appendChild(s); wrap.appendChild(tick);
-      const val = document.createElement("span"); val.className="val"; val.textContent = fmt(p,p.base);
+      const val = document.createElement("span"); val.className="val"; val.textContent = fmt(p,getBase(p.id));
       row.appendChild(lab); row.appendChild(wrap); row.appendChild(val);
       d2.appendChild(row);
       uiRefs[p.id] = {slider:s, val, tick, row, label:lab};
@@ -446,10 +537,14 @@ function refreshStageLeds(){
 
 /* ---- section reset ---- */
 function resetSection(id){
-  for(const p of PLIST) if(p.sec===id){ p.base = p.def; morphOverride.add(p.id); }
+  for(const p of PLIST) if(p.sec===id){
+    if(p.master){ mBase[p.id] = p.def; morphOverride.add("M:"+p.id); }
+    else if(linkChans){ chanBase.A[p.id]=p.def; chanBase.B[p.id]=p.def; morphOverride.add("A:"+p.id); morphOverride.add("B:"+p.id); }
+    else { chanBase[activeChan][p.id] = p.def; morphOverride.add(activeChan+":"+p.id); }
+  }
   if(id==="feedback"){ fbTrailMode=false; rescanMode=false; }
   if(id==="mixer"){ mixMode=0; wipeInv=false; const sm=document.getElementById("selMixMode"); if(sm) sm.value=0; }
-  if(id==="frame"){ edgeMode=0; linkB=true; }
+  if(id==="frame"){ edgeMode=0; }
   if(id==="keyer"){ keyChroma=false; showKeyMatte=false; }
   refreshUI(); refreshToggles();
 }
@@ -475,10 +570,7 @@ const MIXMODES = ["FADE","WIPE H","WIPE V","DIAGONAL","BOX","CIRCLE","SPLIT H","
 function sectionExtras(id, d){
   if(id==="mixer"){
     const tr = document.createElement("div"); tr.className="trow";
-    const lb = document.createElement("button"); lb.textContent = "LOAD B";
-    lb.title = "Load a video into channel B";
-    lb.onclick = ()=>{ if(window.__loadB) window.__loadB(); };
-    tr.appendChild(lb);
+
     const sel = document.createElement("select");
     sel.id = "selMixMode"; sel.style.flex = "1";
     sel.title = "Transition / blend mode between channel A and B";
@@ -490,17 +582,17 @@ function sectionExtras(id, d){
     d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
-    note.textContent = "Load B, then run the A>B FADER like a T-bar. Wipes use SOFT for edge feather, DETAIL for blind/bar count, CTR X/Y to move the wipe origin. Modulate the fader for auto-transitions.";
+    note.textContent = "Combines the two finished channels. Run the A>B FADER like a T-bar; wipes use SOFT for edge feather, DETAIL for blind/bar count, CTR X/Y for the origin. Give channel B a source first.";
     d.appendChild(note);
   }
   if(id==="morph"){
     const tr2 = document.createElement("div"); tr2.className="trow";
     const sa = document.createElement("button"); sa.textContent="STORE A"; sa.id="morphBtnA";
     sa.title = "Snapshot every slider as morph point A";
-    sa.onclick = ()=>{ morphA = {}; for(const p of PLIST) morphA[p.id]=p.base; morphOverride.clear(); sa.classList.add("on"); toast("Morph point A stored"); };
+    sa.onclick = ()=>{ morphA = snapshotAll(); morphOverride.clear(); sa.classList.add("on"); toast("Morph point A stored (both channels)"); };
     const sb = document.createElement("button"); sb.textContent="STORE B"; sb.id="morphBtnB";
     sb.title = "Snapshot every slider as morph point B";
-    sb.onclick = ()=>{ morphB = {}; for(const p of PLIST) morphB[p.id]=p.base; morphOverride.clear(); sb.classList.add("on"); toast("Morph point B stored — MORPH A>B now blends between them"); };
+    sb.onclick = ()=>{ morphB = snapshotAll(); morphOverride.clear(); sb.classList.add("on"); toast("Morph point B stored \u2014 MORPH now blends the whole rig"); };
     const sc = document.createElement("button"); sc.textContent="CLR";
     sc.title = "Clear morph points";
     sc.onclick = ()=>{ morphA=morphB=null; morphOverride.clear(); sa.classList.remove("on"); sb.classList.remove("on"); };
@@ -533,11 +625,10 @@ function sectionExtras(id, d){
     const tr = document.createElement("div"); tr.className="trow";
     const EDGES = ["BLACK","TILE","MIRROR"];
     mkToggle(tr, "edgeMode", ()=>"EDGE: "+EDGES[edgeMode], ()=>{ edgeMode=(edgeMode+1)%3; });
-    mkToggle(tr, "linkB", ()=>"B: "+(linkB?"FOLLOWS A":"INDEPENDENT"), ()=>{ linkB=!linkB; });
     d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
-    note.textContent = "ZOOM/POS/ROTATE frame channel A. Set B to INDEPENDENT to give channel B its own framing with the B sliders below.";
+    note.textContent = "Frames this channel's picture inside the raster. Each channel has its own framing.";
     d.appendChild(note);
   }
   if(id==="glitch"){
@@ -659,9 +750,11 @@ function refreshLfoUI(){
 function refreshUI(){
   for(const p of PLIST){
     const r = uiRefs[p.id]; if(!r) continue;
-    r.slider.value = p.base; r.val.textContent = fmt(p,p.base);
+    const v = getBase(p.id);
+    r.slider.value = v; r.val.textContent = fmt(p,v);
   }
-  document.getElementById("fbModeBtn").textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX");
+  const fm = document.getElementById("fbModeBtn");
+  if(fm) fm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX");
 }
 /* mod tick indicators (cheap: 15Hz) */
 setInterval(()=>{
@@ -670,7 +763,7 @@ setInterval(()=>{
   for(const p of PLIST){
     const r = uiRefs[p.id]; if(!r) continue;
     if(routed.has(p.id)){
-      const f = (p.cur-p.min)/(p.max-p.min);
+      const f = (getCur(p.id)-p.min)/(p.max-p.min);
       r.tick.style.display = "block";
       r.tick.style.left = "calc("+(f*100).toFixed(1)+"% - 1px)";
     } else r.tick.style.display = "none";
@@ -691,19 +784,26 @@ function renderRoutes(){
     src.value = r.src; src.onchange = ()=>{ r.src = src.value; };
     const dst = document.createElement("select"); dst.className="dst";
     for(const p of PLIST){ const o=document.createElement("option"); o.value=p.id; o.textContent=p.name+" ("+p.sec+")"; dst.appendChild(o); }
-    dst.value = r.dst; dst.onchange = ()=>{ r.dst = dst.value; };
+    dst.value = r.dst; dst.onchange = ()=>{ r.dst = dst.value; syncChanSel(); };
+    const chSel = document.createElement("select"); chSel.className="rch";
+    for(const c of ["A","B","AB"]){ const o=document.createElement("option"); o.value=c; o.textContent=c; chSel.appendChild(o); }
+    chSel.value = r.ch || "A";
+    chSel.title = "Which channel this route modulates";
+    chSel.onchange = ()=>{ r.ch = chSel.value; };
+    const syncChanSel = ()=>{ chSel.style.visibility = (P[r.dst] && P[r.dst].master) ? "hidden" : "visible"; };
+    syncChanSel();
     const amt = document.createElement("input");
     amt.type="range"; amt.min=-1; amt.max=1; amt.step=0.01; amt.value=r.amt;
     const av = document.createElement("span"); av.className="mamt"; av.textContent = (+r.amt).toFixed(2);
     amt.addEventListener("input", ()=>{ r.amt = parseFloat(amt.value); av.textContent = r.amt.toFixed(2); });
     const rm = document.createElement("button"); rm.className="rm"; rm.textContent="✕";
     rm.onclick = ()=>{ routes.splice(i,1); renderRoutes(); };
-    row.appendChild(src); row.appendChild(dst); row.appendChild(amt); row.appendChild(av); row.appendChild(rm);
+    row.appendChild(src); row.appendChild(chSel); row.appendChild(dst); row.appendChild(amt); row.appendChild(av); row.appendChild(rm);
     routesDiv.appendChild(row);
   });
 }
 document.getElementById("btnAddRoute").onclick = ()=>{
-  routes.push({src:"lfo1", dst:"hWobble", amt:0.3});
+  routes.push({src:"lfo1", dst:"hWobble", amt:0.3, ch:activeChan});
   renderRoutes();
 };
 
@@ -769,8 +869,9 @@ function onMidi(e){
   const pid = midiMap[key];
   if(pid){
     const p = P[pid];
-    p.base = p.min + (d2/127)*(p.max-p.min);
+    const v = p.min + (d2/127)*(p.max-p.min);
+    setBase(pid, v);
     const r = uiRefs[pid];
-    if(r){ r.slider.value = p.base; r.val.textContent = fmt(p,p.base); }
+    if(r){ r.slider.value = v; r.val.textContent = fmt(p,v); }
   }
 }

@@ -46,8 +46,8 @@ const FS_FB = COMMON + KEYFN +
 "  float fa = u_srcRot*3.14159;\n" +
 "  float fc = cos(fa), fs = sin(fa);\n" +
 "  fuv = mat2(fc,-fs,fs,fc)*fuv;\n" +
-"  fuv /= pow(3.0, u_srcZoom);\n" +
-"  fuv += 0.5 - vec2(u_srcX, u_srcY)*0.6;\n" +
+"  fuv /= pow(8.0, u_srcZoom);\n" +
+"  fuv += 0.5 - vec2(u_srcX, u_srcY)*1.5;\n" +
 "  vec3 a = (u_hasSrc>0.5) ? fitSample(u_src, fuv, u_srcAspect, outA) : vec3(0.0);\n" +
 "  vec3 src = a;\n" +
 "  if(u_hasB>0.5 && u_abMix>0.001){\n" +
@@ -58,11 +58,11 @@ const FS_FB = COMMON + KEYFN +
 "    src = mix(a, b, clamp(m,0.0,1.0));\n" +
 "  }\n" +
 "  vec2 p = uv-0.5;\n" +
-"  float ang = u_fbRotate*0.35;\n" +
+"  float ang = u_fbRotate*1.0;\n" +
 "  float ca = cos(ang), sa = sin(ang);\n" +
 "  p = mat2(ca,-sa,sa,ca)*p;\n" +
-"  p *= (1.0 - u_fbZoom*0.12);\n" +
-"  p += vec2(u_fbShiftX,u_fbShiftY)*0.08;\n" +
+"  p *= (1.0 - u_fbZoom*0.3);\n" +
+"  p += vec2(u_fbShiftX,u_fbShiftY)*0.3;\n" +
 "  vec3 prev = texture(u_prev, p+0.5).rgb;\n" +
 "  float ha = u_fbHue*1.2;\n" +
 "  vec3 py = rgb2yiq(prev);\n" +
@@ -190,10 +190,11 @@ const FS_COL = COMMON + KEYFN +
 "uniform float u_time,u_bypass,u_saturation,u_hue,u_brightness,u_contrast,u_posterize,u_solarize,u_glow;\n" +
 "uniform float u_colorize,u_colorBands,u_colorSweep,u_lumaHue,u_sharpEcho,u_echoSpace,u_rgbSep,u_invFlick;\n" +
 "uniform float u_rGain,u_gGain,u_bGain;\n" +
-"uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx;\n" +
+"uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx,u_showKey;\n" +
 "float lum(vec2 p){ return dot(texture(u_tex, clamp(p,0.0,1.0)).rgb, vec3(0.299,0.587,0.114)); }\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  if(u_showKey>0.5){ float km = keyOf(texture(u_tex,uv).rgb, u_keyMode, u_keyHue, u_keyThresh, u_keySoft, u_keyInv); O = vec4(vec3(km),1.0); return; }\n" +
 "  if(u_bypass>0.5){ O=texture(u_tex,uv); return; }\n" +
 "  float px = 1.0/u_res.x;\n" +
 "  /* bent enhancer: RGB channel split */\n" +
@@ -266,7 +267,8 @@ const FS_CRT = COMMON +
 
 /* ---------------- parameter registry ---------------- */
 const SECTIONS = [
-  {id:"mixer",    name:"MIXER A / B",       cls:"mag"},
+  {id:"mixer",    name:"INPUT MIXER — VIDEO A/B", cls:"mag"},
+  {id:"morph",    name:"PRESET MORPH",      cls:"mag"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag"},
   {id:"enhancer", name:"BENT ENHANCER",     cls:"mag"},
   {id:"feedback", name:"FEEDBACK / RESCAN", cls:"mag"},
@@ -280,7 +282,7 @@ const SECTIONS = [
 ];
 const PDEF = [
   ["abMix","A>B MIX","mixer",0,1,0],
-  ["morph","MORPH A>B","mixer",0,1,0],
+  ["morph","MORPH A>B","morph",0,1,0],
 
   ["srcZoom","ZOOM","frame",-1,1,0],
   ["srcX","POS X","frame",-1,1,0],
@@ -288,7 +290,7 @@ const PDEF = [
   ["srcRot","ROTATE","frame",-1,1,0],
 
   ["echo","ECHO","time",0,1,0],
-  ["delayF","DELAY FRM","time",1,9,3],
+  ["delayF","DELAY FRM","time",1,29,3],
   ["stutter","STUTTER","time",0,1,0],
 
   ["keyThresh","THRESHOLD","keyer",0,1,0.5],
@@ -367,6 +369,7 @@ let chainSwap = false;     // true = colour/enhancer stage runs BEFORE the tape/
 let keyChroma = false;     // keyer mode: false=luma true=chroma
 let mixMode = 0;           // A/B mixer: 0=fade 1=luma key 2=chroma key
 let edgeMode = 0;          // frame edge: 0=black 1=tile 2=mirror
+let showKeyMatte = false;  // keyer matte viewer
 
 /* ---------------- GL engine ---------------- */
 const canvas = document.getElementById("glcanvas");
@@ -414,7 +417,7 @@ function makeRT(w,h){
 let procW=1280, procH=720;
 let rtA, rtB, finalA, finalB, rtCRT;
 let ring=null, ringW=0, ringFilled=0;
-const RING_N = 10;
+const RING_N = 30;
 function clearRing(){
   if(ring){ for(const rt of ring){ gl.deleteTexture(rt.tex); gl.deleteFramebuffer(rt.fbo); } }
   ring=null; ringW=0; ringFilled=0;

@@ -83,6 +83,9 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
 /* toggle rows */
 .trow{display:flex; gap:6px; padding:4px 0 2px; flex-wrap:wrap;}
 .trow button{padding:4px 8px; font-size:9px;}
+.secreset{margin-left:auto; padding:1px 6px; font-size:8px; color:var(--dim); border-color:var(--line); letter-spacing:1px;}
+.secreset:hover{color:var(--red); border-color:var(--red);}
+#spd.hot::-webkit-slider-thumb{background:var(--red); box-shadow:0 0 6px var(--red);}
 /* ---------- stage ---------- */
 #stage{flex:1; display:flex; flex-direction:column; min-width:0; background:#000;}
 #canvasWrap{flex:1; position:relative; min-height:0; background:#000; overflow:hidden;}
@@ -190,6 +193,7 @@ audio,video{display:none;}
   <div class="hgrp">
     <select id="selPreset"></select>
     <button id="btnUndo" class="cy" title="Undo last randomize / mutate / preset change (Z)">UNDO</button>
+    <button id="btnInit" title="Total reset — init patch, everything back to defaults (undoable)">INIT</button>
     <button id="btnSave" title="Export current state as .json">SAVE</button>
     <button id="btnLoad" title="Import a saved .json state">OPEN</button>
   </div>
@@ -217,8 +221,10 @@ audio,video{display:none;}
     <div id="transport">
       <button id="btnPlay">❚❚</button>
       <button id="btnLoop" class="on" title="Loop playback">LOOP</button>
+      <button id="btnMute" title="Mute file audio (audio-reactivity keeps working)">MUTE</button>
+      <button id="btnVari" title="Varispeed: pitch follows speed like tape (off = time-stretch)">VARI</button>
       <span style="color:var(--dim); font-size:9px;">SPD</span>
-      <input type="range" id="spd" min="0.1" max="2" step="0.05" value="1" style="width:90px;" title="Playback speed">
+      <input type="range" id="spd" min="0.1" max="2" step="0.05" value="1" style="width:90px;" title="Playback speed — double-click to reset to 1x. Resets when you load a new file.">
       <input type="range" id="seek" min="0" max="1" step="0.001" value="0">
       <span id="tcode">--:-- / --:--</span>
     </div>
@@ -256,8 +262,8 @@ audio,video{display:none;}
   <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch four LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
   <h3>PERFORMANCE</h3>
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
-  <h3>MIXER, KEYER &amp; TIME BASE</h3>
-  <p>Load a second video with <b>B</b> and blend with A&gt;B MIX — FADE, LUMA KEY or CHROMA KEY modes. The <b>KEYER</b> splits the image by brightness (or hue): KEY&gt;FX applies the glitch chain only inside the key, KEY&gt;FB grows feedback only inside the key. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor. CHAIN swaps whether tape damage or the colour/enhancer stage comes first.</p>
+  <h3>MIXER, MORPH, KEYER &amp; TIME BASE</h3>
+  <p>The <b>INPUT MIXER</b> blends video channel B over A (load B first) — FADE, LUMA KEY or CHROMA KEY modes. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor. CHAIN swaps whether tape damage or the colour/enhancer stage comes first.</p>
   <h3>VIDEO-REACTIVE</h3>
   <p>MOTION, BRIGHT and CUT are mod sources computed from the picture itself — patch CUT into TEAR and every edit knocks the sync loose like a real deck.</p>
   <h3>TEMPO &amp; MIDI</h3>

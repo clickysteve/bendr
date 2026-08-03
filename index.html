@@ -83,6 +83,9 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
 /* toggle rows */
 .trow{display:flex; gap:6px; padding:4px 0 2px; flex-wrap:wrap;}
 .trow button{padding:4px 8px; font-size:9px;}
+.secreset{margin-left:auto; padding:1px 6px; font-size:8px; color:var(--dim); border-color:var(--line); letter-spacing:1px;}
+.secreset:hover{color:var(--red); border-color:var(--red);}
+#spd.hot::-webkit-slider-thumb{background:var(--red); box-shadow:0 0 6px var(--red);}
 /* ---------- stage ---------- */
 #stage{flex:1; display:flex; flex-direction:column; min-width:0; background:#000;}
 #canvasWrap{flex:1; position:relative; min-height:0; background:#000; overflow:hidden;}
@@ -190,6 +193,7 @@ audio,video{display:none;}
   <div class="hgrp">
     <select id="selPreset"></select>
     <button id="btnUndo" class="cy" title="Undo last randomize / mutate / preset change (Z)">UNDO</button>
+    <button id="btnInit" title="Total reset — init patch, everything back to defaults (undoable)">INIT</button>
     <button id="btnSave" title="Export current state as .json">SAVE</button>
     <button id="btnLoad" title="Import a saved .json state">OPEN</button>
   </div>
@@ -217,8 +221,10 @@ audio,video{display:none;}
     <div id="transport">
       <button id="btnPlay">❚❚</button>
       <button id="btnLoop" class="on" title="Loop playback">LOOP</button>
+      <button id="btnMute" title="Mute file audio (audio-reactivity keeps working)">MUTE</button>
+      <button id="btnVari" title="Varispeed: pitch follows speed like tape (off = time-stretch)">VARI</button>
       <span style="color:var(--dim); font-size:9px;">SPD</span>
-      <input type="range" id="spd" min="0.1" max="2" step="0.05" value="1" style="width:90px;" title="Playback speed">
+      <input type="range" id="spd" min="0.1" max="2" step="0.05" value="1" style="width:90px;" title="Playback speed — double-click to reset to 1x. Resets when you load a new file.">
       <input type="range" id="seek" min="0" max="1" step="0.001" value="0">
       <span id="tcode">--:-- / --:--</span>
     </div>
@@ -256,8 +262,8 @@ audio,video{display:none;}
   <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch four LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
   <h3>PERFORMANCE</h3>
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
-  <h3>MIXER, KEYER &amp; TIME BASE</h3>
-  <p>Load a second video with <b>B</b> and blend with A&gt;B MIX — FADE, LUMA KEY or CHROMA KEY modes. The <b>KEYER</b> splits the image by brightness (or hue): KEY&gt;FX applies the glitch chain only inside the key, KEY&gt;FB grows feedback only inside the key. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor. CHAIN swaps whether tape damage or the colour/enhancer stage comes first.</p>
+  <h3>MIXER, MORPH, KEYER &amp; TIME BASE</h3>
+  <p>The <b>INPUT MIXER</b> blends video channel B over A (load B first) — FADE, LUMA KEY or CHROMA KEY modes. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor. CHAIN swaps whether tape damage or the colour/enhancer stage comes first.</p>
   <h3>VIDEO-REACTIVE</h3>
   <p>MOTION, BRIGHT and CUT are mod sources computed from the picture itself — patch CUT into TEAR and every edit knocks the sync loose like a real deck.</p>
   <h3>TEMPO &amp; MIDI</h3>
@@ -338,8 +344,8 @@ const FS_FB = COMMON + KEYFN +
 "  float fa = u_srcRot*3.14159;\n" +
 "  float fc = cos(fa), fs = sin(fa);\n" +
 "  fuv = mat2(fc,-fs,fs,fc)*fuv;\n" +
-"  fuv /= pow(3.0, u_srcZoom);\n" +
-"  fuv += 0.5 - vec2(u_srcX, u_srcY)*0.6;\n" +
+"  fuv /= pow(8.0, u_srcZoom);\n" +
+"  fuv += 0.5 - vec2(u_srcX, u_srcY)*1.5;\n" +
 "  vec3 a = (u_hasSrc>0.5) ? fitSample(u_src, fuv, u_srcAspect, outA) : vec3(0.0);\n" +
 "  vec3 src = a;\n" +
 "  if(u_hasB>0.5 && u_abMix>0.001){\n" +
@@ -350,11 +356,11 @@ const FS_FB = COMMON + KEYFN +
 "    src = mix(a, b, clamp(m,0.0,1.0));\n" +
 "  }\n" +
 "  vec2 p = uv-0.5;\n" +
-"  float ang = u_fbRotate*0.35;\n" +
+"  float ang = u_fbRotate*1.0;\n" +
 "  float ca = cos(ang), sa = sin(ang);\n" +
 "  p = mat2(ca,-sa,sa,ca)*p;\n" +
-"  p *= (1.0 - u_fbZoom*0.12);\n" +
-"  p += vec2(u_fbShiftX,u_fbShiftY)*0.08;\n" +
+"  p *= (1.0 - u_fbZoom*0.3);\n" +
+"  p += vec2(u_fbShiftX,u_fbShiftY)*0.3;\n" +
 "  vec3 prev = texture(u_prev, p+0.5).rgb;\n" +
 "  float ha = u_fbHue*1.2;\n" +
 "  vec3 py = rgb2yiq(prev);\n" +
@@ -482,10 +488,11 @@ const FS_COL = COMMON + KEYFN +
 "uniform float u_time,u_bypass,u_saturation,u_hue,u_brightness,u_contrast,u_posterize,u_solarize,u_glow;\n" +
 "uniform float u_colorize,u_colorBands,u_colorSweep,u_lumaHue,u_sharpEcho,u_echoSpace,u_rgbSep,u_invFlick;\n" +
 "uniform float u_rGain,u_gGain,u_bGain;\n" +
-"uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx;\n" +
+"uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx,u_showKey;\n" +
 "float lum(vec2 p){ return dot(texture(u_tex, clamp(p,0.0,1.0)).rgb, vec3(0.299,0.587,0.114)); }\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  if(u_showKey>0.5){ float km = keyOf(texture(u_tex,uv).rgb, u_keyMode, u_keyHue, u_keyThresh, u_keySoft, u_keyInv); O = vec4(vec3(km),1.0); return; }\n" +
 "  if(u_bypass>0.5){ O=texture(u_tex,uv); return; }\n" +
 "  float px = 1.0/u_res.x;\n" +
 "  /* bent enhancer: RGB channel split */\n" +
@@ -558,7 +565,8 @@ const FS_CRT = COMMON +
 
 /* ---------------- parameter registry ---------------- */
 const SECTIONS = [
-  {id:"mixer",    name:"MIXER A / B",       cls:"mag"},
+  {id:"mixer",    name:"INPUT MIXER — VIDEO A/B", cls:"mag"},
+  {id:"morph",    name:"PRESET MORPH",      cls:"mag"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag"},
   {id:"enhancer", name:"BENT ENHANCER",     cls:"mag"},
   {id:"feedback", name:"FEEDBACK / RESCAN", cls:"mag"},
@@ -572,7 +580,7 @@ const SECTIONS = [
 ];
 const PDEF = [
   ["abMix","A>B MIX","mixer",0,1,0],
-  ["morph","MORPH A>B","mixer",0,1,0],
+  ["morph","MORPH A>B","morph",0,1,0],
 
   ["srcZoom","ZOOM","frame",-1,1,0],
   ["srcX","POS X","frame",-1,1,0],
@@ -580,7 +588,7 @@ const PDEF = [
   ["srcRot","ROTATE","frame",-1,1,0],
 
   ["echo","ECHO","time",0,1,0],
-  ["delayF","DELAY FRM","time",1,9,3],
+  ["delayF","DELAY FRM","time",1,29,3],
   ["stutter","STUTTER","time",0,1,0],
 
   ["keyThresh","THRESHOLD","keyer",0,1,0.5],
@@ -659,6 +667,7 @@ let chainSwap = false;     // true = colour/enhancer stage runs BEFORE the tape/
 let keyChroma = false;     // keyer mode: false=luma true=chroma
 let mixMode = 0;           // A/B mixer: 0=fade 1=luma key 2=chroma key
 let edgeMode = 0;          // frame edge: 0=black 1=tile 2=mirror
+let showKeyMatte = false;  // keyer matte viewer
 
 /* ---------------- GL engine ---------------- */
 const canvas = document.getElementById("glcanvas");
@@ -706,7 +715,7 @@ function makeRT(w,h){
 let procW=1280, procH=720;
 let rtA, rtB, finalA, finalB, rtCRT;
 let ring=null, ringW=0, ringFilled=0;
-const RING_N = 10;
+const RING_N = 30;
 function clearRing(){
   if(ring){ for(const rt of ring){ gl.deleteTexture(rt.tex); gl.deleteFramebuffer(rt.fbo); } }
   ring=null; ringW=0; ringFilled=0;
@@ -857,6 +866,7 @@ const bendMix = {sync:0, roll:0, rainbow:0, drop:0, melt:0, kill:0};
 const bendHeld = {sync:false, roll:false, rainbow:false, drop:false, melt:false, kill:false};
 
 let morphA = null, morphB = null;
+const morphOverride = new Set();   // params the user has touched since storing morph points
 function morphModExtra(){
   let v = 0;
   for(const r of routes) if(r.dst === "morph") v += r.amt*(P.morph.max-P.morph.min)*modVal[r.src];
@@ -868,7 +878,7 @@ function applyParams(dt){
   if(morphA && morphB){
     const m = Math.min(1, Math.max(0, P.morph.base + morphModExtra()));
     for(const p of PLIST){
-      if(p.id === "morph") continue;
+      if(p.id === "morph" || morphOverride.has(p.id)) continue;
       if(morphA[p.id] !== undefined && morphB[p.id] !== undefined)
         p.cur = morphA[p.id] + (morphB[p.id]-morphA[p.id])*m;
     }
@@ -891,7 +901,7 @@ function applyParams(dt){
 }
 
 /* ---------------- audio ---------------- */
-let audioCtx=null, analyser=null, srcNode=null, micNode=null, micStream=null;
+let audioCtx=null, analyser=null, srcNode=null, micNode=null, micStream=null, outGainNode=null;
 let recDest=null, audioMode="off";
 const fftBuf = new Uint8Array(1024);
 function ensureAudioCtx(){
@@ -908,8 +918,11 @@ function hookVideoAudio(){
   if(!srcNode && video){
     try{
       srcNode = audioCtx.createMediaElementSource(video);
-      srcNode.connect(audioCtx.destination);
+      outGainNode = audioCtx.createGain();
+      srcNode.connect(outGainNode);
+      outGainNode.connect(audioCtx.destination);
       srcNode.connect(recDest);
+      if(typeof applyMute === "function") applyMute();
     }catch(e){ console.warn(e); }
   }
   if(srcNode){ try{ srcNode.connect(analyser); }catch(e){} }
@@ -1002,6 +1015,11 @@ function buildPanel(){
     d.className = "sec "+sec.cls;
     const h = document.createElement("h3");
     h.innerHTML = "<span class='led'></span>"+sec.name;
+    const rb = document.createElement("button");
+    rb.className = "secreset"; rb.textContent = "RESET";
+    rb.title = "Reset this section to defaults";
+    rb.onclick = ()=>resetSection(sec.id);
+    h.appendChild(rb);
     d.appendChild(h);
     sectionExtras(sec.id, d);
     for(const p of PLIST.filter(p=>p.sec===sec.id)){
@@ -1011,7 +1029,13 @@ function buildPanel(){
       const wrap = document.createElement("div"); wrap.className="sldwrap";
       const s = document.createElement("input");
       s.type="range"; s.min=p.min; s.max=p.max; s.step=(p.max-p.min)/400; s.value=p.base;
-      s.addEventListener("input", ()=>{ p.base = parseFloat(s.value); val.textContent = fmt(p,p.base); });
+      s.addEventListener("input", ()=>{
+        p.base = parseFloat(s.value); val.textContent = fmt(p,p.base);
+        morphOverride.add(p.id);
+        if(p.id==="abMix" && p.base>0.03 && !window.__bLoaded){
+          if(!window.__abHintT || performance.now()-window.__abHintT>6000){ window.__abHintT=performance.now(); toast("A>B MIX blends in channel B — load a second video with LOAD B first"); }
+        }
+      });
       s.addEventListener("dblclick", ()=>{ p.base = p.def; s.value=p.def; val.textContent = fmt(p,p.def); });
       const tick = document.createElement("div"); tick.className="modtick";
       wrap.appendChild(s); wrap.appendChild(tick);
@@ -1076,6 +1100,16 @@ function buildPanel(){
   buildAudioSection();
 }
 
+/* ---- section reset ---- */
+function resetSection(id){
+  for(const p of PLIST) if(p.sec===id){ p.base = p.def; morphOverride.add(p.id); }
+  if(id==="feedback"){ fbTrailMode=false; rescanMode=false; chainSwap=false; }
+  if(id==="mixer"){ mixMode=0; }
+  if(id==="frame"){ edgeMode=0; }
+  if(id==="keyer"){ keyChroma=false; showKeyMatte=false; }
+  refreshUI(); refreshToggles();
+}
+
 /* ---- section toggle rows ---- */
 const toggleRefs = {};
 function mkToggle(parent, id, labelFn, onClick){
@@ -1101,21 +1135,28 @@ function sectionExtras(id, d){
     tr.appendChild(lb);
     mkToggle(tr, "mixMode", ()=>"MODE: "+MIXMODES[mixMode], ()=>{ mixMode = (mixMode+1)%3; });
     d.appendChild(tr);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Blends video channel B over A. Load B, then raise A>B MIX.";
+    d.appendChild(note);
+  }
+  if(id==="morph"){
     const tr2 = document.createElement("div"); tr2.className="trow";
-    const sa = document.createElement("button"); sa.textContent="SET A";
-    sa.title = "Store current state as morph point A";
-    sa.onclick = ()=>{ morphA = {}; for(const p of PLIST) morphA[p.id]=p.base; sa.classList.add("on"); };
-    const sb = document.createElement("button"); sb.textContent="SET B";
-    sb.title = "Store current state as morph point B";
-    sb.onclick = ()=>{ morphB = {}; for(const p of PLIST) morphB[p.id]=p.base; sb.classList.add("on"); };
+    const sa = document.createElement("button"); sa.textContent="STORE A"; sa.id="morphBtnA";
+    sa.title = "Snapshot every slider as morph point A";
+    sa.onclick = ()=>{ morphA = {}; for(const p of PLIST) morphA[p.id]=p.base; morphOverride.clear(); sa.classList.add("on"); toast("Morph point A stored"); };
+    const sb = document.createElement("button"); sb.textContent="STORE B"; sb.id="morphBtnB";
+    sb.title = "Snapshot every slider as morph point B";
+    sb.onclick = ()=>{ morphB = {}; for(const p of PLIST) morphB[p.id]=p.base; morphOverride.clear(); sb.classList.add("on"); toast("Morph point B stored — MORPH A>B now blends between them"); };
     const sc = document.createElement("button"); sc.textContent="CLR";
     sc.title = "Clear morph points";
-    sc.onclick = ()=>{ morphA=morphB=null; sa.classList.remove("on"); sb.classList.remove("on"); };
-    const note = document.createElement("span");
-    note.style.cssText = "color:var(--dim); font-size:8.5px; align-self:center;";
-    note.textContent = "← MORPH blends A→B";
-    tr2.appendChild(sa); tr2.appendChild(sb); tr2.appendChild(sc); tr2.appendChild(note);
+    sc.onclick = ()=>{ morphA=morphB=null; morphOverride.clear(); sa.classList.remove("on"); sb.classList.remove("on"); };
+    tr2.appendChild(sa); tr2.appendChild(sb); tr2.appendChild(sc);
     d.appendChild(tr2);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Snapshot two whole panel states, then MORPH blends every slider between them. Moving any slider takes that control back.";
+    d.appendChild(note);
   }
   if(id==="feedback"){
     const tr = document.createElement("div"); tr.className="trow";
@@ -1129,7 +1170,12 @@ function sectionExtras(id, d){
   if(id==="keyer"){
     const tr = document.createElement("div"); tr.className="trow";
     mkToggle(tr, "keyMode", ()=>"KEY: "+(keyChroma?"CHROMA":"LUMA"), ()=>{ keyChroma=!keyChroma; });
+    mkToggle(tr, "showKey", ()=>"VIEW MATTE: "+(showKeyMatte?"ON":"OFF"), ()=>{ showKeyMatte=!showKeyMatte; });
     d.appendChild(tr);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Selects part of the image by brightness (or hue). Turn on VIEW MATTE: white = selected. KEY>FX glitches only the selection; KEY>FB grows feedback only there.";
+    d.appendChild(note);
   }
   if(id==="frame"){
     const tr = document.createElement("div"); tr.className="trow";
@@ -1485,6 +1531,26 @@ function undo(){
   if(st) restoreState(st);
 }
 document.getElementById("btnUndo").onclick = undo;
+function initPatch(){
+  pushHistory();
+  fbTrailMode=false; rescanMode=false; chainSwap=false; keyChroma=false;
+  mixMode=0; edgeMode=0; showKeyMatte=false;
+  morphA=null; morphB=null; morphOverride.clear();
+  for(const el of ["morphBtnA","morphBtnB"]){ const b=document.getElementById(el); if(b) b.classList.remove("on"); }
+  Object.assign(lfoState.lfo1, {rate:0.3,  shape:"sine", sync:0});
+  Object.assign(lfoState.lfo2, {rate:1.7,  shape:"snh",  sync:0});
+  Object.assign(lfoState.lfo3, {rate:0.07, shape:"tri",  sync:0});
+  Object.assign(lfoState.lfo4, {rate:5.5,  shape:"sine", sync:0});
+  Object.assign(audioCfg.bass, {lo:30,   hi:150,   gain:1});
+  Object.assign(audioCfg.mid,  {lo:300,  hi:2200,  gain:1});
+  Object.assign(audioCfg.high, {lo:4000, hi:11000, gain:1});
+  audioCfg.response = 0.5;
+  applyState({}, []);
+  refreshToggles();
+  document.getElementById("selPreset").value = 0;
+  toast("Init patch — everything back to defaults (Z to undo)");
+}
+document.getElementById("btnInit").onclick = initPatch;
 
 /* save / load */
 document.getElementById("btnSave").onclick = ()=>{
@@ -1536,7 +1602,7 @@ fileInB.onchange = ()=>{
   if(!f) return;
   videoB.src = URL.createObjectURL(f);
   videoB.playbackRate = 1;
-  videoB.play().then(()=>{ hasB = true; }).catch(()=>{ hasB = true; });
+  videoB.play().then(()=>{ hasB = true; window.__bLoaded = true; }).catch(()=>{ hasB = true; window.__bLoaded = true; });
   document.getElementById("btnFileB").classList.add("on");
   toast("Channel B: "+f.name+" — raise A>B MIX in the MIXER section");
 };
@@ -1553,8 +1619,10 @@ function handleFile(f){
   stopCam();
   video.srcObject = null;
   video.src = URL.createObjectURL(f);
-  video.muted = false;
+  setSpeed(1);   // fresh file, fresh speed — SPD slider is per-session, not per-file
+  video.muted = masterMuted;
   video.play().catch(()=>{ video.muted = true; video.play().catch(()=>{}); toast("Muted (browser autoplay) — press P or click ▶"); });
+  applyMute();
   inputMode = "file";
   setInputButtons();
   hookVideoAudio();
@@ -1683,12 +1751,34 @@ btnPlay.onclick = ()=>{ if(video.paused) video.play(); else video.pause(); };
 video.addEventListener("play", ()=> btnPlay.textContent="❚❚");
 video.addEventListener("pause", ()=> btnPlay.textContent="▶");
 document.getElementById("btnLoop").onclick = e=>{ video.loop=!video.loop; e.target.classList.toggle("on", video.loop); };
-let playSpeed = 1;
-document.getElementById("spd").addEventListener("input", e=>{
-  playSpeed = parseFloat(e.target.value);
-  video.playbackRate = playSpeed;
-  video.defaultPlaybackRate = playSpeed;
-});
+let playSpeed = 1, masterMuted = false;
+const spdEl = document.getElementById("spd");
+function setSpeed(v){
+  playSpeed = v;
+  spdEl.value = v;
+  video.playbackRate = v;
+  video.defaultPlaybackRate = v;
+  spdEl.classList.toggle("hot", Math.abs(v-1) > 0.001);
+}
+spdEl.addEventListener("input", e=>{ setSpeed(parseFloat(e.target.value)); });
+spdEl.addEventListener("dblclick", ()=>{ setSpeed(1); });
+function applyMute(){
+  if(typeof outGainNode !== "undefined" && outGainNode){
+    outGainNode.gain.value = masterMuted ? 0 : 1;
+    if(!video.error) video.muted = false;
+  } else {
+    video.muted = masterMuted;
+  }
+  document.getElementById("btnMute").classList.toggle("on", masterMuted);
+}
+document.getElementById("btnMute").onclick = ()=>{ masterMuted = !masterMuted; applyMute(); };
+let variMode = false;
+document.getElementById("btnVari").onclick = e=>{
+  variMode = !variMode;
+  e.target.classList.toggle("on", variMode);
+  if("preservesPitch" in video) video.preservesPitch = !variMode;
+  toast(variMode ? "Varispeed: pitch follows speed (tape mode)" : "Time-stretch: pitch held constant");
+};
 /* playbackRate resets when a new source loads — reapply */
 video.addEventListener("loadeddata", ()=>{ video.playbackRate = playSpeed; });
 video.addEventListener("ratechange", ()=>{
@@ -1991,6 +2081,7 @@ function colExtras(pr, now){
   gl.uniform1f(U(pr,"u_time"), now);
   gl.uniform1f(U(pr,"u_bypass"), bypass);
   gl.uniform1f(U(pr,"u_keyMode"), keyChroma?1:0);
+  gl.uniform1f(U(pr,"u_showKey"), showKeyMatte?1:0);
 }
 
 function renderFrame(now, dt){
@@ -2221,6 +2312,7 @@ async function offlineRender(){
 }
 
 /* ---------------- init ---------------- */
+window.__pcur = id=>P[id]&&P[id].cur;
 window.__dbg = ()=>({inputMode, rs:video.readyState, err:video.error&&video.error.message, vw:video.videoWidth, hasSrc, srcAspect, cur:video.currentTime, paused:video.paused, rate:video.playbackRate, spd:playSpeed});
 
 /* ---------------- init ---------------- */

@@ -122,6 +122,26 @@ function undo(){
   if(st) restoreState(st);
 }
 document.getElementById("btnUndo").onclick = undo;
+function initPatch(){
+  pushHistory();
+  fbTrailMode=false; rescanMode=false; chainSwap=false; keyChroma=false;
+  mixMode=0; edgeMode=0; showKeyMatte=false;
+  morphA=null; morphB=null; morphOverride.clear();
+  for(const el of ["morphBtnA","morphBtnB"]){ const b=document.getElementById(el); if(b) b.classList.remove("on"); }
+  Object.assign(lfoState.lfo1, {rate:0.3,  shape:"sine", sync:0});
+  Object.assign(lfoState.lfo2, {rate:1.7,  shape:"snh",  sync:0});
+  Object.assign(lfoState.lfo3, {rate:0.07, shape:"tri",  sync:0});
+  Object.assign(lfoState.lfo4, {rate:5.5,  shape:"sine", sync:0});
+  Object.assign(audioCfg.bass, {lo:30,   hi:150,   gain:1});
+  Object.assign(audioCfg.mid,  {lo:300,  hi:2200,  gain:1});
+  Object.assign(audioCfg.high, {lo:4000, hi:11000, gain:1});
+  audioCfg.response = 0.5;
+  applyState({}, []);
+  refreshToggles();
+  document.getElementById("selPreset").value = 0;
+  toast("Init patch — everything back to defaults (Z to undo)");
+}
+document.getElementById("btnInit").onclick = initPatch;
 
 /* save / load */
 document.getElementById("btnSave").onclick = ()=>{
@@ -173,7 +193,7 @@ fileInB.onchange = ()=>{
   if(!f) return;
   videoB.src = URL.createObjectURL(f);
   videoB.playbackRate = 1;
-  videoB.play().then(()=>{ hasB = true; }).catch(()=>{ hasB = true; });
+  videoB.play().then(()=>{ hasB = true; window.__bLoaded = true; }).catch(()=>{ hasB = true; window.__bLoaded = true; });
   document.getElementById("btnFileB").classList.add("on");
   toast("Channel B: "+f.name+" — raise A>B MIX in the MIXER section");
 };
@@ -190,8 +210,10 @@ function handleFile(f){
   stopCam();
   video.srcObject = null;
   video.src = URL.createObjectURL(f);
-  video.muted = false;
+  setSpeed(1);   // fresh file, fresh speed — SPD slider is per-session, not per-file
+  video.muted = masterMuted;
   video.play().catch(()=>{ video.muted = true; video.play().catch(()=>{}); toast("Muted (browser autoplay) — press P or click ▶"); });
+  applyMute();
   inputMode = "file";
   setInputButtons();
   hookVideoAudio();
@@ -320,12 +342,34 @@ btnPlay.onclick = ()=>{ if(video.paused) video.play(); else video.pause(); };
 video.addEventListener("play", ()=> btnPlay.textContent="❚❚");
 video.addEventListener("pause", ()=> btnPlay.textContent="▶");
 document.getElementById("btnLoop").onclick = e=>{ video.loop=!video.loop; e.target.classList.toggle("on", video.loop); };
-let playSpeed = 1;
-document.getElementById("spd").addEventListener("input", e=>{
-  playSpeed = parseFloat(e.target.value);
-  video.playbackRate = playSpeed;
-  video.defaultPlaybackRate = playSpeed;
-});
+let playSpeed = 1, masterMuted = false;
+const spdEl = document.getElementById("spd");
+function setSpeed(v){
+  playSpeed = v;
+  spdEl.value = v;
+  video.playbackRate = v;
+  video.defaultPlaybackRate = v;
+  spdEl.classList.toggle("hot", Math.abs(v-1) > 0.001);
+}
+spdEl.addEventListener("input", e=>{ setSpeed(parseFloat(e.target.value)); });
+spdEl.addEventListener("dblclick", ()=>{ setSpeed(1); });
+function applyMute(){
+  if(typeof outGainNode !== "undefined" && outGainNode){
+    outGainNode.gain.value = masterMuted ? 0 : 1;
+    if(!video.error) video.muted = false;
+  } else {
+    video.muted = masterMuted;
+  }
+  document.getElementById("btnMute").classList.toggle("on", masterMuted);
+}
+document.getElementById("btnMute").onclick = ()=>{ masterMuted = !masterMuted; applyMute(); };
+let variMode = false;
+document.getElementById("btnVari").onclick = e=>{
+  variMode = !variMode;
+  e.target.classList.toggle("on", variMode);
+  if("preservesPitch" in video) video.preservesPitch = !variMode;
+  toast(variMode ? "Varispeed: pitch follows speed (tape mode)" : "Time-stretch: pitch held constant");
+};
 /* playbackRate resets when a new source loads — reapply */
 video.addEventListener("loadeddata", ()=>{ video.playbackRate = playSpeed; });
 video.addEventListener("ratechange", ()=>{
@@ -628,6 +672,7 @@ function colExtras(pr, now){
   gl.uniform1f(U(pr,"u_time"), now);
   gl.uniform1f(U(pr,"u_bypass"), bypass);
   gl.uniform1f(U(pr,"u_keyMode"), keyChroma?1:0);
+  gl.uniform1f(U(pr,"u_showKey"), showKeyMatte?1:0);
 }
 
 function renderFrame(now, dt){
@@ -858,6 +903,7 @@ async function offlineRender(){
 }
 
 /* ---------------- init ---------------- */
+window.__pcur = id=>P[id]&&P[id].cur;
 window.__dbg = ()=>({inputMode, rs:video.readyState, err:video.error&&video.error.message, vw:video.videoWidth, hasSrc, srcAspect, cur:video.currentTime, paused:video.paused, rate:video.playbackRate, spd:playSpeed});
 
 /* ---------------- init ---------------- */

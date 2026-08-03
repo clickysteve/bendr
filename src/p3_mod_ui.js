@@ -94,6 +94,7 @@ const bendMix = {sync:0, roll:0, rainbow:0, drop:0, melt:0, kill:0};
 const bendHeld = {sync:false, roll:false, rainbow:false, drop:false, melt:false, kill:false};
 
 let morphA = null, morphB = null;
+const morphOverride = new Set();   // params the user has touched since storing morph points
 function morphModExtra(){
   let v = 0;
   for(const r of routes) if(r.dst === "morph") v += r.amt*(P.morph.max-P.morph.min)*modVal[r.src];
@@ -105,7 +106,7 @@ function applyParams(dt){
   if(morphA && morphB){
     const m = Math.min(1, Math.max(0, P.morph.base + morphModExtra()));
     for(const p of PLIST){
-      if(p.id === "morph") continue;
+      if(p.id === "morph" || morphOverride.has(p.id)) continue;
       if(morphA[p.id] !== undefined && morphB[p.id] !== undefined)
         p.cur = morphA[p.id] + (morphB[p.id]-morphA[p.id])*m;
     }
@@ -128,7 +129,7 @@ function applyParams(dt){
 }
 
 /* ---------------- audio ---------------- */
-let audioCtx=null, analyser=null, srcNode=null, micNode=null, micStream=null;
+let audioCtx=null, analyser=null, srcNode=null, micNode=null, micStream=null, outGainNode=null;
 let recDest=null, audioMode="off";
 const fftBuf = new Uint8Array(1024);
 function ensureAudioCtx(){
@@ -145,8 +146,11 @@ function hookVideoAudio(){
   if(!srcNode && video){
     try{
       srcNode = audioCtx.createMediaElementSource(video);
-      srcNode.connect(audioCtx.destination);
+      outGainNode = audioCtx.createGain();
+      srcNode.connect(outGainNode);
+      outGainNode.connect(audioCtx.destination);
       srcNode.connect(recDest);
+      if(typeof applyMute === "function") applyMute();
     }catch(e){ console.warn(e); }
   }
   if(srcNode){ try{ srcNode.connect(analyser); }catch(e){} }
@@ -239,6 +243,11 @@ function buildPanel(){
     d.className = "sec "+sec.cls;
     const h = document.createElement("h3");
     h.innerHTML = "<span class='led'></span>"+sec.name;
+    const rb = document.createElement("button");
+    rb.className = "secreset"; rb.textContent = "RESET";
+    rb.title = "Reset this section to defaults";
+    rb.onclick = ()=>resetSection(sec.id);
+    h.appendChild(rb);
     d.appendChild(h);
     sectionExtras(sec.id, d);
     for(const p of PLIST.filter(p=>p.sec===sec.id)){
@@ -248,7 +257,13 @@ function buildPanel(){
       const wrap = document.createElement("div"); wrap.className="sldwrap";
       const s = document.createElement("input");
       s.type="range"; s.min=p.min; s.max=p.max; s.step=(p.max-p.min)/400; s.value=p.base;
-      s.addEventListener("input", ()=>{ p.base = parseFloat(s.value); val.textContent = fmt(p,p.base); });
+      s.addEventListener("input", ()=>{
+        p.base = parseFloat(s.value); val.textContent = fmt(p,p.base);
+        morphOverride.add(p.id);
+        if(p.id==="abMix" && p.base>0.03 && !window.__bLoaded){
+          if(!window.__abHintT || performance.now()-window.__abHintT>6000){ window.__abHintT=performance.now(); toast("A>B MIX blends in channel B — load a second video with LOAD B first"); }
+        }
+      });
       s.addEventListener("dblclick", ()=>{ p.base = p.def; s.value=p.def; val.textContent = fmt(p,p.def); });
       const tick = document.createElement("div"); tick.className="modtick";
       wrap.appendChild(s); wrap.appendChild(tick);
@@ -313,6 +328,16 @@ function buildPanel(){
   buildAudioSection();
 }
 
+/* ---- section reset ---- */
+function resetSection(id){
+  for(const p of PLIST) if(p.sec===id){ p.base = p.def; morphOverride.add(p.id); }
+  if(id==="feedback"){ fbTrailMode=false; rescanMode=false; chainSwap=false; }
+  if(id==="mixer"){ mixMode=0; }
+  if(id==="frame"){ edgeMode=0; }
+  if(id==="keyer"){ keyChroma=false; showKeyMatte=false; }
+  refreshUI(); refreshToggles();
+}
+
 /* ---- section toggle rows ---- */
 const toggleRefs = {};
 function mkToggle(parent, id, labelFn, onClick){
@@ -338,21 +363,28 @@ function sectionExtras(id, d){
     tr.appendChild(lb);
     mkToggle(tr, "mixMode", ()=>"MODE: "+MIXMODES[mixMode], ()=>{ mixMode = (mixMode+1)%3; });
     d.appendChild(tr);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Blends video channel B over A. Load B, then raise A>B MIX.";
+    d.appendChild(note);
+  }
+  if(id==="morph"){
     const tr2 = document.createElement("div"); tr2.className="trow";
-    const sa = document.createElement("button"); sa.textContent="SET A";
-    sa.title = "Store current state as morph point A";
-    sa.onclick = ()=>{ morphA = {}; for(const p of PLIST) morphA[p.id]=p.base; sa.classList.add("on"); };
-    const sb = document.createElement("button"); sb.textContent="SET B";
-    sb.title = "Store current state as morph point B";
-    sb.onclick = ()=>{ morphB = {}; for(const p of PLIST) morphB[p.id]=p.base; sb.classList.add("on"); };
+    const sa = document.createElement("button"); sa.textContent="STORE A"; sa.id="morphBtnA";
+    sa.title = "Snapshot every slider as morph point A";
+    sa.onclick = ()=>{ morphA = {}; for(const p of PLIST) morphA[p.id]=p.base; morphOverride.clear(); sa.classList.add("on"); toast("Morph point A stored"); };
+    const sb = document.createElement("button"); sb.textContent="STORE B"; sb.id="morphBtnB";
+    sb.title = "Snapshot every slider as morph point B";
+    sb.onclick = ()=>{ morphB = {}; for(const p of PLIST) morphB[p.id]=p.base; morphOverride.clear(); sb.classList.add("on"); toast("Morph point B stored — MORPH A>B now blends between them"); };
     const sc = document.createElement("button"); sc.textContent="CLR";
     sc.title = "Clear morph points";
-    sc.onclick = ()=>{ morphA=morphB=null; sa.classList.remove("on"); sb.classList.remove("on"); };
-    const note = document.createElement("span");
-    note.style.cssText = "color:var(--dim); font-size:8.5px; align-self:center;";
-    note.textContent = "← MORPH blends A→B";
-    tr2.appendChild(sa); tr2.appendChild(sb); tr2.appendChild(sc); tr2.appendChild(note);
+    sc.onclick = ()=>{ morphA=morphB=null; morphOverride.clear(); sa.classList.remove("on"); sb.classList.remove("on"); };
+    tr2.appendChild(sa); tr2.appendChild(sb); tr2.appendChild(sc);
     d.appendChild(tr2);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Snapshot two whole panel states, then MORPH blends every slider between them. Moving any slider takes that control back.";
+    d.appendChild(note);
   }
   if(id==="feedback"){
     const tr = document.createElement("div"); tr.className="trow";
@@ -366,7 +398,12 @@ function sectionExtras(id, d){
   if(id==="keyer"){
     const tr = document.createElement("div"); tr.className="trow";
     mkToggle(tr, "keyMode", ()=>"KEY: "+(keyChroma?"CHROMA":"LUMA"), ()=>{ keyChroma=!keyChroma; });
+    mkToggle(tr, "showKey", ()=>"VIEW MATTE: "+(showKeyMatte?"ON":"OFF"), ()=>{ showKeyMatte=!showKeyMatte; });
     d.appendChild(tr);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Selects part of the image by brightness (or hue). Turn on VIEW MATTE: white = selected. KEY>FX glitches only the selection; KEY>FB grows feedback only there.";
+    d.appendChild(note);
   }
   if(id==="frame"){
     const tr = document.createElement("div"); tr.className="trow";

@@ -4,50 +4,51 @@
 
 **▶ Live: [bendr.allmyfriendsaresynths.com](https://bendr.allmyfriendsaresynths.com)**
 
-BENDR emulates the analogue glitch aesthetic of circuit-bent video hardware: bent video enhancers, dying VHS decks, unstable sync circuits, and rescan feedback rigs. Feed it video and abuse the signal path in real time.
+BENDR emulates the analogue glitch aesthetic of circuit-bent video hardware: bent video enhancers, dying VHS decks, unstable sync circuits, and rescan feedback rigs — plus a digital corruption stage for pixel sorting, databending and datamoshing. Feed it video and abuse the signal path in real time.
 
 Everything is a single self-contained HTML file. No server, no dependencies, nothing leaves your machine — video files stream from disk, so a 4GB MP4 works as well as a 4MB one. Chrome recommended.
 
 ![BENDR interface](docs/doc_ui.png)
 
-## Signal path
+## Signal chain
+
+The rail above the picture is the live signal path. **Drag the pills to reorder the stages, click one to bypass it.** Order changes everything: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.
 
 ```
-A/B mixer → frame position/zoom/rotate → feedback / rescan
-  → frame store (echo · stutter)
-  → tape & sync damage ⇄ bent enhancer & colour (CHAIN swaps the order)
-  → keyer masks → CRT
+INPUT (A/B mixer · framing) → FEEDBACK / RESCAN → frame store
+  → [ TAPE/SYNC · COLOUR/ENHANCER · GLITCH LAB · FLOW/MOSH ]  ← reorderable
+  → CRT OUT
 ```
 
-- **Physical sync model** — a per-scanline PLL simulation runs on the CPU every frame: correlated drift, loss-of-lock shear with exponential re-lock, a drifting tracking band, head-switch skew, AGC breathing, and a rolling blanking bar when v-hold slips. No random rectangles.
-- **Composite/NTSC rot** — chroma bleed & delay, directional luma bleed, vertical colour bleed, rainbow fringing on luma edges, dot crawl, ringing, bandwidth-limited streaky noise, comet-tail dropouts.
-- **Bent enhancer** — luma-keyed rainbow colorizer, a sharpness circuit driven into oscillating edge ghosts, RGB split, luma→hue slew, flickering inversion, per-channel RGB gain.
-- **Feedback / rescan** — zoom/rotate/hue-spin feedback; RESCAN: FULL feeds the CRT output (scanlines, curvature and all) back through the entire chain, like a camera pointed at a monitor.
-- **Frame store** — echo from N frames back (modulate DELAY to time-scrub), stutter freeze.
-- **Keyer** — luma or chroma key with threshold/softness/invert; masks the FX chain and/or feedback.
-- **A/B mixer** — two video channels with fade / luma-key / chroma-key compositing, plus full-state MORPH between two stored panel snapshots.
-- **Frame / position** — zoom, position, and rotate the picture inside the raster, with BLACK / TILE / MIRROR edge modes.
+- **Tape / sync** — a per-scanline PLL simulation runs on the CPU every frame: correlated drift, loss-of-lock shear with exponential re-lock, a drifting tracking band, head-switch skew, AGC breathing, a rolling blanking bar when v-hold slips. Composite rot on top: chroma bleed and delay, directional luma bleed, vertical colour bleed, rainbow fringing, dot crawl, ringing, streaky bandwidth-limited noise, comet-tail dropouts.
+- **Colour / bent enhancer** — luma-keyed rainbow colorizer, a sharpness circuit driven into oscillating edge ghosts, RGB split, luma→hue slew, flickering inversion, per-channel RGB gain, posterize, solarize.
+- **Glitch lab** — pixel sorting (bright runs stretch into streaks), macroblock databending, halftone dropout, channel-driven drift warp, FM contour warp.
+- **Flow / mosh** — holds its own history and advects it: mosh hold freezes frames while motion keeps pushing them, melt drips brightness downward, swirl advects through a noise field, vector trash shoves macroblocks like corrupted motion vectors, time shear smears top and bottom differently.
+- **Feedback / rescan** — zoom/rotate/hue-spin feedback; RESCAN: FULL feeds the CRT output (scanlines, curvature and all) back through the entire chain.
+- **Keyer** — luma or chroma key with a matte viewer; masks the glitch chain and/or the feedback.
+- **Mixer** — two video channels with independent framing, a fader plus twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and movable origin, key transitions, and add/difference/multiply/screen/lighten blends.
+- **Preset morph** — snapshot two whole panel states and blend every slider between them.
 
-| ![Dead deck v-hold roll](docs/doc_out_deaddeck.png) | ![Enhancer burn](docs/doc_out_burn.png) |
-|---|---|
-| DEAD DECK with the V-HOLD bend held | ENHANCER BURN |
+| ![Datamosh](docs/doc_out_datamosh.png) | ![Halftone](docs/doc_out_dots.png) | ![Liquid melt](docs/doc_out_melt.png) |
+|---|---|---|
+| DATAMOSH | DOT MATRIX | LIQUID MELT |
 
 ## Movement
 
 Nothing sits still. The mod matrix patches any source into any parameter:
 
-- Four LFOs (sine/tri/saw/square/S&H), free-running or tempo-synced (tap tempo or MIDI clock)
-- CHAOS, DRIFT and SPIKE generators
-- Audio bands (bass/mid/high) with adjustable frequency ranges, gain, response, input device and channel selection for audio interfaces
-- **Video-reactive sources** computed from the picture itself: MOTION, BRIGHT, and CUT — patch CUT→TEAR and every edit knocks the sync loose like a real deck
+- Four LFOs (sine/tri/saw/square/S&H), free-running or tempo-synced via tap tempo or MIDI clock
+- Chaos, drift and spike generators
+- Audio bands with adjustable frequency ranges, gain, response, input device and channel selection for audio interfaces
+- Video-reactive sources computed from the picture itself: motion, brightness, and scene-cut detection — patch CUT into TEAR and every edit knocks the sync loose
 
-Six momentary bend pads (mouse, `Q W E R T Y`, or MIDI notes C1–F1), MIDI CC learn on every slider, randomize/mutate with undo.
+Six momentary bend pads (mouse, `Q W E R T Y`, or MIDI notes C1–F1), MIDI CC learn on every slider, randomize/mutate with undo, per-section resets and a global init.
 
 ## Output
 
 - Live **WebM recording** with source audio
 - Frame-accurate **offline MP4 render** via WebCodecs — every frame processed at full quality regardless of realtime performance (video only)
-- PNG stills, fullscreen, and a clean **pop-out output window** for OBS capture or a second display (double-click it for fullscreen; the render loop is driven from whichever window is visible, so fullscreen output never freezes)
+- PNG stills, fullscreen, and a clean **pop-out output window** for OBS capture or a second display
 
 ## Keys
 
@@ -55,14 +56,14 @@ Six momentary bend pads (mouse, `Q W E R T Y`, or MIDI notes C1–F1), MIDI CC l
 
 ## Development
 
-Source lives in `src/` as four parts (shell/CSS, GL engine + shaders, modulation + UI, I/O + main loop) plus the vendored [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) (MIT). Build the single-file `index.html` with:
+Source lives in `src/` as four parts (shell/CSS, GL engine + shaders, modulation + UI, I/O + main loop) plus a vendored MP4 muxer. Build the single-file `index.html` with:
 
 ```
 python3 build.py
 ```
 
-`test/e2e-example.js` shows how the app is exercised headlessly with Playwright (load video, switch presets, record, render).
+`test/e2e-example.js` shows how the app is exercised headlessly with Playwright.
 
 ## License
 
-MIT. Vendored mp4-muxer is MIT, © Vanilagy.
+MIT.

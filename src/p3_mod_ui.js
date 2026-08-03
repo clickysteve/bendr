@@ -242,14 +242,20 @@ function buildPanel(){
     const d = document.createElement("div");
     d.className = "sec "+sec.cls;
     const h = document.createElement("h3");
-    h.innerHTML = "<span class='led'></span>"+sec.name;
+    h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+sec.name;
     const rb = document.createElement("button");
     rb.className = "secreset"; rb.textContent = "RESET";
     rb.title = "Reset this section to defaults";
-    rb.onclick = ()=>resetSection(sec.id);
+    rb.onclick = e=>{ e.stopPropagation(); resetSection(sec.id); };
     h.appendChild(rb);
+    h.title = "Click to collapse / expand";
+    h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
     d.appendChild(h);
-    sectionExtras(sec.id, d);
+    const body = document.createElement("div"); body.className = "secbody";
+    d.appendChild(body);
+    secEls[sec.id] = d;
+    sectionExtras(sec.id, body);
+    const dOuter = d; const d2 = body;
     for(const p of PLIST.filter(p=>p.sec===sec.id)){
       const row = document.createElement("div"); row.className="prow";
       const lab = document.createElement("label"); lab.textContent = p.name; lab.title = "Click while MIDI learn is on to map a controller";
@@ -269,7 +275,7 @@ function buildPanel(){
       wrap.appendChild(s); wrap.appendChild(tick);
       const val = document.createElement("span"); val.className="val"; val.textContent = fmt(p,p.base);
       row.appendChild(lab); row.appendChild(wrap); row.appendChild(val);
-      d.appendChild(row);
+      d2.appendChild(row);
       uiRefs[p.id] = {slider:s, val, tick, row, label:lab};
     }
     if(sec.id==="feedback"){
@@ -278,8 +284,7 @@ function buildPanel(){
     panel.appendChild(d);
   }
   /* LFO config section */
-  const d = document.createElement("div"); d.className="sec mag";
-  d.innerHTML = "<h3><span class='led'></span>LFO SETTINGS</h3>";
+  const d = mkSection("lfo", "mag", "LFO SETTINGS");
   /* tempo row */
   {
     const row = document.createElement("div"); row.className="prow";
@@ -328,12 +333,101 @@ function buildPanel(){
   buildAudioSection();
 }
 
+/* ---- collapsible section plumbing ---- */
+const secEls = {};
+function mkSection(id, cls, name){
+  const d = document.createElement("div"); d.className = "sec "+cls;
+  const h = document.createElement("h3");
+  h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+name;
+  h.title = "Click to collapse / expand";
+  h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
+  d.appendChild(h);
+  const body = document.createElement("div"); body.className = "secbody";
+  d.appendChild(body);
+  secEls[id] = d;
+  /* callers append to the body */
+  d.appendChild = body.appendChild.bind(body);
+  return d;
+}
+function saveCollapse(){
+  try{
+    const st = {};
+    for(const k in secEls) st[k] = secEls[k].classList.contains("collapsed");
+    localStorage.setItem("bendr.collapse", JSON.stringify(st));
+  }catch(e){}
+}
+function loadCollapse(){
+  try{
+    const st = JSON.parse(localStorage.getItem("bendr.collapse")||"{}");
+    for(const k in st) if(secEls[k] && st[k]) secEls[k].classList.add("collapsed");
+  }catch(e){}
+}
+function collapseAll(v){
+  for(const k in secEls) secEls[k].classList.toggle("collapsed", v);
+  saveCollapse();
+}
+
+/* ---- signal chain rail: drag to reorder, click to bypass ---- */
+const STAGE_INFO = {
+  sig:    {name:"TAPE / SYNC",  sec:["signal","sync","vhs"]},
+  col:    {name:"COLOUR / ENH", sec:["enhancer","color"]},
+  glitch: {name:"GLITCH LAB",   sec:["glitch"]},
+  flow:   {name:"FLOW / MOSH",  sec:["flow"]},
+};
+let dragStage = null;
+function renderChain(){
+  const host = document.getElementById("chainStages");
+  if(!host) return;
+  host.innerHTML = "";
+  chainOrder.forEach((id, i)=>{
+    if(i>0){ const a = document.createElement("span"); a.className="arrow"; a.textContent="\u25b8"; host.appendChild(a); }
+    const el = document.createElement("div");
+    el.className = "stagepill" + (stageEnabled[id] ? "" : " off");
+    el.draggable = true;
+    el.dataset.stage = id;
+    el.innerHTML = "<span class='grip'>\u2059</span><span class='dot'></span>" + STAGE_INFO[id].name;
+    el.title = "Drag to reorder · click to bypass this stage";
+    el.onclick = ()=>{ stageEnabled[id] = !stageEnabled[id]; renderChain(); };
+    el.addEventListener("dragstart", e=>{
+      dragStage = id; el.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try{ e.dataTransfer.setData("text/plain", id); }catch(err){}
+    });
+    el.addEventListener("dragend", ()=>{
+      dragStage = null; el.classList.remove("dragging");
+      document.querySelectorAll(".stagepill").forEach(p=>p.classList.remove("dragover"));
+    });
+    el.addEventListener("dragover", e=>{ e.preventDefault(); e.dataTransfer.dropEffect="move"; el.classList.add("dragover"); });
+    el.addEventListener("dragleave", ()=>el.classList.remove("dragover"));
+    el.addEventListener("drop", e=>{
+      e.preventDefault(); e.stopPropagation();
+      el.classList.remove("dragover");
+      const from = dragStage || e.dataTransfer.getData("text/plain");
+      if(!from || from===id) return;
+      const arr = chainOrder.filter(x=>x!==from);
+      arr.splice(arr.indexOf(id), 0, from);
+      chainOrder = arr;
+      renderChain();
+    });
+    host.appendChild(el);
+  });
+}
+/* mark panel sections whose stage is live */
+function refreshStageLeds(){
+  for(const st in STAGE_INFO){
+    for(const sid of STAGE_INFO[st].sec){
+      const el = secEls[sid];
+      if(el) el.classList.toggle("active", !!stageEnabled[st]);
+    }
+  }
+}
+
 /* ---- section reset ---- */
 function resetSection(id){
   for(const p of PLIST) if(p.sec===id){ p.base = p.def; morphOverride.add(p.id); }
-  if(id==="feedback"){ fbTrailMode=false; rescanMode=false; chainSwap=false; }
-  if(id==="mixer"){ mixMode=0; }
-  if(id==="frame"){ edgeMode=0; }
+  if(id==="feedback"){ fbTrailMode=false; rescanMode=false; }
+  if(id==="mixer"){ mixMode=0; wipeInv=false; const sm=document.getElementById("selMixMode"); if(sm) sm.value=0; }
+  if(id==="frame"){ edgeMode=0; linkB=true; }
   if(id==="keyer"){ keyChroma=false; showKeyMatte=false; }
   refreshUI(); refreshToggles();
 }
@@ -353,7 +447,9 @@ function refreshToggles(){
   const fm = document.getElementById("fbModeBtn");
   if(fm) fm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX");
 }
-const MIXMODES = ["FADE","LUMA KEY","CHROMA KEY"];
+const MIXMODES = ["FADE","WIPE H","WIPE V","DIAGONAL","BOX","CIRCLE","SPLIT H","SPLIT V",
+  "BLINDS V","BLINDS H","CLOCK","DIAG BARS","BLOCKS","LUMA KEY","CHROMA KEY",
+  "ADD","DIFFERENCE","MULTIPLY","SCREEN","LIGHTEN"];
 function sectionExtras(id, d){
   if(id==="mixer"){
     const tr = document.createElement("div"); tr.className="trow";
@@ -361,11 +457,18 @@ function sectionExtras(id, d){
     lb.title = "Load a video into channel B";
     lb.onclick = ()=>{ if(window.__loadB) window.__loadB(); };
     tr.appendChild(lb);
-    mkToggle(tr, "mixMode", ()=>"MODE: "+MIXMODES[mixMode], ()=>{ mixMode = (mixMode+1)%3; });
+    const sel = document.createElement("select");
+    sel.id = "selMixMode"; sel.style.flex = "1";
+    sel.title = "Transition / blend mode between channel A and B";
+    MIXMODES.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=m; sel.appendChild(o); });
+    sel.value = mixMode;
+    sel.onchange = ()=>{ mixMode = parseInt(sel.value); };
+    tr.appendChild(sel);
+    mkToggle(tr, "wipeInv", ()=>"WIPE: "+(wipeInv?"INV":"NORM"), ()=>{ wipeInv=!wipeInv; });
     d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
-    note.textContent = "Blends video channel B over A. Load B, then raise A>B MIX.";
+    note.textContent = "Load B, then run the A>B FADER like a T-bar. Wipes use SOFT for edge feather, DETAIL for blind/bar count, CTR X/Y to move the wipe origin. Modulate the fader for auto-transitions.";
     d.appendChild(note);
   }
   if(id==="morph"){
@@ -392,7 +495,6 @@ function sectionExtras(id, d){
     bm.onclick = ()=>{ fbTrailMode=!fbTrailMode; bm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX"); };
     tr.appendChild(bm);
     mkToggle(tr, "rescan", ()=>"RESCAN: "+(rescanMode?"FULL":"CLEAN"), ()=>{ rescanMode=!rescanMode; });
-    mkToggle(tr, "chain", ()=>"CHAIN: "+(chainSwap?"COL→TAPE":"TAPE→COL"), ()=>{ chainSwap=!chainSwap; });
     d.appendChild(tr);
   }
   if(id==="keyer"){
@@ -409,8 +511,24 @@ function sectionExtras(id, d){
     const tr = document.createElement("div"); tr.className="trow";
     const EDGES = ["BLACK","TILE","MIRROR"];
     mkToggle(tr, "edgeMode", ()=>"EDGE: "+EDGES[edgeMode], ()=>{ edgeMode=(edgeMode+1)%3; });
-    tr.title = "What appears beyond the picture edge when zoomed out, shifted or rotated";
+    mkToggle(tr, "linkB", ()=>"B: "+(linkB?"FOLLOWS A":"INDEPENDENT"), ()=>{ linkB=!linkB; });
     d.appendChild(tr);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "ZOOM/POS/ROTATE frame channel A. Set B to INDEPENDENT to give channel B its own framing with the B sliders below.";
+    d.appendChild(note);
+  }
+  if(id==="glitch"){
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Digital corruption: pixel sorting, macroblock databending, halftone dropout, channel-driven warps.";
+    d.appendChild(note);
+  }
+  if(id==="flow"){
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Temporal smear: MOSH HOLD freezes frames while motion keeps pushing them, MELT drips, SWIRL advects, VECTOR TRASH shoves blocks.";
+    d.appendChild(note);
   }
 }
 
@@ -420,8 +538,7 @@ const audioUIRefs = [];
 const meterEls = {};
 function hzFmt(v){ return v>=1000 ? (v/1000).toFixed(1)+"k" : Math.round(v); }
 function buildAudioSection(){
-  const d = document.createElement("div"); d.className="sec cyan";
-  d.innerHTML = "<h3><span class='led'></span>AUDIO REACT</h3>";
+  const d = mkSection("audio", "cyan", "AUDIO REACT");
   /* live meters */
   const mrow = document.createElement("div");
   mrow.style.cssText = "display:flex; gap:6px; padding:2px 0 8px;";

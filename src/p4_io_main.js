@@ -21,6 +21,16 @@ const PRESETS = [
  [{src:"drift",dst:"hue",amt:0.3},{src:"lfo1",dst:"solarize",amt:0.2},{src:"bass",dst:"saturation",amt:0.25},{src:"chaos",dst:"fbShiftX",amt:0.1}]],
 ["TOTAL COLLAPSE", {chromaBleed:0.7,chromaDelay:0.4,rainbow:0.7,dotCrawl:0.5,ringing:0.6,signalNoise:0.45,chromaNoise:0.4,hWobble:0.5,wobbleFreq:0.6,tear:0.6,tearSize:0.6,vRoll:0.2,jitter:0.7,humBar:0.5,tracking:0.7,dropout:0.7,headSwitch:0.9,tapeWow:0.6,genLoss:0.5,saturation:1.4,posterize:0.25,solarize:0.15,glow:0.3,fbAmount:0.5,fbHue:0.1,scanlines:0.4,vignette:0.5},
  [{src:"chaos",dst:"vRoll",amt:0.3},{src:"spike",dst:"dropout",amt:0.6},{src:"lfo2",dst:"tracking",amt:0.4},{src:"bass",dst:"tear",amt:0.4},{src:"drift",dst:"hue",amt:0.4}]],
+["DATAMOSH", {mosh:0.86,moshBlock:0.35,melt:0.12,blockShift:0.4,blockSize:0.3,chromaBleed:0.35,signalNoise:0.05,saturation:1.2,contrast:1.1,glow:0.15,scanlines:0.12,aperture:0.08,curvature:0.2,vignette:0.3},
+ [{src:"cut",dst:"moshBlock",amt:0.55},{src:"motion",dst:"mosh",amt:-0.25},{src:"spike",dst:"blockShift",amt:0.4},{src:"chaos",dst:"timeGrad",amt:0.2}]],
+["PIXEL SORT", {pixelSort:0.9,sortThresh:0.42,driftWarp:0.12,contrast:1.3,saturation:1.35,chromaBleed:0.2,ringing:0.2,glow:0.25,scanlines:0.15,curvature:0.2,vignette:0.3},
+ [{src:"lfo3",dst:"sortThresh",amt:0.22},{src:"bright",dst:"sortThresh",amt:-0.15},{src:"lfo1",dst:"pixelSort",amt:0.12}]],
+["DOT MATRIX", {dotify:0.92,dotSize:0.45,contrast:1.5,saturation:1.5,glow:0.3,brightness:0.05,chromaBleed:0.15,scanlines:0.1,aperture:0.1,curvature:0.25,vignette:0.35},
+ [{src:"lfo1",dst:"dotSize",amt:0.2},{src:"bass",dst:"dotSize",amt:0.25},{src:"drift",dst:"hue",amt:0.2}]],
+["LIQUID MELT", {melt:0.62,swirl:0.5,mosh:0.35,timeGrad:0.25,driftWarp:0.3,saturation:1.6,glow:0.4,chromaBleed:0.4,lumaBleed:0.25,posterize:0.1,scanlines:0.15,curvature:0.25,vignette:0.35},
+ [{src:"lfo3",dst:"swirl",amt:0.3},{src:"drift",dst:"melt",amt:0.25},{src:"lfo1",dst:"hue",amt:0.2},{src:"mid",dst:"driftWarp",amt:0.25}]],
+["DATABENT", {blockShift:0.75,blockSize:0.45,fmWarp:0.45,driftWarp:0.35,pixelSort:0.3,sortThresh:0.55,chromaNoise:0.25,signalNoise:0.12,saturation:1.4,contrast:1.25,glow:0.2,scanlines:0.18,vignette:0.35},
+ [{src:"spike",dst:"blockShift",amt:0.5},{src:"chaos",dst:"fmWarp",amt:0.3},{src:"cut",dst:"blockSize",amt:0.4},{src:"lfo2",dst:"driftWarp",amt:0.25}]],
 ];
 function applyState(bases, rts, extra){
   for(const p of PLIST){ p.base = (bases[p.id] !== undefined) ? bases[p.id] : p.def; }
@@ -57,6 +67,9 @@ function randomizeAll(){
     const r = Math.random();
     if(p.sec==="crt"){ v = p.base; }
     else if(p.sec==="frame"){ v = Math.random()<0.7 ? p.def : p.def + (Math.random()*2-1)*0.3*(p.max-p.min); }
+    else if(p.sec==="mixer"){ v = p.base; }
+    else if(p.id==="mosh"){ v = Math.random()<0.6 ? 0 : Math.random()*0.85; }
+    else if(p.sec==="glitch"||p.sec==="flow"){ v = Math.random()<0.45 ? p.def : p.min + Math.pow(Math.random(),1.5)*(p.max-p.min); }
     else if(p.id==="fbAmount"){ v = Math.random()<0.5 ? Math.random()*0.5 : 0.5+Math.random()*0.45; }
     else if(p.id==="vRoll"){ v = Math.random()<0.75 ? 0 : (Math.random()*2-1)*0.3; }
     else if(p.id==="saturation"){ v = 0.6+Math.random()*1.6; }
@@ -79,11 +92,17 @@ function randomizeAll(){
       amt: (Math.random()*2-1)*0.55,
     });
   }
+  if(Math.random()<0.35){
+    const arr = chainOrder.slice();
+    for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+    chainOrder = arr;
+  }
   for(const k of LFOKEYS){
     lfoState[k].rate = Math.pow(10, -1.5+Math.random()*2.2);
     if(Math.random()<0.4) lfoState[k].shape = ["sine","tri","saw","sqr","snh"][Math.floor(Math.random()*5)];
   }
   applyState(bases, rts);
+  renderChain();
 }
 function mutate(){
   pushHistory();
@@ -100,18 +119,24 @@ function captureState(){
   const bases = {}; for(const p of PLIST) bases[p.id]=p.base;
   const st = {bases, routes: routes.map(r=>({...r})),
     audioCfg: JSON.parse(JSON.stringify(audioCfg)),
-    fbTrailMode, rescanMode, chainSwap, keyChroma, mixMode, edgeMode};
+    fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, linkB, wipeInv,
+    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}};
   for(const k of LFOKEYS) st[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   return st;
 }
 function restoreState(st){
   if(st.rescanMode !== undefined) rescanMode = st.rescanMode;
-  if(st.chainSwap !== undefined) chainSwap = st.chainSwap;
+  if(st.chainOrder && st.chainOrder.length===4) chainOrder = st.chainOrder.slice();
+  if(st.stageEnabled) stageEnabled = {...stageEnabled, ...st.stageEnabled};
+  if(st.linkB !== undefined) linkB = st.linkB;
+  if(st.wipeInv !== undefined) wipeInv = st.wipeInv;
+  const smEl = document.getElementById("selMixMode"); if(smEl) smEl.value = mixMode;
   if(st.keyChroma !== undefined) keyChroma = st.keyChroma;
   if(st.mixMode !== undefined) mixMode = st.mixMode;
   if(st.edgeMode !== undefined) edgeMode = st.edgeMode;
   applyState(st.bases||{}, st.routes||[], st);
   refreshToggles();
+  renderChain();
 }
 function pushHistory(){
   histStack.push(captureState());
@@ -124,8 +149,12 @@ function undo(){
 document.getElementById("btnUndo").onclick = undo;
 function initPatch(){
   pushHistory();
-  fbTrailMode=false; rescanMode=false; chainSwap=false; keyChroma=false;
-  mixMode=0; edgeMode=0; showKeyMatte=false;
+  fbTrailMode=false; rescanMode=false; keyChroma=false;
+  mixMode=0; edgeMode=0; showKeyMatte=false; linkB=true; wipeInv=false;
+  { const sm=document.getElementById("selMixMode"); if(sm) sm.value=0; }
+  chainOrder = ["sig","col","glitch","flow"];
+  stageEnabled = {sig:true, col:true, glitch:true, flow:true};
+  morphOverride.clear();
   morphA=null; morphB=null; morphOverride.clear();
   for(const el of ["morphBtnA","morphBtnB"]){ const b=document.getElementById(el); if(b) b.classList.remove("on"); }
   Object.assign(lfoState.lfo1, {rate:0.3,  shape:"sine", sync:0});
@@ -138,6 +167,7 @@ function initPatch(){
   audioCfg.response = 0.5;
   applyState({}, []);
   refreshToggles();
+  renderChain();
   document.getElementById("selPreset").value = 0;
   toast("Init patch — everything back to defaults (Z to undo)");
 }
@@ -146,7 +176,8 @@ document.getElementById("btnInit").onclick = initPatch;
 /* save / load */
 document.getElementById("btnSave").onclick = ()=>{
   const bases = {}; for(const p of PLIST) bases[p.id]=p.base;
-  const state = {app:"bendr", v:3, bases, routes, audioCfg, fbTrailMode, rescanMode, chainSwap, keyChroma, mixMode, edgeMode};
+  const state = {app:"bendr", v:4, bases, routes, audioCfg, fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, linkB, wipeInv,
+    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}};
   for(const k of LFOKEYS) state[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape};
   const blob = new Blob([JSON.stringify(state,null,1)], {type:"application/json"});
   dl(URL.createObjectURL(blob), "bendr-"+stamp()+".json");
@@ -523,10 +554,20 @@ function markBend(id, on){
 
 /* drag & drop */
 const dropHint = document.getElementById("dropHint");
-window.addEventListener("dragover", e=>{ e.preventDefault(); dropHint.classList.add("show"); });
+function isFileDrag(e){
+  if(dragStage) return false;                       /* reordering the chain, not dropping a file */
+  const t = e.dataTransfer && e.dataTransfer.types;
+  return !t || Array.prototype.indexOf.call(t, "Files") !== -1;
+}
+window.addEventListener("dragover", e=>{
+  if(!isFileDrag(e)) return;
+  e.preventDefault(); dropHint.classList.add("show");
+});
 window.addEventListener("dragleave", e=>{ if(e.relatedTarget===null) dropHint.classList.remove("show"); });
 window.addEventListener("drop", e=>{
-  e.preventDefault(); dropHint.classList.remove("show");
+  dropHint.classList.remove("show");
+  if(!isFileDrag(e)) return;
+  e.preventDefault();
   const f = e.dataTransfer.files[0];
   if(f) handleFile(f);
 });
@@ -675,6 +716,30 @@ function colExtras(pr, now){
   gl.uniform1f(U(pr,"u_showKey"), showKeyMatte?1:0);
 }
 
+function stageNeeded(id){
+  if(id === "glitch") return P.pixelSort.cur>0.003 || P.blockShift.cur>0.003 || P.dotify.cur>0.003 || P.driftWarp.cur>0.003 || P.fmWarp.cur>0.003;
+  if(id === "flow") return P.mosh.cur>0.003 || P.melt.cur>0.003 || P.swirl.cur>0.003 || P.moshBlock.cur>0.003 || Math.abs(P.timeGrad.cur)>0.003;
+  return true;
+}
+function runStage(id, inTex, dstRT, now){
+  if(id === "sig")    return runPass(progSIG, inTex, dstRT.fbo, procW, procH, pr=>sigExtras(pr,now));
+  if(id === "col")    return runPass(progCOL, inTex, dstRT.fbo, procW, procH, pr=>colExtras(pr,now));
+  if(id === "glitch") return runPass(progGLITCH, inTex, dstRT.fbo, procW, procH, pr=>{ gl.uniform1f(U(pr,"u_time"), now); });
+  if(id === "flow"){
+    /* advect our own history, then keep a copy for the next frame */
+    runPass(progFLOW, inTex, dstRT.fbo, procW, procH, pr=>{
+      gl.uniform1f(U(pr,"u_time"), now);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, flowA.tex);
+      gl.uniform1i(U(pr,"u_flowPrev"), 1);
+    });
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, dstRT.fbo);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, flowB.fbo);
+    gl.blitFramebuffer(0,0,procW,procH, 0,0,procW,procH, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    const t = flowA; flowA = flowB; flowB = t;
+    return;
+  }
+}
+
 function renderFrame(now, dt){
   frameNo++;
   sizeCanvas();
@@ -749,6 +814,8 @@ function renderFrame(now, dt){
   gl.uniform1f(U(progFB,"u_mixMode"), mixMode);
   gl.uniform1f(U(progFB,"u_keyMode"), keyChroma?1:0);
   gl.uniform1f(U(progFB,"u_edgeMode"), edgeMode);
+  gl.uniform1f(U(progFB,"u_linkB"), linkB?1:0);
+  gl.uniform1f(U(progFB,"u_wipeInv"), wipeInv?1:0);
   setParamUniforms(progFB);
   draw();
 
@@ -760,14 +827,19 @@ function renderFrame(now, dt){
     ringW = (ringW+1)%RING_N; ringFilled = Math.min(ringFilled+1, RING_N);
   }
 
-  /* passes 2+3: tape/sync and colour/enhancer — CHAIN toggle sets the order */
-  if(!chainSwap){
-    runPass(progSIG, rtA.tex, rtB.fbo, procW, procH, pr=>sigExtras(pr,now));
-    runPass(progCOL, rtB.tex, finalB.fbo, procW, procH, pr=>colExtras(pr,now));
-  } else {
-    runPass(progCOL, rtA.tex, rtB.fbo, procW, procH, pr=>colExtras(pr,now));
-    runPass(progSIG, rtB.tex, finalB.fbo, procW, procH, pr=>sigExtras(pr,now));
+  /* ---- dynamic signal chain: stages run in the order set on the rail ---- */
+  const active = chainOrder.filter(id=>stageEnabled[id] && stageNeeded(id));
+  let srcT = rtA.tex;
+  const scratch = [rtB, rtC];
+  let si = 0;
+  for(let k=0; k<active.length; k++){
+    const last = (k === active.length-1);
+    const dst = last ? finalB : scratch[si];
+    runStage(active[k], srcT, dst, now);
+    srcT = dst.tex;
+    si ^= 1;
   }
+  if(active.length === 0) runPass(progCOPY, srcT, finalB.fbo, procW, procH, null);
 
   /* pass 4: CRT -> screen */
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -936,6 +1008,15 @@ if(OUTPUT_MODE){
   })();
 } else {
   buildPanel();
+  renderChain();
+  loadCollapse();
+  refreshStageLeds();
+  setInterval(refreshStageLeds, 400);
+  document.getElementById("btnChainReset").onclick = ()=>{
+    chainOrder = ["sig","col","glitch","flow"];
+    stageEnabled = {sig:true, col:true, glitch:true, flow:true};
+    renderChain();
+  };
   renderRoutes();
   loadPreset(1);   /* RAINBOW RITE so it looks alive immediately */
   sizeCanvas();

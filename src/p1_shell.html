@@ -83,6 +83,38 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
 /* toggle rows */
 .trow{display:flex; gap:6px; padding:4px 0 2px; flex-wrap:wrap;}
 .trow button{padding:4px 8px; font-size:9px;}
+/* collapsible sections */
+.sec h3{cursor:pointer; user-select:none;}
+.sec h3 .caret{color:var(--dim); font-size:8px; width:8px; display:inline-block; transition:transform .12s;}
+.sec.collapsed .caret{transform:rotate(-90deg);}
+.sec.collapsed .secbody{display:none;}
+.sec.collapsed h3{padding-bottom:2px;}
+.sec.active h3 .led{animation:ledpulse 1.4s ease-in-out infinite;}
+@keyframes ledpulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+/* signal chain rail */
+#chain{
+  flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:6px 10px;
+  background:var(--panel2); border-bottom:1px solid var(--line); overflow-x:auto; min-height:36px;
+}
+#chain::-webkit-scrollbar{height:5px;} #chain::-webkit-scrollbar-thumb{background:#2a2a34;}
+#chain .clabel{font-size:8px; letter-spacing:2px; color:var(--dim); white-space:nowrap; padding-right:2px;}
+.stagepill{
+  display:flex; align-items:center; gap:5px; padding:4px 9px; border-radius:4px; cursor:grab;
+  background:var(--panel); border:1px solid var(--line); font-size:9px; letter-spacing:1px;
+  color:var(--txt); white-space:nowrap; transition:border-color .12s, opacity .12s;
+}
+.stagepill:hover{border-color:var(--amber);}
+.stagepill.dragging{opacity:.35; cursor:grabbing;}
+.stagepill.dragover{border-color:var(--cyan); box-shadow:-2px 0 0 var(--cyan);}
+.stagepill.off{opacity:.4; color:var(--dim);}
+.stagepill .dot{width:5px; height:5px; border-radius:50%; background:var(--mag); box-shadow:0 0 5px var(--mag);}
+.stagepill.off .dot{background:#3a3a44; box-shadow:none;}
+.stagepill .grip{color:var(--dim); font-size:9px; letter-spacing:-1px;}
+#chain .arrow{color:var(--dim); font-size:9px;}
+#chain .fixed{
+  padding:4px 9px; border-radius:4px; background:transparent; border:1px dashed var(--line);
+  font-size:9px; letter-spacing:1px; color:var(--dim); white-space:nowrap;
+}
 .secreset{margin-left:auto; padding:1px 6px; font-size:8px; color:var(--dim); border-color:var(--line); letter-spacing:1px;}
 .secreset:hover{color:var(--red); border-color:var(--red);}
 #spd.hot::-webkit-slider-thumb{background:var(--red); box-shadow:0 0 6px var(--red);}
@@ -213,6 +245,14 @@ audio,video{display:none;}
 <div id="main">
   <div id="panel"></div>
   <div id="stage">
+    <div id="chain">
+      <span class="clabel">SIGNAL CHAIN</span>
+      <span class="fixed">INPUT</span><span class="arrow">▸</span>
+      <span class="fixed">FEEDBACK</span><span class="arrow">▸</span>
+      <span id="chainStages" style="display:flex; align-items:center; gap:6px;"></span>
+      <span class="arrow">▸</span><span class="fixed">CRT OUT</span>
+      <button id="btnChainReset" style="margin-left:8px; padding:3px 8px; font-size:8.5px;">RESET ORDER</button>
+    </div>
     <div id="canvasWrap">
       <canvas id="glcanvas"></canvas>
       <div id="osd"></div>
@@ -256,8 +296,13 @@ audio,video{display:none;}
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>INPUT</h3>
   <p><b>FILE</b> loads any video your browser can play (drag &amp; drop works too — files stream from disk, so size doesn't matter). <b>CAM</b> uses your webcam. <b>PATTERN</b> is a built-in test signal — pick BARS, TESTCARD, OSCILLATOR (video-synth colour waves), GRID, RAMP or STATIC from the dropdown.</p>
+  <h3>SIGNAL CHAIN</h3>
+  <p>The rail above the picture is the live signal path. <b>Drag the pills to reorder</b> the four processing stages, and click a pill to switch it off. Order changes the result completely: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.</p>
   <h3>SIGNAL PATH</h3>
   <p>Feedback → composite/NTSC encode-decode → sync &amp; tape damage → bent enhancer → colour stage → CRT. The <b>BENT ENHANCER</b> section is the circuit-bent video enhancer core: RAINBOW MAP replaces luma with hot posterized rainbows, EDGE RING is the sharpness circuit driven into oscillation (repeating ghost edges), RGB SPLIT tears the channels apart, LUMA HUE makes colour chase brightness, INV FLICKER strobes inversions.</p>
+  <h3>GLITCH LAB &amp; FLOW / MOSH</h3>
+  <p><b>GLITCH LAB</b> is the digital-corruption stage: PIXEL SORT stretches bright runs into vertical streaks (set SORT THRESH to pick what smears), BLOCK TRASH jumps and corrupts macroblocks like a broken codec, HALFTONE drops everything to brightness-sized dots, DRIFT WARP pushes pixels using their own colour values, FM WARP ripples contours by brightness.</p>
+  <p><b>FLOW / MOSH</b> is the temporal-smear stage, and it holds its own history: MOSH HOLD freezes the frame while motion keeps pushing it (classic datamosh bloom), MELT drips brightness downward, SWIRL advects the image through a slow noise field, VECTOR TRASH shoves macroblocks around like corrupted motion vectors, TIME SHEAR makes the top and bottom of the frame smear by different amounts.</p>
   <h3>MOVEMENT</h3>
   <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch four LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
   <h3>PERFORMANCE</h3>

@@ -680,7 +680,7 @@ function sizeCanvas(){
   if(offline) return;
   const wrap = document.getElementById("canvasWrap");
   if(!wrap) return;
-  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  const dpr = Math.min(window.devicePixelRatio||1, isTouch ? 1.5 : 2);
   const w = Math.floor(wrap.clientWidth*dpr), h = Math.floor(wrap.clientHeight*dpr);
   if(canvas.width!==w || canvas.height!==h){ canvas.width=w; canvas.height=h; }
 }
@@ -1007,6 +1007,27 @@ if(OUTPUT_MODE){
     try{ if(window.opener && !window.opener.closed && window.opener.__tick) window.opener.__tick(); }catch(e){}
   })();
 } else {
+  /* mobile: one pane at a time via the bottom tab bar */
+  function setMTab(t){
+    document.body.classList.remove("mtab-controls","mtab-bends","mtab-matrix","mtab-video");
+    document.body.classList.add("mtab-"+t);
+    document.querySelectorAll("#mtabs button").forEach(b=>b.classList.toggle("on", b.dataset.mtab===t));
+    try{ localStorage.setItem("bendr.mtab", t); }catch(e){}
+    setTimeout(sizeCanvas, 60);
+  }
+  document.querySelectorAll("#mtabs button").forEach(b=>{ b.onclick = ()=>setMTab(b.dataset.mtab); });
+  let startTab = "controls";
+  try{ startTab = localStorage.getItem("bendr.mtab") || "controls"; }catch(e){}
+  setMTab(startTab);
+  window.addEventListener("orientationchange", ()=>setTimeout(sizeCanvas, 250));
+
+  /* touch devices: lighter default so phones hold framerate */
+  if(isTouch){
+    setProcRes(360);
+    const rs = document.getElementById("selRes");
+    if(rs) rs.value = "360";
+  }
+
   buildPanel();
   renderChain();
   loadCollapse();

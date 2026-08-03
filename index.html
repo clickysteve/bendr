@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>BENDR — circuit-bent video processor</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <style>
 :root{
   --bg:#0a0a0e; --panel:#131318; --panel2:#191922; --line:#26262f;
@@ -28,7 +28,7 @@ body{
 .hsep{width:1px; height:24px; background:var(--line); margin:0 4px;}
 #hdr .spacer{flex:1;}
 button, select{
-  font-family:var(--font); font-size:10px; letter-spacing:0.5px;
+  font-family:var(--font); font-size:10px; letter-spacing:0.5px; white-space:nowrap;
   background:var(--panel2); color:var(--txt); border:1px solid var(--line);
   padding:5px 9px; cursor:pointer; border-radius:3px; outline:none;
 }
@@ -118,6 +118,8 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
 .secreset{margin-left:auto; padding:1px 6px; font-size:8px; color:var(--dim); border-color:var(--line); letter-spacing:1px;}
 .secreset:hover{color:var(--red); border-color:var(--red);}
 #spd.hot::-webkit-slider-thumb{background:var(--red); box-shadow:0 0 6px var(--red);}
+/* ---------- mobile tab bar (hidden on desktop) ---------- */
+#mtabs{display:none;}
 /* ---------- stage ---------- */
 #stage{flex:1; display:flex; flex-direction:column; min-width:0; background:#000;}
 #canvasWrap{flex:1; position:relative; min-height:0; background:#000; overflow:hidden;}
@@ -186,6 +188,95 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
 .toastmsg.err{border-color:var(--red); color:#ffb0ab;}
 @keyframes tfade{0%{opacity:0; transform:translateX(10px);}6%{opacity:1; transform:none;}80%{opacity:1;}100%{opacity:0;}}
 audio,video{display:none;}
+
+/* ============================================================
+   MOBILE / TOUCH LAYOUT
+   ============================================================ */
+@media (hover:none) and (pointer:coarse){
+  /* fatter controls for fingers */
+  input[type=range]{height:30px;}
+  input[type=range]::-webkit-slider-runnable-track{height:5px;}
+  input[type=range]::-webkit-slider-thumb{width:20px; height:20px; margin-top:-7px; border-radius:4px;}
+  input[type=range]::-moz-range-thumb{width:20px; height:20px;}
+  button, select{padding:9px 12px; font-size:11px;}
+  .prow{padding:5px 0;}
+  .sldwrap{height:30px;}
+  .modtick{top:6px; height:18px;}
+  .stagepill{padding:9px 10px; font-size:10px;}
+  .secreset{padding:5px 9px; font-size:9px;}
+}
+@media (max-width:900px){
+  html,body{overscroll-behavior:none;}
+  #hdr{
+    height:auto; flex:0 0 auto; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden;
+    gap:6px; padding:6px 8px; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  #hdr::-webkit-scrollbar{display:none;}
+  #hdr .spacer{display:none;}
+  #logo{font-size:13px; letter-spacing:1px;}
+  #logo small{display:none;}
+  .hsep{height:20px; margin:0 2px;}
+
+  #main{flex-direction:column; overflow:hidden;}
+  #stage{order:1; flex:0 0 auto; min-height:0;}
+  #canvasWrap{flex:0 0 auto; width:100%; aspect-ratio:16/9;}
+  #chain{padding:5px 8px; gap:5px;}
+  #chain .clabel, #chain .fixed{display:none;}
+  #chain .arrow{display:none;}
+  #chain #btnChainReset{margin-left:4px;}
+  #transport{flex:0 0 auto; height:auto; padding:5px 8px 6px; flex-wrap:wrap; gap:5px 6px;}
+  #transport button{padding:7px 10px;}
+  #transport > span{font-size:8.5px;}
+  #tcode{min-width:auto; flex:0 0 auto; order:4; margin-left:auto;}
+  #spd{width:62px !important;}
+  #seek{flex:1 1 100%; order:5; height:26px;}
+  #osd{font-size:9px; left:6px; bottom:6px;}
+
+  /* one pane at a time, chosen by the bottom tab bar */
+  #panel{
+    order:2; width:100%; flex:1 1 auto; border-right:none; border-top:1px solid var(--line);
+    padding-bottom:78px; max-height:none;
+  }
+  #lower{
+    order:3; flex:1 1 auto; max-height:none; flex-direction:column;
+    border-top:1px solid var(--line); overflow-y:auto; padding-bottom:78px;
+  }
+  #bends{border-right:none; width:100%; flex:0 0 auto;}
+  .bendbtns{grid-template-columns:repeat(3,1fr); gap:8px;}
+  .bend{padding:16px 6px; font-size:11px;}
+  #matrix{width:100%;}
+  .mrow{flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #1e1e26;}
+  .mrow .src, .mrow .dst{width:auto; flex:1 1 40%;}
+  .mrow input[type=range]{flex:1 1 65%; order:5;}
+  .mrow .mamt{order:6; flex:0 0 auto; padding-left:6px;}
+
+  body.mtab-controls #lower{display:none;}
+  body.mtab-controls #panel{display:block;}
+  body.mtab-bends #panel, body.mtab-matrix #panel{display:none;}
+  body.mtab-bends #lower, body.mtab-matrix #lower{display:flex;}
+  body.mtab-bends #matrix{display:none;}
+  body.mtab-matrix #bends{display:none;}
+  body.mtab-video #panel, body.mtab-video #lower{display:none;}
+  body.mtab-video #canvasWrap{aspect-ratio:auto; height:calc(100vh - 190px);}
+
+  /* bottom tab bar */
+  #mtabs{
+    display:flex; position:fixed; left:0; right:0; bottom:0; z-index:45;
+    background:var(--panel); border-top:1px solid var(--line);
+    padding:6px 6px calc(6px + env(safe-area-inset-bottom));
+    gap:6px;
+  }
+  #mtabs button{flex:1; padding:11px 4px; font-size:10px; letter-spacing:1px;}
+  #toast{top:auto; bottom:74px; right:8px; left:8px; align-items:stretch;}
+  .toastmsg{max-width:none; padding:6px 10px; font-size:9.5px;}
+  #helpBox{padding:16px 18px; font-size:12px;}
+}
+/* landscape phones: give the picture the whole screen height it can get */
+@media (max-width:900px) and (orientation:landscape){
+  #canvasWrap{aspect-ratio:auto; height:calc(100vh - 150px);}
+  body.mtab-video #canvasWrap{height:calc(100vh - 96px);}
+  .bendbtns{grid-template-columns:repeat(6,1fr);}
+}
 </style>
 </head>
 <body>
@@ -319,6 +410,12 @@ audio,video{display:none;}
   <p><b>REC</b> captures the live output (with source audio when AUDIO=SOURCE) to a WebM file. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
   <p style="padding-top:10px; color:var(--dim);">Click anywhere to close.</p>
 </div></div>
+<div id="mtabs">
+  <button data-mtab="controls" class="on">CONTROLS</button>
+  <button data-mtab="bends">BEND</button>
+  <button data-mtab="matrix">MATRIX</button>
+  <button data-mtab="video">VIDEO</button>
+</div>
 <div id="toast"></div>
 <div id="renderOv" style="display:none; position:fixed; inset:0; z-index:80; background:rgba(6,6,10,.9); flex-direction:column; align-items:center; justify-content:center; gap:16px;">
   <div id="renderTxt" style="color:var(--amber); font-size:14px; letter-spacing:2px;">RENDERING…</div>
@@ -1359,6 +1456,16 @@ const STAGE_INFO = {
   flow:   {name:"FLOW / MOSH",  sec:["flow"]},
 };
 let dragStage = null;
+const isTouch = window.matchMedia("(hover:none) and (pointer:coarse)").matches;
+function moveStage(id, dir){
+  const i = chainOrder.indexOf(id);
+  const j = i + dir;
+  if(i<0 || j<0 || j>=chainOrder.length) return;
+  const arr = chainOrder.slice();
+  arr.splice(j, 0, arr.splice(i,1)[0]);
+  chainOrder = arr;
+  renderChain();
+}
 function renderChain(){
   const host = document.getElementById("chainStages");
   if(!host) return;
@@ -1370,8 +1477,20 @@ function renderChain(){
     el.draggable = true;
     el.dataset.stage = id;
     el.innerHTML = "<span class='grip'>\u2059</span><span class='dot'></span>" + STAGE_INFO[id].name;
-    el.title = "Drag to reorder · click to bypass this stage";
+    el.title = isTouch ? "Tap to bypass \u00b7 use the arrows to reorder" : "Drag to reorder \u00b7 click to bypass this stage";
     el.onclick = ()=>{ stageEnabled[id] = !stageEnabled[id]; renderChain(); };
+    if(isTouch){
+      /* HTML5 drag doesn't exist on touch — give each pill move arrows */
+      const mk = (txt, dir, disabled)=>{
+        const b = document.createElement("span");
+        b.textContent = txt;
+        b.style.cssText = "padding:0 6px; color:"+(disabled?"#33333d":"var(--cyan)")+"; font-size:12px;";
+        if(!disabled) b.onclick = e=>{ e.stopPropagation(); moveStage(id, dir); };
+        return b;
+      };
+      el.insertBefore(mk("\u25c2", -1, i===0), el.firstChild);
+      el.appendChild(mk("\u25b8", 1, i===chainOrder.length-1));
+    }
     el.addEventListener("dragstart", e=>{
       dragStage = id; el.classList.add("dragging");
       e.dataTransfer.effectAllowed = "move";
@@ -2418,7 +2537,7 @@ function sizeCanvas(){
   if(offline) return;
   const wrap = document.getElementById("canvasWrap");
   if(!wrap) return;
-  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  const dpr = Math.min(window.devicePixelRatio||1, isTouch ? 1.5 : 2);
   const w = Math.floor(wrap.clientWidth*dpr), h = Math.floor(wrap.clientHeight*dpr);
   if(canvas.width!==w || canvas.height!==h){ canvas.width=w; canvas.height=h; }
 }
@@ -2745,6 +2864,27 @@ if(OUTPUT_MODE){
     try{ if(window.opener && !window.opener.closed && window.opener.__tick) window.opener.__tick(); }catch(e){}
   })();
 } else {
+  /* mobile: one pane at a time via the bottom tab bar */
+  function setMTab(t){
+    document.body.classList.remove("mtab-controls","mtab-bends","mtab-matrix","mtab-video");
+    document.body.classList.add("mtab-"+t);
+    document.querySelectorAll("#mtabs button").forEach(b=>b.classList.toggle("on", b.dataset.mtab===t));
+    try{ localStorage.setItem("bendr.mtab", t); }catch(e){}
+    setTimeout(sizeCanvas, 60);
+  }
+  document.querySelectorAll("#mtabs button").forEach(b=>{ b.onclick = ()=>setMTab(b.dataset.mtab); });
+  let startTab = "controls";
+  try{ startTab = localStorage.getItem("bendr.mtab") || "controls"; }catch(e){}
+  setMTab(startTab);
+  window.addEventListener("orientationchange", ()=>setTimeout(sizeCanvas, 250));
+
+  /* touch devices: lighter default so phones hold framerate */
+  if(isTouch){
+    setProcRes(360);
+    const rs = document.getElementById("selRes");
+    if(rs) rs.value = "360";
+  }
+
   buildPanel();
   renderChain();
   loadCollapse();

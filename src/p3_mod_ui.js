@@ -375,6 +375,16 @@ const STAGE_INFO = {
   flow:   {name:"FLOW / MOSH",  sec:["flow"]},
 };
 let dragStage = null;
+const isTouch = window.matchMedia("(hover:none) and (pointer:coarse)").matches;
+function moveStage(id, dir){
+  const i = chainOrder.indexOf(id);
+  const j = i + dir;
+  if(i<0 || j<0 || j>=chainOrder.length) return;
+  const arr = chainOrder.slice();
+  arr.splice(j, 0, arr.splice(i,1)[0]);
+  chainOrder = arr;
+  renderChain();
+}
 function renderChain(){
   const host = document.getElementById("chainStages");
   if(!host) return;
@@ -386,8 +396,20 @@ function renderChain(){
     el.draggable = true;
     el.dataset.stage = id;
     el.innerHTML = "<span class='grip'>\u2059</span><span class='dot'></span>" + STAGE_INFO[id].name;
-    el.title = "Drag to reorder · click to bypass this stage";
+    el.title = isTouch ? "Tap to bypass \u00b7 use the arrows to reorder" : "Drag to reorder \u00b7 click to bypass this stage";
     el.onclick = ()=>{ stageEnabled[id] = !stageEnabled[id]; renderChain(); };
+    if(isTouch){
+      /* HTML5 drag doesn't exist on touch — give each pill move arrows */
+      const mk = (txt, dir, disabled)=>{
+        const b = document.createElement("span");
+        b.textContent = txt;
+        b.style.cssText = "padding:0 6px; color:"+(disabled?"#33333d":"var(--cyan)")+"; font-size:12px;";
+        if(!disabled) b.onclick = e=>{ e.stopPropagation(); moveStage(id, dir); };
+        return b;
+      };
+      el.insertBefore(mk("\u25c2", -1, i===0), el.firstChild);
+      el.appendChild(mk("\u25b8", 1, i===chainOrder.length-1));
+    }
     el.addEventListener("dragstart", e=>{
       dragStage = id; el.classList.add("dragging");
       e.dataTransfer.effectAllowed = "move";

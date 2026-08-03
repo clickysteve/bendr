@@ -8,6 +8,8 @@ BENDR emulates the analogue glitch aesthetic of circuit-bent video hardware: ben
 
 Everything is a single self-contained HTML file. No server, no dependencies, nothing leaves your machine — video files stream from disk, so a 4GB MP4 works as well as a 4MB one. Chrome recommended.
 
+Works on phones and tablets too: the picture stays pinned at the top, controls / bend pads / mod matrix live behind a bottom tab bar, sliders and pads are touch-sized, and the signal chain reorders with tap arrows instead of drag.
+
 ![BENDR interface](docs/doc_ui.png)
 
 ## Signal chain

@@ -7,3 +7,4 @@
 node_modules/
 _to_delete/
 .DS_Store
+*.tar.gz

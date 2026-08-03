@@ -122,6 +122,87 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
 .secreset{margin-left:auto; padding:1px 6px; font-size:8px; color:var(--dim); border-color:var(--line); letter-spacing:1px;}
 .secreset:hover{color:var(--red); border-color:var(--red);}
 #spd.hot::-webkit-slider-thumb{background:var(--red); box-shadow:0 0 6px var(--red);}
+/* right-click modulation menu */
+.modmenu{
+  position:fixed; z-index:70; width:200px; max-height:340px; overflow-y:auto;
+  background:var(--panel); border:1px solid var(--mag); border-radius:5px;
+  box-shadow:0 8px 24px rgba(0,0,0,.6); padding:4px;
+}
+.modmenu .mmhead{
+  font-size:8.5px; letter-spacing:1.5px; color:var(--mag); padding:6px 8px 7px;
+  border-bottom:1px solid var(--line); margin-bottom:3px;
+}
+.modmenu .mmsep{
+  font-size:7.5px; letter-spacing:1.5px; color:var(--dim); padding:6px 8px 3px;
+  border-top:1px solid var(--line); margin-top:3px;
+}
+.modmenu .mmrow{
+  padding:6px 8px; font-size:9.5px; letter-spacing:1px; color:var(--txt);
+  cursor:pointer; border-radius:3px; display:flex; align-items:center; gap:6px;
+}
+.modmenu .mmrow:hover{background:var(--panel2); color:#fff;}
+.modmenu .mmrow.existing{background:rgba(255,62,165,.1); cursor:default;}
+.modmenu .mmrow.existing span{flex:0 0 auto; color:var(--mag); font-size:9px;}
+.modmenu .mmrow.existing input{flex:1; min-width:40px;}
+.modmenu .mmrow.existing button{padding:1px 5px; font-size:9px; color:var(--dim);}
+/* modulation page */
+#modpage{
+  position:fixed; inset:0; background:rgba(6,6,10,.94); z-index:56; display:none;
+  flex-direction:column; padding:14px 16px; gap:10px;
+}
+#modpage.show{display:flex;}
+#modpage .mphead{display:flex; align-items:center; gap:10px;}
+#modpage .mphead h3{font-size:11px; letter-spacing:2.5px; color:var(--cyan);}
+#modgrid{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:10px;
+  overflow-y:auto; flex:1; align-content:start;
+}
+.modcard{
+  background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:9px 10px;
+}
+.modcard h4{
+  font-size:9px; letter-spacing:2px; color:var(--amber); padding-bottom:6px;
+  display:flex; align-items:center; gap:6px;
+}
+.modcard.audio h4{color:var(--cyan);} .modcard.vid h4{color:var(--mag);}
+.modcard canvas{
+  width:100%; height:52px; display:block; background:#0c0c11;
+  border:1px solid #1e1e26; border-radius:3px; margin-bottom:6px;
+}
+.modcard .mcrow{display:flex; align-items:center; gap:6px; padding:2px 0;}
+.modcard .mcrow label{font-size:8.5px; letter-spacing:1px; color:var(--dim); width:38px;}
+.modcard .mcrow select{font-size:9px; padding:3px 14px 3px 5px;}
+.modcard .mcrow input[type=range]{flex:1;}
+.modcard .mcval{font-size:9px; color:var(--txt); width:38px; text-align:right;}
+.modcard .dests{font-size:8.5px; color:var(--dim); padding-top:5px; line-height:1.5; border-top:1px solid #1e1e26; margin-top:6px;}
+.modcard .dests b{color:var(--cyan); font-weight:400;}
+/* text / shape editor */
+#textEd{
+  position:fixed; inset:0; background:rgba(6,6,10,.9); z-index:55; display:none;
+  align-items:center; justify-content:center;
+}
+#textEd.show{display:flex;}
+#textEd .edbox{
+  width:620px; max-width:94vw; max-height:90vh; overflow-y:auto; background:var(--panel);
+  border:1px solid var(--mag); border-radius:6px; padding:16px 18px;
+}
+#textEd h3{
+  font-size:10px; letter-spacing:2px; color:var(--mag); padding-bottom:10px;
+  display:flex; align-items:center; gap:8px;
+}
+#textEd h4{font-size:9px; letter-spacing:2px; color:var(--dim); padding:12px 0 4px; border-top:1px solid var(--line); margin-top:10px;}
+#textEd textarea{
+  width:100%; background:var(--panel2); color:var(--txt); border:1px solid var(--line);
+  border-radius:4px; padding:8px; font-family:var(--font); font-size:13px; letter-spacing:1px;
+  resize:vertical; outline:none;
+}
+#textEd textarea:focus{border-color:var(--mag);}
+.edrow{display:flex; align-items:center; gap:8px; padding:6px 0; flex-wrap:wrap;}
+.edrow label{font-size:8.5px; letter-spacing:1.5px; color:var(--dim); white-space:nowrap;}
+.edrow input[type=range]{flex:1 1 90px; min-width:70px;}
+.edrow input[type=color]{
+  width:34px; height:22px; padding:0; border:1px solid var(--line); background:none; cursor:pointer;
+}
 /* channel selector */
 #chanbar{
   display:flex; gap:6px; padding:8px 10px; border-bottom:1px solid var(--line);
@@ -316,13 +397,14 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version — check this matches what you expect after a deploy">v11.0</span>
+  <span id="ver" title="Build version — check this matches what you expect after a deploy">v12.0</span>
   <div class="hsep"></div>
   <div class="hgrp">
     <button id="btnFile" title="Load channel A video (any size — it streams from disk)">FILE A</button>
     <button id="btnFileB" title="Load channel B video for the A/B mixer">B</button>
     <button id="btnCam" title="Use webcam on channel A">CAM</button>
-    <button id="btnPat" title="Built-in test pattern on channel A">PATTERN</button>
+    <button id="btnPat" title="Built-in test pattern on this channel">PATTERN</button>
+    <button id="btnText" title="Text / shape generator for this channel">TEXT</button>
     <select id="selPat" title="Test pattern type">
       <option value="bars">BARS</option>
       <option value="testcard">TESTCARD</option>
@@ -357,6 +439,7 @@ audio,video{display:none;}
   </div>
   <div class="spacer"></div>
   <div class="hgrp">
+    <button id="btnMod" title="Modulation page — see every source moving (D)">MOD</button>
     <button id="btnMidi" title="MIDI learn: toggle, then click a parameter name, then move a knob">MIDI</button>
     <button id="btnBypass" title="Hold to see the clean signal (B)">BYPASS</button>
     <button id="btnSnap" title="Save a PNG still (S)">SNAP</button>
@@ -418,10 +501,12 @@ audio,video{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v11.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v12.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>TWO CHANNELS</h3>
   <p>BENDR is a two-channel mixer: <b>A</b> and <b>B</b> each have their own input <i>and</i> their own complete set of effects. The big A / B buttons at the top of the panel choose which channel you're editing — everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits both at once, <b>COPY</b> pushes the current channel onto the other, <b>SWAP</b> exchanges them. Sections tagged MASTER (the mixer, morph and CRT) are shared. Then the <b>INPUT MIXER</b> combines the two finished channels with the A&gt;B fader, wipes, keys and blends.</p>
+  <h3>TEXT / SHAPES</h3>
+  <p><b>TEXT</b> turns the selected channel into a text and shape generator — type anything, pick a font, position/scroll/repeat it, add outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric, starburst) with count, spin and pulse. It feeds the channel like any other source, so you can glitch it, feed it back, and mix it against video on the other channel.</p>
   <h3>INPUT</h3>
   <p>Each channel takes its own source. <b>FILE</b> loads any video your browser can play into the selected channel (drag &amp; drop works too — files stream from disk, so size doesn't matter). <b>CAM</b> uses your webcam. <b>PATTERN</b> is a built-in test signal — pick BARS, TESTCARD, OSCILLATOR (video-synth colour waves), GRID, RAMP or STATIC from the dropdown.</p>
   <h3>SIGNAL CHAIN</h3>
@@ -445,6 +530,8 @@ audio,video{display:none;}
   <p>The <b>INPUT MIXER</b> blends video channel B over A (load B first) — FADE, LUMA KEY or CHROMA KEY modes. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor. CHAIN swaps whether tape damage or the colour/enhancer stage comes first.</p>
   <h3>VIDEO-REACTIVE</h3>
   <p>MOTION, BRIGHT and CUT are mod sources computed from the picture itself — patch CUT into TEAR and every edit knocks the sync loose like a real deck.</p>
+  <h3>MODULATION</h3>
+  <p><b>Right-click any parameter</b> to patch a modulator straight onto it, adjust the amount, or remove it. The <b>MOD</b> button (or <kbd>D</kbd>) opens the modulation page: every source drawn live, LFO rate/shape/sync editable in place, and each card lists what it's driving.</p>
   <h3>TEMPO &amp; MIDI</h3>
   <p>TAP sets the tempo; LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
   <h3>KEYS</h3>
@@ -458,6 +545,75 @@ audio,video{display:none;}
   <button data-mtab="bends">BEND</button>
   <button data-mtab="matrix">MATRIX</button>
   <button data-mtab="video">VIDEO</button>
+</div>
+<div id="modpage">
+  <div class="mphead">
+    <h3>MODULATION</h3>
+    <span style="color:var(--dim); font-size:9px;">Right-click any parameter in the panel to patch it &middot; sources animate live below</span>
+    <span style="flex:1;"></span>
+    <button id="modPageClose">CLOSE</button>
+  </div>
+  <div id="modgrid"></div>
+</div>
+<div id="textEd">
+  <div class="edbox">
+    <h3>TEXT / SHAPE GENERATOR <span id="textEdChan"></span><button id="textEdClose" style="margin-left:auto;">CLOSE</button></h3>
+    <textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
+    <div class="edrow">
+      <label>FONT</label>
+      <select id="txtFont">
+        <option value="mono">MONO</option>
+        <option value="sans">SANS BOLD</option>
+        <option value="serif">SERIF</option>
+        <option value="cond">CONDENSED</option>
+      </select>
+      <label>SIZE</label><input type="range" id="txtSize" min="0.03" max="0.6" step="0.005" value="0.2">
+      <label>TRACK</label><input type="range" id="txtTrack" min="-0.1" max="0.5" step="0.005" value="0">
+    </div>
+    <div class="edrow">
+      <label>X</label><input type="range" id="txtX" min="0" max="1" step="0.005" value="0.5">
+      <label>Y</label><input type="range" id="txtY" min="0" max="1" step="0.005" value="0.5">
+      <label>ROT</label><input type="range" id="txtRot" min="-180" max="180" step="1" value="0">
+    </div>
+    <div class="edrow">
+      <label>SCROLL X</label><input type="range" id="txtScrollX" min="-1" max="1" step="0.01" value="0">
+      <label>SCROLL Y</label><input type="range" id="txtScrollY" min="-1" max="1" step="0.01" value="0">
+      <label>REPEAT</label><input type="range" id="txtRepeat" min="1" max="8" step="1" value="1">
+    </div>
+    <div class="edrow">
+      <label>INK</label><input type="color" id="txtInk" value="#ffffff">
+      <label>BG</label><input type="color" id="txtBg" value="#000000">
+      <label>OUTLINE</label><input type="range" id="txtOutline" min="0" max="20" step="0.5" value="0">
+    </div>
+    <h4>SHAPES</h4>
+    <div class="edrow">
+      <select id="shpKind">
+        <option value="none">NONE</option>
+        <option value="circle">CIRCLE</option>
+        <option value="ring">RING</option>
+        <option value="rect">RECT</option>
+        <option value="tri">TRIANGLE</option>
+        <option value="cross">CROSS</option>
+        <option value="bars">BARS</option>
+        <option value="grid">GRID</option>
+        <option value="rings">CONCENTRIC</option>
+        <option value="starburst">STARBURST</option>
+      </select>
+      <label>COUNT</label><input type="range" id="shpCount" min="1" max="24" step="1" value="1">
+      <label>SIZE</label><input type="range" id="shpSize" min="0.02" max="1" step="0.005" value="0.3">
+    </div>
+    <div class="edrow">
+      <label>X</label><input type="range" id="shpX" min="0" max="1" step="0.005" value="0.5">
+      <label>Y</label><input type="range" id="shpY" min="0" max="1" step="0.005" value="0.5">
+      <label>SPIN</label><input type="range" id="shpSpin" min="-2" max="2" step="0.01" value="0">
+      <label>FILL</label><input type="color" id="shpFill" value="#ff2fa0">
+    </div>
+    <div class="edrow">
+      <label>STROKE</label><input type="range" id="shpStroke" min="0" max="40" step="0.5" value="0">
+      <label>PULSE</label><input type="range" id="shpPulse" min="0" max="1" step="0.01" value="0">
+      <span style="color:var(--dim); font-size:9px; flex:1;">Feeds this channel like any other source — glitch it, feed it back, mix it.</span>
+    </div>
+  </div>
 </div>
 <div id="toast"></div>
 <div id="renderOv" style="display:none; position:fixed; inset:0; z-index:80; background:rgba(6,6,10,.9); flex-direction:column; align-items:center; justify-content:center; gap:16px;">

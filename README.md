@@ -50,6 +50,12 @@ per channel:  INPUT → framing → FEEDBACK / RESCAN → frame store
 
 Presets named after the glitch art series on [allmyfriendsarejpegs.com](https://allmyfriendsarejpegs.com): VOL I / II / III, TRIANGLES, 80S TRIANGLE, BLADE RUNNER TRIANGLE, CRT REPHOTO and JPEGS.
 
+## Text and shapes
+
+Any channel can be a text/shape generator instead of a video source: type anything, choose font, size, tracking, position, rotation, scroll and repeat, add an outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric rings, starburst) with count, spin, stroke and pulse. It behaves exactly like any other source, so it can be glitched, fed back and mixed against video on the other channel.
+
+![Text through contour and feedback](docs/doc_text.png)
+
 ## Movement
 
 Nothing sits still. The mod matrix patches any source into any parameter:
@@ -58,6 +64,10 @@ Nothing sits still. The mod matrix patches any source into any parameter:
 - Chaos, drift and spike generators
 - Audio bands with adjustable frequency ranges, gain, response, input device and channel selection for audio interfaces
 - Video-reactive sources computed from the picture itself: motion, brightness, and scene-cut detection — patch CUT into TEAR and every edit knocks the sync loose
+
+**Right-click any parameter** to patch a modulator onto it directly. The **MOD** page (`D`) draws every source live — four LFOs with editable rate, ten shapes and tempo sync, chaos/drift/spike generators, audio bands and video-reactive sources — and shows what each one is driving.
+
+![Modulation page](docs/doc_modpage.png)
 
 Six momentary bend pads (mouse, `Q W E R T Y`, or MIDI notes C1–F1), MIDI CC learn on every slider, randomize/mutate with undo, per-section resets and a global init.
 

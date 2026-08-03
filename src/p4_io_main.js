@@ -171,6 +171,7 @@ function restoreState(st){
   } else {
     applyState(st.bases||{}, st.routes||[], st);   /* legacy single-channel state */
   }
+  if(st.srcText){ for(const ch of CHANNELS) if(st.srcText[ch]) Object.assign(SRC[ch].text, st.srcText[ch]); }
   if(st.activeChan) setActiveChan(st.activeChan);
   refreshToggles();
   renderChain();
@@ -226,7 +227,8 @@ document.getElementById("btnSave").onclick = ()=>{
   const snap = snapshotAll();
   const state = {app:"bendr", v:5, chan:snap.chan, master:snap.master, routes, audioCfg,
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
-    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}};
+    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
+    srcText: {A:{...SRC.A.text}, B:{...SRC.B.text}}};
   for(const k of LFOKEYS) state[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   const blob = new Blob([JSON.stringify(state,null,1)], {type:"application/json"});
   dl(URL.createObjectURL(blob), "bendr-"+stamp()+".json");
@@ -262,7 +264,11 @@ function newSource(ch){
   pc.width = 960; pc.height = 540;
   return {ch, video:v, mode:"pattern", pattern:"bars", cam:null,
           patCanvas:pc, pat:pc.getContext("2d"), patClock:0,
-          aspect:16/9, has:0, speed:1, name:"", audioHooked:false};
+          aspect:16/9, has:0, speed:1, name:"", audioHooked:false,
+          text:{body:"BENDR", font:"mono", size:0.2, track:0, x:0.5, y:0.5, rot:0,
+                scrollX:0, scrollY:0, repeat:1, ink:"#ffffff", bg:"#000000", outline:0,
+                shape:"none", shpCount:1, shpSize:0.3, shpX:0.5, shpY:0.5,
+                shpSpin:0, shpFill:"#ff2fa0", shpStroke:0, shpPulse:0}};
 }
 const SRC = {A:newSource("A"), B:newSource("B")};
 /* the A-channel video keeps the old name so audio hookup keeps working */
@@ -331,6 +337,7 @@ function syncChanInputUI(){
   document.getElementById("btnFile").classList.toggle("on", S.mode==="file");
   document.getElementById("btnCam").classList.toggle("on", S.mode==="cam");
   document.getElementById("btnPat").classList.toggle("on", S.mode==="pattern");
+  document.getElementById("btnText").classList.toggle("on", S.mode==="text");
   document.getElementById("btnFile").textContent = "FILE " + activeChan;
   selPat.value = S.pattern;
   const sp = document.getElementById("spd");
@@ -338,8 +345,124 @@ function syncChanInputUI(){
   sp.classList.toggle("hot", Math.abs(S.speed-1) > 0.001);
   const lp = document.getElementById("btnLoop");
   lp.classList.toggle("on", S.video.loop);
+  if(textEd && textEd.classList.contains("show")) syncTextEditor();
 }
 window.__syncChanInputUI = syncChanInputUI;
+
+/* ---- text / shape generator ---- */
+const FONTS = {mono:'"SF Mono", ui-monospace, Menlo, monospace',
+               sans:'Helvetica, Arial, sans-serif',
+               serif:'Georgia, "Times New Roman", serif',
+               cond:'"Arial Narrow", "Helvetica Neue", sans-serif'};
+function drawTextSource(S, t){
+  const g = S.pat, W = S.patCanvas.width, H = S.patCanvas.height, T = S.text;
+  g.setTransform(1,0,0,1,0,0);
+  g.fillStyle = T.bg; g.fillRect(0,0,W,H);
+
+  /* shapes underneath */
+  if(T.shape !== "none"){
+    const n = Math.max(1, Math.round(T.shpCount));
+    const pulse = 1 + T.shpPulse*0.45*Math.sin(t*3.1);
+    for(let i=0;i<n;i++){
+      const f = n===1 ? 0 : i/(n-1);
+      g.save();
+      g.translate(T.shpX*W, T.shpY*H);
+      g.rotate(T.shpSpin*t + f*Math.PI*2/Math.max(1,n));
+      const sz = T.shpSize*H*pulse*(1 - f*0.55);
+      g.fillStyle = T.shpFill; g.strokeStyle = T.shpFill; g.lineWidth = T.shpStroke;
+      const stroked = T.shpStroke > 0.2;
+      g.beginPath();
+      switch(T.shape){
+        case "circle": g.arc(0,0,sz,0,7); break;
+        case "ring":   g.arc(0,0,sz,0,7); g.arc(0,0,sz*0.55,0,7); break;
+        case "rect":   g.rect(-sz,-sz*0.62,sz*2,sz*1.24); break;
+        case "tri":    g.moveTo(0,-sz); g.lineTo(sz*0.87,sz*0.5); g.lineTo(-sz*0.87,sz*0.5); g.closePath(); break;
+        case "cross":  g.rect(-sz,-sz*0.18,sz*2,sz*0.36); g.rect(-sz*0.18,-sz,sz*0.36,sz*2); break;
+        case "bars":   for(let b=0;b<8;b++) g.rect(-sz + b*sz/4, -sz, sz/8, sz*2); break;
+        case "grid":   for(let b=-4;b<=4;b++){ g.rect(b*sz/4-sz*0.02,-sz,sz*0.04,sz*2); g.rect(-sz,b*sz/4-sz*0.02,sz*2,sz*0.04); } break;
+        case "rings":  for(let b=1;b<=6;b++){ g.moveTo(sz*b/6,0); g.arc(0,0,sz*b/6,0,7); } break;
+        case "starburst": for(let b=0;b<16;b++){ const a=b*Math.PI/8; g.moveTo(0,0); g.lineTo(Math.cos(a)*sz, Math.sin(a)*sz); } break;
+      }
+      if(T.shape==="rings" || T.shape==="starburst" || stroked){ g.lineWidth = Math.max(1,T.shpStroke||2); g.stroke(); }
+      else g.fill();
+      g.restore();
+    }
+  }
+
+  /* text on top */
+  const body = (T.body||"").split("\n");
+  if(body.length && body.join("").length){
+    const px = Math.max(4, T.size*H);
+    g.font = "bold "+px+"px "+FONTS[T.font];
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillStyle = T.ink; g.strokeStyle = T.ink; g.lineWidth = T.outline;
+    const reps = Math.max(1, Math.round(T.repeat));
+    for(let r=0;r<reps;r++){
+      g.save();
+      const ox = ((T.x + T.scrollX*t) % 1 + 1) % 1;
+      const oy = ((T.y + T.scrollY*t) % 1 + 1) % 1;
+      g.translate(ox*W, oy*H + (r - (reps-1)/2)*px*1.35*Math.max(1,reps>1?1.2:1));
+      g.rotate(T.rot*Math.PI/180);
+      body.forEach((line,li)=>{
+        const yy = (li - (body.length-1)/2)*px*1.15;
+        if(T.track !== 0){
+          /* manual letter spacing */
+          const chars = [...line];
+          const sp = T.track*px;
+          let total = 0;
+          for(const c of chars) total += g.measureText(c).width + sp;
+          let cx = -total/2;
+          for(const c of chars){
+            const w = g.measureText(c).width;
+            if(T.outline>0.2) g.strokeText(c, cx+w/2, yy); else g.fillText(c, cx+w/2, yy);
+            cx += w + sp;
+          }
+        } else {
+          if(T.outline>0.2) g.strokeText(line, 0, yy); else g.fillText(line, 0, yy);
+        }
+      });
+      g.restore();
+    }
+  }
+  g.setTransform(1,0,0,1,0,0);
+}
+
+/* text editor wiring */
+const textEd = document.getElementById("textEd");
+const TXT_CTRL = [["txtBody","body","s"],["txtFont","font","s"],["txtSize","size","f"],["txtTrack","track","f"],
+  ["txtX","x","f"],["txtY","y","f"],["txtRot","rot","f"],["txtScrollX","scrollX","f"],["txtScrollY","scrollY","f"],
+  ["txtRepeat","repeat","f"],["txtInk","ink","s"],["txtBg","bg","s"],["txtOutline","outline","f"],
+  ["shpKind","shape","s"],["shpCount","shpCount","f"],["shpSize","shpSize","f"],["shpX","shpX","f"],["shpY","shpY","f"],
+  ["shpSpin","shpSpin","f"],["shpFill","shpFill","s"],["shpStroke","shpStroke","f"],["shpPulse","shpPulse","f"]];
+function syncTextEditor(){
+  const T = cur().text;
+  document.getElementById("textEdChan").textContent = "\u2014 CHANNEL "+activeChan;
+  for(const [id,key,kind] of TXT_CTRL){
+    const el = document.getElementById(id); if(!el) continue;
+    el.value = T[key];
+  }
+}
+for(const [id,key,kind] of TXT_CTRL){
+  const el = document.getElementById(id); if(!el) continue;
+  const handler = ()=>{
+    const T = cur().text;
+    T[key] = (kind==="f") ? parseFloat(el.value) : el.value;
+    const S = cur();
+    if(S.mode !== "text"){ stopCam(activeChan); S.mode = "text"; S.name = "text"; syncChanInputUI(); }
+  };
+  el.addEventListener("input", handler);
+  el.addEventListener("change", handler);
+}
+document.getElementById("btnText").onclick = ()=>{
+  const S = cur();
+  stopCam(activeChan);
+  S.mode = "text"; S.name = "text";
+  syncChanInputUI(); syncTextEditor();
+  textEd.classList.add("show");
+  setTimeout(()=>document.getElementById("txtBody").focus(), 50);
+};
+document.getElementById("textEdClose").onclick = ()=> textEd.classList.remove("show");
+textEd.addEventListener("click", e=>{ if(e.target===textEd) textEd.classList.remove("show"); });
 
 /* test pattern drawing — per source */
 const noiseC = document.createElement("canvas"); noiseC.width=240; noiseC.height=135;
@@ -603,6 +726,7 @@ window.addEventListener("keydown", e=>{
   if(k==="f"){ document.getElementById("btnFull").click(); return; }
   if(k==="s"){ document.getElementById("btnSnap").click(); return; }
   if(k==="h"){ help.classList.toggle("show"); return; }
+  if(k==="d"){ document.getElementById("modpage").classList.toggle("show"); return; }
   if(k==="p"){ btnPlay.click(); return; }
   if(k==="b"){ setBypass(true); return; }
   if(k==="q"){ bendHeld.sync=true; markBend("sync",true); }
@@ -731,7 +855,7 @@ let mdAvg=0.02, motionPeak=0.05, cutV=0;
 function updateContentAnalysis(dt){
   const S = SRC.A;
   let src = null;
-  if(S.mode==="pattern") src = S.patCanvas;
+  if(S.mode==="pattern" || S.mode==="text") src = S.patCanvas;
   else if(S.video.readyState>=2 && S.video.videoWidth>0) src = S.video;
   if(!src){ modVal.motion *= 1-Math.min(1,dt*4); cutV *= Math.exp(-dt*5); modVal.cut = cutV; return; }
   try{ anaCtx.drawImage(src, 0, 0, 32, 18); }catch(e){ return; }
@@ -816,7 +940,7 @@ function runStage(id, inTex, dstRT, now, ch){
 
 function srcReady(ch){
   const S = SRC[ch];
-  if(S.mode === "pattern") return true;
+  if(S.mode === "pattern" || S.mode === "text") return true;
   return S.video.readyState >= 2 && S.video.videoWidth > 0;
 }
 window.__chanHasSource = srcReady;
@@ -826,9 +950,9 @@ function uploadSource(ch, dt){
   const S = SRC[ch];
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
-  if(S.mode === "pattern"){
+  if(S.mode === "pattern" || S.mode === "text"){
     S.patClock += dt*S.speed;
-    drawPattern(S, S.patClock);
+    if(S.mode === "text") drawTextSource(S, S.patClock); else drawPattern(S, S.patClock);
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, S.patCanvas);
     S.aspect = S.patCanvas.width/S.patCanvas.height; S.has = 1;
   } else if(S.video.readyState >= 2 && S.video.videoWidth > 0){
@@ -915,6 +1039,7 @@ function renderFrame(now, dt){
   updateAudio(dt);
   updateContentAnalysis(dt);
   updateMod(dt, now);
+  pushModHistory();
   applyParams(dt);
   updateSyncModel(dt, now);
 
@@ -1139,6 +1264,13 @@ if(OUTPUT_MODE){
   }
 
   buildPanel();
+  buildModPage();
+  setInterval(drawModPage, 50);
+  {
+    const mp = document.getElementById("modpage");
+    document.getElementById("btnMod").onclick = ()=>{ mp.classList.toggle("show"); };
+    document.getElementById("modPageClose").onclick = ()=> mp.classList.remove("show");
+  }
   setActiveChan("A");
   syncChanInputUI();
   renderChain();

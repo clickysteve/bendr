@@ -62,9 +62,17 @@ function lfoOut(st, dt){
       if(st.phase < st.rate*dt || st.lastPh > ph){ st.snh = Math.random()*2-1; }
       st.lastPh = ph;
       return st.snh;
+    case "exp":  return Math.exp(-ph*4)*2-1;
+    case "ramp": return 1-ph*2;
+    case "pulse":return ph<0.15?1:-1;
+    case "sine2":return Math.sin(ph*Math.PI*4);
+    case "drift":
+      st.d = (st.d||0)*0.97 + (Math.random()*2-1)*0.03;
+      return Math.max(-1, Math.min(1, st.d*6));
   }
   return 0;
 }
+const LFO_SHAPES = ["sine","tri","saw","ramp","sqr","pulse","snh","exp","sine2","drift"];
 function updateMod(dt, t){
   for(const k of LFOKEYS){
     if(lfoState[k].sync > 0) lfoState[k].rate = (bpm/60)/lfoState[k].sync;
@@ -343,8 +351,10 @@ function buildPanel(){
     const dOuter = d; const d2 = body;
     for(const p of PLIST.filter(p=>p.sec===sec.id)){
       const row = document.createElement("div"); row.className="prow";
-      const lab = document.createElement("label"); lab.textContent = p.name; lab.title = "Click while MIDI learn is on to map a controller";
+      const lab = document.createElement("label"); lab.textContent = p.name;
+      lab.title = "Right-click to patch a modulator \u00b7 click while MIDI learn is on to map a controller";
       lab.onclick = ()=>{ if(midiLearnMode){ setLearnTarget(p.id); } };
+      row.addEventListener("contextmenu", e=>{ e.preventDefault(); openModMenu(e, p); });
       const wrap = document.createElement("div"); wrap.className="sldwrap";
       const s = document.createElement("input");
       s.type="range"; s.min=p.min; s.max=p.max; s.step=(p.max-p.min)/400; s.value=getBase(p.id);
@@ -422,6 +432,163 @@ function buildPanel(){
   }
   panel.appendChild(d);
   buildAudioSection();
+}
+
+/* ---- MOD page: every source, live ---- */
+const modHist = {};   // id -> Float32Array ring
+const MODHIST_N = 140;
+for(const m of ["lfo1","lfo2","lfo3","lfo4","chaos","drift","spike","bass","mid","high","motion","bright","cut"]){
+  modHist[m] = {buf:new Float32Array(MODHIST_N), w:0};
+}
+function pushModHistory(){
+  for(const id in modHist){
+    const h = modHist[id];
+    h.buf[h.w] = modVal[id] || 0;
+    h.w = (h.w+1) % MODHIST_N;
+  }
+}
+const modCards = {};
+function buildModPage(){
+  const grid = document.getElementById("modgrid");
+  if(!grid) return;
+  grid.innerHTML = "";
+  const groups = [
+    {cls:"", title:"LFO", ids:LFOKEYS},
+    {cls:"", title:"GENERATORS", ids:["chaos","drift","spike"]},
+    {cls:"audio", title:"AUDIO", ids:["bass","mid","high"]},
+    {cls:"vid", title:"VIDEO", ids:["motion","bright","cut"]},
+  ];
+  for(const g of groups) for(const id of g.ids){
+    const src = MODSRC.find(m=>m.id===id);
+    const card = document.createElement("div");
+    card.className = "modcard "+g.cls;
+    const h = document.createElement("h4");
+    h.innerHTML = src.name;
+    const val = document.createElement("span");
+    val.style.cssText = "margin-left:auto; color:var(--txt); font-size:9px;";
+    h.appendChild(val);
+    card.appendChild(h);
+    const cv = document.createElement("canvas");
+    cv.width = 250; cv.height = 52;
+    card.appendChild(cv);
+
+    if(LFOKEYS.includes(id)){
+      const st = lfoState[id];
+      const r1 = document.createElement("div"); r1.className="mcrow";
+      const l1 = document.createElement("label"); l1.textContent="RATE";
+      const s1 = document.createElement("input");
+      s1.type="range"; s1.min=-2; s1.max=1.2; s1.step=0.01; s1.value=Math.log10(st.rate);
+      const v1 = document.createElement("span"); v1.className="mcval";
+      const upd1 = ()=>{ st.rate = Math.pow(10, parseFloat(s1.value)); v1.textContent = st.rate.toFixed(2)+"Hz"; };
+      s1.addEventListener("input", ()=>{ upd1(); refreshLfoUI(); }); upd1();
+      r1.appendChild(l1); r1.appendChild(s1); r1.appendChild(v1);
+      card.appendChild(r1);
+
+      const r2 = document.createElement("div"); r2.className="mcrow";
+      const l2 = document.createElement("label"); l2.textContent="SHAPE";
+      const sh = document.createElement("select");
+      for(const o of LFO_SHAPES){ const op=document.createElement("option"); op.value=o; op.textContent=o.toUpperCase(); sh.appendChild(op); }
+      sh.value = st.shape;
+      sh.onchange = ()=>{ st.shape = sh.value; refreshLfoUI(); };
+      const sy = document.createElement("select");
+      for(const [v,n] of [["0","FREE"],["16","4BAR"],["8","2BAR"],["4","1BAR"],["2","1/2"],["1","1/4"],["0.5","1/8"],["0.25","1/16"]]){
+        const op=document.createElement("option"); op.value=v; op.textContent=n; sy.appendChild(op);
+      }
+      sy.value = String(st.sync||0);
+      sy.onchange = ()=>{ st.sync = parseFloat(sy.value); s1.disabled = st.sync>0; refreshLfoUI(); };
+      s1.disabled = (st.sync||0) > 0;
+      r2.appendChild(l2); r2.appendChild(sh); r2.appendChild(sy);
+      card.appendChild(r2);
+    }
+    const dests = document.createElement("div");
+    dests.className = "dests";
+    card.appendChild(dests);
+    grid.appendChild(card);
+    modCards[id] = {cv, ctx:cv.getContext("2d"), val, dests};
+  }
+}
+function drawModPage(){
+  const page = document.getElementById("modpage");
+  if(!page || !page.classList.contains("show")) return;
+  for(const id in modCards){
+    const c = modCards[id];
+    const g = c.ctx, W = c.cv.width, H = c.cv.height;
+    g.clearRect(0,0,W,H);
+    g.strokeStyle = "#1e1e26"; g.beginPath(); g.moveTo(0,H/2); g.lineTo(W,H/2); g.stroke();
+    const h = modHist[id];
+    g.strokeStyle = id.startsWith("lfo") ? "#ff7a18" : (["bass","mid","high"].includes(id) ? "#2ee6d6" : "#ff3ea5");
+    g.lineWidth = 1.5; g.beginPath();
+    for(let i=0;i<MODHIST_N;i++){
+      const v = h.buf[(h.w+i)%MODHIST_N];
+      const x = i/(MODHIST_N-1)*W;
+      const y = H/2 - v*(H/2-3);
+      i ? g.lineTo(x,y) : g.moveTo(x,y);
+    }
+    g.stroke();
+    c.val.textContent = (modVal[id]||0).toFixed(2);
+    const rs = routes.filter(r=>r.src===id);
+    c.dests.innerHTML = rs.length
+      ? rs.map(r=>"<b>"+(P[r.dst]?P[r.dst].name:r.dst)+"</b> "+(P[r.dst]&&P[r.dst].master?"":r.ch||"A")+" "+r.amt.toFixed(2)).join(" &nbsp; ")
+      : "not patched \u2014 right-click a parameter to assign";
+  }
+}
+
+/* ---- right-click modulation assign ---- */
+let modMenuEl = null;
+function closeModMenu(){ if(modMenuEl){ modMenuEl.remove(); modMenuEl = null; } }
+document.addEventListener("click", closeModMenu);
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModMenu(); });
+function routesFor(pid){
+  return routes.filter(r=>r.dst===pid && (P[pid].master || !r.ch || r.ch===activeChan || r.ch==="AB"));
+}
+function openModMenu(ev, p){
+  closeModMenu();
+  const m = document.createElement("div");
+  m.className = "modmenu";
+  modMenuEl = m;
+  const head = document.createElement("div");
+  head.className = "mmhead";
+  head.textContent = p.name + (p.master ? "  \u00b7 MASTER" : "  \u00b7 CH "+activeChan);
+  m.appendChild(head);
+
+  const existing = routesFor(p.id);
+  if(existing.length){
+    for(const r of existing){
+      const row = document.createElement("div");
+      row.className = "mmrow existing";
+      const nm = MODSRC.find(x=>x.id===r.src);
+      row.innerHTML = "<span>\u25cf "+(nm?nm.name:r.src)+"</span>";
+      const amt = document.createElement("input");
+      amt.type="range"; amt.min=-1; amt.max=1; amt.step=0.01; amt.value=r.amt;
+      amt.addEventListener("input", ()=>{ r.amt = parseFloat(amt.value); renderRoutes(); });
+      amt.addEventListener("click", e=>e.stopPropagation());
+      const del = document.createElement("button");
+      del.textContent = "\u2715";
+      del.onclick = e=>{ e.stopPropagation(); routes.splice(routes.indexOf(r),1); renderRoutes(); closeModMenu(); };
+      row.appendChild(amt); row.appendChild(del);
+      m.appendChild(row);
+    }
+    const sep = document.createElement("div"); sep.className="mmsep"; sep.textContent="ADD ANOTHER";
+    m.appendChild(sep);
+  }
+
+  for(const src of MODSRC){
+    const b = document.createElement("div");
+    b.className = "mmrow";
+    b.textContent = src.name;
+    b.onclick = e=>{
+      e.stopPropagation();
+      routes.push({src:src.id, dst:p.id, amt:0.3, ch:(p.master?"A":activeChan)});
+      renderRoutes();
+      closeModMenu();
+      toast(src.name+" \u2192 "+p.name);
+    };
+    m.appendChild(b);
+  }
+  document.body.appendChild(m);
+  const w = 200, h = Math.min(m.scrollHeight, 340);
+  m.style.left = Math.min(ev.clientX, window.innerWidth - w - 8) + "px";
+  m.style.top  = Math.min(ev.clientY, window.innerHeight - h - 8) + "px";
 }
 
 /* ---- collapsible section plumbing ---- */

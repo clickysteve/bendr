@@ -122,6 +122,87 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
 .secreset{margin-left:auto; padding:1px 6px; font-size:8px; color:var(--dim); border-color:var(--line); letter-spacing:1px;}
 .secreset:hover{color:var(--red); border-color:var(--red);}
 #spd.hot::-webkit-slider-thumb{background:var(--red); box-shadow:0 0 6px var(--red);}
+/* right-click modulation menu */
+.modmenu{
+  position:fixed; z-index:70; width:200px; max-height:340px; overflow-y:auto;
+  background:var(--panel); border:1px solid var(--mag); border-radius:5px;
+  box-shadow:0 8px 24px rgba(0,0,0,.6); padding:4px;
+}
+.modmenu .mmhead{
+  font-size:8.5px; letter-spacing:1.5px; color:var(--mag); padding:6px 8px 7px;
+  border-bottom:1px solid var(--line); margin-bottom:3px;
+}
+.modmenu .mmsep{
+  font-size:7.5px; letter-spacing:1.5px; color:var(--dim); padding:6px 8px 3px;
+  border-top:1px solid var(--line); margin-top:3px;
+}
+.modmenu .mmrow{
+  padding:6px 8px; font-size:9.5px; letter-spacing:1px; color:var(--txt);
+  cursor:pointer; border-radius:3px; display:flex; align-items:center; gap:6px;
+}
+.modmenu .mmrow:hover{background:var(--panel2); color:#fff;}
+.modmenu .mmrow.existing{background:rgba(255,62,165,.1); cursor:default;}
+.modmenu .mmrow.existing span{flex:0 0 auto; color:var(--mag); font-size:9px;}
+.modmenu .mmrow.existing input{flex:1; min-width:40px;}
+.modmenu .mmrow.existing button{padding:1px 5px; font-size:9px; color:var(--dim);}
+/* modulation page */
+#modpage{
+  position:fixed; inset:0; background:rgba(6,6,10,.94); z-index:56; display:none;
+  flex-direction:column; padding:14px 16px; gap:10px;
+}
+#modpage.show{display:flex;}
+#modpage .mphead{display:flex; align-items:center; gap:10px;}
+#modpage .mphead h3{font-size:11px; letter-spacing:2.5px; color:var(--cyan);}
+#modgrid{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:10px;
+  overflow-y:auto; flex:1; align-content:start;
+}
+.modcard{
+  background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:9px 10px;
+}
+.modcard h4{
+  font-size:9px; letter-spacing:2px; color:var(--amber); padding-bottom:6px;
+  display:flex; align-items:center; gap:6px;
+}
+.modcard.audio h4{color:var(--cyan);} .modcard.vid h4{color:var(--mag);}
+.modcard canvas{
+  width:100%; height:52px; display:block; background:#0c0c11;
+  border:1px solid #1e1e26; border-radius:3px; margin-bottom:6px;
+}
+.modcard .mcrow{display:flex; align-items:center; gap:6px; padding:2px 0;}
+.modcard .mcrow label{font-size:8.5px; letter-spacing:1px; color:var(--dim); width:38px;}
+.modcard .mcrow select{font-size:9px; padding:3px 14px 3px 5px;}
+.modcard .mcrow input[type=range]{flex:1;}
+.modcard .mcval{font-size:9px; color:var(--txt); width:38px; text-align:right;}
+.modcard .dests{font-size:8.5px; color:var(--dim); padding-top:5px; line-height:1.5; border-top:1px solid #1e1e26; margin-top:6px;}
+.modcard .dests b{color:var(--cyan); font-weight:400;}
+/* text / shape editor */
+#textEd{
+  position:fixed; inset:0; background:rgba(6,6,10,.9); z-index:55; display:none;
+  align-items:center; justify-content:center;
+}
+#textEd.show{display:flex;}
+#textEd .edbox{
+  width:620px; max-width:94vw; max-height:90vh; overflow-y:auto; background:var(--panel);
+  border:1px solid var(--mag); border-radius:6px; padding:16px 18px;
+}
+#textEd h3{
+  font-size:10px; letter-spacing:2px; color:var(--mag); padding-bottom:10px;
+  display:flex; align-items:center; gap:8px;
+}
+#textEd h4{font-size:9px; letter-spacing:2px; color:var(--dim); padding:12px 0 4px; border-top:1px solid var(--line); margin-top:10px;}
+#textEd textarea{
+  width:100%; background:var(--panel2); color:var(--txt); border:1px solid var(--line);
+  border-radius:4px; padding:8px; font-family:var(--font); font-size:13px; letter-spacing:1px;
+  resize:vertical; outline:none;
+}
+#textEd textarea:focus{border-color:var(--mag);}
+.edrow{display:flex; align-items:center; gap:8px; padding:6px 0; flex-wrap:wrap;}
+.edrow label{font-size:8.5px; letter-spacing:1.5px; color:var(--dim); white-space:nowrap;}
+.edrow input[type=range]{flex:1 1 90px; min-width:70px;}
+.edrow input[type=color]{
+  width:34px; height:22px; padding:0; border:1px solid var(--line); background:none; cursor:pointer;
+}
 /* channel selector */
 #chanbar{
   display:flex; gap:6px; padding:8px 10px; border-bottom:1px solid var(--line);
@@ -316,13 +397,14 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version — check this matches what you expect after a deploy">v11.0</span>
+  <span id="ver" title="Build version — check this matches what you expect after a deploy">v12.0</span>
   <div class="hsep"></div>
   <div class="hgrp">
     <button id="btnFile" title="Load channel A video (any size — it streams from disk)">FILE A</button>
     <button id="btnFileB" title="Load channel B video for the A/B mixer">B</button>
     <button id="btnCam" title="Use webcam on channel A">CAM</button>
-    <button id="btnPat" title="Built-in test pattern on channel A">PATTERN</button>
+    <button id="btnPat" title="Built-in test pattern on this channel">PATTERN</button>
+    <button id="btnText" title="Text / shape generator for this channel">TEXT</button>
     <select id="selPat" title="Test pattern type">
       <option value="bars">BARS</option>
       <option value="testcard">TESTCARD</option>
@@ -357,6 +439,7 @@ audio,video{display:none;}
   </div>
   <div class="spacer"></div>
   <div class="hgrp">
+    <button id="btnMod" title="Modulation page — see every source moving (D)">MOD</button>
     <button id="btnMidi" title="MIDI learn: toggle, then click a parameter name, then move a knob">MIDI</button>
     <button id="btnBypass" title="Hold to see the clean signal (B)">BYPASS</button>
     <button id="btnSnap" title="Save a PNG still (S)">SNAP</button>
@@ -418,10 +501,12 @@ audio,video{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v11.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v12.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>TWO CHANNELS</h3>
   <p>BENDR is a two-channel mixer: <b>A</b> and <b>B</b> each have their own input <i>and</i> their own complete set of effects. The big A / B buttons at the top of the panel choose which channel you're editing — everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits both at once, <b>COPY</b> pushes the current channel onto the other, <b>SWAP</b> exchanges them. Sections tagged MASTER (the mixer, morph and CRT) are shared. Then the <b>INPUT MIXER</b> combines the two finished channels with the A&gt;B fader, wipes, keys and blends.</p>
+  <h3>TEXT / SHAPES</h3>
+  <p><b>TEXT</b> turns the selected channel into a text and shape generator — type anything, pick a font, position/scroll/repeat it, add outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric, starburst) with count, spin and pulse. It feeds the channel like any other source, so you can glitch it, feed it back, and mix it against video on the other channel.</p>
   <h3>INPUT</h3>
   <p>Each channel takes its own source. <b>FILE</b> loads any video your browser can play into the selected channel (drag &amp; drop works too — files stream from disk, so size doesn't matter). <b>CAM</b> uses your webcam. <b>PATTERN</b> is a built-in test signal — pick BARS, TESTCARD, OSCILLATOR (video-synth colour waves), GRID, RAMP or STATIC from the dropdown.</p>
   <h3>SIGNAL CHAIN</h3>
@@ -445,6 +530,8 @@ audio,video{display:none;}
   <p>The <b>INPUT MIXER</b> blends video channel B over A (load B first) — FADE, LUMA KEY or CHROMA KEY modes. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor. CHAIN swaps whether tape damage or the colour/enhancer stage comes first.</p>
   <h3>VIDEO-REACTIVE</h3>
   <p>MOTION, BRIGHT and CUT are mod sources computed from the picture itself — patch CUT into TEAR and every edit knocks the sync loose like a real deck.</p>
+  <h3>MODULATION</h3>
+  <p><b>Right-click any parameter</b> to patch a modulator straight onto it, adjust the amount, or remove it. The <b>MOD</b> button (or <kbd>D</kbd>) opens the modulation page: every source drawn live, LFO rate/shape/sync editable in place, and each card lists what it's driving.</p>
   <h3>TEMPO &amp; MIDI</h3>
   <p>TAP sets the tempo; LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
   <h3>KEYS</h3>
@@ -458,6 +545,75 @@ audio,video{display:none;}
   <button data-mtab="bends">BEND</button>
   <button data-mtab="matrix">MATRIX</button>
   <button data-mtab="video">VIDEO</button>
+</div>
+<div id="modpage">
+  <div class="mphead">
+    <h3>MODULATION</h3>
+    <span style="color:var(--dim); font-size:9px;">Right-click any parameter in the panel to patch it &middot; sources animate live below</span>
+    <span style="flex:1;"></span>
+    <button id="modPageClose">CLOSE</button>
+  </div>
+  <div id="modgrid"></div>
+</div>
+<div id="textEd">
+  <div class="edbox">
+    <h3>TEXT / SHAPE GENERATOR <span id="textEdChan"></span><button id="textEdClose" style="margin-left:auto;">CLOSE</button></h3>
+    <textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
+    <div class="edrow">
+      <label>FONT</label>
+      <select id="txtFont">
+        <option value="mono">MONO</option>
+        <option value="sans">SANS BOLD</option>
+        <option value="serif">SERIF</option>
+        <option value="cond">CONDENSED</option>
+      </select>
+      <label>SIZE</label><input type="range" id="txtSize" min="0.03" max="0.6" step="0.005" value="0.2">
+      <label>TRACK</label><input type="range" id="txtTrack" min="-0.1" max="0.5" step="0.005" value="0">
+    </div>
+    <div class="edrow">
+      <label>X</label><input type="range" id="txtX" min="0" max="1" step="0.005" value="0.5">
+      <label>Y</label><input type="range" id="txtY" min="0" max="1" step="0.005" value="0.5">
+      <label>ROT</label><input type="range" id="txtRot" min="-180" max="180" step="1" value="0">
+    </div>
+    <div class="edrow">
+      <label>SCROLL X</label><input type="range" id="txtScrollX" min="-1" max="1" step="0.01" value="0">
+      <label>SCROLL Y</label><input type="range" id="txtScrollY" min="-1" max="1" step="0.01" value="0">
+      <label>REPEAT</label><input type="range" id="txtRepeat" min="1" max="8" step="1" value="1">
+    </div>
+    <div class="edrow">
+      <label>INK</label><input type="color" id="txtInk" value="#ffffff">
+      <label>BG</label><input type="color" id="txtBg" value="#000000">
+      <label>OUTLINE</label><input type="range" id="txtOutline" min="0" max="20" step="0.5" value="0">
+    </div>
+    <h4>SHAPES</h4>
+    <div class="edrow">
+      <select id="shpKind">
+        <option value="none">NONE</option>
+        <option value="circle">CIRCLE</option>
+        <option value="ring">RING</option>
+        <option value="rect">RECT</option>
+        <option value="tri">TRIANGLE</option>
+        <option value="cross">CROSS</option>
+        <option value="bars">BARS</option>
+        <option value="grid">GRID</option>
+        <option value="rings">CONCENTRIC</option>
+        <option value="starburst">STARBURST</option>
+      </select>
+      <label>COUNT</label><input type="range" id="shpCount" min="1" max="24" step="1" value="1">
+      <label>SIZE</label><input type="range" id="shpSize" min="0.02" max="1" step="0.005" value="0.3">
+    </div>
+    <div class="edrow">
+      <label>X</label><input type="range" id="shpX" min="0" max="1" step="0.005" value="0.5">
+      <label>Y</label><input type="range" id="shpY" min="0" max="1" step="0.005" value="0.5">
+      <label>SPIN</label><input type="range" id="shpSpin" min="-2" max="2" step="0.01" value="0">
+      <label>FILL</label><input type="color" id="shpFill" value="#ff2fa0">
+    </div>
+    <div class="edrow">
+      <label>STROKE</label><input type="range" id="shpStroke" min="0" max="40" step="0.5" value="0">
+      <label>PULSE</label><input type="range" id="shpPulse" min="0" max="1" step="0.01" value="0">
+      <span style="color:var(--dim); font-size:9px; flex:1;">Feeds this channel like any other source — glitch it, feed it back, mix it.</span>
+    </div>
+  </div>
 </div>
 <div id="toast"></div>
 <div id="renderOv" style="display:none; position:fixed; inset:0; z-index:80; background:rgba(6,6,10,.9); flex-direction:column; align-items:center; justify-content:center; gap:16px;">
@@ -1326,9 +1482,17 @@ function lfoOut(st, dt){
       if(st.phase < st.rate*dt || st.lastPh > ph){ st.snh = Math.random()*2-1; }
       st.lastPh = ph;
       return st.snh;
+    case "exp":  return Math.exp(-ph*4)*2-1;
+    case "ramp": return 1-ph*2;
+    case "pulse":return ph<0.15?1:-1;
+    case "sine2":return Math.sin(ph*Math.PI*4);
+    case "drift":
+      st.d = (st.d||0)*0.97 + (Math.random()*2-1)*0.03;
+      return Math.max(-1, Math.min(1, st.d*6));
   }
   return 0;
 }
+const LFO_SHAPES = ["sine","tri","saw","ramp","sqr","pulse","snh","exp","sine2","drift"];
 function updateMod(dt, t){
   for(const k of LFOKEYS){
     if(lfoState[k].sync > 0) lfoState[k].rate = (bpm/60)/lfoState[k].sync;
@@ -1607,8 +1771,10 @@ function buildPanel(){
     const dOuter = d; const d2 = body;
     for(const p of PLIST.filter(p=>p.sec===sec.id)){
       const row = document.createElement("div"); row.className="prow";
-      const lab = document.createElement("label"); lab.textContent = p.name; lab.title = "Click while MIDI learn is on to map a controller";
+      const lab = document.createElement("label"); lab.textContent = p.name;
+      lab.title = "Right-click to patch a modulator \u00b7 click while MIDI learn is on to map a controller";
       lab.onclick = ()=>{ if(midiLearnMode){ setLearnTarget(p.id); } };
+      row.addEventListener("contextmenu", e=>{ e.preventDefault(); openModMenu(e, p); });
       const wrap = document.createElement("div"); wrap.className="sldwrap";
       const s = document.createElement("input");
       s.type="range"; s.min=p.min; s.max=p.max; s.step=(p.max-p.min)/400; s.value=getBase(p.id);
@@ -1686,6 +1852,163 @@ function buildPanel(){
   }
   panel.appendChild(d);
   buildAudioSection();
+}
+
+/* ---- MOD page: every source, live ---- */
+const modHist = {};   // id -> Float32Array ring
+const MODHIST_N = 140;
+for(const m of ["lfo1","lfo2","lfo3","lfo4","chaos","drift","spike","bass","mid","high","motion","bright","cut"]){
+  modHist[m] = {buf:new Float32Array(MODHIST_N), w:0};
+}
+function pushModHistory(){
+  for(const id in modHist){
+    const h = modHist[id];
+    h.buf[h.w] = modVal[id] || 0;
+    h.w = (h.w+1) % MODHIST_N;
+  }
+}
+const modCards = {};
+function buildModPage(){
+  const grid = document.getElementById("modgrid");
+  if(!grid) return;
+  grid.innerHTML = "";
+  const groups = [
+    {cls:"", title:"LFO", ids:LFOKEYS},
+    {cls:"", title:"GENERATORS", ids:["chaos","drift","spike"]},
+    {cls:"audio", title:"AUDIO", ids:["bass","mid","high"]},
+    {cls:"vid", title:"VIDEO", ids:["motion","bright","cut"]},
+  ];
+  for(const g of groups) for(const id of g.ids){
+    const src = MODSRC.find(m=>m.id===id);
+    const card = document.createElement("div");
+    card.className = "modcard "+g.cls;
+    const h = document.createElement("h4");
+    h.innerHTML = src.name;
+    const val = document.createElement("span");
+    val.style.cssText = "margin-left:auto; color:var(--txt); font-size:9px;";
+    h.appendChild(val);
+    card.appendChild(h);
+    const cv = document.createElement("canvas");
+    cv.width = 250; cv.height = 52;
+    card.appendChild(cv);
+
+    if(LFOKEYS.includes(id)){
+      const st = lfoState[id];
+      const r1 = document.createElement("div"); r1.className="mcrow";
+      const l1 = document.createElement("label"); l1.textContent="RATE";
+      const s1 = document.createElement("input");
+      s1.type="range"; s1.min=-2; s1.max=1.2; s1.step=0.01; s1.value=Math.log10(st.rate);
+      const v1 = document.createElement("span"); v1.className="mcval";
+      const upd1 = ()=>{ st.rate = Math.pow(10, parseFloat(s1.value)); v1.textContent = st.rate.toFixed(2)+"Hz"; };
+      s1.addEventListener("input", ()=>{ upd1(); refreshLfoUI(); }); upd1();
+      r1.appendChild(l1); r1.appendChild(s1); r1.appendChild(v1);
+      card.appendChild(r1);
+
+      const r2 = document.createElement("div"); r2.className="mcrow";
+      const l2 = document.createElement("label"); l2.textContent="SHAPE";
+      const sh = document.createElement("select");
+      for(const o of LFO_SHAPES){ const op=document.createElement("option"); op.value=o; op.textContent=o.toUpperCase(); sh.appendChild(op); }
+      sh.value = st.shape;
+      sh.onchange = ()=>{ st.shape = sh.value; refreshLfoUI(); };
+      const sy = document.createElement("select");
+      for(const [v,n] of [["0","FREE"],["16","4BAR"],["8","2BAR"],["4","1BAR"],["2","1/2"],["1","1/4"],["0.5","1/8"],["0.25","1/16"]]){
+        const op=document.createElement("option"); op.value=v; op.textContent=n; sy.appendChild(op);
+      }
+      sy.value = String(st.sync||0);
+      sy.onchange = ()=>{ st.sync = parseFloat(sy.value); s1.disabled = st.sync>0; refreshLfoUI(); };
+      s1.disabled = (st.sync||0) > 0;
+      r2.appendChild(l2); r2.appendChild(sh); r2.appendChild(sy);
+      card.appendChild(r2);
+    }
+    const dests = document.createElement("div");
+    dests.className = "dests";
+    card.appendChild(dests);
+    grid.appendChild(card);
+    modCards[id] = {cv, ctx:cv.getContext("2d"), val, dests};
+  }
+}
+function drawModPage(){
+  const page = document.getElementById("modpage");
+  if(!page || !page.classList.contains("show")) return;
+  for(const id in modCards){
+    const c = modCards[id];
+    const g = c.ctx, W = c.cv.width, H = c.cv.height;
+    g.clearRect(0,0,W,H);
+    g.strokeStyle = "#1e1e26"; g.beginPath(); g.moveTo(0,H/2); g.lineTo(W,H/2); g.stroke();
+    const h = modHist[id];
+    g.strokeStyle = id.startsWith("lfo") ? "#ff7a18" : (["bass","mid","high"].includes(id) ? "#2ee6d6" : "#ff3ea5");
+    g.lineWidth = 1.5; g.beginPath();
+    for(let i=0;i<MODHIST_N;i++){
+      const v = h.buf[(h.w+i)%MODHIST_N];
+      const x = i/(MODHIST_N-1)*W;
+      const y = H/2 - v*(H/2-3);
+      i ? g.lineTo(x,y) : g.moveTo(x,y);
+    }
+    g.stroke();
+    c.val.textContent = (modVal[id]||0).toFixed(2);
+    const rs = routes.filter(r=>r.src===id);
+    c.dests.innerHTML = rs.length
+      ? rs.map(r=>"<b>"+(P[r.dst]?P[r.dst].name:r.dst)+"</b> "+(P[r.dst]&&P[r.dst].master?"":r.ch||"A")+" "+r.amt.toFixed(2)).join(" &nbsp; ")
+      : "not patched \u2014 right-click a parameter to assign";
+  }
+}
+
+/* ---- right-click modulation assign ---- */
+let modMenuEl = null;
+function closeModMenu(){ if(modMenuEl){ modMenuEl.remove(); modMenuEl = null; } }
+document.addEventListener("click", closeModMenu);
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModMenu(); });
+function routesFor(pid){
+  return routes.filter(r=>r.dst===pid && (P[pid].master || !r.ch || r.ch===activeChan || r.ch==="AB"));
+}
+function openModMenu(ev, p){
+  closeModMenu();
+  const m = document.createElement("div");
+  m.className = "modmenu";
+  modMenuEl = m;
+  const head = document.createElement("div");
+  head.className = "mmhead";
+  head.textContent = p.name + (p.master ? "  \u00b7 MASTER" : "  \u00b7 CH "+activeChan);
+  m.appendChild(head);
+
+  const existing = routesFor(p.id);
+  if(existing.length){
+    for(const r of existing){
+      const row = document.createElement("div");
+      row.className = "mmrow existing";
+      const nm = MODSRC.find(x=>x.id===r.src);
+      row.innerHTML = "<span>\u25cf "+(nm?nm.name:r.src)+"</span>";
+      const amt = document.createElement("input");
+      amt.type="range"; amt.min=-1; amt.max=1; amt.step=0.01; amt.value=r.amt;
+      amt.addEventListener("input", ()=>{ r.amt = parseFloat(amt.value); renderRoutes(); });
+      amt.addEventListener("click", e=>e.stopPropagation());
+      const del = document.createElement("button");
+      del.textContent = "\u2715";
+      del.onclick = e=>{ e.stopPropagation(); routes.splice(routes.indexOf(r),1); renderRoutes(); closeModMenu(); };
+      row.appendChild(amt); row.appendChild(del);
+      m.appendChild(row);
+    }
+    const sep = document.createElement("div"); sep.className="mmsep"; sep.textContent="ADD ANOTHER";
+    m.appendChild(sep);
+  }
+
+  for(const src of MODSRC){
+    const b = document.createElement("div");
+    b.className = "mmrow";
+    b.textContent = src.name;
+    b.onclick = e=>{
+      e.stopPropagation();
+      routes.push({src:src.id, dst:p.id, amt:0.3, ch:(p.master?"A":activeChan)});
+      renderRoutes();
+      closeModMenu();
+      toast(src.name+" \u2192 "+p.name);
+    };
+    m.appendChild(b);
+  }
+  document.body.appendChild(m);
+  const w = 200, h = Math.min(m.scrollHeight, 340);
+  m.style.left = Math.min(ev.clientX, window.innerWidth - w - 8) + "px";
+  m.style.top  = Math.min(ev.clientY, window.innerHeight - h - 8) + "px";
 }
 
 /* ---- collapsible section plumbing ---- */
@@ -2312,6 +2635,7 @@ function restoreState(st){
   } else {
     applyState(st.bases||{}, st.routes||[], st);   /* legacy single-channel state */
   }
+  if(st.srcText){ for(const ch of CHANNELS) if(st.srcText[ch]) Object.assign(SRC[ch].text, st.srcText[ch]); }
   if(st.activeChan) setActiveChan(st.activeChan);
   refreshToggles();
   renderChain();
@@ -2367,7 +2691,8 @@ document.getElementById("btnSave").onclick = ()=>{
   const snap = snapshotAll();
   const state = {app:"bendr", v:5, chan:snap.chan, master:snap.master, routes, audioCfg,
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
-    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}};
+    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
+    srcText: {A:{...SRC.A.text}, B:{...SRC.B.text}}};
   for(const k of LFOKEYS) state[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   const blob = new Blob([JSON.stringify(state,null,1)], {type:"application/json"});
   dl(URL.createObjectURL(blob), "bendr-"+stamp()+".json");
@@ -2403,7 +2728,11 @@ function newSource(ch){
   pc.width = 960; pc.height = 540;
   return {ch, video:v, mode:"pattern", pattern:"bars", cam:null,
           patCanvas:pc, pat:pc.getContext("2d"), patClock:0,
-          aspect:16/9, has:0, speed:1, name:"", audioHooked:false};
+          aspect:16/9, has:0, speed:1, name:"", audioHooked:false,
+          text:{body:"BENDR", font:"mono", size:0.2, track:0, x:0.5, y:0.5, rot:0,
+                scrollX:0, scrollY:0, repeat:1, ink:"#ffffff", bg:"#000000", outline:0,
+                shape:"none", shpCount:1, shpSize:0.3, shpX:0.5, shpY:0.5,
+                shpSpin:0, shpFill:"#ff2fa0", shpStroke:0, shpPulse:0}};
 }
 const SRC = {A:newSource("A"), B:newSource("B")};
 /* the A-channel video keeps the old name so audio hookup keeps working */
@@ -2472,6 +2801,7 @@ function syncChanInputUI(){
   document.getElementById("btnFile").classList.toggle("on", S.mode==="file");
   document.getElementById("btnCam").classList.toggle("on", S.mode==="cam");
   document.getElementById("btnPat").classList.toggle("on", S.mode==="pattern");
+  document.getElementById("btnText").classList.toggle("on", S.mode==="text");
   document.getElementById("btnFile").textContent = "FILE " + activeChan;
   selPat.value = S.pattern;
   const sp = document.getElementById("spd");
@@ -2479,8 +2809,124 @@ function syncChanInputUI(){
   sp.classList.toggle("hot", Math.abs(S.speed-1) > 0.001);
   const lp = document.getElementById("btnLoop");
   lp.classList.toggle("on", S.video.loop);
+  if(textEd && textEd.classList.contains("show")) syncTextEditor();
 }
 window.__syncChanInputUI = syncChanInputUI;
+
+/* ---- text / shape generator ---- */
+const FONTS = {mono:'"SF Mono", ui-monospace, Menlo, monospace',
+               sans:'Helvetica, Arial, sans-serif',
+               serif:'Georgia, "Times New Roman", serif',
+               cond:'"Arial Narrow", "Helvetica Neue", sans-serif'};
+function drawTextSource(S, t){
+  const g = S.pat, W = S.patCanvas.width, H = S.patCanvas.height, T = S.text;
+  g.setTransform(1,0,0,1,0,0);
+  g.fillStyle = T.bg; g.fillRect(0,0,W,H);
+
+  /* shapes underneath */
+  if(T.shape !== "none"){
+    const n = Math.max(1, Math.round(T.shpCount));
+    const pulse = 1 + T.shpPulse*0.45*Math.sin(t*3.1);
+    for(let i=0;i<n;i++){
+      const f = n===1 ? 0 : i/(n-1);
+      g.save();
+      g.translate(T.shpX*W, T.shpY*H);
+      g.rotate(T.shpSpin*t + f*Math.PI*2/Math.max(1,n));
+      const sz = T.shpSize*H*pulse*(1 - f*0.55);
+      g.fillStyle = T.shpFill; g.strokeStyle = T.shpFill; g.lineWidth = T.shpStroke;
+      const stroked = T.shpStroke > 0.2;
+      g.beginPath();
+      switch(T.shape){
+        case "circle": g.arc(0,0,sz,0,7); break;
+        case "ring":   g.arc(0,0,sz,0,7); g.arc(0,0,sz*0.55,0,7); break;
+        case "rect":   g.rect(-sz,-sz*0.62,sz*2,sz*1.24); break;
+        case "tri":    g.moveTo(0,-sz); g.lineTo(sz*0.87,sz*0.5); g.lineTo(-sz*0.87,sz*0.5); g.closePath(); break;
+        case "cross":  g.rect(-sz,-sz*0.18,sz*2,sz*0.36); g.rect(-sz*0.18,-sz,sz*0.36,sz*2); break;
+        case "bars":   for(let b=0;b<8;b++) g.rect(-sz + b*sz/4, -sz, sz/8, sz*2); break;
+        case "grid":   for(let b=-4;b<=4;b++){ g.rect(b*sz/4-sz*0.02,-sz,sz*0.04,sz*2); g.rect(-sz,b*sz/4-sz*0.02,sz*2,sz*0.04); } break;
+        case "rings":  for(let b=1;b<=6;b++){ g.moveTo(sz*b/6,0); g.arc(0,0,sz*b/6,0,7); } break;
+        case "starburst": for(let b=0;b<16;b++){ const a=b*Math.PI/8; g.moveTo(0,0); g.lineTo(Math.cos(a)*sz, Math.sin(a)*sz); } break;
+      }
+      if(T.shape==="rings" || T.shape==="starburst" || stroked){ g.lineWidth = Math.max(1,T.shpStroke||2); g.stroke(); }
+      else g.fill();
+      g.restore();
+    }
+  }
+
+  /* text on top */
+  const body = (T.body||"").split("\n");
+  if(body.length && body.join("").length){
+    const px = Math.max(4, T.size*H);
+    g.font = "bold "+px+"px "+FONTS[T.font];
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillStyle = T.ink; g.strokeStyle = T.ink; g.lineWidth = T.outline;
+    const reps = Math.max(1, Math.round(T.repeat));
+    for(let r=0;r<reps;r++){
+      g.save();
+      const ox = ((T.x + T.scrollX*t) % 1 + 1) % 1;
+      const oy = ((T.y + T.scrollY*t) % 1 + 1) % 1;
+      g.translate(ox*W, oy*H + (r - (reps-1)/2)*px*1.35*Math.max(1,reps>1?1.2:1));
+      g.rotate(T.rot*Math.PI/180);
+      body.forEach((line,li)=>{
+        const yy = (li - (body.length-1)/2)*px*1.15;
+        if(T.track !== 0){
+          /* manual letter spacing */
+          const chars = [...line];
+          const sp = T.track*px;
+          let total = 0;
+          for(const c of chars) total += g.measureText(c).width + sp;
+          let cx = -total/2;
+          for(const c of chars){
+            const w = g.measureText(c).width;
+            if(T.outline>0.2) g.strokeText(c, cx+w/2, yy); else g.fillText(c, cx+w/2, yy);
+            cx += w + sp;
+          }
+        } else {
+          if(T.outline>0.2) g.strokeText(line, 0, yy); else g.fillText(line, 0, yy);
+        }
+      });
+      g.restore();
+    }
+  }
+  g.setTransform(1,0,0,1,0,0);
+}
+
+/* text editor wiring */
+const textEd = document.getElementById("textEd");
+const TXT_CTRL = [["txtBody","body","s"],["txtFont","font","s"],["txtSize","size","f"],["txtTrack","track","f"],
+  ["txtX","x","f"],["txtY","y","f"],["txtRot","rot","f"],["txtScrollX","scrollX","f"],["txtScrollY","scrollY","f"],
+  ["txtRepeat","repeat","f"],["txtInk","ink","s"],["txtBg","bg","s"],["txtOutline","outline","f"],
+  ["shpKind","shape","s"],["shpCount","shpCount","f"],["shpSize","shpSize","f"],["shpX","shpX","f"],["shpY","shpY","f"],
+  ["shpSpin","shpSpin","f"],["shpFill","shpFill","s"],["shpStroke","shpStroke","f"],["shpPulse","shpPulse","f"]];
+function syncTextEditor(){
+  const T = cur().text;
+  document.getElementById("textEdChan").textContent = "\u2014 CHANNEL "+activeChan;
+  for(const [id,key,kind] of TXT_CTRL){
+    const el = document.getElementById(id); if(!el) continue;
+    el.value = T[key];
+  }
+}
+for(const [id,key,kind] of TXT_CTRL){
+  const el = document.getElementById(id); if(!el) continue;
+  const handler = ()=>{
+    const T = cur().text;
+    T[key] = (kind==="f") ? parseFloat(el.value) : el.value;
+    const S = cur();
+    if(S.mode !== "text"){ stopCam(activeChan); S.mode = "text"; S.name = "text"; syncChanInputUI(); }
+  };
+  el.addEventListener("input", handler);
+  el.addEventListener("change", handler);
+}
+document.getElementById("btnText").onclick = ()=>{
+  const S = cur();
+  stopCam(activeChan);
+  S.mode = "text"; S.name = "text";
+  syncChanInputUI(); syncTextEditor();
+  textEd.classList.add("show");
+  setTimeout(()=>document.getElementById("txtBody").focus(), 50);
+};
+document.getElementById("textEdClose").onclick = ()=> textEd.classList.remove("show");
+textEd.addEventListener("click", e=>{ if(e.target===textEd) textEd.classList.remove("show"); });
 
 /* test pattern drawing — per source */
 const noiseC = document.createElement("canvas"); noiseC.width=240; noiseC.height=135;
@@ -2744,6 +3190,7 @@ window.addEventListener("keydown", e=>{
   if(k==="f"){ document.getElementById("btnFull").click(); return; }
   if(k==="s"){ document.getElementById("btnSnap").click(); return; }
   if(k==="h"){ help.classList.toggle("show"); return; }
+  if(k==="d"){ document.getElementById("modpage").classList.toggle("show"); return; }
   if(k==="p"){ btnPlay.click(); return; }
   if(k==="b"){ setBypass(true); return; }
   if(k==="q"){ bendHeld.sync=true; markBend("sync",true); }
@@ -2872,7 +3319,7 @@ let mdAvg=0.02, motionPeak=0.05, cutV=0;
 function updateContentAnalysis(dt){
   const S = SRC.A;
   let src = null;
-  if(S.mode==="pattern") src = S.patCanvas;
+  if(S.mode==="pattern" || S.mode==="text") src = S.patCanvas;
   else if(S.video.readyState>=2 && S.video.videoWidth>0) src = S.video;
   if(!src){ modVal.motion *= 1-Math.min(1,dt*4); cutV *= Math.exp(-dt*5); modVal.cut = cutV; return; }
   try{ anaCtx.drawImage(src, 0, 0, 32, 18); }catch(e){ return; }
@@ -2957,7 +3404,7 @@ function runStage(id, inTex, dstRT, now, ch){
 
 function srcReady(ch){
   const S = SRC[ch];
-  if(S.mode === "pattern") return true;
+  if(S.mode === "pattern" || S.mode === "text") return true;
   return S.video.readyState >= 2 && S.video.videoWidth > 0;
 }
 window.__chanHasSource = srcReady;
@@ -2967,9 +3414,9 @@ function uploadSource(ch, dt){
   const S = SRC[ch];
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
-  if(S.mode === "pattern"){
+  if(S.mode === "pattern" || S.mode === "text"){
     S.patClock += dt*S.speed;
-    drawPattern(S, S.patClock);
+    if(S.mode === "text") drawTextSource(S, S.patClock); else drawPattern(S, S.patClock);
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, S.patCanvas);
     S.aspect = S.patCanvas.width/S.patCanvas.height; S.has = 1;
   } else if(S.video.readyState >= 2 && S.video.videoWidth > 0){
@@ -3056,6 +3503,7 @@ function renderFrame(now, dt){
   updateAudio(dt);
   updateContentAnalysis(dt);
   updateMod(dt, now);
+  pushModHistory();
   applyParams(dt);
   updateSyncModel(dt, now);
 
@@ -3280,6 +3728,13 @@ if(OUTPUT_MODE){
   }
 
   buildPanel();
+  buildModPage();
+  setInterval(drawModPage, 50);
+  {
+    const mp = document.getElementById("modpage");
+    document.getElementById("btnMod").onclick = ()=>{ mp.classList.toggle("show"); };
+    document.getElementById("modPageClose").onclick = ()=> mp.classList.remove("show");
+  }
   setActiveChan("A");
   syncChanInputUI();
   renderChain();

@@ -31,6 +31,22 @@ const PRESETS = [
  [{src:"lfo3",dst:"swirl",amt:0.3},{src:"drift",dst:"melt",amt:0.25},{src:"lfo1",dst:"hue",amt:0.2},{src:"mid",dst:"driftWarp",amt:0.25}]],
 ["DATABENT", {blockShift:0.75,blockSize:0.45,fmWarp:0.45,driftWarp:0.35,pixelSort:0.3,sortThresh:0.55,chromaNoise:0.25,signalNoise:0.12,saturation:1.4,contrast:1.25,glow:0.2,scanlines:0.18,vignette:0.35},
  [{src:"spike",dst:"blockShift",amt:0.5},{src:"chaos",dst:"fmWarp",amt:0.3},{src:"cut",dst:"blockSize",amt:0.4},{src:"lfo2",dst:"driftWarp",amt:0.25}]],
+["VOL I \u2014 ENHANCER LINES", {contour:0.95,contourBands:9,contourWidth:1.3,contourHue:0.04,contourFill:0.18,lumaSteps:0.55,stepCount:5,contrast:1.25,saturation:0.55,ringing:0.12,sharpEcho:0.15,echoSpace:0.25,chromaBleed:0.15,signalNoise:0,chromaNoise:0,hWobble:0.04,jitter:0.05,tapeWow:0.1,genLoss:0,glow:0.08,scanlines:0.2,aperture:0.1,curvature:0.28,vignette:0.45,bloom:0.12,bloomRad:0.25,halation:0.3,grain:0.18},
+ [{src:"drift",dst:"contourBands",amt:0.12,ch:"A"},{src:"lfo1",dst:"contourHue",amt:0.15,ch:"A"},{src:"chaos",dst:"chromaDelay",amt:0.08,ch:"A"}]],
+["VOL II \u2014 COLOURISER", {contour:0.45,contourBands:9,contourWidth:1.6,contourHue:0.5,contourFill:0.7,lumaSteps:0.75,stepCount:5,colorize:0.6,colorBands:1.6,colorSweep:0.18,saturation:1.7,lumaHue:0.25,glow:0.45,contrast:1.25,chromaBleed:0.35,rainbow:0.25,tapeWow:0.15,scanlines:0.28,aperture:0.2,curvature:0.3,vignette:0.4,bloom:0.35,halation:0.3,grain:0.2},
+ [{src:"lfo1",dst:"colorSweep",amt:0.2,ch:"A"},{src:"drift",dst:"contourHue",amt:0.3,ch:"A"},{src:"bass",dst:"colorize",amt:0.15,ch:"A"}]],
+["VOL III \u2014 FULL BEND", {contour:0.6,contourBands:12,contourWidth:1.0,contourHue:0.35,contourFill:0.35,lumaSteps:0.6,stepCount:7,dither:0.4,colorize:0.5,colorBands:2.4,rainbow:0.55,lumaHue:0.4,rgbSep:0.2,sharpEcho:0.5,echoSpace:0.3,saturation:1.8,contrast:1.35,glow:0.5,chromaBleed:0.45,chromaNoise:0.15,hWobble:0.12,jitter:0.25,tracking:0.2,scanlines:0.3,curvature:0.3,vignette:0.42,bloom:0.45,bloomRad:0.45,halation:0.4,grain:0.3},
+ [{src:"lfo2",dst:"contourBands",amt:0.25,ch:"A"},{src:"chaos",dst:"rgbSep",amt:0.2,ch:"A"},{src:"drift",dst:"hue",amt:0.3,ch:"A"},{src:"spike",dst:"tear",amt:0.3,ch:"A"}]],
+["TRIANGLES", {kaleido:1,kaleidoN:3,kaleidoRot:0,lumaSteps:0.95,stepCount:4,dither:0.15,colorize:0.55,colorBands:1.1,saturation:1.5,contrast:1.3,contour:0.3,contourBands:6,contourWidth:1.4,contourFill:0.85,glow:0.3,chromaBleed:0.2,scanlines:0.2,curvature:0.25,vignette:0.4,bloom:0.25,grain:0.18},
+ [{src:"lfo3",dst:"kaleidoRot",amt:0.35,ch:"A"},{src:"drift",dst:"kaleidoX",amt:0.2,ch:"A"},{src:"lfo1",dst:"colorSweep",amt:0.15,ch:"A"}]],
+["80S TRIANGLE", {kaleido:1,kaleidoN:3,kaleidoRot:0.15,srcZoom:0.15,lumaSteps:0.9,stepCount:5,colorize:0.75,colorBands:2.2,colorSweep:0.3,saturation:2.0,contrast:1.4,glow:0.6,rainbow:0.3,rgbSep:0.12,scanlines:0.35,aperture:0.3,curvature:0.3,vignette:0.45,bloom:0.55,bloomRad:0.5,halation:0.2,grain:0.15},
+ [{src:"lfo1",dst:"colorSweep",amt:0.3,ch:"A"},{src:"lfo3",dst:"kaleidoRot",amt:0.25,ch:"A"},{src:"bass",dst:"glow",amt:0.3,ch:"A"}]],
+["BLADE RUNNER TRIANGLE", {kaleido:1,kaleidoN:3,kaleidoRot:-0.1,lumaSteps:0.8,stepCount:6,contour:0.4,contourBands:10,contourWidth:1.2,contourHue:0.08,contourFill:0.3,saturation:1.15,hue:0.58,contrast:1.45,brightness:-0.12,glow:0.5,bloom:0.6,bloomRad:0.6,halation:0.75,defocus:0.25,grain:0.35,chromaBleed:0.4,genLoss:0.15,scanlines:0.25,curvature:0.3,vignette:0.55},
+ [{src:"drift",dst:"kaleidoRot",amt:0.15,ch:"A"},{src:"lfo3",dst:"bloom",amt:0.2,ch:"A"},{src:"chaos",dst:"chromaDelay",amt:0.12,ch:"A"}]],
+["CRT REPHOTO", {bloom:0.5,bloomRad:0.35,halation:0.5,defocus:0.3,grain:0.45,scanlines:0.4,aperture:0.35,curvature:0.4,vignette:0.55,chromaBleed:0.3,ringing:0.25,genLoss:0.2,signalNoise:0.06,hWobble:0.04,tapeWow:0.12,contrast:1.15,saturation:1.1,glow:0.15},
+ [{src:"drift",dst:"defocus",amt:0.12,ch:"A"},{src:"lfo3",dst:"bloom",amt:0.15,ch:"A"}]],
+["JPEGS", {blockShift:0.55,blockSize:0.4,dither:0.8,lumaSteps:0.7,stepCount:6,pixelSort:0.25,sortThresh:0.55,contour:0.25,contourBands:8,contourFill:0.8,saturation:1.35,contrast:1.2,chromaNoise:0.2,glow:0.2,scanlines:0.15,curvature:0.2,vignette:0.35,grain:0.2},
+ [{src:"spike",dst:"blockShift",amt:0.4,ch:"A"},{src:"cut",dst:"blockSize",amt:0.35,ch:"A"},{src:"lfo2",dst:"dither",amt:0.2,ch:"A"}]],
 ];
 function applyState(bases, rts, extra, chOnly){
   /* a preset's flat value map loads into the target channel (default: active) plus master */
@@ -72,7 +88,11 @@ function randomizeAll(){
     let v;
     const r = Math.random();
     if(p.sec==="crt"){ v = getBase(p.id); }
+    else if(p.id==="kaleido"){ v = Math.random()<0.78 ? 0 : 0.5+Math.random()*0.5; }
+    else if(p.id==="kaleidoN"){ v = 2+Math.floor(Math.random()*7); }
     else if(p.sec==="frame"){ v = Math.random()<0.7 ? p.def : p.def + (Math.random()*2-1)*0.3*(p.max-p.min); }
+    else if(p.id==="contour"){ v = Math.random()<0.6 ? 0 : Math.random()*0.9; }
+    else if(p.sec==="contour"){ v = Math.random()<0.5 ? p.def : p.min + Math.random()*(p.max-p.min); }
     else if(p.sec==="mixer" || p.sec==="morph"){ v = getBase(p.id); }
     else if(p.id==="mosh"){ v = Math.random()<0.6 ? 0 : Math.random()*0.85; }
     else if(p.sec==="glitch"||p.sec==="flow"){ v = Math.random()<0.45 ? p.def : p.min + Math.pow(Math.random(),1.5)*(p.max-p.min); }

@@ -30,6 +30,9 @@ per channel:  INPUT → framing → FEEDBACK / RESCAN → frame store
 
 - **Tape / sync** — a per-scanline PLL simulation runs on the CPU every frame: correlated drift, loss-of-lock shear with exponential re-lock, a drifting tracking band, head-switch skew, AGC breathing, a rolling blanking bar when v-hold slips. Composite rot on top: chroma bleed and delay, directional luma bleed, vertical colour bleed, rainbow fringing, dot crawl, ringing, streaky bandwidth-limited noise, comet-tail dropouts.
 - **Colour / bent enhancer** — luma-keyed rainbow colorizer, a sharpness circuit driven into oscillating edge ghosts, RGB split, luma→hue slew, flickering inversion, per-channel RGB gain, posterize, solarize.
+- **Contour / palette** — draws the isolines between brightness bands, giving the repeated outlines that trace a face or a body the way a bent enhancer does; plus FLATTEN to quantise brightness into solid poster-like colour fields, and DITHER to break the steps into speckle.
+- **Kaleido** — folds the picture into radial symmetry; FOLD N = 3 gives triangles, and modulating FOLD SPIN rotates the whole composition.
+- **CRT rephoto** — bloom, film-style halation, glass defocus and grain, for the look of a photograph *of* a screen rather than a clean render.
 - **Glitch lab** — pixel sorting (bright runs stretch into streaks), macroblock databending, halftone dropout, channel-driven drift warp, FM contour warp.
 - **Flow / mosh** — holds its own history and advects it: mosh hold freezes frames while motion keeps pushing them, melt drips brightness downward, swirl advects through a noise field, vector trash shoves macroblocks like corrupted motion vectors, time shear smears top and bottom differently.
 - **Feedback / rescan** — zoom/rotate/hue-spin feedback; RESCAN: FULL feeds the CRT output (scanlines, curvature and all) back through the entire chain.
@@ -40,6 +43,12 @@ per channel:  INPUT → framing → FEEDBACK / RESCAN → frame store
 | ![Datamosh](docs/doc_out_datamosh.png) | ![Halftone](docs/doc_out_dots.png) | ![Liquid melt](docs/doc_out_melt.png) |
 |---|---|---|
 | DATAMOSH | DOT MATRIX | LIQUID MELT |
+
+| ![Contour lines](docs/doc_vol1.png) | ![Triangles](docs/doc_triangles.png) | ![CRT rephoto](docs/doc_crt.png) |
+|---|---|---|
+| VOL I — ENHANCER LINES | TRIANGLES | CRT REPHOTO |
+
+Presets named after the glitch art series on [allmyfriendsarejpegs.com](https://allmyfriendsarejpegs.com): VOL I / II / III, TRIANGLES, 80S TRIANGLE, BLADE RUNNER TRIANGLE, CRT REPHOTO and JPEGS.
 
 ## Movement
 

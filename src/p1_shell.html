@@ -316,7 +316,7 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version — check this matches what you expect after a deploy">v10.0</span>
+  <span id="ver" title="Build version — check this matches what you expect after a deploy">v11.0</span>
   <div class="hsep"></div>
   <div class="hgrp">
     <button id="btnFile" title="Load channel A video (any size — it streams from disk)">FILE A</button>
@@ -418,7 +418,7 @@ audio,video{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v10.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v11.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>TWO CHANNELS</h3>
   <p>BENDR is a two-channel mixer: <b>A</b> and <b>B</b> each have their own input <i>and</i> their own complete set of effects. The big A / B buttons at the top of the panel choose which channel you're editing — everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits both at once, <b>COPY</b> pushes the current channel onto the other, <b>SWAP</b> exchanges them. Sections tagged MASTER (the mixer, morph and CRT) are shared. Then the <b>INPUT MIXER</b> combines the two finished channels with the A&gt;B fader, wipes, keys and blends.</p>
@@ -428,6 +428,12 @@ audio,video{display:none;}
   <p>The rail above the picture is the live signal path. <b>Drag the pills to reorder</b> the four processing stages, and click a pill to switch it off. Order changes the result completely: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.</p>
   <h3>SIGNAL PATH</h3>
   <p>Feedback → composite/NTSC encode-decode → sync &amp; tape damage → bent enhancer → colour stage → CRT. The <b>BENT ENHANCER</b> section is the circuit-bent video enhancer core: RAINBOW MAP replaces luma with hot posterized rainbows, EDGE RING is the sharpness circuit driven into oscillation (repeating ghost edges), RGB SPLIT tears the channels apart, LUMA HUE makes colour chase brightness, INV FLICKER strobes inversions.</p>
+  <h3>CONTOUR / PALETTE</h3>
+  <p>The bent-enhancer signature: <b>CONTOUR</b> draws the isolines between brightness bands, giving those repeated outlines that trace the shape of a face or a body. BANDS sets how many, LINE WIDTH how heavy, LINE HUE colours them by band, KEEP FILL decides how much of the picture survives between the lines (drop it to zero for lines on black). <b>FLATTEN</b> quantises brightness into hard LEVELS for solid poster-like colour fields, and <b>DITHER</b> breaks the steps into speckle.</p>
+  <h3>KALEIDO</h3>
+  <p>In FRAME / POSITION, <b>KALEIDO</b> folds the picture into radial symmetry. FOLD N = 3 gives triangles; modulate FOLD SPIN with a slow LFO and the whole composition rotates.</p>
+  <h3>CRT REPHOTO</h3>
+  <p>The CRT section models a photograph of a screen rather than a clean render: <b>BLOOM</b> for light spilling out of bright areas, <b>HALATION</b> to warm that spill the way film does, <b>DEFOCUS</b> for glass softness and <b>FILM GRAIN</b> on top.</p>
   <h3>GLITCH LAB &amp; FLOW / MOSH</h3>
   <p><b>GLITCH LAB</b> is the digital-corruption stage: PIXEL SORT stretches bright runs into vertical streaks (set SORT THRESH to pick what smears), BLOCK TRASH jumps and corrupts macroblocks like a broken codec, HALFTONE drops everything to brightness-sized dots, DRIFT WARP pushes pixels using their own colour values, FM WARP ripples contours by brightness.</p>
   <p><b>FLOW / MOSH</b> is the temporal-smear stage, and it holds its own history: MOSH HOLD freezes the frame while motion keeps pushing it (classic datamosh bloom), MELT drips brightness downward, SWIRL advects the image through a slow noise field, VECTOR TRASH shoves macroblocks around like corrupted motion vectors, TIME SHEAR makes the top and bottom of the frame smear by different amounts.</p>

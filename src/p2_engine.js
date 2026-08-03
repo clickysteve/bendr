@@ -30,6 +30,7 @@ const FS_FB = COMMON + KEYFN +
 "uniform float u_fbAmount,u_fbZoom,u_fbRotate,u_fbHue,u_fbShiftX,u_fbShiftY,u_fbMode;\n" +
 "uniform float u_echo,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFb;\n" +
 "uniform float u_srcZoom,u_srcX,u_srcY,u_srcRot,u_edgeMode;\n" +
+"uniform float u_kaleido,u_kaleidoN,u_kaleidoRot,u_kaleidoX,u_kaleidoY;\n" +
 "vec2 frameXf(vec2 uv, float rot, float zoom, float px, float py){\n" +
 "  vec2 q = uv-0.5;\n" +
 "  float a = rot*3.14159;\n" +
@@ -48,7 +49,19 @@ const FS_FB = COMMON + KEYFN +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  float outA = u_res.x/u_res.y;\n" +
-"  vec2 fuv = frameXf(uv, u_srcRot, u_srcZoom, u_srcX, u_srcY);\n" +
+"  vec2 kuv = uv;\n" +
+"  if(u_kaleido>0.003){\n" +
+"    vec2 ctr = vec2(0.5) + vec2(u_kaleidoX, u_kaleidoY)*0.5;\n" +
+"    vec2 q = (uv - ctr) * vec2(u_res.x/u_res.y, 1.0);\n" +
+"    float ang = atan(q.y, q.x) + u_kaleidoRot*3.14159;\n" +
+"    float rad = length(q);\n" +
+"    float seg = 6.28318/max(2.0, floor(u_kaleidoN));\n" +
+"    ang = mod(ang, seg);\n" +
+"    ang = abs(ang - seg*0.5);\n" +
+"    vec2 f = ctr + vec2(cos(ang), sin(ang))*rad / vec2(u_res.x/u_res.y, 1.0);\n" +
+"    kuv = mix(uv, f, clamp(u_kaleido,0.0,1.0));\n" +
+"  }\n" +
+"  vec2 fuv = frameXf(kuv, u_srcRot, u_srcZoom, u_srcX, u_srcY);\n" +
 "  vec3 src = (u_hasSrc>0.5) ? fitSample(u_src, fuv, u_srcAspect, outA) : vec3(0.0);\n" +
 "  vec2 p = uv-0.5;\n" +
 "  float ang = u_fbRotate*1.0;\n" +
@@ -230,6 +243,8 @@ const FS_COL = COMMON + KEYFN +
 "uniform float u_time,u_bypass,u_saturation,u_hue,u_brightness,u_contrast,u_posterize,u_solarize,u_glow;\n" +
 "uniform float u_colorize,u_colorBands,u_colorSweep,u_lumaHue,u_sharpEcho,u_echoSpace,u_rgbSep,u_invFlick;\n" +
 "uniform float u_rGain,u_gGain,u_bGain;\n" +
+"uniform float u_contour,u_contourBands,u_contourWidth,u_contourHue,u_contourFill;\n" +
+"uniform float u_lumaSteps,u_stepCount,u_dither;\n" +
 "uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx,u_showKey;\n" +
 "float lum(vec2 p){ return dot(texture(u_tex, clamp(p,0.0,1.0)).rgb, vec3(0.299,0.587,0.114)); }\n" +
 "void main(){\n" +
@@ -277,6 +292,40 @@ const FS_COL = COMMON + KEYFN +
 "    c = mix(c, 1.0-c, m*min(1.0,u_invFlick*1.6));\n" +
 "  }\n" +
 "  if(u_posterize>0.001){ float L = 2.0 + (1.0-u_posterize)*14.0; c = mix(c, floor(c*L+0.5)/L, min(u_posterize*2.0,1.0)); }\n" +
+"  /* ---- flatten: quantise luma into hard steps for solid colour fields ---- */\n" +
+"  if(u_lumaSteps>0.003){\n" +
+"    float L0 = dot(c, vec3(0.299,0.587,0.114));\n" +
+"    float N = max(2.0, floor(u_stepCount));\n" +
+"    float dth = 0.0;\n" +
+"    if(u_dither>0.003){\n" +
+"      ivec2 bp = ivec2(mod(gl_FragCoord.xy, 4.0));\n" +
+"      float bayer[16] = float[16](0.0,8.0,2.0,10.0, 12.0,4.0,14.0,6.0, 3.0,11.0,1.0,9.0, 15.0,7.0,13.0,5.0);\n" +
+"      dth = (bayer[bp.y*4+bp.x]/16.0 - 0.5)*u_dither/N;\n" +
+"    }\n" +
+"    float Lq = floor((L0+dth)*N + 0.5)/N;\n" +
+"    vec3 flat_ = (L0 > 0.001) ? c*(Lq/max(L0,0.001)) : vec3(Lq);\n" +
+"    c = mix(c, clamp(flat_,0.0,1.6), u_lumaSteps);\n" +
+"  }\n" +
+"  /* ---- contour: draw the isolines between luma bands (bent-enhancer outlines) ---- */\n" +
+"  if(u_contour>0.003){\n" +
+"    /* smooth the luma first so grain doesn't spawn false isolines */\n" +
+"    vec2 sp = 1.4/u_res;\n" +
+"    float L1 = dot(c, vec3(0.299,0.587,0.114))*0.36;\n" +
+"    L1 += dot(texture(u_tex, uv+vec2( sp.x,0.0)).rgb, vec3(0.299,0.587,0.114))*0.16;\n" +
+"    L1 += dot(texture(u_tex, uv+vec2(-sp.x,0.0)).rgb, vec3(0.299,0.587,0.114))*0.16;\n" +
+"    L1 += dot(texture(u_tex, uv+vec2(0.0, sp.y)).rgb, vec3(0.299,0.587,0.114))*0.16;\n" +
+"    L1 += dot(texture(u_tex, uv+vec2(0.0,-sp.y)).rgb, vec3(0.299,0.587,0.114))*0.16;\n" +
+"    float b = L1*u_contourBands;\n" +
+"    float g = length(vec2(dFdx(b), dFdy(b))) + 1e-4;\n" +
+"    float f = fract(b);\n" +
+"    float dist = min(f, 1.0-f)/g;\n" +
+"    float line = 1.0 - smoothstep(u_contourWidth*0.5, u_contourWidth*0.5+1.0, dist);\n" +
+"    float band = floor(b);\n" +
+"    vec3 lc = 0.5+0.5*cos(6.2832*(band/u_contourBands*1.5 + u_contourHue + vec3(0.0,0.33,0.67)));\n" +
+"    lc = mix(vec3(1.0), lc, smoothstep(0.0,0.15,u_contourHue));\n" +
+"    vec3 bg = c*u_contourFill;\n" +
+"    c = mix(c, mix(bg, lc, line), u_contour);\n" +
+"  }\n" +
 "  c += c*c*u_glow*0.8;\n" +
 "  if(u_keyFx>0.001){\n" +
 "    vec3 dry = texture(u_tex, uv).rgb;\n" +
@@ -290,6 +339,7 @@ const FS_CRT = COMMON +
 "uniform sampler2D u_tex;\n" +
 "uniform vec2 u_procRes;\n" +
 "uniform float u_scanlines,u_aperture,u_curvature,u_vignette,u_time;\n" +
+"uniform float u_bloom,u_bloomRad,u_halation,u_defocus,u_grain;\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  vec2 p = uv*2.0-1.0;\n" +
@@ -297,13 +347,37 @@ const FS_CRT = COMMON +
 "  vec2 cuv = p*0.5+0.5;\n" +
 "  if(cuv.x<0.0||cuv.x>1.0||cuv.y<0.0||cuv.y>1.0){ O=vec4(0.0,0.0,0.0,1.0); return; }\n" +
 "  vec3 c = texture(u_tex, cuv).rgb;\n" +
+"  /* defocus + bloom: light spreading in the glass and the camera lens */\n" +
+"  if(u_defocus>0.003 || u_bloom>0.003){\n" +
+"    vec2 px = 1.0/u_res;\n" +
+"    vec3 blur = vec3(0.0); float wsum = 0.0;\n" +
+"    float rad = (1.5 + u_bloomRad*16.0);\n" +
+"    for(int i=0;i<12;i++){\n" +
+"      float a = float(i)*0.5236;\n" +
+"      float r = (1.0 + mod(float(i),3.0))*0.45;\n" +
+"      vec2 off = vec2(cos(a), sin(a))*rad*r*px;\n" +
+"      float w = 1.0/(1.0+r*1.4);\n" +
+"      blur += texture(u_tex, clamp(cuv+off,0.0,1.0)).rgb*w; wsum += w;\n" +
+"    }\n" +
+"    blur /= max(wsum, 0.0001);\n" +
+"    c = mix(c, blur, u_defocus*0.85);\n" +
+"    if(u_bloom>0.003){\n" +
+"      vec3 hot = max(blur - 0.42, 0.0)*1.9;\n" +
+"      vec3 tint = mix(vec3(1.0), vec3(1.25,0.62,0.42), u_halation);\n" +
+"      c += hot*u_bloom*1.5*tint;\n" +
+"    }\n" +
+"  }\n" +
 "  float scan = 1.0 - u_scanlines*0.4*(0.5+0.5*cos(cuv.y*u_procRes.y*6.2832));\n" +
 "  c *= scan;\n" +
 "  float m = mod(gl_FragCoord.x, 3.0);\n" +
 "  vec3 mask = vec3(m<1.0?1.0:0.6, (m>=1.0&&m<2.0)?1.0:0.6, m>=2.0?1.0:0.6);\n" +
 "  c *= mix(vec3(1.0), mask*1.25, u_aperture*0.7);\n" +
 "  c *= 1.0 - u_vignette*0.9*pow(length(p*0.75), 2.6);\n" +
-"  O = vec4(c,1.0);\n}\n";
+"  if(u_grain>0.003){\n" +
+"    float gn = h21(gl_FragCoord.xy + fract(u_time)*vec2(37.7,71.3));\n" +
+"    c += (gn-0.5)*u_grain*0.16*(0.35+0.65*(1.0-dot(c,vec3(0.333))));\n" +
+"  }\n" +
+"  O = vec4(max(c,0.0),1.0);\n}\n";
 
 
 /* pass: GLITCH LAB — databending, pixel sort, halftone dropout, drift/FM warp */
@@ -416,6 +490,7 @@ const SECTIONS = [
   {id:"enhancer", name:"BENT ENHANCER",     cls:"mag"},
   {id:"feedback", name:"FEEDBACK / RESCAN", cls:"mag"},
   {id:"time",     name:"TIME BASE",         cls:"mag"},
+  {id:"contour",  name:"CONTOUR / PALETTE",  cls:"mag"},
   {id:"glitch",   name:"GLITCH LAB",        cls:"mag"},
   {id:"flow",     name:"FLOW / MOSH",       cls:"mag"},
   {id:"keyer",    name:"KEYER",             cls:"cyan"},
@@ -441,10 +516,24 @@ const PDEF = [
   ["srcX","POS X","frame",-1,1,0],
   ["srcY","POS Y","frame",-1,1,0],
   ["srcRot","ROTATE","frame",-1,1,0],
+  ["kaleido","KALEIDO","frame",0,1,0],
+  ["kaleidoN","FOLD N","frame",2,12,3],
+  ["kaleidoRot","FOLD SPIN","frame",-1,1,0],
+  ["kaleidoX","FOLD CTR X","frame",-1,1,0],
+  ["kaleidoY","FOLD CTR Y","frame",-1,1,0],
 
   ["echo","ECHO","time",0,1,0],
   ["delayF","DELAY FRM","time",1,29,3],
   ["stutter","STUTTER","time",0,1,0],
+
+  ["contour","CONTOUR","contour",0,1,0],
+  ["contourBands","BANDS","contour",2,40,10],
+  ["contourWidth","LINE WIDTH","contour",0.2,6,1.2],
+  ["contourHue","LINE HUE","contour",0,1,0],
+  ["contourFill","KEEP FILL","contour",0,1,0.25],
+  ["lumaSteps","FLATTEN","contour",0,1,0],
+  ["stepCount","LEVELS","contour",2,16,5],
+  ["dither","DITHER","contour",0,1,0],
 
   ["pixelSort","PIXEL SORT","glitch",0,1,0],
   ["sortThresh","SORT THRESH","glitch",0,1,0.45],
@@ -524,6 +613,11 @@ const PDEF = [
   ["aperture","RGB MASK","crt",0,1,0.12],
   ["curvature","CURVATURE","crt",0,1,0.3],
   ["vignette","VIGNETTE","crt",0,1,0.35],
+  ["bloom","BLOOM","crt",0,1,0],
+  ["bloomRad","BLOOM SIZE","crt",0,1,0.4],
+  ["halation","HALATION","crt",0,1,0],
+  ["defocus","DEFOCUS","crt",0,1,0],
+  ["grain","FILM GRAIN","crt",0,1,0],
 ];
 /* Master sections are single-instance; everything else exists once per channel. */
 const MASTER_SECS = new Set(["mixer","crt","morph"]);

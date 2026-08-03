@@ -207,7 +207,9 @@ const FS_SIG = COMMON + KEYFN +
 "uniform float u_jitter,u_humBar;\n" +
 "uniform float u_chromaBleed,u_chromaDelay,u_rainbow,u_dotCrawl,u_ringing,u_signalNoise,u_chromaNoise;\n" +
 "uniform float u_lumaBleed,u_bleedDir,u_vBleed;\n" +
-"uniform float u_dropout,u_genLoss;\n" +
+"uniform float u_dropout,u_genLoss,u_genCount,u_dropoutLen,u_chromaLoss;\n" +
+"uniform float u_tapeSpeed,u_edgeDmg,u_printThru,u_hiss,u_stillNoise,u_shuttleNz;\n" +
+"uniform float u_chanIdx,u_tpStill,u_tpShuttle;\n" +
 "uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx;\n" +
 "float lum(vec2 p){ return dot(texture(u_tex, fract(p)).rgb, vec3(0.299,0.587,0.114)); }\n" +
 "void main(){\n" +
@@ -218,8 +220,12 @@ const FS_SIG = COMMON + KEYFN +
 "  float row = uv.y*u_rows;\n" +
 "  int i0 = clamp(int(row),0,int(u_rows)-1);\n" +
 "  int i1 = min(i0+1,int(u_rows)-1);\n" +
-"  vec4 D = mix(texelFetch(u_dispT,ivec2(i0,0),0), texelFetch(u_dispT,ivec2(i1,0),0), fract(row));\n" +
-"  float dx = D.x, rowGain = D.y, noiseG = D.z;\n" +
+"  int ci = int(u_chanIdx);\n" +
+"  vec4 D = mix(texelFetch(u_dispT,ivec2(i0,ci),0), texelFetch(u_dispT,ivec2(i1,ci),0), fract(row));\n" +
+"  float dx = D.x, rowGain = D.y, noiseG = D.z, hfl = clamp(D.w,0.0,1.0);\n" +
+"  /* generation loss compounds: each dub costs bandwidth, adds noise, loses chroma */\n" +
+"  float gEff = 1.0 - pow(1.0 - clamp(u_genLoss,0.0,0.98)*0.5, max(u_genCount,1.0));\n" +
+"  float sp = u_tapeSpeed;\n" +
 "  float rowI = floor(uv.y*u_res.y);\n" +
 "  dx += (h21(vec2(rowI, floor(t*479.0)))-0.5)*0.0018*u_jitter;\n" +
 "  /* interlace comb shimmer */\n" +
@@ -232,7 +238,7 @@ const FS_SIG = COMMON + KEYFN +
 "  float yl = lum(suv-vec2(2.0*px,0.0)), yr = lum(suv+vec2(2.0*px,0.0));\n" +
 "  y += u_ringing*1.4*(y - 0.5*(yl+yr));\n" +
 "  vec2 iq = vec2(0.0);\n" +
-"  float spread = mix(0.6, 11.0, u_chromaBleed);\n" +
+"  float spread = mix(0.6, 11.0, u_chromaBleed)*(1.0 + sp*1.7 + gEff*1.1 + hfl*2.2);\n" +
 "  float cdel = u_chromaDelay*10.0*px;\n" +
 "  for(int i=0;i<9;i++){\n" +
 "    float fi = float(i)-2.5;\n" +
@@ -246,8 +252,19 @@ const FS_SIG = COMMON + KEYFN +
 "  float crawl = sin(suv.x*u_res.x*3.14159 + rowI*3.14159 + t*7.0);\n" +
 "  y += u_dotCrawl*length(iq)*crawl*0.35;\n" +
 "  float ys = 0.25*(lum(suv-vec2(3.0*px,0.0)) + lum(suv+vec2(3.0*px,0.0)) + lum(suv-vec2(6.0*px,0.0)) + lum(suv+vec2(6.0*px,0.0)));\n" +
-"  y = mix(y, ys, u_genLoss*0.7);\n" +
-"  iq *= 1.0 - u_genLoss*0.45;\n" +
+"  y = mix(y, ys, clamp(gEff*0.7 + sp*0.35 + hfl*0.9, 0.0, 1.0));\n" +
+"  iq *= 1.0 - clamp(gEff*0.45 + sp*0.25 + hfl*0.7, 0.0, 1.0);\n" +
+"  /* chroma loss: the colour-under signal gives up before the luma does */\n" +
+"  if(u_chromaLoss>0.003){\n" +
+"    float cs = h21(vec2(rowI*0.37, floor(t*3.0)));\n" +
+"    float band = smoothstep(1.0-u_chromaLoss, 1.02-u_chromaLoss, cs);\n" +
+"    iq *= 1.0 - u_chromaLoss*(0.45+0.55*band);\n" +
+"  }\n" +
+"  /* print-through: a faint pre-echo of the picture bleeding off the next tape layer */\n" +
+"  if(u_printThru>0.003){\n" +
+"    vec3 gh = rgb2yiq(texture(u_tex, fract(suv+vec2(0.004*u_printThru, 0.055*u_printThru))).rgb);\n" +
+"    y += (gh.x-0.5)*u_printThru*0.22;\n" +
+"  }\n" +
 "  /* luma bleed: hot signal smears along the scan direction */\n" +
 "  if(u_lumaBleed>0.003){\n" +
 "    float bdir = (u_bleedDir>=0.0)?1.0:-1.0;\n" +
@@ -277,17 +294,45 @@ const FS_SIG = COMMON + KEYFN +
 "  float nseed = rowI*7.13 + floor(t*61.0)*13.7;\n" +
 "  float nb = mix(h21(vec2(floor(nx),nseed)), h21(vec2(floor(nx)+1.0,nseed)), smoothstep(0.0,1.0,fract(nx)));\n" +
 "  float streak = smoothstep(0.55,0.95,h21(vec2(rowI, floor(t*61.0)+3.0)));\n" +
-"  y += (nb-0.5)*(u_signalNoise*(0.22+0.85*streak) + noiseG*0.55 + u_genLoss*0.1);\n" +
+"  y += (nb-0.5)*(u_signalNoise*(0.22+0.85*streak) + noiseG*0.55 + gEff*0.14 + sp*0.05);\n" +
+"  /* tape hiss: fine, uncorrelated, sits in the luma */\n" +
+"  if(u_hiss>0.003) y += (h21(uv*u_res*1.7+fract(t)*vec2(91.3,57.1))-0.5)*u_hiss*0.28;\n" +
 "  y += (h21(suv*u_res+fract(t)*vec2(31.7,17.3))-0.5)*u_signalNoise*0.1;\n" +
 "  iq += (vec2(h21(vec2(floor(nx)*1.7,nseed+31.0)), h21(vec2(floor(nx)*2.3,nseed+57.0)))-0.5)*u_chromaNoise*0.55;\n" +
 "  iq *= 1.0/(1.0+noiseG*2.5);\n" +
 "  /* dropouts — comet-tail streaks */\n" +
 "  float dr = h21(vec2(rowI*1.31, floor(t*24.0)));\n" +
-"  if(dr < u_dropout*0.05){\n" +
+"  if(dr < u_dropout*0.05*(1.0+sp*1.5)){\n" +
 "    float xs = h21(vec2(rowI, floor(t*24.0)+7.0));\n" +
-"    float len = 0.06 + h21(vec2(rowI,99.0))*0.5;\n" +
+"    float len = (0.06 + h21(vec2(rowI,99.0))*0.5)*(0.25+u_dropoutLen*2.4);\n" +
 "    float f = (suv.x-xs)/len;\n" +
 "    if(f>0.0 && f<1.0){ float k = pow(1.0-f,1.8)*0.95; y = mix(y,1.05,k); iq *= 1.0-k; }\n" +
+"  }\n" +
+"  /* edge damage: the top and bottom of the tape wears first */\n" +
+"  if(u_edgeDmg>0.003){\n" +
+"    float ed = smoothstep(0.10*u_edgeDmg+0.02, 0.0, min(uv.y, 1.0-uv.y));\n" +
+"    float en = h21(vec2(floor(suv.x*u_res.x/2.0), rowI+floor(t*50.0)*3.0));\n" +
+"    y = mix(y, en*0.9, ed*u_edgeDmg);\n" +
+"    iq *= 1.0 - ed*u_edgeDmg;\n" +
+"  }\n" +
+"  /* still-frame: the noise bar a deck parks across a paused field */\n" +
+"  float stAmt = max(u_stillNoise, u_tpStill);\n" +
+"  if(stAmt>0.003){\n" +
+"    float bp = fract(0.5 + t*0.03);\n" +
+"    float bd = abs(fract(uv.y - bp + 0.5) - 0.5);\n" +
+"    float bm = smoothstep(0.045*stAmt+0.004, 0.0, bd);\n" +
+"    float bn = h21(vec2(floor(suv.x*u_res.x/2.5), rowI*1.7+floor(t*50.0)*11.0));\n" +
+"    y = mix(y, bn, bm*0.95); iq *= 1.0-bm*0.9;\n" +
+"  }\n" +
+"  /* shuttle: bands of head-crossing noise march through the picture */\n" +
+"  float shA = max(u_shuttleNz, abs(u_tpShuttle));\n" +
+"  if(shA>0.003){\n" +
+"    float dir = (u_tpShuttle<0.0)?-1.0:1.0;\n" +
+"    float nb2 = 3.0 + floor(shA*7.0);\n" +
+"    float ph2 = fract(uv.y*nb2 - t*dir*1.6);\n" +
+"    float bm2 = smoothstep(0.55, 0.98, ph2)*shA;\n" +
+"    float sn = h21(vec2(floor(suv.x*u_res.x/2.0), rowI+floor(t*50.0)*7.0));\n" +
+"    y = mix(y, sn*0.85, bm2*0.9); iq *= 1.0-bm2*0.85;\n" +
 "  }\n" +
 "  /* hum bar */\n" +
 "  float hb = smoothstep(0.18,0.0,abs(fract(uv.y-u_humpos)-0.5))*u_humBar;\n" +
@@ -603,36 +648,126 @@ const FS_GLITCH = COMMON +
 "  }\n" +
 "  O = vec4(c,1.0);\n}\n";
 
-/* pass: FLOW / MOSH — motion-vector trash, melt, swirl; advects its own history */
+/* pass: FLOW / MOSH — optical-flow datamosh, melt, swirl, vector trash.
+   Holds its own history and advects it along a selectable vector field.
+   u_srcPrev is last frame's input, so real motion vectors can be estimated. */
 const FS_FLOW = COMMON +
-"uniform sampler2D u_tex; uniform sampler2D u_flowPrev;\n" +
-"uniform float u_time;\n" +
-"uniform float u_mosh,u_melt,u_swirl,u_moshBlock,u_timeGrad;\n" +
+"uniform sampler2D u_tex; uniform sampler2D u_flowPrev; uniform sampler2D u_srcPrev;\n" +
+"uniform float u_time,u_flowField,u_flowEdge;\n" +
+"uniform float u_mosh,u_moshGate,u_moshVec,u_melt,u_meltDir,u_meltGate;\n" +
+"uniform float u_swirl,u_swirlScale,u_swirlSpeed,u_moshBlock,u_moshBlockSize,u_moshRate;\n" +
+"uniform float u_timeGrad,u_shearAxis,u_flowCurl,u_flowGain,u_flowSharp;\n" +
+"uniform float u_flowNoise,u_flowHue,u_flowFade,u_flowRepel,u_flowStretch;\n" +
 "float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);\n" +
 "  return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y); }\n" +
+"float lm(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }\n" +
+"vec2 fedge(vec2 p){\n" +
+"  if(u_flowEdge>1.5){ vec2 t=fract(p*0.5)*2.0; return 1.0-abs(t-1.0); }\n" +
+"  if(u_flowEdge>0.5) return fract(p);\n" +
+"  return clamp(p, 0.0, 1.0);\n}\n" +
+"vec3 tapF(vec2 p){ return texture(u_flowPrev, fedge(p)).rgb; }\n" +
+"/* single-step Lucas-Kanade: how far did this pixel's brightness pattern travel? */\n" +
+"vec2 motionAt(vec2 uv){\n" +
+"  vec2 e = 1.5/u_res;\n" +
+"  float c  = lm(texture(u_tex, uv).rgb);\n" +
+"  float pv = lm(texture(u_srcPrev, uv).rgb);\n" +
+"  vec2 g = vec2(lm(texture(u_tex, uv+vec2(e.x,0.0)).rgb) - lm(texture(u_tex, uv-vec2(e.x,0.0)).rgb),\n" +
+"                lm(texture(u_tex, uv+vec2(0.0,e.y)).rgb) - lm(texture(u_tex, uv-vec2(0.0,e.y)).rgb));\n" +
+"  float d = c - pv;\n" +
+"  vec2 mv = -d*g/(dot(g,g)+0.02);\n" +
+"  return clamp(mv*e*3.0, vec2(-0.06), vec2(0.06));\n}\n" +
+"vec3 hrot(vec3 c, float a){\n" +
+"  vec3 q = rgb2yiq(c); float s=sin(a), k=cos(a);\n" +
+"  return yiq2rgb(vec3(q.x, q.y*k-q.z*s, q.y*s+q.z*k));\n}\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  vec3 cur = texture(u_tex, uv).rgb;\n" +
-"  float l = dot(cur, vec3(0.299,0.587,0.114));\n" +
+"  float l = lm(cur);\n" +
+"  float ar = u_res.y/u_res.x;\n" +
+"  vec2 mv = motionAt(uv);\n" +
+"  float mmag = length(mv)*26.0;\n" +
 "  vec2 v = vec2(0.0);\n" +
-"  v.y -= u_melt*(0.15 + 0.85*l)*0.005;\n" +
+"  /* --- the driving vector field --- */\n" +
+"  vec2 F = vec2(0.0);\n" +
+"  if(u_flowField<0.5){ F = mv*18.0; }\n" +                                      /* MOTION */
+"  else if(u_flowField<1.5){\n" +                                                /* CONTOUR: perpendicular to luma gradient */
+"    vec2 e = 1.5/u_res;\n" +
+"    vec2 g = vec2(lm(texture(u_tex, uv+vec2(e.x,0.0)).rgb) - lm(texture(u_tex, uv-vec2(e.x,0.0)).rgb),\n" +
+"                  lm(texture(u_tex, uv+vec2(0.0,e.y)).rgb) - lm(texture(u_tex, uv-vec2(0.0,e.y)).rgb));\n" +
+"    F = vec2(-g.y, g.x)*2.2;\n" +
+"  }\n" +
+"  else if(u_flowField<2.5){\n" +                                               /* CURL NOISE */
+"    float e = 0.02;\n" +
+"    vec2 np = uv*vec2(4.0, 4.0*ar) + u_time*0.05;\n" +
+"    F = vec2(vn(np+vec2(0.0,e)) - vn(np-vec2(0.0,e)), -(vn(np+vec2(e,0.0)) - vn(np-vec2(e,0.0))))/e*0.5;\n" +
+"  }\n" +
+"  else if(u_flowField<3.5){ F = normalize(uv-0.5+1e-5)*0.7; }\n" +              /* RADIAL */
+"  else if(u_flowField<4.5){ vec2 c2 = uv-0.5; F = vec2(-c2.y, c2.x)*2.2; }\n" + /* SPIRAL */
+"  else if(u_flowField<5.5){ vec3 q = rgb2yiq(cur); F = q.yz*3.0; }\n" +         /* CHROMA */
+"  else { F = vec2(sin(uv.y*22.0+u_time*0.7), sin(uv.x*17.0-u_time*0.5))*0.8; }\n" + /* WEAVE */
+"  v += F*u_moshVec*0.006;\n" +
+"  /* melt: gravity along an arbitrary angle, gated on brightness */\n" +
+"  if(u_melt>0.003){\n" +
+"    float a = u_meltDir*3.14159;\n" +
+"    float gate = mix(1.0, smoothstep(u_meltGate-0.18, u_meltGate+0.18, l), step(0.001,u_meltGate));\n" +
+"    v += vec2(sin(a), -cos(a))*u_melt*(0.15+0.85*l)*gate*0.006;\n" +
+"  }\n" +
 "  if(u_swirl>0.003){\n" +
 "    float e = 0.02;\n" +
-"    vec2 np = uv*vec2(3.0, 3.0*u_res.y/u_res.x) + u_time*0.06;\n" +
+"    float sc = 1.0 + u_swirlScale*11.0;\n" +
+"    vec2 np = uv*vec2(sc, sc*ar) + u_time*(0.02+u_swirlSpeed*0.5);\n" +
 "    float dnx = vn(np+vec2(0.0,e)) - vn(np-vec2(0.0,e));\n" +
 "    float dny = vn(np+vec2(e,0.0)) - vn(np-vec2(e,0.0));\n" +
 "    v += u_swirl*0.004*vec2(dnx,-dny)/e;\n" +
 "  }\n" +
+"  /* vector trash: macroblocks shoved by garbage motion vectors */\n" +
 "  if(u_moshBlock>0.003){\n" +
-"    vec2 cell = floor(uv*vec2(18.0, 10.0));\n" +
-"    float tk = floor(u_time*1.7);\n" +
+"    float bs = mix(46.0, 5.0, u_moshBlockSize);\n" +
+"    vec2 cell = floor(uv*vec2(bs, bs*ar));\n" +
+"    float tk = floor(u_time*(0.25+u_moshRate*11.0));\n" +
 "    vec2 bv = vec2(h21(cell+tk*7.0), h21(cell+tk*13.0))-0.5;\n" +
-"    v += u_moshBlock*0.012*bv;\n" +
+"    v += u_moshBlock*0.03*bv;\n" +
 "  }\n" +
-"  vec3 prev = texture(u_flowPrev, clamp(uv+v, 0.0, 1.0)).rgb;\n" +
-"  float pers = max(u_mosh, clamp((u_melt+u_swirl+u_moshBlock)*0.75, 0.0, 0.9));\n" +
-"  pers = clamp(pers + u_timeGrad*(uv.y-0.5)*1.4, 0.0, 0.99);\n" +
-"  O = vec4(mix(cur, prev, pers), 1.0);\n}\n";
+"  /* stretch: displacement grows with distance from centre, so the frame smears outward */\n" +
+"  if(abs(u_flowStretch)>0.003) v += (uv-0.5)*u_flowStretch*mmag*0.05;\n" +
+"  /* edge repel: push away from contrast so shapes peel apart */\n" +
+"  if(abs(u_flowRepel)>0.003){\n" +
+"    vec2 e = 1.5/u_res;\n" +
+"    vec2 g = vec2(lm(texture(u_tex, uv+vec2(e.x,0.0)).rgb) - lm(texture(u_tex, uv-vec2(e.x,0.0)).rgb),\n" +
+"                  lm(texture(u_tex, uv+vec2(0.0,e.y)).rgb) - lm(texture(u_tex, uv-vec2(0.0,e.y)).rgb));\n" +
+"    v += g*u_flowRepel*0.05;\n" +
+"  }\n" +
+"  if(u_flowNoise>0.003){\n" +
+"    v += (vec2(h21(uv*u_res+fract(u_time)*vec2(37.1,11.7)), h21(uv*u_res+fract(u_time)*vec2(19.3,53.9)))-0.5)\n" +
+"         *u_flowNoise*0.01;\n" +
+"  }\n" +
+"  /* curl knob rotates the whole field: 0 = as-is, 0.5 = fully perpendicular (orbit instead of drift) */\n" +
+"  if(abs(u_flowCurl)>0.003){\n" +
+"    float a = u_flowCurl*3.14159;\n" +
+"    float s = sin(a), k = cos(a);\n" +
+"    v = vec2(v.x*k - v.y*s, v.x*s + v.y*k);\n" +
+"  }\n" +
+"  v *= u_flowGain;\n" +
+"  vec3 prev = tapF(uv+v);\n" +
+"  /* re-sharpen: repeated bilinear resampling melts detail, this claws some back */\n" +
+"  if(u_flowSharp>0.003){\n" +
+"    vec2 e = 1.6/u_res;\n" +
+"    vec3 b = (tapF(uv+v+vec2(e.x,0.0)) + tapF(uv+v-vec2(e.x,0.0)) +\n" +
+"              tapF(uv+v+vec2(0.0,e.y)) + tapF(uv+v-vec2(0.0,e.y)))*0.25;\n" +
+"    prev = max(prev + (prev-b)*u_flowSharp*1.5, vec3(0.0));\n" +
+"  }\n" +
+"  if(abs(u_flowHue)>0.003) prev = max(hrot(prev, u_flowHue*0.06), vec3(0.0));\n" +
+"  prev *= 1.0 - u_flowFade*0.09;\n" +
+"  /* how much of the held frame survives */\n" +
+"  float pers = max(u_mosh, clamp((u_melt+u_swirl+u_moshBlock+u_moshVec)*0.7, 0.0, 0.92));\n" +
+"  /* mosh gate: hold only where the picture is moving (or only where it is still) */\n" +
+"  if(abs(u_moshGate)>0.003){\n" +
+"    float mg = smoothstep(0.02, 0.32, mmag);\n" +
+"    pers *= mix(1.0, (u_moshGate>0.0)?mg:(1.0-mg), abs(u_moshGate));\n" +
+"  }\n" +
+"  float ax = mix(uv.y, uv.x, clamp(u_shearAxis,0.0,1.0)) - 0.5;\n" +
+"  pers = clamp(pers + u_timeGrad*ax*1.4, 0.0, 0.995);\n" +
+"  O = vec4(clamp(mix(cur, prev, pers), -0.2, 2.0), 1.0);\n}\n";
 
 
 /* pass: SIGNAL LAB — techniques adapted from the open-source glitch canon */
@@ -752,7 +887,9 @@ const FS_COPY = COMMON +
 
 /* ---------------- parameter registry ---------------- */
 const SECTIONS = [
-  {id:"mixer",    name:"INPUT MIXER — VIDEO A/B", cls:"mag"},
+  {id:"mixer",    name:"MIX BUS 1 \u00b7 A+B", cls:"mag"},
+  {id:"mixer2",   name:"MIX BUS 2 \u00b7 C+D", cls:"mag"},
+  {id:"mixerM",   name:"MASTER MIX \u00b7 BUS 1+2", cls:"mag"},
   {id:"morph",    name:"PRESET MORPH",      cls:"mag"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag"},
   {id:"enhancer", name:"BENT ENHANCER",     cls:"mag"},
@@ -769,7 +906,7 @@ const SECTIONS = [
   {id:"crt",      name:"CRT DISPLAY",       cls:"cyan"},
 ];
 const PDEF = [
-  ["abMix","A>B FADER","mixer",0,1,0],
+  ["abMix","BUS 1 FADER A>B","mixer",0,1,0],
   ["wipeSoft","WIPE SOFT","mixer",0,1,0.03],
   ["wipeDetail","WIPE DETAIL","mixer",0,1,0.3],
   ["wipeX","WIPE CTR X","mixer",-1,1,0],
@@ -778,6 +915,27 @@ const PDEF = [
   ["mixKeySoft","KEY SOFT","mixer",0.01,1,0.2],
   ["mixKeyInv","KEY INVERT","mixer",0,1,0],
   ["mixKeyHue","KEY HUE","mixer",0,1,0.33],
+
+  ["cdMix","BUS 2 FADER C>D","mixer2",0,1,0],
+  ["wipeSoft2","WIPE SOFT","mixer2",0,1,0.03],
+  ["wipeDetail2","WIPE DETAIL","mixer2",0,1,0.3],
+  ["wipeX2","WIPE CTR X","mixer2",-1,1,0],
+  ["wipeY2","WIPE CTR Y","mixer2",-1,1,0],
+  ["mixKeyThresh2","KEY THRESH","mixer2",0,1,0.5],
+  ["mixKeySoft2","KEY SOFT","mixer2",0.01,1,0.2],
+  ["mixKeyInv2","KEY INVERT","mixer2",0,1,0],
+  ["mixKeyHue2","KEY HUE","mixer2",0,1,0.33],
+
+  ["busMix","MASTER FADER 1>2","mixerM",0,1,0],
+  ["wipeSoftM","WIPE SOFT","mixerM",0,1,0.03],
+  ["wipeDetailM","WIPE DETAIL","mixerM",0,1,0.3],
+  ["wipeXM","WIPE CTR X","mixerM",-1,1,0],
+  ["wipeYM","WIPE CTR Y","mixerM",-1,1,0],
+  ["mixKeyThreshM","KEY THRESH","mixerM",0,1,0.5],
+  ["mixKeySoftM","KEY SOFT","mixerM",0.01,1,0.2],
+  ["mixKeyInvM","KEY INVERT","mixerM",0,1,0],
+  ["mixKeyHueM","KEY HUE","mixerM",0,1,0.33],
+
   ["morph","MORPH A>B","morph",0,1,0],
 
   ["srcZoom","ZOOM","frame",-1,1,0],
@@ -835,10 +993,27 @@ const PDEF = [
   ["fmWarp","FM WARP","glitch",0,1,0],
 
   ["mosh","MOSH HOLD","flow",0,0.99,0],
+  ["moshGate","MOSH GATE","flow",-1,1,0],
+  ["moshVec","P-FRAME PUSH","flow",0,1,0],
+  ["flowGain","FLOW GAIN","flow",0,3,1],
+  ["flowCurl","CURL / ROTATE","flow",-1,1,0],
   ["melt","MELT","flow",0,1,0],
+  ["meltDir","MELT DIR","flow",-1,1,0],
+  ["meltGate","MELT GATE","flow",0,1,0],
   ["swirl","SWIRL","flow",0,1,0],
+  ["swirlScale","SWIRL SCALE","flow",0,1,0.18],
+  ["swirlSpeed","SWIRL SPEED","flow",0,1,0.08],
   ["moshBlock","VECTOR TRASH","flow",0,1,0],
+  ["moshBlockSize","TRASH SIZE","flow",0,1,0.68],
+  ["moshRate","TRASH RATE","flow",0,1,0.13],
+  ["flowStretch","STRETCH","flow",-1,1,0],
+  ["flowRepel","EDGE REPEL","flow",-1,1,0],
+  ["flowNoise","FLOW NOISE","flow",0,1,0],
+  ["flowSharp","RE-SHARP","flow",0,1,0],
+  ["flowHue","HUE / PASS","flow",-1,1,0],
+  ["flowFade","DECAY / PASS","flow",0,1,0],
   ["timeGrad","TIME SHEAR","flow",-1,1,0],
+  ["shearAxis","SHEAR AXIS","flow",0,1,0],
 
   ["keyThresh","THRESHOLD","keyer",0,1,0.5],
   ["keySoft","SOFTNESS","keyer",0.01,1,0.2],
@@ -903,11 +1078,29 @@ const PDEF = [
   ["jitter","JITTER","sync",0,1,0.1],
   ["humBar","HUM BAR","sync",0,1,0.1],
 
+  ["tapeSpeed","TAPE SPEED SP>EP","vhs",0,1,0],
   ["tracking","TRACKING","vhs",0,1,0],
+  ["trackPhase","TRACK PHASE","vhs",-1,1,0],
+  ["trackHunt","SERVO HUNT","vhs",0,1,0],
   ["dropout","DROPOUT","vhs",0,1,0],
+  ["dropoutLen","DROPOUT LEN","vhs",0,1,0.35],
+  ["chromaLoss","CHROMA LOSS","vhs",0,1,0],
+  ["crease","TAPE CREASE","vhs",0,1,0],
+  ["creasePos","CREASE POS","vhs",0,1,0.5],
+  ["headClog","HEAD CLOG","vhs",0,1,0],
+  ["azimuth","AZIMUTH ERR","vhs",0,1,0],
   ["headSwitch","HEAD SW","vhs",0,1,0.3],
   ["tapeWow","TAPE WOW","vhs",0,1,0.15],
+  ["wowRate","WOW RATE","vhs",0,1,0.25],
+  ["flutter","SCRAPE FLUTTER","vhs",0,1,0],
+  ["tapeStretch","TAPE STRETCH","vhs",0,1,0],
+  ["edgeDmg","EDGE DAMAGE","vhs",0,1,0],
+  ["printThru","PRINT-THROUGH","vhs",0,1,0],
+  ["hiss","TAPE HISS","vhs",0,1,0],
+  ["stillNoise","STILL FRAME BAR","vhs",0,1,0],
+  ["shuttleNz","SHUTTLE BANDS","vhs",0,1,0],
   ["genLoss","GEN LOSS","vhs",0,1,0.1],
+  ["genCount","GENERATIONS","vhs",1,12,1],
 
   ["rGain","RED GAIN","color",0,2,1],
   ["gGain","GREEN GAIN","color",0,2,1],
@@ -954,8 +1147,9 @@ const PDEF = [
   ["safeArea","SAFE GUIDES","overlay",0,1,0],
 ];
 /* Master sections are single-instance; everything else exists once per channel. */
-const MASTER_SECS = new Set(["mixer","crt","morph"]);
-const CHANNELS = ["A","B"];
+const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","morph"]);
+const CHANNELS = ["A","B","C","D"];
+const BUSPAIR = {A:"B", B:"A", C:"D", D:"C"};   // each channel's partner on its mixer bus
 const P = {};           // id -> param descriptor
 const PLIST = [];       // all params
 const CLIST = [];       // per-channel params
@@ -966,7 +1160,8 @@ for(const [id,name,sec,min,max,def] of PDEF){
   (p.master ? MLIST : CLIST).push(p);
 }
 /* values */
-const chanBase = {A:{}, B:{}}, chanCur = {A:{}, B:{}};
+const chanBase = {}, chanCur = {};
+for(const ch of CHANNELS){ chanBase[ch]={}; chanCur[ch]={}; }
 const mBase = {}, mCur = {};
 for(const ch of CHANNELS) for(const p of CLIST){ chanBase[ch][p.id]=p.def; chanCur[ch][p.id]=p.def; }
 for(const p of MLIST){ mBase[p.id]=p.def; mCur[p.id]=p.def; }
@@ -980,7 +1175,7 @@ function setBase(id, v, ch){
   v = Math.min(p.max, Math.max(p.min, v));
   if(p.master){ mBase[id]=v; return; }
   if(ch){ chanBase[ch][id]=v; return; }
-  if(linkChans){ chanBase.A[id]=v; chanBase.B[id]=v; }
+  if(linkChans){ for(const c of CHANNELS) chanBase[c][id]=v; }
   else chanBase[activeChan][id]=v;
 }
 function getCur(id, ch){ const p=P[id]; return p.master ? mCur[id] : chanCur[ch||activeChan][id]; }
@@ -990,14 +1185,25 @@ let rescanMode = false;    // true = feedback taps the CRT-processed output (ful
 let chainOrder = ["sig","col","glitch","lab","flow"];    // drag-to-reorder signal chain
 let stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true};
 let keyChroma = false;     // keyer mode: false=luma true=chroma
-let mixMode = 0;           // A/B mixer transition/blend mode (see MIXMODES)
+let mixMode = 0;           // BUS 1 (A/B) transition/blend mode (see MIXMODES)
 let wipeInv = false;
+let mixMode2 = 0, wipeInv2 = false;   // BUS 2 (C/D)
+let mixModeM = 0, wipeInvM = false;   // MASTER (bus 1 / bus 2)
+/* the mixer shader has one set of uniform names; each bus feeds it its own params */
+const MIXP = ["abMix","wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue"];
+const MIXBUS = {
+  b1: MIXP,
+  b2: ["cdMix","wipeSoft2","wipeDetail2","wipeX2","wipeY2","mixKeyThresh2","mixKeySoft2","mixKeyInv2","mixKeyHue2"],
+  bM: ["busMix","wipeSoftM","wipeDetailM","wipeXM","wipeYM","mixKeyThreshM","mixKeySoftM","mixKeyInvM","mixKeyHueM"]
+};
 let fbWrap = 0;        // 0 clamp 1 repeat 2 mirror
 let fbMirror = 0;      // 0 none 1 H 2 V 3 quad
 let fbBlend = 0;       // 0 mix 1 add 2 screen 3 max 4 min 5 difference
 let fbNL = 0;          // 0 clamp 1 tanh 2 wrap 3 fold
 let fbInvert = false;  // invert each pass
 let fbTap = 0;         // 0 pre-display  1 post-display (rescan)
+let flowField = 0;     // FLOW field: 0 motion 1 contour 2 curl-noise 3 radial 4 spiral 5 chroma 6 weave
+let flowEdge = 0;      // FLOW edge: 0 clamp 1 repeat 2 mirror
 let outModel = 0;      // display model index
 let edgeMode = 0;          // frame edge: 0=black 1=tile 2=mirror
 let showKeyMatte = false;  // keyer matte viewer
@@ -1054,13 +1260,15 @@ const RING_N = 30;
 /* Each channel owns its feedback history, flow history and frame ring;
    scratch buffers are shared because channels render one after the other. */
 function newChanRT(){
-  return {fbPrev:null, fbNext:null, crt:null, flowA:null, flowB:null, out:null,
+  return {fbPrev:null, fbNext:null, crt:null, flowA:null, flowB:null, flowSrc:null, out:null,
           ring:null, ringW:0, ringFilled:0};
 }
-const chanRT = {A:newChanRT(), B:newChanRT()};
-let scratch1, scratch2, mixOut, persistA, persistB;
+const chanRT = {};
+for(const ch of CHANNELS) chanRT[ch] = newChanRT();
+let scratch1, scratch2, mixOut, busOut1, busOut2, persistA, persistB;
 let fieldSrc = 0;   // field-modulation source
-const autoGain = {A:1, B:1};
+const autoGain = {};
+for(const ch of CHANNELS) autoGain[ch] = 1;
 
 function freeRT(rt){ if(rt){ gl.deleteTexture(rt.tex); gl.deleteFramebuffer(rt.fbo); } }
 function clearRing(c){
@@ -1073,15 +1281,18 @@ function ensureRing(c){
 function allocRTs(){
   for(const ch of CHANNELS){
     const c = chanRT[ch];
-    for(const k of ["fbPrev","fbNext","crt","flowA","flowB","out"]) freeRT(c[k]);
+    for(const k of ["fbPrev","fbNext","crt","flowA","flowB","flowSrc","out"]) freeRT(c[k]);
     clearRing(c);
     c.fbPrev = makeRT(procW,procH); c.fbNext = makeRT(procW,procH);
     c.crt    = makeRT(procW,procH);
     c.flowA  = makeRT(procW,procH); c.flowB  = makeRT(procW,procH);
+    c.flowSrc= makeRT(procW,procH);
     c.out    = makeRT(procW,procH);
   }
-  freeRT(scratch1); freeRT(scratch2); freeRT(mixOut); freeRT(persistA); freeRT(persistB);
+  freeRT(scratch1); freeRT(scratch2); freeRT(mixOut); freeRT(busOut1); freeRT(busOut2);
+  freeRT(persistA); freeRT(persistB);
   scratch1 = makeRT(procW,procH); scratch2 = makeRT(procW,procH); mixOut = makeRT(procW,procH);
+  busOut1 = makeRT(procW,procH); busOut2 = makeRT(procW,procH);
   persistA = makeRT(procW,procH); persistB = makeRT(procW,procH);
 }
 function setProcRes(h){
@@ -1100,13 +1311,15 @@ function makeSrcTex(){
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   return t;
 }
-const srcTex = {A: makeSrcTex(), B: makeSrcTex()};
+const srcTex = {};
+for(const ch of CHANNELS) srcTex[ch] = makeSrcTex();
 
 /* per-scanline sync model texture (written by CPU each frame) */
 const SROWS = 576;
+const SCHAN = 4;                 // one row of the sync texture per channel
 const dispTex = gl.createTexture();
 gl.bindTexture(gl.TEXTURE_2D, dispTex);
-gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,SROWS,1,0,gl.RGBA,gl.FLOAT,null);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,SROWS,SCHAN,0,gl.RGBA,gl.FLOAT,null);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -1122,5 +1335,6 @@ function setParamUniforms(pr, ch){
 function draw(){ gl.drawArrays(gl.TRIANGLES, 0, 3); }
 
 /* animated signal state */
-const vrollpos={A:0,B:0}, humpos={A:0,B:0};
+const vrollpos={}, humpos={};
+for(const ch of CHANNELS){ vrollpos[ch]=0; humpos[ch]=0; }
 let frameNo=0, bypass=0;

@@ -8,13 +8,19 @@ BENDR emulates the analogue glitch aesthetic of circuit-bent video hardware: ben
 
 Everything is a single self-contained HTML file. No server, no dependencies, nothing leaves your machine — video files stream from disk, so a 4GB MP4 works as well as a 4MB one. Chrome recommended.
 
+The panel sections drag to reorder and the layout remembers it. The mod matrix, modulation page and text editor live in a resizable dock under the picture rather than in pop-up panels, so the output stays visible while you patch.
+
 Works on phones and tablets too: the picture stays pinned at the top, controls / bend pads / mod matrix live behind a bottom tab bar, sliders and pads are touch-sized, and the signal chain reorders with tap arrows instead of drag.
 
 ![BENDR interface](docs/doc_ui.png)
 
-## Two channels
+## Four channels, three buses
 
-BENDR is a two-channel mixer. **A** and **B** each have their own input *and* their own complete set of effects — different footage, different framing, different glitch chain, running at the same time. The big A / B buttons at the top of the panel choose which channel you're editing; LINK edits both at once, COPY and SWAP move settings between them. Sections tagged MASTER (mixer, morph, CRT) are shared. The mixer then combines the two finished channels with a fader, twelve wipe patterns, key transitions and blend modes.
+BENDR is a four-channel mixer. **A**, **B**, **C** and **D** each have their own input *and* their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; LINK edits all four, COPY and SWAP move settings between a channel and its partner on the same bus.
+
+The channels meet in three mixers, each with the same twenty transitions: **BUS 1** combines A and B, **BUS 2** combines C and D, and **MASTER MIX** crossfades bus 1 against bus 2. Everything downstream (display, overlay, morph) is shared. Leave the master fader at zero and channels C and D never render, so a two-channel setup costs exactly what it always did.
+
+![Four channels through three buses](docs/doc_quad.png)
 
 ![Two channels mixed through a circle wipe](docs/doc_mixer.png)
 
@@ -23,23 +29,26 @@ BENDR is a two-channel mixer. **A** and **B** each have their own input *and* th
 The rail above the picture is the live signal path. **Drag the pills to reorder the stages, click one to bypass it.** Order changes everything: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.
 
 ```
-per channel:  INPUT → framing → FEEDBACK / RESCAN → frame store
-                → [ TAPE/SYNC · COLOUR/ENH · GLITCH LAB · FLOW/MOSH ]  ← reorderable
-                   with SIGNAL LAB in the same reorderable chain
-        both:  → MIXER (fader · wipes · keys · blends) → MASTER OUTPUT → OVERLAY
+per channel (A B C D):  INPUT → framing → FEEDBACK / RESCAN → frame store
+                          → [ TAPE/SYNC · COLOUR/ENH · GLITCH LAB · SIGNAL LAB · FLOW/MOSH ]  ← reorderable
+                  A + B:  → MIX BUS 1 ┐
+                  C + D:  → MIX BUS 2 ┴→ MASTER MIX → MASTER OUTPUT → OVERLAY
 ```
 
-- **Tape / sync** — a per-scanline PLL simulation runs on the CPU every frame: correlated drift, loss-of-lock shear with exponential re-lock, a drifting tracking band, head-switch skew, AGC breathing, a rolling blanking bar when v-hold slips. Composite rot on top: chroma bleed and delay, directional luma bleed, vertical colour bleed, rainbow fringing, dot crawl, ringing, streaky bandwidth-limited noise, comet-tail dropouts.
+- **Tape / sync** — a per-scanline PLL simulation runs on the CPU every frame, once per channel: correlated drift, loss-of-lock shear with exponential re-lock, a drifting tracking band, head-switch skew, AGC breathing, a rolling blanking bar when v-hold slips. Composite rot on top: chroma bleed and delay, directional luma bleed, vertical colour bleed, rainbow fringing, dot crawl, ringing, streaky bandwidth-limited noise, comet-tail dropouts.
+- **Tape transport** — a whole deck per channel. The transport row drives that channel's source: still parks the noise bar a paused deck lays across the field, shuttle and jog scrub with head-crossing bands marching through the picture. Tape speed runs SP to EP, so the slower the tape the less bandwidth survives; generations compounds gen loss as if the tape had been dubbed that many times; track phase places the mistracking band and servo hunt sets the auto-tracking circuit searching for it. Then tape crease, head clog, azimuth error, scrape flutter, wow with its own rate, tape stretch, edge damage, print-through, chroma loss, hiss, and dropout with adjustable streak length.
+
+![A chewed tape](docs/doc_deck.png)
 - **Colour / bent enhancer** — luma-keyed rainbow colorizer, a sharpness circuit driven into oscillating edge ghosts, RGB split, luma→hue slew, flickering inversion, per-channel RGB gain, posterize, solarize.
 - **Contour / palette** — draws the isolines between brightness bands, giving the repeated outlines that trace a face or a body the way a bent enhancer does; plus FLATTEN to quantise brightness into solid poster-like colour fields, and DITHER to break the steps into speckle.
 - **Kaleido** — folds the picture into radial symmetry; FOLD N = 3 gives triangles, and modulating FOLD SPIN rotates the whole composition.
 - **CRT rephoto** — bloom, film-style halation, glass defocus and grain, for the look of a photograph *of* a screen rather than a clean render.
 - **Glitch lab** — pixel sorting (bright runs stretch into streaks), macroblock databending, halftone dropout, channel-driven drift warp, FM contour warp.
-- **Flow / mosh** — holds its own history and advects it: mosh hold freezes frames while motion keeps pushing them, melt drips brightness downward, swirl advects through a noise field, vector trash shoves macroblocks like corrupted motion vectors, time shear smears top and bottom differently.
+- **Flow / mosh** — a temporal-smear stage with its own frame store, advected along a selectable vector field: real per-pixel optical flow estimated from the picture, brightness contours, curl noise, radial, spiral, chroma, weave. P-frame push drags the held frame along that field, which on the motion setting is what datamosh actually is — the picture stops updating while the movement keeps pulling it apart. Mosh gate restricts the holding to the moving parts of the frame or to the still parts; curl rotates the whole field so drift becomes orbit. Plus melt with its own angle and brightness gate, swirl with scale and speed, vector trash with block size and rate, stretch, edge repel, flow noise, per-pass hue and decay, re-sharpening, time shear on either axis, and clamp / repeat / mirror edges.
 - **Feedback / rescan** — a full feedback rig: zoom, rotate, shear, offset and mirror in the loop, edge mode (clamp for tunnels, repeat for lattices, mirror for mandalas), per-pass colour rotation, saturation, value gain and per-channel RGB gain, chromatic displacement, blur plus sharpen (an activator–inhibitor pair that grows Turing patterns), a four-way non-linearity (clamp / soft / wrap / fold) with drive and pivot, threshold, loop noise, vertical roll, sync jitter and an auto-level servo. RESCAN: FULL feeds the display output back through the entire chain. Thirty presets prefixed **FB** are named after the looks they produce.
 - **Signal lab** — sparse line jitter, NTSC crosstalk with separate artifact and fringing controls, shaped snow with clumping, FM wobble, slitscan, row smear, 1-bit crush with ordered dither, moiré, a multi-band sequential keyer, and field modulation that varies across the frame rather than per-frame.
 - **Keyer** — luma or chroma key with a matte viewer; masks the glitch chain and/or the feedback.
-- **Mixer** — combines the two fully-processed channels: a fader plus twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and movable origin, key transitions, and add/difference/multiply/screen/lighten blends.
+- **Mixers** — three of them (bus 1, bus 2, master), each combining two fully-processed inputs: a fader plus twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and movable origin, key transitions, and add/difference/multiply/screen/lighten blends.
 - **Preset morph** — snapshot two whole panel states and blend every slider between them.
 - **Master output** — a display stage rather than a filter: seven display models (flat, aperture grille, slot mask, shadow mask, LCD stripe, mono monitor, green screen) with beam-profile scanlines that widen with brightness, phosphor persistence, HV sag, bloom, halation, defocus, grain, and a full output transform. Plus an overlay stage: letterbox and pillarbox mattes, bezel, glass glare, dust, scratches, screen moiré, rolling shutter and safe-area guides.
 
@@ -55,7 +64,7 @@ Presets named after the glitch art series on [allmyfriendsarejpegs.com](https://
 
 ## Text and shapes
 
-Any channel can be a text/shape generator instead of a video source: type anything, choose font, size, tracking, position, rotation, scroll and repeat, add an outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric rings, starburst) with count, spin, stroke and pulse. It behaves exactly like any other source, so it can be glitched, fed back and mixed against video on the other channel.
+Any channel can be a text/shape generator instead of a video source: type anything, choose from thirty-three fonts, set size, tracking, position, rotation, scroll and repeat, add an outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric rings, starburst) with count, spin, stroke and pulse. It behaves exactly like any other source, so it can be glitched, fed back and mixed against video on the other channel.
 
 ![Text through contour and feedback](docs/doc_text.png)
 
@@ -76,7 +85,7 @@ Six momentary bend pads (mouse, `Q W E R T Y`, or MIDI notes C1–F1), MIDI CC l
 
 ## Output
 
-- Live **WebM recording** with source audio
+- Live **recording** with source audio, MP4 where the browser supports it and WebM otherwise
 - Frame-accurate **offline MP4 render** via WebCodecs — every frame processed at full quality regardless of realtime performance (video only)
 - PNG stills, fullscreen, and a clean **pop-out output window** for OBS capture or a second display
 

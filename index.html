@@ -18,8 +18,16 @@ body{
 }
 /* ---------- header ---------- */
 #hdr{
-  height:46px; flex:0 0 46px; display:flex; align-items:center; gap:10px;
-  padding:0 12px; border-bottom:1px solid var(--line); background:var(--panel);
+  flex:0 0 auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:6px 12px; border-bottom:1px solid var(--line); background:var(--panel);
+}
+.hgrp{
+  position:relative; display:flex; align-items:center; gap:4px;
+  padding:5px 8px 4px; border:1px solid var(--line); border-radius:5px; background:rgba(0,0,0,.18);
+}
+.hgrp::before{
+  content:attr(data-lab); position:absolute; top:-6px; left:7px;
+  font-size:7px; letter-spacing:1.5px; color:var(--dim); background:var(--panel); padding:0 3px;
 }
 #logo{font-size:15px; font-weight:700; letter-spacing:2px; color:var(--amber); white-space:nowrap;}
 #logo b{color:var(--cyan); font-weight:700;}
@@ -214,10 +222,15 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
 }
 .chanbtn b{font-size:17px; letter-spacing:2px; display:block; color:var(--dim);}
 .chanbtn small{font-size:7.5px; letter-spacing:2px; color:#4a4a56; display:block;}
+.chanbtn{flex:1 1 22%;}
 .chanbtn.chA.on{background:rgba(255,122,24,.16); border-color:var(--amber);}
 .chanbtn.chA.on b{color:var(--amber);} .chanbtn.chA.on small{color:var(--amber); opacity:.7;}
 .chanbtn.chB.on{background:rgba(46,230,214,.16); border-color:var(--cyan);}
 .chanbtn.chB.on b{color:var(--cyan);} .chanbtn.chB.on small{color:var(--cyan); opacity:.7;}
+.chanbtn.chC.on{background:rgba(255,47,160,.16); border-color:var(--mag);}
+.chanbtn.chC.on b{color:var(--mag);} .chanbtn.chC.on small{color:var(--mag); opacity:.7;}
+.chanbtn.chD.on{background:rgba(180,255,90,.16); border-color:#b4ff5a;}
+.chanbtn.chD.on b{color:#b4ff5a;} .chanbtn.chD.on small{color:#b4ff5a; opacity:.7;}
 .chantools{display:flex; gap:6px; flex:1 1 100%;}
 .chantools button{flex:1; padding:5px 4px; font-size:8.5px;}
 .sectag{
@@ -227,11 +240,17 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
 .sectag.master{color:var(--dim);}
 .sectag.chan::after{content:"CH A"; }
 body.chan-b .sectag.chan::after{content:"CH B";}
+body.chan-c .sectag.chan::after{content:"CH C";}
+body.chan-d .sectag.chan::after{content:"CH D";}
 .sectag.chan{color:var(--amber); border-color:#3a2a1a;}
 body.chan-b .sectag.chan{color:var(--cyan); border-color:#1d4d48;}
+body.chan-c .sectag.chan{color:var(--mag); border-color:#4d1d3c;}
+body.chan-d .sectag.chan{color:#b4ff5a; border-color:#2f4d1d;}
 /* channel-tinted panel edge so you always know where you are */
 #panel{border-left:3px solid var(--amber);}
 body.chan-b #panel{border-left-color:var(--cyan);}
+body.chan-c #panel{border-left-color:var(--mag);}
+body.chan-d #panel{border-left-color:#b4ff5a;}
 .mrow .rch{width:46px;}
 /* ---------- mobile tab bar (hidden on desktop) ---------- */
 #mtabs{display:none;}
@@ -259,7 +278,42 @@ body.chan-b #panel{border-left-color:var(--cyan);}
 #seek{flex:1;}
 #tcode{color:var(--dim); min-width:100px; text-align:right; font-size:9.5px;}
 /* bends + matrix */
-#lower{flex:0 0 auto; display:flex; border-top:1px solid var(--line); background:var(--panel); max-height:190px;}
+#dragbar{
+  height:6px; cursor:ns-resize; background:var(--panel2); border-top:1px solid var(--line);
+  flex:0 0 6px; position:relative;
+}
+#dragbar::after{content:""; position:absolute; left:50%; top:2px; width:40px; height:2px; margin-left:-20px; background:#3a3a46; border-radius:1px;}
+#lower{flex:0 0 auto; display:flex; border-top:1px solid var(--line); background:var(--panel); height:250px; min-height:110px;}
+#dock{flex:1; display:flex; flex-direction:column; min-width:0;}
+#dockTabs{
+  display:flex; align-items:center; gap:5px; padding:5px 8px 4px;
+  border-bottom:1px solid var(--line); background:var(--panel2);
+}
+#dockTabs button{padding:4px 12px; font-size:9px;}
+#dockHint{font-size:8.5px; color:var(--dim); padding-right:4px;}
+#dockBody{flex:1; overflow:auto; min-height:0; position:relative;}
+#dockBody > div{display:none; height:100%;}
+#dockBody > div.on{display:block;}
+#modgrid{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:8px;
+  padding:8px; align-content:start; overflow-y:auto;
+}
+#textdock{padding:10px 12px; overflow-y:auto;}
+#textdock .edrow{display:flex; align-items:center; gap:8px; padding:5px 0; flex-wrap:wrap;}
+#textdock label{font-size:8.5px; letter-spacing:1.5px; color:var(--dim); white-space:nowrap;}
+#textdock input[type=range]{flex:1 1 80px; min-width:60px;}
+#textdock input[type=color]{width:34px; height:22px; padding:0; border:1px solid var(--line); background:none; cursor:pointer;}
+#textdock textarea{
+  width:100%; background:var(--panel2); color:var(--txt); border:1px solid var(--line);
+  border-radius:4px; padding:8px; font-family:var(--font); font-size:13px; letter-spacing:1px;
+  resize:vertical; outline:none;
+}
+#textdock textarea:focus{border-color:var(--mag);}
+#textdock h4{font-size:9px; letter-spacing:2px; color:var(--dim); padding:10px 0 2px;}
+/* sidebar section drag-reorder */
+.sec.secdrag{opacity:.4;}
+.sec.secover{box-shadow:inset 0 3px 0 var(--cyan);}
+.sec h3 .grab{color:#3a3a46; font-size:9px; cursor:grab; letter-spacing:-1px;}
 #bends{flex:0 0 auto; padding:10px; border-right:1px solid var(--line); display:flex; flex-direction:column; gap:6px;}
 #bends h4, #matrix h4{font-size:8.5px; letter-spacing:2px; color:var(--dim); padding-bottom:2px;}
 .bendbtns{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
@@ -397,15 +451,13 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version — check this matches what you expect after a deploy">v13.0</span>
-  <div class="hsep"></div>
-  <div class="hgrp">
-    <button id="btnFile" title="Load channel A video (any size — it streams from disk)">FILE A</button>
-    <button id="btnFileB" title="Load channel B video for the A/B mixer">B</button>
-    <button id="btnCam" title="Use webcam on channel A">CAM</button>
-    <button id="btnPat" title="Built-in test pattern on this channel">PATTERN</button>
-    <button id="btnText" title="Text / shape generator for this channel">TEXT</button>
-    <select id="selPat" title="Test pattern type">
+  <span id="ver" title="Build version">v14.0</span>
+
+  <div class="hgrp" data-lab="SOURCE">
+    <button id="btnFile" title="Load a video file into this channel">FILE</button>
+    <button id="btnCam" title="Webcam on this channel">CAM</button>
+    <button id="btnPat" title="Test pattern / video-synth source">PATTERN</button>
+    <select id="selPat" title="Pattern type">
       <option value="bars">BARS</option>
       <option value="testcard">TESTCARD</option>
       <option value="osc">OSCILLATOR</option>
@@ -420,14 +472,22 @@ audio,video{display:none;}
       <option value="lissa">LISSAJOUS</option>
       <option value="checker">CHECKER</option>
     </select>
+    <button id="btnText" title="Text / shape generator (opens the dock below)">TEXT</button>
   </div>
-  <div class="hsep"></div>
-  <div class="hgrp">
-    <span style="color:var(--dim); font-size:9px;">AUDIO</span>
+
+  <div class="hgrp" data-lab="PATCH">
+    <select id="selPreset"></select>
+    <button id="btnUndo" class="cy" title="Undo (Z)">UNDO</button>
+    <button id="btnInit" title="Init patch — everything to defaults">INIT</button>
+    <button id="btnSave" title="Save patch as .json">SAVE</button>
+    <button id="btnLoad" title="Open a saved patch">OPEN</button>
+  </div>
+
+  <div class="hgrp" data-lab="ENGINE">
     <select id="selAudio" title="Audio-reactive source">
-      <option value="off">OFF</option>
-      <option value="source">SOURCE</option>
-      <option value="mic">MIC</option>
+      <option value="off">AUDIO OFF</option>
+      <option value="source">AUD: SOURCE</option>
+      <option value="mic">AUD: INPUT</option>
     </select>
     <select id="selRes" title="Internal processing resolution">
       <option value="360">360p</option>
@@ -435,26 +495,18 @@ audio,video{display:none;}
       <option value="720" selected>720p</option>
       <option value="1080">1080p</option>
     </select>
+    <button id="btnMod" title="Modulation dock (D)">MOD</button>
+    <button id="btnMidi" title="MIDI learn">MIDI</button>
   </div>
-  <div class="hsep"></div>
-  <div class="hgrp">
-    <select id="selPreset"></select>
-    <button id="btnUndo" class="cy" title="Undo last randomize / mutate / preset change (Z)">UNDO</button>
-    <button id="btnInit" title="Total reset — init patch, everything back to defaults (undoable)">INIT</button>
-    <button id="btnSave" title="Export current state as .json">SAVE</button>
-    <button id="btnLoad" title="Import a saved .json state">OPEN</button>
-  </div>
-  <div class="spacer"></div>
-  <div class="hgrp">
-    <button id="btnMod" title="Modulation page — see every source moving (D)">MOD</button>
-    <button id="btnMidi" title="MIDI learn: toggle, then click a parameter name, then move a knob">MIDI</button>
-    <button id="btnBypass" title="Hold to see the clean signal (B)">BYPASS</button>
-    <button id="btnSnap" title="Save a PNG still (S)">SNAP</button>
-    <button id="btnRec" title="Record output live to WebM (R)">● REC</button>
-    <button id="btnRender" title="Offline render channel A to MP4 — frame-accurate, no dropped frames">RENDER</button>
+
+  <div class="hgrp" data-lab="OUTPUT">
+    <button id="btnBypass" title="Hold for the clean signal (B)">BYPASS</button>
+    <button id="btnSnap" title="PNG still (S)">SNAP</button>
+    <button id="btnRec" title="Record output (R)">● REC</button>
     <span id="recTime">0:00</span>
-    <button id="btnPop" title="Pop out a clean output window — capture it with OBS or drag to a second display">POP OUT</button>
-    <button id="btnFull" title="Fullscreen output (F)">FULL</button>
+    <button id="btnRender" title="Offline frame-accurate MP4 render of channel A">RENDER</button>
+    <button id="btnPop" title="Pop-out output window for OBS or a second display">POP OUT</button>
+    <button id="btnFull" title="Fullscreen (F)">FULL</button>
     <button id="btnHelp" title="Help (H)">?</button>
   </div>
 </div>
@@ -484,6 +536,7 @@ audio,video{display:none;}
       <input type="range" id="seek" min="0" max="1" step="0.001" value="0">
       <span id="tcode">--:-- / --:--</span>
     </div>
+    <div id="dragbar"></div>
     <div id="lower">
       <div id="bends">
         <h4>BEND — HOLD THESE</h4>
@@ -500,85 +553,57 @@ audio,video{display:none;}
           <button id="bigMut" class="bend" style="flex:1; border-color:#1d4d48; color:var(--cyan);">MUTATE<small>M</small></button>
         </div>
       </div>
+      <div id="dock">
+        <div id="dockTabs">
+          <button data-dock="matrix" class="on">MATRIX</button>
+          <button data-dock="mod">MOD</button>
+          <button data-dock="text">TEXT</button>
+          <span style="flex:1;"></span>
+          <span id="dockHint"></span>
+        </div>
+        <div id="dockBody">
       <div id="matrix">
         <h4>MOD MATRIX — PATCH SOURCES INTO ANY PARAMETER <button id="btnAddRoute" style="margin-left:8px; padding:2px 8px;">+ ROUTE</button></h4>
         <div id="routes"></div>
       </div>
-    </div>
-  </div>
-</div>
-<div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v13.0</span></h2>
-  <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
-  <h3>TWO CHANNELS</h3>
-  <p>BENDR is a two-channel mixer: <b>A</b> and <b>B</b> each have their own input <i>and</i> their own complete set of effects. The big A / B buttons at the top of the panel choose which channel you're editing — everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits both at once, <b>COPY</b> pushes the current channel onto the other, <b>SWAP</b> exchanges them. Sections tagged MASTER (the mixer, morph and CRT) are shared. Then the <b>INPUT MIXER</b> combines the two finished channels with the A&gt;B fader, wipes, keys and blends.</p>
-  <h3>TEXT / SHAPES</h3>
-  <p><b>TEXT</b> turns the selected channel into a text and shape generator — type anything, pick a font, position/scroll/repeat it, add outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric, starburst) with count, spin and pulse. It feeds the channel like any other source, so you can glitch it, feed it back, and mix it against video on the other channel.</p>
-  <h3>INPUT</h3>
-  <p>Each channel takes its own source. <b>FILE</b> loads any video your browser can play into the selected channel (drag &amp; drop works too — files stream from disk, so size doesn't matter). <b>CAM</b> uses your webcam. <b>PATTERN</b> is a built-in test signal — pick BARS, TESTCARD, OSCILLATOR (video-synth colour waves), GRID, RAMP or STATIC from the dropdown.</p>
-  <h3>MASTER OUTPUT</h3>
-  <p>The final stage is a display, not just a filter. <b>DISPLAY</b> cycles the model — flat, aperture grille, slot mask, shadow mask, LCD stripe, mono monitor, green screen — each with its own mask geometry. BEAM WIDTH and BEAM SHAPE set the scanline beam profile (the beam widens with brightness, like a real tube). Then persistence, HV sag (the picture breathes wider as it gets brighter), bloom, halation, defocus, grain, and a full output transform: gamma, black level, white clip, contrast, saturation, warmth. <b>OUTPUT OVERLAY</b> adds letterbox and pillarbox mattes, bezel, glass glare, dust, scratches, screen moiré, rolling shutter and safe-area guides.</p>
-  <h3>FEEDBACK</h3>
-  <p>The loop is the instrument. <b>EDGE</b> decides the whole family — CLAMP gives tunnels and plumes, REPEAT gives lattices, MIRROR gives mandalas. <b>CURVE</b> is the non-linearity (clamp / soft / wrap / fold) and is where structure lives; without it the loop just decays or blows out. <b>INJECT</b> sets how the live picture enters (mix, add, screen, max, min, difference). BLUR plus SHARPEN inside the loop is an activator–inhibitor pair, which is what grows Turing labyrinths and cellular patterns. LOOP NOISE is load-bearing rather than decorative: at zero the loop settles into a dead attractor. VAL / PASS is the loop gain and the most sensitive control in the app. Thirty feedback presets prefixed FB are named after the looks they produce.</p>
-  <h3>SIGNAL LAB</h3>
-  <p>Techniques adapted from the open-source glitch canon: sparse line jitter (only lines past the gate displace, and they displace hard), NTSC crosstalk with separate artifact and fringing controls, shaped snow with clumping, FM wobble, slitscan, row smear, 1-bit crush with ordered dither, moiré, and a multi-band sequential keyer that splits brightness into bands and colours each. <b>FIELD MOD</b> is video-rate modulation: the field varies across the frame, so it modulates hue and warp per-pixel rather than per-frame.</p>
-  <h3>SIGNAL CHAIN</h3>
-  <p>The rail above the picture is the live signal path. <b>Drag the pills to reorder</b> the four processing stages, and click a pill to switch it off. Order changes the result completely: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.</p>
-  <h3>SIGNAL PATH</h3>
-  <p>Feedback → composite/NTSC encode-decode → sync &amp; tape damage → bent enhancer → colour stage → CRT. The <b>BENT ENHANCER</b> section is the circuit-bent video enhancer core: RAINBOW MAP replaces luma with hot posterized rainbows, EDGE RING is the sharpness circuit driven into oscillation (repeating ghost edges), RGB SPLIT tears the channels apart, LUMA HUE makes colour chase brightness, INV FLICKER strobes inversions.</p>
-  <h3>CONTOUR / PALETTE</h3>
-  <p>The bent-enhancer signature: <b>CONTOUR</b> draws the isolines between brightness bands, giving those repeated outlines that trace the shape of a face or a body. BANDS sets how many, LINE WIDTH how heavy, LINE HUE colours them by band, KEEP FILL decides how much of the picture survives between the lines (drop it to zero for lines on black). <b>FLATTEN</b> quantises brightness into hard LEVELS for solid poster-like colour fields, and <b>DITHER</b> breaks the steps into speckle.</p>
-  <h3>KALEIDO</h3>
-  <p>In FRAME / POSITION, <b>KALEIDO</b> folds the picture into radial symmetry. FOLD N = 3 gives triangles; modulate FOLD SPIN with a slow LFO and the whole composition rotates.</p>
-  <h3>CRT REPHOTO</h3>
-  <p>The CRT section models a photograph of a screen rather than a clean render: <b>BLOOM</b> for light spilling out of bright areas, <b>HALATION</b> to warm that spill the way film does, <b>DEFOCUS</b> for glass softness and <b>FILM GRAIN</b> on top.</p>
-  <h3>GLITCH LAB &amp; FLOW / MOSH</h3>
-  <p><b>GLITCH LAB</b> is the digital-corruption stage: PIXEL SORT stretches bright runs into vertical streaks (set SORT THRESH to pick what smears), BLOCK TRASH jumps and corrupts macroblocks like a broken codec, HALFTONE drops everything to brightness-sized dots, DRIFT WARP pushes pixels using their own colour values, FM WARP ripples contours by brightness.</p>
-  <p><b>FLOW / MOSH</b> is the temporal-smear stage, and it holds its own history: MOSH HOLD freezes the frame while motion keeps pushing it (classic datamosh bloom), MELT drips brightness downward, SWIRL advects the image through a slow noise field, VECTOR TRASH shoves macroblocks around like corrupted motion vectors, TIME SHEAR makes the top and bottom of the frame smear by different amounts.</p>
-  <h3>MOVEMENT</h3>
-  <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch four LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
-  <h3>PERFORMANCE</h3>
-  <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
-  <h3>MIXER, MORPH, KEYER &amp; TIME BASE</h3>
-  <p>The <b>INPUT MIXER</b> blends video channel B over A (load B first) — FADE, LUMA KEY or CHROMA KEY modes. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor. CHAIN swaps whether tape damage or the colour/enhancer stage comes first.</p>
-  <h3>VIDEO-REACTIVE</h3>
-  <p>MOTION, BRIGHT and CUT are mod sources computed from the picture itself — patch CUT into TEAR and every edit knocks the sync loose like a real deck.</p>
-  <h3>MODULATION</h3>
-  <p><b>Right-click any parameter</b> to patch a modulator straight onto it, adjust the amount, or remove it. The <b>MOD</b> button (or <kbd>D</kbd>) opens the modulation page: every source drawn live, LFO rate/shape/sync editable in place, and each card lists what it's driving.</p>
-  <h3>TEMPO &amp; MIDI</h3>
-  <p>TAP sets the tempo; LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
-  <h3>KEYS</h3>
-  <p><kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>1</kbd>–<kbd>9</kbd> presets &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> snapshot &nbsp; <kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>H</kbd> this help</p>
-  <h3>OUTPUT</h3>
-  <p><b>REC</b> captures the live output (with source audio when AUDIO=SOURCE) to a WebM file. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
-  <p style="padding-top:10px; color:var(--dim);">Click anywhere to close.</p>
-</div></div>
-<div id="mtabs">
-  <button data-mtab="controls" class="on">CONTROLS</button>
-  <button data-mtab="bends">BEND</button>
-  <button data-mtab="matrix">MATRIX</button>
-  <button data-mtab="video">VIDEO</button>
-</div>
-<div id="modpage">
-  <div class="mphead">
-    <h3>MODULATION</h3>
-    <span style="color:var(--dim); font-size:9px;">Right-click any parameter in the panel to patch it &middot; sources animate live below</span>
-    <span style="flex:1;"></span>
-    <button id="modPageClose">CLOSE</button>
-  </div>
-  <div id="modgrid"></div>
-</div>
-<div id="textEd">
-  <div class="edbox">
-    <h3>TEXT / SHAPE GENERATOR <span id="textEdChan"></span><button id="textEdClose" style="margin-left:auto;">CLOSE</button></h3>
-    <textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
+      <div id="modgrid"></div>
+      <div id="textdock"><textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
     <div class="edrow">
       <label>FONT</label>
       <select id="txtFont">
         <option value="mono">MONO</option>
-        <option value="sans">SANS BOLD</option>
+        <option value="sans">HELVETICA</option>
         <option value="serif">SERIF</option>
         <option value="cond">CONDENSED</option>
+        <option value="impact">IMPACT</option>
+        <option value="courier">COURIER</option>
+        <option value="times">TIMES</option>
+        <option value="georgia">GEORGIA</option>
+        <option value="garamond">GARAMOND</option>
+        <option value="palatino">PALATINO</option>
+        <option value="baskerville">BASKERVILLE</option>
+        <option value="didot">DIDOT</option>
+        <option value="futura">FUTURA</option>
+        <option value="gill">GILL SANS</option>
+        <option value="optima">OPTIMA</option>
+        <option value="avenir">AVENIR</option>
+        <option value="verdana">VERDANA</option>
+        <option value="tahoma">TAHOMA</option>
+        <option value="trebuchet">TREBUCHET</option>
+        <option value="rockwell">ROCKWELL</option>
+        <option value="copperplate">COPPERPLATE</option>
+        <option value="papyrus">PAPYRUS</option>
+        <option value="chalkduster">CHALKDUSTER</option>
+        <option value="marker">MARKER FELT</option>
+        <option value="bradley">BRADLEY HAND</option>
+        <option value="snell">SNELL SCRIPT</option>
+        <option value="zapfino">ZAPFINO</option>
+        <option value="andale">ANDALE MONO</option>
+        <option value="menlo">MENLO</option>
+        <option value="monaco">MONACO</option>
+        <option value="cursive">CURSIVE</option>
+        <option value="fantasy">FANTASY</option>
+        <option value="system">SYSTEM UI</option>
       </select>
       <label>SIZE</label><input type="range" id="txtSize" min="0.03" max="0.6" step="0.005" value="0.2">
       <label>TRACK</label><input type="range" id="txtTrack" min="-0.1" max="0.5" step="0.005" value="0">
@@ -626,7 +651,65 @@ audio,video{display:none;}
       <label>PULSE</label><input type="range" id="shpPulse" min="0" max="1" step="0.01" value="0">
       <span style="color:var(--dim); font-size:9px; flex:1;">Feeds this channel like any other source — glitch it, feed it back, mix it.</span>
     </div>
+        </div>
+      </div>
+    </div>
   </div>
+</div>
+<div id="help"><div id="helpBox">
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v14.0</span></h2>
+  <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
+  <h3>FOUR CHANNELS, THREE BUSES</h3>
+  <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
+  <p>The channels meet in three mixers, each with the same twenty transitions: <b>BUS 1</b> combines A and B, <b>BUS 2</b> combines C and D, and <b>MASTER MIX</b> crossfades bus 1 against bus 2. Everything downstream of that (CRT display, overlay, morph) is shared. Leave the master fader at zero and channels C and D never render, so the two-channel setup costs exactly what it always did — push it off zero and the second bus comes alive.</p>
+  <h3>TEXT / SHAPES</h3>
+  <p><b>TEXT</b> turns the selected channel into a text and shape generator — type anything, pick a font, position/scroll/repeat it, add outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric, starburst) with count, spin and pulse. It feeds the channel like any other source, so you can glitch it, feed it back, and mix it against video on the other channel.</p>
+  <h3>INPUT</h3>
+  <p>All four channels take their own source. <b>FILE</b> loads any video your browser can play into the selected channel (drag &amp; drop works too — files stream from disk, so size doesn't matter). <b>CAM</b> uses your webcam. <b>PATTERN</b> is a built-in test signal — pick BARS, TESTCARD, OSCILLATOR (video-synth colour waves), GRID, RAMP or STATIC from the dropdown.</p>
+  <h3>MASTER OUTPUT</h3>
+  <p>The final stage is a display, not just a filter. <b>DISPLAY</b> cycles the model — flat, aperture grille, slot mask, shadow mask, LCD stripe, mono monitor, green screen — each with its own mask geometry. BEAM WIDTH and BEAM SHAPE set the scanline beam profile (the beam widens with brightness, like a real tube). Then persistence, HV sag (the picture breathes wider as it gets brighter), bloom, halation, defocus, grain, and a full output transform: gamma, black level, white clip, contrast, saturation, warmth. <b>OUTPUT OVERLAY</b> adds letterbox and pillarbox mattes, bezel, glass glare, dust, scratches, screen moiré, rolling shutter and safe-area guides.</p>
+  <h3>FEEDBACK</h3>
+  <p>The loop is the instrument. <b>EDGE</b> decides the whole family — CLAMP gives tunnels and plumes, REPEAT gives lattices, MIRROR gives mandalas. <b>CURVE</b> is the non-linearity (clamp / soft / wrap / fold) and is where structure lives; without it the loop just decays or blows out. <b>INJECT</b> sets how the live picture enters (mix, add, screen, max, min, difference). BLUR plus SHARPEN inside the loop is an activator–inhibitor pair, which is what grows Turing labyrinths and cellular patterns. LOOP NOISE is load-bearing rather than decorative: at zero the loop settles into a dead attractor. VAL / PASS is the loop gain and the most sensitive control in the app. Thirty feedback presets prefixed FB are named after the looks they produce.</p>
+  <h3>SIGNAL LAB</h3>
+  <p>Techniques adapted from the open-source glitch canon: sparse line jitter (only lines past the gate displace, and they displace hard), NTSC crosstalk with separate artifact and fringing controls, shaped snow with clumping, FM wobble, slitscan, row smear, 1-bit crush with ordered dither, moiré, and a multi-band sequential keyer that splits brightness into bands and colours each. <b>FIELD MOD</b> is video-rate modulation: the field varies across the frame, so it modulates hue and warp per-pixel rather than per-frame.</p>
+  <h3>SIGNAL CHAIN</h3>
+  <p>The rail above the picture is the live signal path. <b>Drag the pills to reorder</b> the four processing stages, and click a pill to switch it off. Order changes the result completely: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.</p>
+  <h3>SIGNAL PATH</h3>
+  <p>Feedback → composite/NTSC encode-decode → sync &amp; tape damage → bent enhancer → colour stage → CRT. The <b>BENT ENHANCER</b> section is the circuit-bent video enhancer core: RAINBOW MAP replaces luma with hot posterized rainbows, EDGE RING is the sharpness circuit driven into oscillation (repeating ghost edges), RGB SPLIT tears the channels apart, LUMA HUE makes colour chase brightness, INV FLICKER strobes inversions.</p>
+  <h3>CONTOUR / PALETTE</h3>
+  <p>The bent-enhancer signature: <b>CONTOUR</b> draws the isolines between brightness bands, giving those repeated outlines that trace the shape of a face or a body. BANDS sets how many, LINE WIDTH how heavy, LINE HUE colours them by band, KEEP FILL decides how much of the picture survives between the lines (drop it to zero for lines on black). <b>FLATTEN</b> quantises brightness into hard LEVELS for solid poster-like colour fields, and <b>DITHER</b> breaks the steps into speckle.</p>
+  <h3>KALEIDO</h3>
+  <p>In FRAME / POSITION, <b>KALEIDO</b> folds the picture into radial symmetry. FOLD N = 3 gives triangles; modulate FOLD SPIN with a slow LFO and the whole composition rotates.</p>
+  <h3>CRT REPHOTO</h3>
+  <p>The CRT section models a photograph of a screen rather than a clean render: <b>BLOOM</b> for light spilling out of bright areas, <b>HALATION</b> to warm that spill the way film does, <b>DEFOCUS</b> for glass softness and <b>FILM GRAIN</b> on top.</p>
+  <h3>GLITCH LAB &amp; FLOW / MOSH</h3>
+  <p><b>GLITCH LAB</b> is the digital-corruption stage: PIXEL SORT stretches bright runs into vertical streaks (set SORT THRESH to pick what smears), BLOCK TRASH jumps and corrupts macroblocks like a broken codec, HALFTONE drops everything to brightness-sized dots, DRIFT WARP pushes pixels using their own colour values, FM WARP ripples contours by brightness.</p>
+  <p><b>FLOW / MOSH</b> is the temporal-smear stage, and it holds its own frame store. <b>FIELD</b> picks the vector field everything is advected along: MOTION estimates real optical flow from the picture (frame to frame, per pixel), CONTOUR runs along brightness edges, CURL NOISE churns, RADIAL and SPIRAL push out and around, CHROMA steers by colour, WEAVE crosshatches. <b>P-FRAME PUSH</b> drags the held frame along that field, which on MOTION is what proper datamosh actually is: the picture stops updating while the movement keeps pulling it apart. <b>MOSH HOLD</b> sets how much of the held frame survives each pass and <b>MOSH GATE</b> restricts the holding to the moving parts of the frame (positive) or the still parts (negative). <b>CURL / ROTATE</b> turns the whole field sideways, so drift becomes orbit. Then MELT with its own direction and brightness gate, SWIRL with scale and speed, VECTOR TRASH with block size and rate, STRETCH, EDGE REPEL, FLOW NOISE, per-pass HUE and DECAY, RE-SHARP to claw back the detail resampling eats, TIME SHEAR on either axis, and an EDGE mode (clamp / repeat / mirror) for what happens off the edge of the frame.</p>
+  <h3>TAPE TRANSPORT</h3>
+  <p>A whole deck, per channel. The transport row drives that channel's source: <b>STILL</b> parks the noise bar a paused deck lays across the field, the shuttle and jog buttons scrub with head-crossing bands marching through the picture. <b>TAPE SPEED</b> runs SP to EP — the slower the tape, the less bandwidth survives, so chroma widens and detail goes. <b>GENERATIONS</b> compounds GEN LOSS as if the tape had been dubbed that many times. <b>TRACK PHASE</b> places the mistracking band and <b>SERVO HUNT</b> sets the auto-tracking circuit searching for it. On top: tape crease, head clog, azimuth error, scrape flutter, wow with its own rate, tape stretch, edge damage, print-through, chroma loss, tape hiss, and dropout with adjustable streak length.</p>
+  <h3>MOVEMENT</h3>
+  <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch four LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
+  <h3>PERFORMANCE</h3>
+  <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
+  <h3>MIXER, MORPH, KEYER &amp; TIME BASE</h3>
+  <p>Each of the three <b>MIXERS</b> gets the same twenty modes: a plain fade, twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and a movable origin, luma and chroma key transitions, and add / difference / multiply / screen / lighten blends. Run the fader like a T-bar. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor.</p>
+  <h3>VIDEO-REACTIVE</h3>
+  <p>MOTION, BRIGHT and CUT are mod sources computed from the picture itself — patch CUT into TEAR and every edit knocks the sync loose like a real deck.</p>
+  <h3>MODULATION</h3>
+  <p><b>Right-click any parameter</b> to patch a modulator straight onto it, adjust the amount, or remove it. The <b>MOD</b> button (or <kbd>D</kbd>) opens the modulation page: every source drawn live, LFO rate/shape/sync editable in place, and each card lists what it's driving.</p>
+  <h3>TEMPO &amp; MIDI</h3>
+  <p>TAP sets the tempo; LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
+  <h3>KEYS</h3>
+  <p><kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>1</kbd>–<kbd>9</kbd> presets &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> snapshot &nbsp; <kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>H</kbd> this help</p>
+  <h3>OUTPUT</h3>
+  <p><b>REC</b> captures the live output (with source audio when AUDIO=SOURCE) — MP4 where the browser supports it, WebM otherwise. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
+  <p style="padding-top:10px; color:var(--dim);">Click anywhere to close.</p>
+</div></div>
+<div id="mtabs">
+  <button data-mtab="controls" class="on">CONTROLS</button>
+  <button data-mtab="bends">BEND</button>
+  <button data-mtab="matrix">MATRIX</button>
+  <button data-mtab="video">VIDEO</button>
 </div>
 <div id="toast"></div>
 <div id="renderOv" style="display:none; position:fixed; inset:0; z-index:80; background:rgba(6,6,10,.9); flex-direction:column; align-items:center; justify-content:center; gap:16px;">
@@ -635,7 +718,7 @@ audio,video{display:none;}
   <button id="btnRenderCancel">CANCEL</button>
 </div>
 <input type="file" id="fileIn" accept="video/*,.json" style="display:none">
-<script>/* mp4-muxer v5 (c) Vanilagy, MIT license - inlined for offline use */
+<script>/* mp4-muxer v5 (c) Vanilagy, MIT license — inlined for offline use */
 /**
  * Minified by jsDelivr using Terser v5.39.0.
  * Original file: /npm/mp4-muxer@5.2.1/build/mp4-muxer.js
@@ -859,7 +942,9 @@ const FS_SIG = COMMON + KEYFN +
 "uniform float u_jitter,u_humBar;\n" +
 "uniform float u_chromaBleed,u_chromaDelay,u_rainbow,u_dotCrawl,u_ringing,u_signalNoise,u_chromaNoise;\n" +
 "uniform float u_lumaBleed,u_bleedDir,u_vBleed;\n" +
-"uniform float u_dropout,u_genLoss;\n" +
+"uniform float u_dropout,u_genLoss,u_genCount,u_dropoutLen,u_chromaLoss;\n" +
+"uniform float u_tapeSpeed,u_edgeDmg,u_printThru,u_hiss,u_stillNoise,u_shuttleNz;\n" +
+"uniform float u_chanIdx,u_tpStill,u_tpShuttle;\n" +
 "uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx;\n" +
 "float lum(vec2 p){ return dot(texture(u_tex, fract(p)).rgb, vec3(0.299,0.587,0.114)); }\n" +
 "void main(){\n" +
@@ -870,8 +955,12 @@ const FS_SIG = COMMON + KEYFN +
 "  float row = uv.y*u_rows;\n" +
 "  int i0 = clamp(int(row),0,int(u_rows)-1);\n" +
 "  int i1 = min(i0+1,int(u_rows)-1);\n" +
-"  vec4 D = mix(texelFetch(u_dispT,ivec2(i0,0),0), texelFetch(u_dispT,ivec2(i1,0),0), fract(row));\n" +
-"  float dx = D.x, rowGain = D.y, noiseG = D.z;\n" +
+"  int ci = int(u_chanIdx);\n" +
+"  vec4 D = mix(texelFetch(u_dispT,ivec2(i0,ci),0), texelFetch(u_dispT,ivec2(i1,ci),0), fract(row));\n" +
+"  float dx = D.x, rowGain = D.y, noiseG = D.z, hfl = clamp(D.w,0.0,1.0);\n" +
+"  /* generation loss compounds: each dub costs bandwidth, adds noise, loses chroma */\n" +
+"  float gEff = 1.0 - pow(1.0 - clamp(u_genLoss,0.0,0.98)*0.5, max(u_genCount,1.0));\n" +
+"  float sp = u_tapeSpeed;\n" +
 "  float rowI = floor(uv.y*u_res.y);\n" +
 "  dx += (h21(vec2(rowI, floor(t*479.0)))-0.5)*0.0018*u_jitter;\n" +
 "  /* interlace comb shimmer */\n" +
@@ -884,7 +973,7 @@ const FS_SIG = COMMON + KEYFN +
 "  float yl = lum(suv-vec2(2.0*px,0.0)), yr = lum(suv+vec2(2.0*px,0.0));\n" +
 "  y += u_ringing*1.4*(y - 0.5*(yl+yr));\n" +
 "  vec2 iq = vec2(0.0);\n" +
-"  float spread = mix(0.6, 11.0, u_chromaBleed);\n" +
+"  float spread = mix(0.6, 11.0, u_chromaBleed)*(1.0 + sp*1.7 + gEff*1.1 + hfl*2.2);\n" +
 "  float cdel = u_chromaDelay*10.0*px;\n" +
 "  for(int i=0;i<9;i++){\n" +
 "    float fi = float(i)-2.5;\n" +
@@ -898,8 +987,19 @@ const FS_SIG = COMMON + KEYFN +
 "  float crawl = sin(suv.x*u_res.x*3.14159 + rowI*3.14159 + t*7.0);\n" +
 "  y += u_dotCrawl*length(iq)*crawl*0.35;\n" +
 "  float ys = 0.25*(lum(suv-vec2(3.0*px,0.0)) + lum(suv+vec2(3.0*px,0.0)) + lum(suv-vec2(6.0*px,0.0)) + lum(suv+vec2(6.0*px,0.0)));\n" +
-"  y = mix(y, ys, u_genLoss*0.7);\n" +
-"  iq *= 1.0 - u_genLoss*0.45;\n" +
+"  y = mix(y, ys, clamp(gEff*0.7 + sp*0.35 + hfl*0.9, 0.0, 1.0));\n" +
+"  iq *= 1.0 - clamp(gEff*0.45 + sp*0.25 + hfl*0.7, 0.0, 1.0);\n" +
+"  /* chroma loss: the colour-under signal gives up before the luma does */\n" +
+"  if(u_chromaLoss>0.003){\n" +
+"    float cs = h21(vec2(rowI*0.37, floor(t*3.0)));\n" +
+"    float band = smoothstep(1.0-u_chromaLoss, 1.02-u_chromaLoss, cs);\n" +
+"    iq *= 1.0 - u_chromaLoss*(0.45+0.55*band);\n" +
+"  }\n" +
+"  /* print-through: a faint pre-echo of the picture bleeding off the next tape layer */\n" +
+"  if(u_printThru>0.003){\n" +
+"    vec3 gh = rgb2yiq(texture(u_tex, fract(suv+vec2(0.004*u_printThru, 0.055*u_printThru))).rgb);\n" +
+"    y += (gh.x-0.5)*u_printThru*0.22;\n" +
+"  }\n" +
 "  /* luma bleed: hot signal smears along the scan direction */\n" +
 "  if(u_lumaBleed>0.003){\n" +
 "    float bdir = (u_bleedDir>=0.0)?1.0:-1.0;\n" +
@@ -929,17 +1029,45 @@ const FS_SIG = COMMON + KEYFN +
 "  float nseed = rowI*7.13 + floor(t*61.0)*13.7;\n" +
 "  float nb = mix(h21(vec2(floor(nx),nseed)), h21(vec2(floor(nx)+1.0,nseed)), smoothstep(0.0,1.0,fract(nx)));\n" +
 "  float streak = smoothstep(0.55,0.95,h21(vec2(rowI, floor(t*61.0)+3.0)));\n" +
-"  y += (nb-0.5)*(u_signalNoise*(0.22+0.85*streak) + noiseG*0.55 + u_genLoss*0.1);\n" +
+"  y += (nb-0.5)*(u_signalNoise*(0.22+0.85*streak) + noiseG*0.55 + gEff*0.14 + sp*0.05);\n" +
+"  /* tape hiss: fine, uncorrelated, sits in the luma */\n" +
+"  if(u_hiss>0.003) y += (h21(uv*u_res*1.7+fract(t)*vec2(91.3,57.1))-0.5)*u_hiss*0.28;\n" +
 "  y += (h21(suv*u_res+fract(t)*vec2(31.7,17.3))-0.5)*u_signalNoise*0.1;\n" +
 "  iq += (vec2(h21(vec2(floor(nx)*1.7,nseed+31.0)), h21(vec2(floor(nx)*2.3,nseed+57.0)))-0.5)*u_chromaNoise*0.55;\n" +
 "  iq *= 1.0/(1.0+noiseG*2.5);\n" +
 "  /* dropouts — comet-tail streaks */\n" +
 "  float dr = h21(vec2(rowI*1.31, floor(t*24.0)));\n" +
-"  if(dr < u_dropout*0.05){\n" +
+"  if(dr < u_dropout*0.05*(1.0+sp*1.5)){\n" +
 "    float xs = h21(vec2(rowI, floor(t*24.0)+7.0));\n" +
-"    float len = 0.06 + h21(vec2(rowI,99.0))*0.5;\n" +
+"    float len = (0.06 + h21(vec2(rowI,99.0))*0.5)*(0.25+u_dropoutLen*2.4);\n" +
 "    float f = (suv.x-xs)/len;\n" +
 "    if(f>0.0 && f<1.0){ float k = pow(1.0-f,1.8)*0.95; y = mix(y,1.05,k); iq *= 1.0-k; }\n" +
+"  }\n" +
+"  /* edge damage: the top and bottom of the tape wears first */\n" +
+"  if(u_edgeDmg>0.003){\n" +
+"    float ed = smoothstep(0.10*u_edgeDmg+0.02, 0.0, min(uv.y, 1.0-uv.y));\n" +
+"    float en = h21(vec2(floor(suv.x*u_res.x/2.0), rowI+floor(t*50.0)*3.0));\n" +
+"    y = mix(y, en*0.9, ed*u_edgeDmg);\n" +
+"    iq *= 1.0 - ed*u_edgeDmg;\n" +
+"  }\n" +
+"  /* still-frame: the noise bar a deck parks across a paused field */\n" +
+"  float stAmt = max(u_stillNoise, u_tpStill);\n" +
+"  if(stAmt>0.003){\n" +
+"    float bp = fract(0.5 + t*0.03);\n" +
+"    float bd = abs(fract(uv.y - bp + 0.5) - 0.5);\n" +
+"    float bm = smoothstep(0.045*stAmt+0.004, 0.0, bd);\n" +
+"    float bn = h21(vec2(floor(suv.x*u_res.x/2.5), rowI*1.7+floor(t*50.0)*11.0));\n" +
+"    y = mix(y, bn, bm*0.95); iq *= 1.0-bm*0.9;\n" +
+"  }\n" +
+"  /* shuttle: bands of head-crossing noise march through the picture */\n" +
+"  float shA = max(u_shuttleNz, abs(u_tpShuttle));\n" +
+"  if(shA>0.003){\n" +
+"    float dir = (u_tpShuttle<0.0)?-1.0:1.0;\n" +
+"    float nb2 = 3.0 + floor(shA*7.0);\n" +
+"    float ph2 = fract(uv.y*nb2 - t*dir*1.6);\n" +
+"    float bm2 = smoothstep(0.55, 0.98, ph2)*shA;\n" +
+"    float sn = h21(vec2(floor(suv.x*u_res.x/2.0), rowI+floor(t*50.0)*7.0));\n" +
+"    y = mix(y, sn*0.85, bm2*0.9); iq *= 1.0-bm2*0.85;\n" +
 "  }\n" +
 "  /* hum bar */\n" +
 "  float hb = smoothstep(0.18,0.0,abs(fract(uv.y-u_humpos)-0.5))*u_humBar;\n" +
@@ -1255,36 +1383,126 @@ const FS_GLITCH = COMMON +
 "  }\n" +
 "  O = vec4(c,1.0);\n}\n";
 
-/* pass: FLOW / MOSH — motion-vector trash, melt, swirl; advects its own history */
+/* pass: FLOW / MOSH — optical-flow datamosh, melt, swirl, vector trash.
+   Holds its own history and advects it along a selectable vector field.
+   u_srcPrev is last frame's input, so real motion vectors can be estimated. */
 const FS_FLOW = COMMON +
-"uniform sampler2D u_tex; uniform sampler2D u_flowPrev;\n" +
-"uniform float u_time;\n" +
-"uniform float u_mosh,u_melt,u_swirl,u_moshBlock,u_timeGrad;\n" +
+"uniform sampler2D u_tex; uniform sampler2D u_flowPrev; uniform sampler2D u_srcPrev;\n" +
+"uniform float u_time,u_flowField,u_flowEdge;\n" +
+"uniform float u_mosh,u_moshGate,u_moshVec,u_melt,u_meltDir,u_meltGate;\n" +
+"uniform float u_swirl,u_swirlScale,u_swirlSpeed,u_moshBlock,u_moshBlockSize,u_moshRate;\n" +
+"uniform float u_timeGrad,u_shearAxis,u_flowCurl,u_flowGain,u_flowSharp;\n" +
+"uniform float u_flowNoise,u_flowHue,u_flowFade,u_flowRepel,u_flowStretch;\n" +
 "float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);\n" +
 "  return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y); }\n" +
+"float lm(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }\n" +
+"vec2 fedge(vec2 p){\n" +
+"  if(u_flowEdge>1.5){ vec2 t=fract(p*0.5)*2.0; return 1.0-abs(t-1.0); }\n" +
+"  if(u_flowEdge>0.5) return fract(p);\n" +
+"  return clamp(p, 0.0, 1.0);\n}\n" +
+"vec3 tapF(vec2 p){ return texture(u_flowPrev, fedge(p)).rgb; }\n" +
+"/* single-step Lucas-Kanade: how far did this pixel's brightness pattern travel? */\n" +
+"vec2 motionAt(vec2 uv){\n" +
+"  vec2 e = 1.5/u_res;\n" +
+"  float c  = lm(texture(u_tex, uv).rgb);\n" +
+"  float pv = lm(texture(u_srcPrev, uv).rgb);\n" +
+"  vec2 g = vec2(lm(texture(u_tex, uv+vec2(e.x,0.0)).rgb) - lm(texture(u_tex, uv-vec2(e.x,0.0)).rgb),\n" +
+"                lm(texture(u_tex, uv+vec2(0.0,e.y)).rgb) - lm(texture(u_tex, uv-vec2(0.0,e.y)).rgb));\n" +
+"  float d = c - pv;\n" +
+"  vec2 mv = -d*g/(dot(g,g)+0.02);\n" +
+"  return clamp(mv*e*3.0, vec2(-0.06), vec2(0.06));\n}\n" +
+"vec3 hrot(vec3 c, float a){\n" +
+"  vec3 q = rgb2yiq(c); float s=sin(a), k=cos(a);\n" +
+"  return yiq2rgb(vec3(q.x, q.y*k-q.z*s, q.y*s+q.z*k));\n}\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  vec3 cur = texture(u_tex, uv).rgb;\n" +
-"  float l = dot(cur, vec3(0.299,0.587,0.114));\n" +
+"  float l = lm(cur);\n" +
+"  float ar = u_res.y/u_res.x;\n" +
+"  vec2 mv = motionAt(uv);\n" +
+"  float mmag = length(mv)*26.0;\n" +
 "  vec2 v = vec2(0.0);\n" +
-"  v.y -= u_melt*(0.15 + 0.85*l)*0.005;\n" +
+"  /* --- the driving vector field --- */\n" +
+"  vec2 F = vec2(0.0);\n" +
+"  if(u_flowField<0.5){ F = mv*18.0; }\n" +                                      /* MOTION */
+"  else if(u_flowField<1.5){\n" +                                                /* CONTOUR: perpendicular to luma gradient */
+"    vec2 e = 1.5/u_res;\n" +
+"    vec2 g = vec2(lm(texture(u_tex, uv+vec2(e.x,0.0)).rgb) - lm(texture(u_tex, uv-vec2(e.x,0.0)).rgb),\n" +
+"                  lm(texture(u_tex, uv+vec2(0.0,e.y)).rgb) - lm(texture(u_tex, uv-vec2(0.0,e.y)).rgb));\n" +
+"    F = vec2(-g.y, g.x)*2.2;\n" +
+"  }\n" +
+"  else if(u_flowField<2.5){\n" +                                               /* CURL NOISE */
+"    float e = 0.02;\n" +
+"    vec2 np = uv*vec2(4.0, 4.0*ar) + u_time*0.05;\n" +
+"    F = vec2(vn(np+vec2(0.0,e)) - vn(np-vec2(0.0,e)), -(vn(np+vec2(e,0.0)) - vn(np-vec2(e,0.0))))/e*0.5;\n" +
+"  }\n" +
+"  else if(u_flowField<3.5){ F = normalize(uv-0.5+1e-5)*0.7; }\n" +              /* RADIAL */
+"  else if(u_flowField<4.5){ vec2 c2 = uv-0.5; F = vec2(-c2.y, c2.x)*2.2; }\n" + /* SPIRAL */
+"  else if(u_flowField<5.5){ vec3 q = rgb2yiq(cur); F = q.yz*3.0; }\n" +         /* CHROMA */
+"  else { F = vec2(sin(uv.y*22.0+u_time*0.7), sin(uv.x*17.0-u_time*0.5))*0.8; }\n" + /* WEAVE */
+"  v += F*u_moshVec*0.006;\n" +
+"  /* melt: gravity along an arbitrary angle, gated on brightness */\n" +
+"  if(u_melt>0.003){\n" +
+"    float a = u_meltDir*3.14159;\n" +
+"    float gate = mix(1.0, smoothstep(u_meltGate-0.18, u_meltGate+0.18, l), step(0.001,u_meltGate));\n" +
+"    v += vec2(sin(a), -cos(a))*u_melt*(0.15+0.85*l)*gate*0.006;\n" +
+"  }\n" +
 "  if(u_swirl>0.003){\n" +
 "    float e = 0.02;\n" +
-"    vec2 np = uv*vec2(3.0, 3.0*u_res.y/u_res.x) + u_time*0.06;\n" +
+"    float sc = 1.0 + u_swirlScale*11.0;\n" +
+"    vec2 np = uv*vec2(sc, sc*ar) + u_time*(0.02+u_swirlSpeed*0.5);\n" +
 "    float dnx = vn(np+vec2(0.0,e)) - vn(np-vec2(0.0,e));\n" +
 "    float dny = vn(np+vec2(e,0.0)) - vn(np-vec2(e,0.0));\n" +
 "    v += u_swirl*0.004*vec2(dnx,-dny)/e;\n" +
 "  }\n" +
+"  /* vector trash: macroblocks shoved by garbage motion vectors */\n" +
 "  if(u_moshBlock>0.003){\n" +
-"    vec2 cell = floor(uv*vec2(18.0, 10.0));\n" +
-"    float tk = floor(u_time*1.7);\n" +
+"    float bs = mix(46.0, 5.0, u_moshBlockSize);\n" +
+"    vec2 cell = floor(uv*vec2(bs, bs*ar));\n" +
+"    float tk = floor(u_time*(0.25+u_moshRate*11.0));\n" +
 "    vec2 bv = vec2(h21(cell+tk*7.0), h21(cell+tk*13.0))-0.5;\n" +
-"    v += u_moshBlock*0.012*bv;\n" +
+"    v += u_moshBlock*0.03*bv;\n" +
 "  }\n" +
-"  vec3 prev = texture(u_flowPrev, clamp(uv+v, 0.0, 1.0)).rgb;\n" +
-"  float pers = max(u_mosh, clamp((u_melt+u_swirl+u_moshBlock)*0.75, 0.0, 0.9));\n" +
-"  pers = clamp(pers + u_timeGrad*(uv.y-0.5)*1.4, 0.0, 0.99);\n" +
-"  O = vec4(mix(cur, prev, pers), 1.0);\n}\n";
+"  /* stretch: displacement grows with distance from centre, so the frame smears outward */\n" +
+"  if(abs(u_flowStretch)>0.003) v += (uv-0.5)*u_flowStretch*mmag*0.05;\n" +
+"  /* edge repel: push away from contrast so shapes peel apart */\n" +
+"  if(abs(u_flowRepel)>0.003){\n" +
+"    vec2 e = 1.5/u_res;\n" +
+"    vec2 g = vec2(lm(texture(u_tex, uv+vec2(e.x,0.0)).rgb) - lm(texture(u_tex, uv-vec2(e.x,0.0)).rgb),\n" +
+"                  lm(texture(u_tex, uv+vec2(0.0,e.y)).rgb) - lm(texture(u_tex, uv-vec2(0.0,e.y)).rgb));\n" +
+"    v += g*u_flowRepel*0.05;\n" +
+"  }\n" +
+"  if(u_flowNoise>0.003){\n" +
+"    v += (vec2(h21(uv*u_res+fract(u_time)*vec2(37.1,11.7)), h21(uv*u_res+fract(u_time)*vec2(19.3,53.9)))-0.5)\n" +
+"         *u_flowNoise*0.01;\n" +
+"  }\n" +
+"  /* curl knob rotates the whole field: 0 = as-is, 0.5 = fully perpendicular (orbit instead of drift) */\n" +
+"  if(abs(u_flowCurl)>0.003){\n" +
+"    float a = u_flowCurl*3.14159;\n" +
+"    float s = sin(a), k = cos(a);\n" +
+"    v = vec2(v.x*k - v.y*s, v.x*s + v.y*k);\n" +
+"  }\n" +
+"  v *= u_flowGain;\n" +
+"  vec3 prev = tapF(uv+v);\n" +
+"  /* re-sharpen: repeated bilinear resampling melts detail, this claws some back */\n" +
+"  if(u_flowSharp>0.003){\n" +
+"    vec2 e = 1.6/u_res;\n" +
+"    vec3 b = (tapF(uv+v+vec2(e.x,0.0)) + tapF(uv+v-vec2(e.x,0.0)) +\n" +
+"              tapF(uv+v+vec2(0.0,e.y)) + tapF(uv+v-vec2(0.0,e.y)))*0.25;\n" +
+"    prev = max(prev + (prev-b)*u_flowSharp*1.5, vec3(0.0));\n" +
+"  }\n" +
+"  if(abs(u_flowHue)>0.003) prev = max(hrot(prev, u_flowHue*0.06), vec3(0.0));\n" +
+"  prev *= 1.0 - u_flowFade*0.09;\n" +
+"  /* how much of the held frame survives */\n" +
+"  float pers = max(u_mosh, clamp((u_melt+u_swirl+u_moshBlock+u_moshVec)*0.7, 0.0, 0.92));\n" +
+"  /* mosh gate: hold only where the picture is moving (or only where it is still) */\n" +
+"  if(abs(u_moshGate)>0.003){\n" +
+"    float mg = smoothstep(0.02, 0.32, mmag);\n" +
+"    pers *= mix(1.0, (u_moshGate>0.0)?mg:(1.0-mg), abs(u_moshGate));\n" +
+"  }\n" +
+"  float ax = mix(uv.y, uv.x, clamp(u_shearAxis,0.0,1.0)) - 0.5;\n" +
+"  pers = clamp(pers + u_timeGrad*ax*1.4, 0.0, 0.995);\n" +
+"  O = vec4(clamp(mix(cur, prev, pers), -0.2, 2.0), 1.0);\n}\n";
 
 
 /* pass: SIGNAL LAB — techniques adapted from the open-source glitch canon */
@@ -1404,7 +1622,9 @@ const FS_COPY = COMMON +
 
 /* ---------------- parameter registry ---------------- */
 const SECTIONS = [
-  {id:"mixer",    name:"INPUT MIXER — VIDEO A/B", cls:"mag"},
+  {id:"mixer",    name:"MIX BUS 1 \u00b7 A+B", cls:"mag"},
+  {id:"mixer2",   name:"MIX BUS 2 \u00b7 C+D", cls:"mag"},
+  {id:"mixerM",   name:"MASTER MIX \u00b7 BUS 1+2", cls:"mag"},
   {id:"morph",    name:"PRESET MORPH",      cls:"mag"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag"},
   {id:"enhancer", name:"BENT ENHANCER",     cls:"mag"},
@@ -1421,7 +1641,7 @@ const SECTIONS = [
   {id:"crt",      name:"CRT DISPLAY",       cls:"cyan"},
 ];
 const PDEF = [
-  ["abMix","A>B FADER","mixer",0,1,0],
+  ["abMix","BUS 1 FADER A>B","mixer",0,1,0],
   ["wipeSoft","WIPE SOFT","mixer",0,1,0.03],
   ["wipeDetail","WIPE DETAIL","mixer",0,1,0.3],
   ["wipeX","WIPE CTR X","mixer",-1,1,0],
@@ -1430,6 +1650,27 @@ const PDEF = [
   ["mixKeySoft","KEY SOFT","mixer",0.01,1,0.2],
   ["mixKeyInv","KEY INVERT","mixer",0,1,0],
   ["mixKeyHue","KEY HUE","mixer",0,1,0.33],
+
+  ["cdMix","BUS 2 FADER C>D","mixer2",0,1,0],
+  ["wipeSoft2","WIPE SOFT","mixer2",0,1,0.03],
+  ["wipeDetail2","WIPE DETAIL","mixer2",0,1,0.3],
+  ["wipeX2","WIPE CTR X","mixer2",-1,1,0],
+  ["wipeY2","WIPE CTR Y","mixer2",-1,1,0],
+  ["mixKeyThresh2","KEY THRESH","mixer2",0,1,0.5],
+  ["mixKeySoft2","KEY SOFT","mixer2",0.01,1,0.2],
+  ["mixKeyInv2","KEY INVERT","mixer2",0,1,0],
+  ["mixKeyHue2","KEY HUE","mixer2",0,1,0.33],
+
+  ["busMix","MASTER FADER 1>2","mixerM",0,1,0],
+  ["wipeSoftM","WIPE SOFT","mixerM",0,1,0.03],
+  ["wipeDetailM","WIPE DETAIL","mixerM",0,1,0.3],
+  ["wipeXM","WIPE CTR X","mixerM",-1,1,0],
+  ["wipeYM","WIPE CTR Y","mixerM",-1,1,0],
+  ["mixKeyThreshM","KEY THRESH","mixerM",0,1,0.5],
+  ["mixKeySoftM","KEY SOFT","mixerM",0.01,1,0.2],
+  ["mixKeyInvM","KEY INVERT","mixerM",0,1,0],
+  ["mixKeyHueM","KEY HUE","mixerM",0,1,0.33],
+
   ["morph","MORPH A>B","morph",0,1,0],
 
   ["srcZoom","ZOOM","frame",-1,1,0],
@@ -1487,10 +1728,27 @@ const PDEF = [
   ["fmWarp","FM WARP","glitch",0,1,0],
 
   ["mosh","MOSH HOLD","flow",0,0.99,0],
+  ["moshGate","MOSH GATE","flow",-1,1,0],
+  ["moshVec","P-FRAME PUSH","flow",0,1,0],
+  ["flowGain","FLOW GAIN","flow",0,3,1],
+  ["flowCurl","CURL / ROTATE","flow",-1,1,0],
   ["melt","MELT","flow",0,1,0],
+  ["meltDir","MELT DIR","flow",-1,1,0],
+  ["meltGate","MELT GATE","flow",0,1,0],
   ["swirl","SWIRL","flow",0,1,0],
+  ["swirlScale","SWIRL SCALE","flow",0,1,0.18],
+  ["swirlSpeed","SWIRL SPEED","flow",0,1,0.08],
   ["moshBlock","VECTOR TRASH","flow",0,1,0],
+  ["moshBlockSize","TRASH SIZE","flow",0,1,0.68],
+  ["moshRate","TRASH RATE","flow",0,1,0.13],
+  ["flowStretch","STRETCH","flow",-1,1,0],
+  ["flowRepel","EDGE REPEL","flow",-1,1,0],
+  ["flowNoise","FLOW NOISE","flow",0,1,0],
+  ["flowSharp","RE-SHARP","flow",0,1,0],
+  ["flowHue","HUE / PASS","flow",-1,1,0],
+  ["flowFade","DECAY / PASS","flow",0,1,0],
   ["timeGrad","TIME SHEAR","flow",-1,1,0],
+  ["shearAxis","SHEAR AXIS","flow",0,1,0],
 
   ["keyThresh","THRESHOLD","keyer",0,1,0.5],
   ["keySoft","SOFTNESS","keyer",0.01,1,0.2],
@@ -1555,11 +1813,29 @@ const PDEF = [
   ["jitter","JITTER","sync",0,1,0.1],
   ["humBar","HUM BAR","sync",0,1,0.1],
 
+  ["tapeSpeed","TAPE SPEED SP>EP","vhs",0,1,0],
   ["tracking","TRACKING","vhs",0,1,0],
+  ["trackPhase","TRACK PHASE","vhs",-1,1,0],
+  ["trackHunt","SERVO HUNT","vhs",0,1,0],
   ["dropout","DROPOUT","vhs",0,1,0],
+  ["dropoutLen","DROPOUT LEN","vhs",0,1,0.35],
+  ["chromaLoss","CHROMA LOSS","vhs",0,1,0],
+  ["crease","TAPE CREASE","vhs",0,1,0],
+  ["creasePos","CREASE POS","vhs",0,1,0.5],
+  ["headClog","HEAD CLOG","vhs",0,1,0],
+  ["azimuth","AZIMUTH ERR","vhs",0,1,0],
   ["headSwitch","HEAD SW","vhs",0,1,0.3],
   ["tapeWow","TAPE WOW","vhs",0,1,0.15],
+  ["wowRate","WOW RATE","vhs",0,1,0.25],
+  ["flutter","SCRAPE FLUTTER","vhs",0,1,0],
+  ["tapeStretch","TAPE STRETCH","vhs",0,1,0],
+  ["edgeDmg","EDGE DAMAGE","vhs",0,1,0],
+  ["printThru","PRINT-THROUGH","vhs",0,1,0],
+  ["hiss","TAPE HISS","vhs",0,1,0],
+  ["stillNoise","STILL FRAME BAR","vhs",0,1,0],
+  ["shuttleNz","SHUTTLE BANDS","vhs",0,1,0],
   ["genLoss","GEN LOSS","vhs",0,1,0.1],
+  ["genCount","GENERATIONS","vhs",1,12,1],
 
   ["rGain","RED GAIN","color",0,2,1],
   ["gGain","GREEN GAIN","color",0,2,1],
@@ -1606,8 +1882,9 @@ const PDEF = [
   ["safeArea","SAFE GUIDES","overlay",0,1,0],
 ];
 /* Master sections are single-instance; everything else exists once per channel. */
-const MASTER_SECS = new Set(["mixer","crt","morph"]);
-const CHANNELS = ["A","B"];
+const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","morph"]);
+const CHANNELS = ["A","B","C","D"];
+const BUSPAIR = {A:"B", B:"A", C:"D", D:"C"};   // each channel's partner on its mixer bus
 const P = {};           // id -> param descriptor
 const PLIST = [];       // all params
 const CLIST = [];       // per-channel params
@@ -1618,7 +1895,8 @@ for(const [id,name,sec,min,max,def] of PDEF){
   (p.master ? MLIST : CLIST).push(p);
 }
 /* values */
-const chanBase = {A:{}, B:{}}, chanCur = {A:{}, B:{}};
+const chanBase = {}, chanCur = {};
+for(const ch of CHANNELS){ chanBase[ch]={}; chanCur[ch]={}; }
 const mBase = {}, mCur = {};
 for(const ch of CHANNELS) for(const p of CLIST){ chanBase[ch][p.id]=p.def; chanCur[ch][p.id]=p.def; }
 for(const p of MLIST){ mBase[p.id]=p.def; mCur[p.id]=p.def; }
@@ -1632,7 +1910,7 @@ function setBase(id, v, ch){
   v = Math.min(p.max, Math.max(p.min, v));
   if(p.master){ mBase[id]=v; return; }
   if(ch){ chanBase[ch][id]=v; return; }
-  if(linkChans){ chanBase.A[id]=v; chanBase.B[id]=v; }
+  if(linkChans){ for(const c of CHANNELS) chanBase[c][id]=v; }
   else chanBase[activeChan][id]=v;
 }
 function getCur(id, ch){ const p=P[id]; return p.master ? mCur[id] : chanCur[ch||activeChan][id]; }
@@ -1642,14 +1920,25 @@ let rescanMode = false;    // true = feedback taps the CRT-processed output (ful
 let chainOrder = ["sig","col","glitch","lab","flow"];    // drag-to-reorder signal chain
 let stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true};
 let keyChroma = false;     // keyer mode: false=luma true=chroma
-let mixMode = 0;           // A/B mixer transition/blend mode (see MIXMODES)
+let mixMode = 0;           // BUS 1 (A/B) transition/blend mode (see MIXMODES)
 let wipeInv = false;
+let mixMode2 = 0, wipeInv2 = false;   // BUS 2 (C/D)
+let mixModeM = 0, wipeInvM = false;   // MASTER (bus 1 / bus 2)
+/* the mixer shader has one set of uniform names; each bus feeds it its own params */
+const MIXP = ["abMix","wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue"];
+const MIXBUS = {
+  b1: MIXP,
+  b2: ["cdMix","wipeSoft2","wipeDetail2","wipeX2","wipeY2","mixKeyThresh2","mixKeySoft2","mixKeyInv2","mixKeyHue2"],
+  bM: ["busMix","wipeSoftM","wipeDetailM","wipeXM","wipeYM","mixKeyThreshM","mixKeySoftM","mixKeyInvM","mixKeyHueM"]
+};
 let fbWrap = 0;        // 0 clamp 1 repeat 2 mirror
 let fbMirror = 0;      // 0 none 1 H 2 V 3 quad
 let fbBlend = 0;       // 0 mix 1 add 2 screen 3 max 4 min 5 difference
 let fbNL = 0;          // 0 clamp 1 tanh 2 wrap 3 fold
 let fbInvert = false;  // invert each pass
 let fbTap = 0;         // 0 pre-display  1 post-display (rescan)
+let flowField = 0;     // FLOW field: 0 motion 1 contour 2 curl-noise 3 radial 4 spiral 5 chroma 6 weave
+let flowEdge = 0;      // FLOW edge: 0 clamp 1 repeat 2 mirror
 let outModel = 0;      // display model index
 let edgeMode = 0;          // frame edge: 0=black 1=tile 2=mirror
 let showKeyMatte = false;  // keyer matte viewer
@@ -1706,13 +1995,15 @@ const RING_N = 30;
 /* Each channel owns its feedback history, flow history and frame ring;
    scratch buffers are shared because channels render one after the other. */
 function newChanRT(){
-  return {fbPrev:null, fbNext:null, crt:null, flowA:null, flowB:null, out:null,
+  return {fbPrev:null, fbNext:null, crt:null, flowA:null, flowB:null, flowSrc:null, out:null,
           ring:null, ringW:0, ringFilled:0};
 }
-const chanRT = {A:newChanRT(), B:newChanRT()};
-let scratch1, scratch2, mixOut, persistA, persistB;
+const chanRT = {};
+for(const ch of CHANNELS) chanRT[ch] = newChanRT();
+let scratch1, scratch2, mixOut, busOut1, busOut2, persistA, persistB;
 let fieldSrc = 0;   // field-modulation source
-const autoGain = {A:1, B:1};
+const autoGain = {};
+for(const ch of CHANNELS) autoGain[ch] = 1;
 
 function freeRT(rt){ if(rt){ gl.deleteTexture(rt.tex); gl.deleteFramebuffer(rt.fbo); } }
 function clearRing(c){
@@ -1725,15 +2016,18 @@ function ensureRing(c){
 function allocRTs(){
   for(const ch of CHANNELS){
     const c = chanRT[ch];
-    for(const k of ["fbPrev","fbNext","crt","flowA","flowB","out"]) freeRT(c[k]);
+    for(const k of ["fbPrev","fbNext","crt","flowA","flowB","flowSrc","out"]) freeRT(c[k]);
     clearRing(c);
     c.fbPrev = makeRT(procW,procH); c.fbNext = makeRT(procW,procH);
     c.crt    = makeRT(procW,procH);
     c.flowA  = makeRT(procW,procH); c.flowB  = makeRT(procW,procH);
+    c.flowSrc= makeRT(procW,procH);
     c.out    = makeRT(procW,procH);
   }
-  freeRT(scratch1); freeRT(scratch2); freeRT(mixOut); freeRT(persistA); freeRT(persistB);
+  freeRT(scratch1); freeRT(scratch2); freeRT(mixOut); freeRT(busOut1); freeRT(busOut2);
+  freeRT(persistA); freeRT(persistB);
   scratch1 = makeRT(procW,procH); scratch2 = makeRT(procW,procH); mixOut = makeRT(procW,procH);
+  busOut1 = makeRT(procW,procH); busOut2 = makeRT(procW,procH);
   persistA = makeRT(procW,procH); persistB = makeRT(procW,procH);
 }
 function setProcRes(h){
@@ -1752,13 +2046,15 @@ function makeSrcTex(){
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   return t;
 }
-const srcTex = {A: makeSrcTex(), B: makeSrcTex()};
+const srcTex = {};
+for(const ch of CHANNELS) srcTex[ch] = makeSrcTex();
 
 /* per-scanline sync model texture (written by CPU each frame) */
 const SROWS = 576;
+const SCHAN = 4;                 // one row of the sync texture per channel
 const dispTex = gl.createTexture();
 gl.bindTexture(gl.TEXTURE_2D, dispTex);
-gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,SROWS,1,0,gl.RGBA,gl.FLOAT,null);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,SROWS,SCHAN,0,gl.RGBA,gl.FLOAT,null);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -1774,7 +2070,8 @@ function setParamUniforms(pr, ch){
 function draw(){ gl.drawArrays(gl.TRIANGLES, 0, 3); }
 
 /* animated signal state */
-const vrollpos={A:0,B:0}, humpos={A:0,B:0};
+const vrollpos={}, humpos={};
+for(const ch of CHANNELS){ vrollpos[ch]=0; humpos[ch]=0; }
 let frameNo=0, bypass=0;
 /* ---------------- toast ---------------- */
 function toast(msg, err){
@@ -1887,7 +2184,8 @@ function morphModExtra(){
   return v;
 }
 function snapshotAll(){
-  const st = {chan:{A:{},B:{}}, master:{}};
+  const st = {chan:{}, master:{}};
+  for(const ch of CHANNELS) st.chan[ch] = {};
   for(const ch of CHANNELS) for(const p of CLIST) st.chan[ch][p.id] = chanBase[ch][p.id];
   for(const p of MLIST) st.master[p.id] = mBase[p.id];
   return st;
@@ -1924,7 +2222,7 @@ function applyParams(dt){
     if(p.master){ mCur[p.id] += d; }
     else {
       const rc = r.ch || "A";
-      if(rc === "AB"){ chanCur.A[p.id] += d; chanCur.B[p.id] += d; }
+      if(rc === "AB"){ for(const ch of CHANNELS) chanCur[ch][p.id] += d; }
       else chanCur[rc][p.id] += d;
     }
   }
@@ -2069,8 +2367,7 @@ function buildChanBar(){
     b.onclick = ()=>{ setActiveChan(ch); };
     return b;
   };
-  bar.appendChild(mk("A"));
-  bar.appendChild(mk("B"));
+  for(const ch of CHANNELS) bar.appendChild(mk(ch));
   const tools = document.createElement("div");
   tools.className = "chantools";
   const lk = document.createElement("button");
@@ -2079,20 +2376,22 @@ function buildChanBar(){
   lk.onclick = ()=>{ linkChans = !linkChans; lk.classList.toggle("on", linkChans); };
   const cp = document.createElement("button");
   cp.textContent = "COPY \u2192";
-  cp.title = "Copy this channel's settings to the other channel";
+  cp.title = "Copy this channel's settings to its partner on the same bus (A\u2194B, C\u2194D)";
   cp.onclick = ()=>{
     pushHistory();
-    const other = activeChan === "A" ? "B" : "A";
+    const other = BUSPAIR[activeChan];
     copyChannel(activeChan, other);
     toast("Copied channel "+activeChan+" \u2192 "+other);
   };
   const sw = document.createElement("button");
   sw.textContent = "SWAP";
-  sw.title = "Swap the two channels' settings";
+  sw.title = "Swap this channel with its partner on the same bus (A\u2194B, C\u2194D)";
   sw.onclick = ()=>{
     pushHistory();
-    for(const p of CLIST){ const t = chanBase.A[p.id]; chanBase.A[p.id] = chanBase.B[p.id]; chanBase.B[p.id] = t; }
-    refreshUI(); toast("Channels swapped");
+    const other = BUSPAIR[activeChan];
+    for(const p of CLIST){ const t = chanBase[activeChan][p.id]; chanBase[activeChan][p.id] = chanBase[other][p.id]; chanBase[other][p.id] = t; }
+    if(window.__swapSources) window.__swapSources(activeChan, other);
+    refreshUI(); toast("Swapped "+activeChan+" \u2194 "+other+" (effects and sources)");
   };
   tools.appendChild(lk); tools.appendChild(cp); tools.appendChild(sw);
   bar.appendChild(tools);
@@ -2101,8 +2400,8 @@ function buildChanBar(){
 function setActiveChan(ch){
   activeChan = ch;
   document.querySelectorAll(".chanbtn").forEach(b=>b.classList.toggle("on", b.dataset.chan===ch));
-  document.body.classList.toggle("chan-b", ch==="B");
-  refreshUI();
+  for(const c of CHANNELS) document.body.classList.toggle("chan-"+c.toLowerCase(), c===ch);
+  refreshUI(); refreshToggles();
   if(window.__syncChanInputUI) window.__syncChanInputUI();
 }
 function buildPanel(){
@@ -2119,9 +2418,10 @@ function buildPanel(){
     rb.title = "Reset this section to defaults";
     rb.onclick = e=>{ e.stopPropagation(); resetSection(sec.id); };
     h.appendChild(rb);
-    h.title = "Click to collapse / expand";
+    h.title = "Click to collapse / expand \u00b7 drag the handle to reorder";
     h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
     d.appendChild(h);
+    makeSectionDraggable(d, h, sec.id);
     const body = document.createElement("div"); body.className = "secbody";
     d.appendChild(body);
     secEls[sec.id] = d;
@@ -2140,7 +2440,7 @@ function buildPanel(){
         const v = parseFloat(s.value);
         setBase(p.id, v); val.textContent = fmt(p,v);
         if(p.master) morphOverride.add("M:"+p.id);
-        else if(linkChans){ morphOverride.add("A:"+p.id); morphOverride.add("B:"+p.id); }
+        else if(linkChans){ for(const ch of CHANNELS) morphOverride.add(ch+":"+p.id); }
         else morphOverride.add(activeChan+":"+p.id);
         if(p.id==="abMix" && v>0.03 && !window.__chanHasSource("B")){
           if(!window.__abHintT || performance.now()-window.__abHintT>6000){
@@ -2369,18 +2669,68 @@ function openModMenu(ev, p){
   m.style.top  = Math.min(ev.clientY, window.innerHeight - h - 8) + "px";
 }
 
-/* ---- collapsible section plumbing ---- */
+/* ---- collapsible + drag-reorderable section plumbing ---- */
 const secEls = {};
+let dragSec = null;
+function makeSectionDraggable(el, head, id){
+  const grab = document.createElement("span");
+  grab.className = "grab"; grab.textContent = "\u2059";
+  grab.draggable = true;
+  grab.title = "Drag to reorder this section";
+  grab.onclick = e=>e.stopPropagation();
+  grab.addEventListener("dragstart", e=>{
+    dragSec = el; el.classList.add("secdrag");
+    e.dataTransfer.effectAllowed = "move";
+    try{ e.dataTransfer.setData("text/plain", id); }catch(err){}
+    e.stopPropagation();
+  });
+  grab.addEventListener("dragend", ()=>{
+    if(dragSec) dragSec.classList.remove("secdrag");
+    dragSec = null;
+    document.querySelectorAll(".sec").forEach(x=>x.classList.remove("secover"));
+    saveSectionOrder();
+  });
+  head.insertBefore(grab, head.firstChild);
+  el.addEventListener("dragover", e=>{
+    if(!dragSec || dragSec===el) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = "move";
+    el.classList.add("secover");
+  });
+  el.addEventListener("dragleave", ()=> el.classList.remove("secover"));
+  el.addEventListener("drop", e=>{
+    if(!dragSec || dragSec===el) return;
+    e.preventDefault(); e.stopPropagation();
+    el.classList.remove("secover");
+    panel.insertBefore(dragSec, el);
+    saveSectionOrder();
+  });
+}
+function saveSectionOrder(){
+  try{
+    const ids = [...panel.querySelectorAll(".sec")].map(el=>{
+      for(const k in secEls) if(secEls[k]===el) return k;
+      return null;
+    }).filter(Boolean);
+    localStorage.setItem("bendr.secorder", JSON.stringify(ids));
+  }catch(e){}
+}
+function loadSectionOrder(){
+  try{
+    const ids = JSON.parse(localStorage.getItem("bendr.secorder")||"[]");
+    for(const id of ids){ const el = secEls[id]; if(el) panel.appendChild(el); }
+  }catch(e){}
+}
 function mkSection(id, cls, name){
   const d = document.createElement("div"); d.className = "sec "+cls;
   const h = document.createElement("h3");
   h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+name;
-  h.title = "Click to collapse / expand";
+  h.title = "Click to collapse / expand \u00b7 drag the handle to reorder";
   h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
   d.appendChild(h);
   const body = document.createElement("div"); body.className = "secbody";
   d.appendChild(body);
   secEls[id] = d;
+  makeSectionDraggable(d, h, id);
   /* callers append to the body */
   d.appendChild = body.appendChild.bind(body);
   return d;
@@ -2485,11 +2835,13 @@ function refreshStageLeds(){
 function resetSection(id){
   for(const p of PLIST) if(p.sec===id){
     if(p.master){ mBase[p.id] = p.def; morphOverride.add("M:"+p.id); }
-    else if(linkChans){ chanBase.A[p.id]=p.def; chanBase.B[p.id]=p.def; morphOverride.add("A:"+p.id); morphOverride.add("B:"+p.id); }
+    else if(linkChans){ for(const ch of CHANNELS){ chanBase[ch][p.id]=p.def; morphOverride.add(ch+":"+p.id); } }
     else { chanBase[activeChan][p.id] = p.def; morphOverride.add(activeChan+":"+p.id); }
   }
   if(id==="feedback"){ fbTrailMode=false; rescanMode=false; fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; }
   if(id==="lab"){ fieldSrc=0; }
+  if(id==="flow"){ flowField=0; flowEdge=0; }
+  if(id==="vhs" && window.__setTransport){ window.__setTransport("play"); if(tapeBtnRefs[0]) for(const k in tapeBtnRefs[0]) tapeBtnRefs[0][k].classList.toggle("on", k==="play"); }
   if(id==="crt"){ outModel=0; }
   if(id==="mixer"){ mixMode=0; wipeInv=false; const sm=document.getElementById("selMixMode"); if(sm) sm.value=0; }
   if(id==="frame"){ edgeMode=0; }
@@ -2511,26 +2863,40 @@ function refreshToggles(){
   for(const k in toggleRefs) toggleRefs[k].btn.textContent = toggleRefs[k].labelFn();
   const fm = document.getElementById("fbModeBtn");
   if(fm) fm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX");
+  if(tapeBtnRefs[0] && window.__transportOf){
+    const m = window.__transportOf(activeChan);
+    for(const k in tapeBtnRefs[0]) tapeBtnRefs[0][k].classList.toggle("on", k===m);
+  }
 }
+const tapeBtnRefs = [];
 const MIXMODES = ["FADE","WIPE H","WIPE V","DIAGONAL","BOX","CIRCLE","SPLIT H","SPLIT V",
   "BLINDS V","BLINDS H","CLOCK","DIAG BARS","BLOCKS","LUMA KEY","CHROMA KEY",
   "ADD","DIFFERENCE","MULTIPLY","SCREEN","LIGHTEN"];
 function sectionExtras(id, d){
-  if(id==="mixer"){
+  if(id==="mixer" || id==="mixer2" || id==="mixerM"){
+    const which = id==="mixer" ? 1 : (id==="mixer2" ? 2 : 3);
     const tr = document.createElement("div"); tr.className="trow";
-
     const sel = document.createElement("select");
-    sel.id = "selMixMode"; sel.style.flex = "1";
-    sel.title = "Transition / blend mode between channel A and B";
+    sel.id = which===1 ? "selMixMode" : (which===2 ? "selMixMode2" : "selMixModeM");
+    sel.style.flex = "1";
+    sel.title = "Transition / blend mode for this bus";
     MIXMODES.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=m; sel.appendChild(o); });
-    sel.value = mixMode;
-    sel.onchange = ()=>{ mixMode = parseInt(sel.value); };
+    sel.value = which===1 ? mixMode : (which===2 ? mixMode2 : mixModeM);
+    sel.onchange = ()=>{
+      const v = parseInt(sel.value);
+      if(which===1) mixMode = v; else if(which===2) mixMode2 = v; else mixModeM = v;
+    };
     tr.appendChild(sel);
-    mkToggle(tr, "wipeInv", ()=>"WIPE: "+(wipeInv?"INV":"NORM"), ()=>{ wipeInv=!wipeInv; });
+    if(which===1) mkToggle(tr, "wipeInv", ()=>"WIPE: "+(wipeInv?"INV":"NORM"), ()=>{ wipeInv=!wipeInv; });
+    if(which===2) mkToggle(tr, "wipeInv2", ()=>"WIPE: "+(wipeInv2?"INV":"NORM"), ()=>{ wipeInv2=!wipeInv2; });
+    if(which===3) mkToggle(tr, "wipeInvM", ()=>"WIPE: "+(wipeInvM?"INV":"NORM"), ()=>{ wipeInvM=!wipeInvM; });
     d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
-    note.textContent = "Combines the two finished channels. Run the A>B FADER like a T-bar; wipes use SOFT for edge feather, DETAIL for blind/bar count, CTR X/Y for the origin. Give channel B a source first.";
+    note.textContent =
+      which===1 ? "Bus 1 combines channels A and B. Run the fader like a T-bar; wipes use SOFT for edge feather, DETAIL for blind/bar count, CTR X/Y for the origin. Give channel B a source first."
+    : which===2 ? "Bus 2 combines channels C and D, exactly like bus 1. It only renders when the MASTER fader is above zero, so leaving it alone costs nothing."
+    : "The master crossfade between the two buses \u2014 the same twenty transitions again, one level up. Push it off zero and channels C and D come alive.";
     d.appendChild(note);
   }
   if(id==="morph"){
@@ -2614,6 +2980,28 @@ function sectionExtras(id, d){
     note.textContent = "Frames this channel's picture inside the raster. Each channel has its own framing.";
     d.appendChild(note);
   }
+  if(id==="vhs"){
+    const tr = document.createElement("div"); tr.className="trow";
+    const MODES = [["rew","\u25c0\u25c0"],["still","\u23f8"],["play","\u25b6"],["ff","\u25b6\u25b6"],["jogr","JOG \u25c0"],["jogf","JOG \u25b6"]];
+    const btns = {};
+    for(const [m,lab] of MODES){
+      const b = document.createElement("button");
+      b.textContent = lab; b.style.flex = "1"; b.style.minWidth = "0";
+      b.title = "Transport: "+m.toUpperCase()+" (this channel)";
+      b.onclick = ()=>{
+        if(window.__setTransport) window.__setTransport(m);
+        for(const k in btns) btns[k].classList.toggle("on", k===m);
+      };
+      btns[m] = b; tr.appendChild(b);
+    }
+    btns.play.classList.add("on");
+    d.appendChild(tr);
+    tapeBtnRefs[0] = btns;
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "A whole deck, per channel. Transport drives this channel's source: STILL parks a noise bar across a held field, shuttle and jog scrub with head-crossing bands. TAPE SPEED runs SP to EP \u2014 the slower the tape, the less bandwidth survives. GENERATIONS compounds GEN LOSS as if the tape had been dubbed that many times. TRACK PHASE places the mistracking band, SERVO HUNT makes the auto-tracking circuit search for it.";
+    d.appendChild(note);
+  }
   if(id==="glitch"){
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
@@ -2621,9 +3009,15 @@ function sectionExtras(id, d){
     d.appendChild(note);
   }
   if(id==="flow"){
+    const tr = document.createElement("div"); tr.className="trow";
+    const FF = ["MOTION","CONTOUR","CURL NOISE","RADIAL","SPIRAL","CHROMA","WEAVE"];
+    const FE = ["CLAMP","REPEAT","MIRROR"];
+    mkToggle(tr, "flowField", ()=>"FIELD: "+FF[flowField], ()=>{ flowField=(flowField+1)%7; });
+    mkToggle(tr, "flowEdge", ()=>"EDGE: "+FE[flowEdge], ()=>{ flowEdge=(flowEdge+1)%3; });
+    d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
-    note.textContent = "Temporal smear: MOSH HOLD freezes frames while motion keeps pushing them, MELT drips, SWIRL advects, VECTOR TRASH shoves blocks.";
+    note.textContent = "Temporal smear with its own frame store. P-FRAME PUSH advects the held frame along the FIELD \u2014 on MOTION that is real optical flow, which is what makes proper datamosh: the picture stops updating but the movement keeps dragging it. MOSH GATE picks whether only moving (+) or only still (\u2212) parts hold. CURL rotates the whole field, so drift becomes orbit.";
     d.appendChild(note);
   }
 }
@@ -2738,6 +3132,10 @@ function refreshUI(){
   }
   const fm = document.getElementById("fbModeBtn");
   if(fm) fm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX");
+  if(tapeBtnRefs[0] && window.__transportOf){
+    const m = window.__transportOf(activeChan);
+    for(const k in tapeBtnRefs[0]) tapeBtnRefs[0][k].classList.toggle("on", k===m);
+  }
 }
 /* mod tick indicators (cheap: 15Hz) */
 setInterval(()=>{
@@ -2769,7 +3167,7 @@ function renderRoutes(){
     for(const p of PLIST){ const o=document.createElement("option"); o.value=p.id; o.textContent=p.name+" ("+p.sec+")"; dst.appendChild(o); }
     dst.value = r.dst; dst.onchange = ()=>{ r.dst = dst.value; syncChanSel(); };
     const chSel = document.createElement("select"); chSel.className="rch";
-    for(const c of ["A","B","AB"]){ const o=document.createElement("option"); o.value=c; o.textContent=c; chSel.appendChild(o); }
+    for(const c of CHANNELS.concat(["AB"])){ const o=document.createElement("option"); o.value=c; o.textContent=(c==="AB"?"ALL":c); chSel.appendChild(o); }
     chSel.value = r.ch || "A";
     chSel.title = "Which channel this route modulates";
     chSel.onchange = ()=>{ r.ch = chSel.value; };
@@ -2905,6 +3303,30 @@ const PRESETS = [
  [{src:"drift",dst:"kaleidoRot",amt:0.15,ch:"A"},{src:"lfo3",dst:"bloom",amt:0.2,ch:"A"},{src:"chaos",dst:"chromaDelay",amt:0.12,ch:"A"}]],
 ["CRT REPHOTO", {bloom:0.5,bloomRad:0.35,halation:0.5,defocus:0.3,grain:0.45,scanlines:0.4,aperture:0.35,curvature:0.4,vignette:0.55,chromaBleed:0.3,ringing:0.25,genLoss:0.2,signalNoise:0.06,hWobble:0.04,tapeWow:0.12,contrast:1.15,saturation:1.1,glow:0.15},
  [{src:"drift",dst:"defocus",amt:0.12,ch:"A"},{src:"lfo3",dst:"bloom",amt:0.15,ch:"A"}]],
+["MOSH · P-FRAME DRAG", {mosh:0.93,moshVec:0.85,flowGain:1.4,moshGate:0.45,flowSharp:0.2,chromaBleed:0.3,saturation:1.25,contrast:1.15,glow:0.2,scanlines:0.14,curvature:0.22,vignette:0.35},
+ [{src:"motion",dst:"moshVec",amt:0.4,ch:"A"},{src:"cut",dst:"mosh",amt:-0.3,ch:"A"},{src:"lfo3",dst:"flowCurl",amt:0.2,ch:"A"}], {ff:0,fe:0}],
+["MOSH · CONTOUR CRAWL", {mosh:0.9,moshVec:0.7,flowCurl:0.35,flowGain:1.6,flowSharp:0.3,contour:0.3,contourBands:9,saturation:1.4,contrast:1.2,glow:0.25,scanlines:0.15,curvature:0.24,vignette:0.36},
+ [{src:"drift",dst:"flowCurl",amt:0.3,ch:"A"},{src:"lfo1",dst:"moshVec",amt:0.2,ch:"A"}], {ff:1,fe:0}],
+["MOSH · VECTOR TRASH", {moshBlock:0.8,moshBlockSize:0.85,moshRate:0.42,mosh:0.6,blockShift:0.25,blockSize:0.5,saturation:1.3,contrast:1.2,chromaNoise:0.15,scanlines:0.15,vignette:0.35},
+ [{src:"spike",dst:"moshBlock",amt:0.5,ch:"A"},{src:"cut",dst:"moshRate",amt:0.45,ch:"A"},{src:"chaos",dst:"moshBlockSize",amt:0.3,ch:"A"}], {ff:0,fe:1}],
+["MOSH · SLOW ORBIT", {mosh:0.95,moshVec:0.55,flowCurl:0.22,flowHue:0.35,flowFade:0.12,flowGain:1.2,saturation:1.5,glow:0.35,chromaBleed:0.35,scanlines:0.18,curvature:0.28,vignette:0.42,bloom:0.3},
+ [{src:"lfo3",dst:"flowCurl",amt:0.25,ch:"A"},{src:"drift",dst:"flowHue",amt:0.3,ch:"A"}], {ff:4,fe:2}],
+["MOSH · GRAVITY DRIP", {melt:0.85,meltDir:0.14,meltGate:0.5,flowGain:1.5,flowSharp:0.25,mosh:0.35,lumaBleed:0.3,saturation:1.5,glow:0.4,chromaBleed:0.4,scanlines:0.15,curvature:0.25,vignette:0.38},
+ [{src:"lfo3",dst:"meltDir",amt:0.3,ch:"A"},{src:"bright",dst:"meltGate",amt:-0.25,ch:"A"},{src:"mid",dst:"melt",amt:0.2,ch:"A"}], {ff:0,fe:0}],
+["MOSH · EDGE PEEL", {flowRepel:0.7,mosh:0.88,moshVec:0.3,flowSharp:0.4,flowGain:1.3,contour:0.25,contourBands:12,contourFill:0.5,saturation:1.35,contrast:1.3,scanlines:0.16,vignette:0.4},
+ [{src:"chaos",dst:"flowRepel",amt:0.35,ch:"A"},{src:"lfo2",dst:"flowStretch",amt:0.2,ch:"A"}], {ff:1,fe:2}],
+["DECK · CHEWED TAPE", {tracking:0.55,trackHunt:0.6,trackPhase:-0.2,crease:0.6,creasePos:0.44,dropout:0.5,dropoutLen:0.7,chromaLoss:0.4,hiss:0.3,genLoss:0.35,genCount:4,headSwitch:0.45,tapeWow:0.35,chromaBleed:0.45,signalNoise:0.12,saturation:1.15,scanlines:0.22,curvature:0.3,vignette:0.45},
+ [{src:"chaos",dst:"trackPhase",amt:0.3,ch:"A"},{src:"spike",dst:"dropout",amt:0.5,ch:"A"},{src:"lfo2",dst:"crease",amt:0.25,ch:"A"}]],
+["DECK · SIXTH GENERATION", {tapeSpeed:0.85,genLoss:0.55,genCount:9,chromaLoss:0.5,hiss:0.35,headSwitch:0.5,tapeWow:0.3,wowRate:0.35,chromaBleed:0.6,dotCrawl:0.3,ringing:0.2,saturation:0.9,contrast:1.1,scanlines:0.26,curvature:0.32,vignette:0.5,defocus:0.15,grain:0.25},
+ [{src:"drift",dst:"tapeSpeed",amt:0.2,ch:"A"},{src:"lfo3",dst:"genLoss",amt:0.15,ch:"A"}]],
+["DECK · HEAD CLOG", {headClog:0.75,azimuth:0.5,tracking:0.3,chromaLoss:0.6,hiss:0.3,dropout:0.35,headSwitch:0.4,chromaBleed:0.4,saturation:1.1,scanlines:0.2,curvature:0.3,vignette:0.45},
+ [{src:"lfo3",dst:"headClog",amt:0.3,ch:"A"},{src:"chaos",dst:"azimuth",amt:0.25,ch:"A"}]],
+["DECK · PAUSE / STILL", {stillNoise:0.8,headSwitch:0.6,tapeStretch:0.3,flutter:0.4,tracking:0.25,hiss:0.25,chromaBleed:0.35,signalNoise:0.1,saturation:1.05,scanlines:0.24,curvature:0.3,vignette:0.45},
+ [{src:"lfo1",dst:"stillNoise",amt:0.2,ch:"A"},{src:"drift",dst:"tapeStretch",amt:0.2,ch:"A"}]],
+["DECK · SHUTTLE SEARCH", {shuttleNz:0.7,tracking:0.4,headSwitch:0.8,hiss:0.4,chromaLoss:0.35,dropout:0.3,tapeSpeed:0.4,chromaBleed:0.4,saturation:1.1,scanlines:0.22,curvature:0.3,vignette:0.45},
+ [{src:"lfo2",dst:"shuttleNz",amt:0.3,ch:"A"},{src:"spike",dst:"tracking",amt:0.35,ch:"A"}]],
+["DECK · DYING SPOOL", {tapeStretch:0.7,flutter:0.7,wowRate:0.6,tapeWow:0.6,edgeDmg:0.6,crease:0.4,creasePos:0.7,printThru:0.5,hiss:0.45,chromaLoss:0.45,genLoss:0.4,genCount:5,dropout:0.45,dropoutLen:0.8,chromaBleed:0.5,saturation:1.0,scanlines:0.25,curvature:0.34,vignette:0.55,grain:0.3},
+ [{src:"chaos",dst:"flutter",amt:0.35,ch:"A"},{src:"drift",dst:"tapeStretch",amt:0.3,ch:"A"},{src:"spike",dst:"edgeDmg",amt:0.3,ch:"A"}]],
 ["JPEGS", {blockShift:0.55,blockSize:0.4,dither:0.8,lumaSteps:0.7,stepCount:6,pixelSort:0.25,sortThresh:0.55,contour:0.25,contourBands:8,contourFill:0.8,saturation:1.35,contrast:1.2,chromaNoise:0.2,glow:0.2,scanlines:0.15,curvature:0.2,vignette:0.35,grain:0.2},
  [{src:"spike",dst:"blockShift",amt:0.4,ch:"A"},{src:"cut",dst:"blockSize",amt:0.35,ch:"A"},{src:"lfo2",dst:"dither",amt:0.2,ch:"A"}]],
 ];
@@ -2975,12 +3397,14 @@ function loadPreset(i){
   pushHistory();
   applyState(pr[1], pr[2]);
   const tg = pr[3];
+  flowField = (tg && tg.ff) || 0;
+  flowEdge  = (tg && tg.fe) || 0;
   if(tg){
     fbWrap = tg.wrap||0; fbMirror = tg.mir||0; fbBlend = tg.blend||0;
     fbNL = tg.nl||0; fbInvert = !!tg.inv;
     if(tg.model!==undefined) outModel = tg.model;
-    refreshToggles();
   }
+  refreshToggles();
   document.getElementById("selPreset").value = i;
   toast("Preset: "+pr[0]+" \u2192 channel "+(linkChans?"A+B":activeChan));
 }
@@ -3034,6 +3458,8 @@ function randomizeAll(){
     for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
     chainOrder = arr;
   }
+  if(Math.random()<0.5) flowField = Math.floor(Math.random()*7);
+  if(Math.random()<0.3) flowEdge = Math.floor(Math.random()*3);
   for(const k of LFOKEYS){
     lfoState[k].rate = Math.pow(10, -1.5+Math.random()*2.2);
     if(Math.random()<0.4) lfoState[k].shape = ["sine","tri","saw","sqr","snh"][Math.floor(Math.random()*5)];
@@ -3058,7 +3484,8 @@ function captureState(){
   const st = {chan:snap.chan, master:snap.master, routes: routes.map(r=>({...r})),
     audioCfg: JSON.parse(JSON.stringify(audioCfg)),
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
-    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc,
+    mixMode2, wipeInv2, mixModeM, wipeInvM,
+    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}};
   for(const k of LFOKEYS) st[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   return st;
@@ -3068,12 +3495,16 @@ function restoreState(st){
   if(st.chainOrder && st.chainOrder.length>=4) chainOrder = st.chainOrder.slice();
   if(st.stageEnabled) stageEnabled = {...stageEnabled, ...st.stageEnabled};
   if(st.wipeInv !== undefined) wipeInv = st.wipeInv;
-  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","fieldSrc"]){
+  if(st.wipeInv2 !== undefined) wipeInv2 = st.wipeInv2;
+  if(st.wipeInvM !== undefined) wipeInvM = st.wipeInvM;
+  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","fieldSrc","flowField","flowEdge","mixMode2","mixModeM"]){
     if(st[k] !== undefined) eval(k+" = st."+k);
   }
   if(st.fbInvert !== undefined) fbInvert = st.fbInvert;
   if(st.linkChans !== undefined){ linkChans = st.linkChans; const lb=document.getElementById("btnLinkChans"); if(lb) lb.classList.toggle("on", linkChans); }
-  const smEl = document.getElementById("selMixMode"); if(smEl) smEl.value = mixMode;
+  { const a=document.getElementById("selMixMode"); if(a) a.value = mixMode;
+    const b=document.getElementById("selMixMode2"); if(b) b.value = mixMode2;
+    const c=document.getElementById("selMixModeM"); if(c) c.value = mixModeM; }
   if(st.keyChroma !== undefined) keyChroma = st.keyChroma;
   if(st.mixMode !== undefined) mixMode = st.mixMode;
   if(st.edgeMode !== undefined) edgeMode = st.edgeMode;
@@ -3113,13 +3544,15 @@ function initPatch(){
   pushHistory();
   fbTrailMode=false; rescanMode=false; keyChroma=false;
   mixMode=0; edgeMode=0; showKeyMatte=false; wipeInv=false; linkChans=false;
-  fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbTap=0; outModel=0; fieldSrc=0;
+  fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbTap=0; outModel=0; fieldSrc=0; flowField=0; flowEdge=0;
+  mixMode2=0; wipeInv2=false; mixModeM=0; wipeInvM=false;
   { const lb=document.getElementById("btnLinkChans"); if(lb) lb.classList.remove("on"); }
   for(const ch of CHANNELS) for(const p of CLIST) chanBase[ch][p.id] = p.def;
   for(const p of MLIST) mBase[p.id] = p.def;
-  { const sm=document.getElementById("selMixMode"); if(sm) sm.value=0; }
+  for(const q of ["selMixMode","selMixMode2","selMixModeM"]){ const sm=document.getElementById(q); if(sm) sm.value=0; }
   chainOrder = ["sig","col","glitch","lab","flow"];
   stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true};
+  for(const ch of CHANNELS) if(window.__setTransport) window.__setTransport("play", ch);
   morphOverride.clear();
   morphA=null; morphB=null; morphOverride.clear();
   for(const el of ["morphBtnA","morphBtnB"]){ const b=document.getElementById(el); if(b) b.classList.remove("on"); }
@@ -3144,9 +3577,10 @@ document.getElementById("btnSave").onclick = ()=>{
   const snap = snapshotAll();
   const state = {app:"bendr", v:5, chan:snap.chan, master:snap.master, routes, audioCfg,
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
-    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc,
+    mixMode2, wipeInv2, mixModeM, wipeInvM,
+    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
-    srcText: {A:{...SRC.A.text}, B:{...SRC.B.text}}};
+    srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   for(const k of LFOKEYS) state[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   const blob = new Blob([JSON.stringify(state,null,1)], {type:"application/json"});
   dl(URL.createObjectURL(blob), "bendr-"+stamp()+".json");
@@ -3177,18 +3611,19 @@ function dl(url, name){
 function newSource(ch){
   const v = document.createElement("video");
   v.playsInline = true; v.loop = true; v.crossOrigin = "anonymous";
-  if(ch === "B") v.muted = true;
+  if(ch !== "A") v.muted = true;
   const pc = document.createElement("canvas");
   pc.width = 960; pc.height = 540;
   return {ch, video:v, mode:"pattern", pattern:"bars", cam:null,
           patCanvas:pc, pat:pc.getContext("2d"), patClock:0,
-          aspect:16/9, has:0, speed:1, name:"", audioHooked:false,
+          aspect:16/9, has:0, speed:1, tpRate:1, name:"", audioHooked:false,
           text:{body:"BENDR", font:"mono", size:0.2, track:0, x:0.5, y:0.5, rot:0,
                 scrollX:0, scrollY:0, repeat:1, ink:"#ffffff", bg:"#000000", outline:0,
                 shape:"none", shpCount:1, shpSize:0.3, shpX:0.5, shpY:0.5,
                 shpSpin:0, shpFill:"#ff2fa0", shpStroke:0, shpPulse:0}};
 }
-const SRC = {A:newSource("A"), B:newSource("B")};
+const SRC = {};
+for(const ch of CHANNELS) SRC[ch] = newSource(ch);
 /* the A-channel video keeps the old name so audio hookup keeps working */
 const video = SRC.A.video;
 const videoB = SRC.B.video;
@@ -3209,7 +3644,7 @@ function handleFile(f, ch){
   S.name = f.name;
   S.speed = 1;
   S.video.playbackRate = 1; S.video.defaultPlaybackRate = 1;
-  S.video.muted = (ch === "B") ? true : masterMuted;
+  S.video.muted = (ch !== "A") ? true : masterMuted;
   S.video.play().catch(()=>{ S.video.muted = true; S.video.play().catch(()=>{}); });
   S.mode = "file";
   if(ch === "A"){ hookVideoAudio(); applyMute(); }
@@ -3263,15 +3698,59 @@ function syncChanInputUI(){
   sp.classList.toggle("hot", Math.abs(S.speed-1) > 0.001);
   const lp = document.getElementById("btnLoop");
   lp.classList.toggle("on", S.video.loop);
-  if(textEd && textEd.classList.contains("show")) syncTextEditor();
+  if(dockTab === "text") syncTextEditor();
 }
 window.__syncChanInputUI = syncChanInputUI;
+/* swap two channels' *sources* (what sits on top), not just their effects */
+window.__swapSources = function(a, b){
+  const A = SRC[a], B = SRC[b];
+  const keys = ["mode","pattern","cam","patClock","aspect","has","speed","tpRate","name","text"];
+  for(const k of keys){ const t = A[k]; A[k] = B[k]; B[k] = t; }
+  /* video elements carry their own media, so swap what each channel points at */
+  const tv = A.video, tp = A.patCanvas, tc = A.pat;
+  A.video = B.video; B.video = tv;
+  A.patCanvas = B.patCanvas; B.patCanvas = tp;
+  A.pat = B.pat; B.pat = tc;
+  A.ch = a; B.ch = b;
+  syncChanInputUI();
+};
 
 /* ---- text / shape generator ---- */
-const FONTS = {mono:'"SF Mono", ui-monospace, Menlo, monospace',
-               sans:'Helvetica, Arial, sans-serif',
-               serif:'Georgia, "Times New Roman", serif',
-               cond:'"Arial Narrow", "Helvetica Neue", sans-serif'};
+const FONTS = {
+  mono:'"SF Mono", ui-monospace, Menlo, monospace',
+  sans:'"Helvetica Neue", Helvetica, Arial, sans-serif',
+  serif:'Georgia, "Times New Roman", serif',
+  cond:'"Arial Narrow", "Helvetica Neue Condensed", sans-serif',
+  impact:'Impact, "Haettenschweiler", sans-serif',
+  courier:'"Courier New", Courier, monospace',
+  times:'"Times New Roman", Times, serif',
+  georgia:'Georgia, serif',
+  garamond:'Garamond, "EB Garamond", serif',
+  palatino:'Palatino, "Palatino Linotype", serif',
+  baskerville:'Baskerville, "Libre Baskerville", serif',
+  didot:'Didot, "Bodoni MT", serif',
+  futura:'Futura, "Century Gothic", sans-serif',
+  gill:'"Gill Sans", "Gill Sans MT", sans-serif',
+  optima:'Optima, Candara, sans-serif',
+  avenir:'Avenir, "Avenir Next", sans-serif',
+  verdana:'Verdana, Geneva, sans-serif',
+  tahoma:'Tahoma, Geneva, sans-serif',
+  trebuchet:'"Trebuchet MS", sans-serif',
+  rockwell:'Rockwell, "Courier Bold", serif',
+  copperplate:'Copperplate, "Copperplate Gothic Light", fantasy',
+  papyrus:'Papyrus, fantasy',
+  chalkduster:'Chalkduster, fantasy',
+  marker:'"Marker Felt", fantasy',
+  bradley:'"Bradley Hand", cursive',
+  snell:'"Snell Roundhand", cursive',
+  zapfino:'Zapfino, cursive',
+  andale:'"Andale Mono", monospace',
+  menlo:'Menlo, monospace',
+  monaco:'Monaco, monospace',
+  cursive:'cursive',
+  fantasy:'fantasy',
+  system:'system-ui, -apple-system, sans-serif'
+};
 function drawTextSource(S, t){
   const g = S.pat, W = S.patCanvas.width, H = S.patCanvas.height, T = S.text;
   g.setTransform(1,0,0,1,0,0);
@@ -3346,7 +3825,22 @@ function drawTextSource(S, t){
 }
 
 /* text editor wiring */
-const textEd = document.getElementById("textEd");
+let dockTab = "matrix";
+function setDock(t){
+  dockTab = t;
+  const map = {matrix:"matrix", mod:"modgrid", text:"textdock"};
+  for(const k in map){
+    const el = document.getElementById(map[k]);
+    if(el) el.classList.toggle("on", k===t);
+  }
+  document.querySelectorAll("#dockTabs button").forEach(b=>b.classList.toggle("on", b.dataset.dock===t));
+  const hint = document.getElementById("dockHint");
+  if(hint) hint.textContent = t==="mod" ? "right-click any parameter to patch it"
+                            : t==="text" ? "typing here never triggers shortcuts"
+                            : "patch sources into any parameter";
+  if(t==="text") syncTextEditor();
+}
+const textEd = null;
 const TXT_CTRL = [["txtBody","body","s"],["txtFont","font","s"],["txtSize","size","f"],["txtTrack","track","f"],
   ["txtX","x","f"],["txtY","y","f"],["txtRot","rot","f"],["txtScrollX","scrollX","f"],["txtScrollY","scrollY","f"],
   ["txtRepeat","repeat","f"],["txtInk","ink","s"],["txtBg","bg","s"],["txtOutline","outline","f"],
@@ -3354,7 +3848,8 @@ const TXT_CTRL = [["txtBody","body","s"],["txtFont","font","s"],["txtSize","size
   ["shpSpin","shpSpin","f"],["shpFill","shpFill","s"],["shpStroke","shpStroke","f"],["shpPulse","shpPulse","f"]];
 function syncTextEditor(){
   const T = cur().text;
-  document.getElementById("textEdChan").textContent = "\u2014 CHANNEL "+activeChan;
+  const ce = document.getElementById("textEdChan");
+  if(ce) ce.textContent = "\u2014 CHANNEL "+activeChan;
   for(const [id,key,kind] of TXT_CTRL){
     const el = document.getElementById(id); if(!el) continue;
     el.value = T[key];
@@ -3376,11 +3871,9 @@ document.getElementById("btnText").onclick = ()=>{
   stopCam(activeChan);
   S.mode = "text"; S.name = "text";
   syncChanInputUI(); syncTextEditor();
-  textEd.classList.add("show");
-  setTimeout(()=>document.getElementById("txtBody").focus(), 50);
+  setDock("text");
+  setTimeout(()=>{ const t=document.getElementById("txtBody"); if(t) t.focus(); }, 60);
 };
-document.getElementById("textEdClose").onclick = ()=> textEd.classList.remove("show");
-textEd.addEventListener("click", e=>{ if(e.target===textEd) textEd.classList.remove("show"); });
 
 /* test pattern drawing — per source */
 const noiseC = document.createElement("canvas"); noiseC.width=240; noiseC.height=135;
@@ -3558,6 +4051,46 @@ for(const ch of CHANNELS){
     if(Math.abs(S.video.playbackRate-S.speed)>0.01 && !S.video.srcObject) S.video.playbackRate = S.speed;
   });
 }
+/* ---- tape transport: per-channel deck mode ---- */
+const transport = {};
+for(const ch of CHANNELS) transport[ch] = "play";
+const TP_RATE = {play:1, still:0, ff:4, rew:-4, jogf:0.25, jogr:-0.25};
+function setTransport(mode, ch){
+  ch = ch || activeChan;
+  transport[ch] = mode;
+  const S = SRC[ch];
+  if(S.mode === "pattern" || S.mode === "text"){
+    S.tpRate = TP_RATE[mode];
+    if(typeof refreshToggles === "function") refreshToggles();
+    return;
+  }
+  const v = S.video;
+  try{
+    if(mode === "play"){ v.playbackRate = S.speed; if(v.paused) v.play(); }
+    else if(mode === "still"){ v.pause(); }
+    else if(mode === "ff"){ v.playbackRate = Math.min(16, Math.abs(S.speed)*4 || 4); if(v.paused) v.play(); }
+    else { v.pause(); }   // rew / jog are driven frame by frame below
+  }catch(e){}
+  if(typeof refreshToggles === "function") refreshToggles();
+}
+window.__setTransport = setTransport;
+window.__transportOf = ch=>transport[ch||activeChan] || "play";
+/* reverse and jog can't use playbackRate, so scrub currentTime each frame */
+function driveTransport(dt){
+  for(const ch of CHANNELS){
+    const m = transport[ch];
+    if(m === "play" || m === "still" || m === "ff") continue;
+    const S = SRC[ch];
+    if(S.mode === "pattern" || S.mode === "text") continue;
+    const v = S.video;
+    if(!v.duration) continue;
+    const r = TP_RATE[m] * (Math.abs(S.speed) || 1);
+    let nt = v.currentTime + r*dt;
+    if(nt < 0) nt += v.duration;
+    if(nt > v.duration) nt -= v.duration;
+    try{ v.currentTime = nt; }catch(e){}
+  }
+}
 function applyMute(){
   if(typeof outGainNode !== "undefined" && outGainNode){
     outGainNode.gain.value = masterMuted ? 0 : 1;
@@ -3594,18 +4127,21 @@ function toggleRec(){
     for(const tr of recDest.stream.getAudioTracks()) stream.addTrack(tr);
   }
   let mime = "";
-  for(const m of ["video/webm;codecs=vp9,opus","video/webm;codecs=vp9","video/webm;codecs=vp8,opus","video/webm"]){
+  for(const m of ["video/mp4;codecs=avc1.640028,mp4a.40.2","video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+                  "video/mp4;codecs=avc1.640028","video/mp4",
+                  "video/webm;codecs=vp9,opus","video/webm;codecs=vp9","video/webm;codecs=vp8,opus","video/webm"]){
     if(MediaRecorder.isTypeSupported(m)){ mime=m; break; }
   }
+  const isMp4 = mime.indexOf("mp4") >= 0;
   recChunks = [];
   recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: 16_000_000});
   recorder.ondataavailable = e=>{ if(e.data.size) recChunks.push(e.data); };
   recorder.onstop = ()=>{
-    const blob = new Blob(recChunks, {type:"video/webm"});
-    dl(URL.createObjectURL(blob), "bendr-"+stamp()+".webm");
+    const blob = new Blob(recChunks, {type: isMp4 ? "video/mp4" : "video/webm"});
+    dl(URL.createObjectURL(blob), "bendr-"+stamp()+(isMp4?".mp4":".webm"));
     recorder=null; btnRec.classList.remove("rec-on"); btnRec.textContent="● REC";
     recTime.style.display="none"; clearInterval(recTimer);
-    toast("Recording saved ("+(blob.size/1048576).toFixed(1)+" MB WebM)");
+    toast("Recording saved ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
   };
   recorder.start(250);
   recStart = performance.now();
@@ -3691,8 +4227,12 @@ for(const b of document.querySelectorAll(".bend[data-bend]")){
 
 /* keyboard */
 const KEYBEND = {q:"sync", w:"roll", e:"rainbow", r_shift:null, t:"melt", y:"kill"};
+function typingNow(e){
+  const t = e.target;
+  return t && (t.tagName==="INPUT" || t.tagName==="SELECT" || t.tagName==="TEXTAREA" || t.isContentEditable);
+}
 window.addEventListener("keydown", e=>{
-  if(e.target.tagName==="INPUT" || e.target.tagName==="SELECT") return;
+  if(typingNow(e)) return;
   const k = e.key.toLowerCase();
   if(k>="1" && k<="9"){ loadPreset(+k-1); return; }
   if(k===" "){ e.preventDefault(); randomizeAll(); return; }
@@ -3701,7 +4241,7 @@ window.addEventListener("keydown", e=>{
   if(k==="f"){ document.getElementById("btnFull").click(); return; }
   if(k==="s"){ document.getElementById("btnSnap").click(); return; }
   if(k==="h"){ help.classList.toggle("show"); return; }
-  if(k==="d"){ document.getElementById("modpage").classList.toggle("show"); return; }
+  if(k==="d"){ setDock(dockTab==="mod" ? "matrix" : "mod"); return; }
   if(k==="p"){ btnPlay.click(); return; }
   if(k==="b"){ setBypass(true); return; }
   if(k==="q"){ bendHeld.sync=true; markBend("sync",true); }
@@ -3712,6 +4252,7 @@ window.addEventListener("keydown", e=>{
   if(k==="y"){ bendHeld.kill=true; markBend("kill",true); }
 });
 window.addEventListener("keyup", e=>{
+  if(typingNow(e)) return;
   const k = e.key.toLowerCase();
   if(k==="b") setBypass(false);
   if(k==="q"){ bendHeld.sync=false; markBend("sync",false); }
@@ -3751,76 +4292,129 @@ window.addEventListener("drop", e=>{
    grip. We evolve smooth correlated processes per scanline and hand the GPU a
    displacement/gain/noise profile each frame. */
 const SNC = 25;
-const syncOU = new Float32Array(SNC);    // slow drift (Ornstein-Uhlenbeck)
-const syncOUF = new Float32Array(SNC);   // fast chatter (tracking band, head switch)
-let syncEvents = [];                     // loss-of-lock events: shear + recovery down the frame
-let trackC = 0.65, trackV = 0;           // tracking band centre, drifting
-const dispData = new Float32Array(SROWS*4);
+/* per-channel PLL state: each channel is its own deck, so each drifts on its own */
+function newSyncState(){
+  return {ou:new Float32Array(SNC), ouf:new Float32Array(SNC), ev:[],
+          trackC:0.65, trackV:0, hunt:0, huntPh:Math.random()*6.28,
+          clogC:0.5+ (Math.random()-0.5)*0.5, clogV:0, creaseJ:0};
+}
+const syncState = {};
+const dispData = new Float32Array(SROWS*SCHAN*4);
 function gaussR(){ return (Math.random()+Math.random()+Math.random()-1.5)*1.633; }
-function updateSyncModel(dt, t){
-  const jit=getCur("jitter","A"), tear=getCur("tear","A"), tsz=getCur("tearSize","A"), wob=getCur("hWobble","A"),
-        wfq=getCur("wobbleFreq","A"), wow=getCur("tapeWow","A"), trk=getCur("tracking","A"), hsw=getCur("headSwitch","A");
+
+function updateSyncChannel(ch, ci, dt, t){
+  if(!syncState[ch]) syncState[ch] = newSyncState();
+  const S = syncState[ch];
+  const g = id=>getCur(id, ch);
+  const jit=g("jitter"), tear=g("tear"), tsz=g("tearSize"), wob=g("hWobble"), wfq=g("wobbleFreq"),
+        wow=g("tapeWow"), wowR=g("wowRate"), flut=g("flutter"), trk=g("tracking"),
+        tph=g("trackPhase"), hunt=g("trackHunt"), hsw=g("headSwitch"), sp=g("tapeSpeed"),
+        stre=g("tapeStretch"), crs=g("crease"), crsP=g("creasePos"), clog=g("headClog"), azi=g("azimuth");
   const sdt = Math.min(dt, 0.05), rq = Math.sqrt(sdt);
   for(let i=0;i<SNC;i++){
-    syncOU[i]  += -6*syncOU[i]*sdt  + 2.4*rq*gaussR();
-    syncOUF[i] += -45*syncOUF[i]*sdt + 10*rq*gaussR();
+    S.ou[i]  += -6*S.ou[i]*sdt  + 2.4*rq*gaussR();
+    S.ouf[i] += -45*S.ouf[i]*sdt + 10*rq*gaussR();
   }
   /* spawn loss-of-lock events: sharp shear at one line, exponential re-lock below */
-  const rate = tear*tear*15 + trk*1.1;
-  if(Math.random() < rate*sdt && syncEvents.length < 10){
+  const rate = tear*tear*15 + trk*1.1 + sp*0.6;
+  if(Math.random() < rate*sdt && S.ev.length < 10){
     const whole = Math.random() < 0.18;   // occasionally the whole frame gets sucked sideways
-    syncEvents.push({
+    S.ev.push({
       t0:t, r0: whole ? SROWS-1 : Math.floor(Math.random()*SROWS),
       A:(0.05+0.45*Math.random()*Math.random())*(Math.random()<0.5?-1:1)*(0.35+0.65*tear),
       L:(10+tsz*90)*(0.5+Math.random())*(whole?6:1),
       rel:0.08+Math.random()*0.5, env:0});
   }
-  for(const ev of syncEvents){
+  for(const ev of S.ev){
     const age = t-ev.t0;
     ev.env = Math.min(age/0.03,1)*Math.exp(-Math.max(0,age-0.03)/ev.rel);
   }
-  syncEvents = syncEvents.filter(ev=>ev.env>0.012);
+  S.ev = S.ev.filter(ev=>ev.env>0.012);
   /* tracking band drifts vertically like a real mistracking head */
-  trackV += -0.6*trackV*sdt + 0.35*rq*gaussR();
-  trackC += trackV*sdt*0.25;
-  if(trackC<0.08){trackC=0.08; trackV=Math.abs(trackV);}
-  if(trackC>0.92){trackC=0.92; trackV=-Math.abs(trackV);}
-  const hsRows = Math.max(0, Math.floor(SROWS*0.05*hsw));
-  const bw = 0.035+0.05*trk;
+  S.trackV += -0.6*S.trackV*sdt + 0.35*rq*gaussR();
+  S.trackC += S.trackV*sdt*0.25;
+  if(S.trackC<0.08){S.trackC=0.08; S.trackV=Math.abs(S.trackV);}
+  if(S.trackC>0.92){S.trackC=0.92; S.trackV=-Math.abs(S.trackV);}
+  /* servo hunt: the auto-tracking circuit searching, overshooting, snapping back */
+  S.huntPh += sdt*(0.35 + hunt*2.4);
+  const huntTri = Math.abs(((S.huntPh*0.5)%1)*2-1);
+  S.hunt = hunt*(huntTri-0.5)*0.55 + hunt*0.10*Math.sin(S.huntPh*9.3);
+  const bandC = Math.min(0.97, Math.max(0.03, S.trackC + tph*0.45 + S.hunt));
+  /* head clog: a dead band that wanders slowly and kills the signal inside it */
+  S.clogV += -0.25*S.clogV*sdt + 0.10*rq*gaussR();
+  S.clogC += S.clogV*sdt*0.2;
+  if(S.clogC<0.05){S.clogC=0.05; S.clogV=Math.abs(S.clogV);}
+  if(S.clogC>0.95){S.clogC=0.95; S.clogV=-Math.abs(S.clogV);}
+  /* tape crease: a hard fold that shears one band sideways and jitters frame to frame */
+  S.creaseJ += (gaussR()*0.5 - S.creaseJ)*Math.min(1, sdt*22);
+  const hsRows = Math.max(0, Math.floor(SROWS*0.05*hsw*(1.0+sp)));
+  const bw = 0.035+0.05*trk + hunt*0.02;
+  const wowF1 = 5.2*(0.25+wowR*3.0), wowF2 = 17.0*(0.25+wowR*3.0);
+  const wowT1 = t*0.9*(0.3+wowR*2.6), wowT2 = t*1.4*(0.3+wowR*2.6);
+  const clogW = 0.012 + clog*0.075, creaseW = 0.006 + crs*0.03;
+  const off = ci*SROWS*4;
   for(let r=0;r<SROWS;r++){
     const fy = r/SROWS;
-    let d = (Math.sin(fy*5.2+t*0.9)+0.6*Math.sin(fy*17.0-t*1.4))*0.006*wow
+    let d = (Math.sin(fy*wowF1+wowT1)+0.6*Math.sin(fy*wowF2-wowT2))*0.006*wow
           + Math.sin(fy*(6.0+wfq*80.0)+t*4.2)*0.013*wob;
+    /* scrape flutter: fast, low-amplitude, high spatial frequency */
+    if(flut>0.003) d += Math.sin(fy*(120.0+flut*420.0)+t*37.0)*0.004*flut
+                      + Math.sin(fy*(311.0)-t*61.0)*0.0022*flut;
+    /* tape stretch: the top of the frame reads long, so geometry leans */
+    if(stre>0.003){ const k=1.0-fy; d += k*k*0.06*stre; }
     const xc = fy*(SNC-1), ic = Math.min(SNC-2, Math.floor(xc)), fc = xc-ic;
     const sm = fc*fc*(3-2*fc);
-    const ouv  = syncOU[ic]*(1-sm)+syncOU[ic+1]*sm;
-    const oufv = syncOUF[ic]*(1-sm)+syncOUF[ic+1]*sm;
+    const ouv  = S.ou[ic]*(1-sm)+S.ou[ic+1]*sm;
+    const oufv = S.ouf[ic]*(1-sm)+S.ouf[ic+1]*sm;
     d += ouv*0.004*(0.12+jit);            // the picture is never perfectly still
-    const g0 = (fy-trackC)/bw;
+    const g0 = (fy-bandC)/bw;
     const bp = Math.exp(-g0*g0);
     d += bp*trk*oufv*0.02;
     let ng = bp*trk*(0.3+0.4*Math.abs(oufv));
-    for(const ev of syncEvents){
+    let hf = bp*trk*0.35 + sp*0.12;
+    for(const ev of S.ev){
       if(r<=ev.r0) d += ev.A*ev.env*Math.exp(-(ev.r0-r)/ev.L);
     }
     if(r<hsRows){
       const k = (hsRows-r)/hsRows;
       d += (0.045*k*k + 0.02*k*oufv)*hsw;
       ng += hsw*0.9*k*k;
+      hf += hsw*0.5*k;
     }
-    const g = 1 - Math.min(0.38, Math.abs(d)*2.0);
-    const o = r*4;
-    dispData[o]=d; dispData[o+1]=g; dispData[o+2]=ng; dispData[o+3]=0;
+    /* head clog band: no RF, so no chroma and no detail, just noise */
+    if(clog>0.003){
+      const gc = (fy-S.clogC)/clogW;
+      const cb = Math.exp(-gc*gc);
+      ng += cb*clog*1.5;
+      hf += cb*clog;
+    }
+    /* crease */
+    if(crs>0.003){
+      const gk = (fy-crsP)/creaseW;
+      const cb = Math.exp(-gk*gk);
+      d += cb*crs*(0.09 + 0.05*S.creaseJ);
+      ng += cb*crs*0.8;
+      hf += cb*crs*0.7;
+    }
+    /* azimuth error: alternate head passes lose the high band */
+    if(azi>0.003) hf += azi*0.75*(r%2);
+    const gn = 1 - Math.min(0.38, Math.abs(d)*2.0) - Math.min(0.5, ng*0.18);
+    const o = off + r*4;
+    dispData[o]=d; dispData[o+1]=gn; dispData[o+2]=ng; dispData[o+3]=Math.min(1, hf);
   }
+}
+function updateSyncModel(dt, t){
+  for(let ci=0; ci<CHANNELS.length && ci<SCHAN; ci++) updateSyncChannel(CHANNELS[ci], ci, dt, t);
   gl.bindTexture(gl.TEXTURE_2D, dispTex);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,SROWS,1,0,gl.RGBA,gl.FLOAT,dispData);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,SROWS,SCHAN,0,gl.RGBA,gl.FLOAT,dispData);
 }
 
 /* ---------------- main loop ---------------- */
 const osd = document.getElementById("osd");
 let lastT = performance.now()/1000, fpsAcc=0, fpsN=0, fpsShow=0;
-const stutterHeld = {A:false, B:false}, stutterT = {A:0, B:0};
-let offline = false;
+const stutterHeld = {}, stutterT = {};
+for(const ch of CHANNELS){ stutterHeld[ch]=false; stutterT[ch]=0; }
+let offline = false, liveList = "A";
 
 /* video content analysis — the picture itself as a mod source (reads channel A) */
 const anaC = document.createElement("canvas"); anaC.width=32; anaC.height=18;
@@ -3882,6 +4476,10 @@ function sigExtras(pr, now, ch){
   gl.uniform1f(U(pr,"u_vrollpos"), vrollpos[ch]);
   gl.uniform1f(U(pr,"u_humpos"), humpos[ch]);
   gl.uniform1f(U(pr,"u_keyMode"), keyChroma?1:0);
+  gl.uniform1f(U(pr,"u_chanIdx"), Math.max(0, CHANNELS.indexOf(ch)));
+  const tp = transport[ch] || "play";
+  gl.uniform1f(U(pr,"u_tpStill"), tp==="still" ? 0.75 : 0);
+  gl.uniform1f(U(pr,"u_tpShuttle"), tp==="ff" ? 0.55 : (tp==="rew" ? -0.55 : 0));
 }
 function colExtras(pr, now){
   gl.uniform1f(U(pr,"u_time"), now);
@@ -3889,11 +4487,12 @@ function colExtras(pr, now){
   gl.uniform1f(U(pr,"u_keyMode"), keyChroma?1:0);
   gl.uniform1f(U(pr,"u_showKey"), showKeyMatte?1:0);
 }
+const FLOW_IDS = ["mosh","moshVec","melt","swirl","moshBlock","timeGrad","flowStretch","flowRepel","flowNoise","flowHue","flowFade"];
 const LAB_IDS = ["sparseJit","ntscArt","ntscFringe","snow","fmAmt","slitscan","bitCrush","bandKey","rowSmear","moire","fieldMod"];
 function stageNeeded(id, ch){
   if(id === "lab") return LAB_IDS.some(k=>getCur(k,ch)>0.003);
   if(id === "glitch") return getCur("pixelSort",ch)>0.003 || getCur("blockShift",ch)>0.003 || getCur("dotify",ch)>0.003 || getCur("driftWarp",ch)>0.003 || getCur("fmWarp",ch)>0.003;
-  if(id === "flow") return getCur("mosh",ch)>0.003 || getCur("melt",ch)>0.003 || getCur("swirl",ch)>0.003 || getCur("moshBlock",ch)>0.003 || Math.abs(getCur("timeGrad",ch))>0.003;
+  if(id === "flow") return FLOW_IDS.some(k=>Math.abs(getCur(k,ch))>0.003);
   return true;
 }
 function runStage(id, inTex, dstRT, now, ch){
@@ -3906,11 +4505,24 @@ function runStage(id, inTex, dstRT, now, ch){
     gl.uniform1f(U(pr,"u_fieldSrc"), fieldSrc);
   }, ch);
   if(id === "flow"){
+    /* if the stage has been idle, prime its history with the live picture so it
+       doesn't fade up from black (or flash a stale frame) when you turn it on */
+    if(frameNo - (C.flowLast || -99) > 1){
+      runPass(progCOPY, inTex, C.flowA.fbo, procW, procH, null, ch);
+      runPass(progCOPY, inTex, C.flowSrc.fbo, procW, procH, null, ch);
+    }
+    C.flowLast = frameNo;
     runPass(progFLOW, inTex, dstRT.fbo, procW, procH, pr=>{
       gl.uniform1f(U(pr,"u_time"), now);
+      gl.uniform1f(U(pr,"u_flowField"), flowField);
+      gl.uniform1f(U(pr,"u_flowEdge"), flowEdge);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, C.flowA.tex);
       gl.uniform1i(U(pr,"u_flowPrev"), 1);
+      gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, C.flowSrc.tex);
+      gl.uniform1i(U(pr,"u_srcPrev"), 2);
     }, ch);
+    /* keep this frame's input for next frame's motion estimate */
+    runPass(progCOPY, inTex, C.flowSrc.fbo, procW, procH, null, ch);
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, dstRT.fbo);
     gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, C.flowB.fbo);
     gl.blitFramebuffer(0,0,procW,procH, 0,0,procW,procH, gl.COLOR_BUFFER_BIT, gl.NEAREST);
@@ -3932,7 +4544,7 @@ function uploadSource(ch, dt){
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
   if(S.mode === "pattern" || S.mode === "text"){
-    S.patClock += dt*S.speed;
+    S.patClock += dt*S.speed*(S.tpRate===undefined?1:S.tpRate);
     if(S.mode === "text") drawTextSource(S, S.patClock); else drawPattern(S, S.patClock);
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, S.patCanvas);
     S.aspect = S.patCanvas.width/S.patCanvas.height; S.has = 1;
@@ -4024,6 +4636,7 @@ function renderFrame(now, dt){
   frameNo++;
   sizeCanvas();
   updateAudio(dt);
+  driveTransport(dt);
   updateContentAnalysis(dt);
   updateMod(dt, now);
   pushModHistory();
@@ -4045,27 +4658,46 @@ function renderFrame(now, dt){
     humpos[ch] = (humpos[ch] + dt*(0.05 + getCur("humBar",ch)*0.1)) % 1;
   }
 
-  /* channel B only costs anything when it's actually in the mix */
-  const bLive = srcReady("B") && mCur.abMix > 0.0005;
+  /* a channel only costs anything when its fader can actually let it through */
+  const masterLive = mCur.busMix > 0.0005;
+  const live = {
+    A: true,
+    B: srcReady("B") && mCur.abMix > 0.0005,
+    C: masterLive && srcReady("C"),
+    D: masterLive && srcReady("D") && mCur.cdMix > 0.0005
+  };
+  liveList = CHANNELS.filter(c=>live[c]).join("+");
+  for(const ch of CHANNELS){
+    if(!live[ch]) continue;
+    uploadSource(ch, dt);
+    renderChannel(ch, now, dt);
+  }
 
-  uploadSource("A", dt);
-  renderChannel("A", now, dt);
-  if(bLive){ uploadSource("B", dt); renderChannel("B", now, dt); }
-
-  /* mixer */
-  gl.bindFramebuffer(gl.FRAMEBUFFER, mixOut.fbo);
-  gl.viewport(0,0,procW,procH);
-  gl.useProgram(progMIX.prog);
-  gl.uniform2f(U(progMIX,"u_res"), procW, procH);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, chanRT.A.out.tex);
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, chanRT.B.out.tex);
-  gl.uniform1i(U(progMIX,"u_texA"), 0);
-  gl.uniform1i(U(progMIX,"u_texB"), 1);
-  gl.uniform1f(U(progMIX,"u_hasB"), bLive?1:0);
-  gl.uniform1f(U(progMIX,"u_mixMode"), mixMode);
-  gl.uniform1f(U(progMIX,"u_wipeInv"), wipeInv?1:0);
-  setParamUniforms(progMIX, "A");
-  draw();
+  /* mixer tree: BUS 1 = A/B, BUS 2 = C/D, MASTER = BUS 1 / BUS 2 */
+  function mixPass(dstRT, texA, texB, hasB, ids, mode, inv){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dstRT.fbo);
+    gl.viewport(0,0,procW,procH);
+    gl.useProgram(progMIX.prog);
+    gl.uniform2f(U(progMIX,"u_res"), procW, procH);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texA);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texB);
+    gl.uniform1i(U(progMIX,"u_texA"), 0);
+    gl.uniform1i(U(progMIX,"u_texB"), 1);
+    gl.uniform1f(U(progMIX,"u_hasB"), hasB?1:0);
+    gl.uniform1f(U(progMIX,"u_mixMode"), mode);
+    gl.uniform1f(U(progMIX,"u_wipeInv"), inv?1:0);
+    setParamUniforms(progMIX, "A");
+    for(let i=0;i<MIXP.length;i++) gl.uniform1f(U(progMIX,"u_"+MIXP[i]), mCur[ids[i]]);
+    draw();
+  }
+  if(masterLive){
+    mixPass(busOut1, chanRT.A.out.tex, chanRT.B.out.tex, live.B, MIXBUS.b1, mixMode, wipeInv);
+    mixPass(busOut2, chanRT.C.out.tex, chanRT.D.out.tex, live.D, MIXBUS.b2, mixMode2, wipeInv2);
+    mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mixModeM, wipeInvM);
+  } else {
+    /* nothing on bus 2, so bus 1 goes straight to master and costs one pass, as before */
+    mixPass(mixOut, chanRT.A.out.tex, chanRT.B.out.tex, live.B, MIXBUS.b1, mixMode, wipeInv);
+  }
 
   /* CRT -> screen */
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -4115,7 +4747,7 @@ function renderFrame(now, dt){
     }
     fpsAcc += 1/Math.max(dt,1e-4); fpsN++;
     if(fpsN>=30){ fpsShow = Math.round(fpsAcc/fpsN); fpsAcc=0; fpsN=0;
-      osd.textContent = procH+"p · "+fpsShow+" fps"+(bLive?" · A+B":" · A")+(recorder?" · REC":"")+(audioMode!=="off"?" · AUD":"")+(rescanMode?" · RESCAN":"");
+      osd.textContent = procH+"p · "+fpsShow+" fps"+(" · "+liveList)+(recorder?" · REC":"")+(audioMode!=="off"?" · AUD":"")+(rescanMode?" · RESCAN":"");
       updateTempoUI();
     }
   }
@@ -4188,7 +4820,7 @@ async function offlineRender(){
   for(let i=0; i<total && !renderCancel; i++){
     const t = i/fps;
     await seekTo(video, t);
-    if(srcReady("B") && videoB.duration) await seekTo(videoB, t % videoB.duration);
+    for(const ch of ["B","C","D"]){ const v = SRC[ch].video; if(srcReady(ch) && v.duration) await seekTo(v, t % v.duration); }
     renderFrame(t0+t, 1/fps);
     const vf = new VideoFrame(canvas, {timestamp: Math.round(i*1e6/fps), duration: Math.round(1e6/fps)});
     enc.encode(vf, {keyFrame: i%(fps*2)===0});
@@ -4215,14 +4847,14 @@ async function offlineRender(){
   ov.style.display = "none";
   offline = false; lastT = performance.now()/1000;
   if(wasPlaying) video.play();
-  if(SRC.B.mode!=="pattern") videoB.play();
+  for(const ch of ["B","C","D"]) if(SRC[ch].mode==="file") SRC[ch].video.play();
 }
 
 /* ---------------- init ---------------- */
 window.__pcur = (id,ch)=>getCur(id,ch);
 window.__dbg = ()=>({chan:activeChan,
-  A:{mode:SRC.A.mode, rs:SRC.A.video.readyState, has:SRC.A.has, spd:SRC.A.speed, rate:SRC.A.video.playbackRate},
-  B:{mode:SRC.B.mode, rs:SRC.B.video.readyState, has:SRC.B.has, spd:SRC.B.speed, rate:SRC.B.video.playbackRate}});
+  ...Object.fromEntries(CHANNELS.map(ch=>[ch,
+    {mode:SRC[ch].mode, rs:SRC[ch].video.readyState, has:SRC[ch].has, spd:SRC[ch].speed, rate:SRC[ch].video.playbackRate}]))});
 
 /* ---------------- init ---------------- */
 const OUTPUT_MODE = (location.hash === "#output") && !!window.opener;
@@ -4277,15 +4909,31 @@ if(OUTPUT_MODE){
   buildPanel();
   buildModPage();
   setInterval(drawModPage, 50);
+  setDock("matrix");
   {
-    const mp = document.getElementById("modpage");
-    document.getElementById("btnMod").onclick = ()=>{ mp.classList.toggle("show"); };
-    document.getElementById("modPageClose").onclick = ()=> mp.classList.remove("show");
+    const bar = document.getElementById("dragbar"), low = document.getElementById("lower");
+    let dragging = false;
+    const move = e=>{
+      if(!dragging) return;
+      const y = (e.touches ? e.touches[0].clientY : e.clientY);
+      const h = Math.max(110, Math.min(window.innerHeight-220, window.innerHeight - y));
+      low.style.height = h + "px";
+      sizeCanvas();
+    };
+    bar.addEventListener("mousedown", ()=>{ dragging = true; document.body.style.cursor="ns-resize"; });
+    bar.addEventListener("touchstart", ()=>{ dragging = true; }, {passive:true});
+    window.addEventListener("mousemove", move);
+    window.addEventListener("touchmove", move, {passive:true});
+    window.addEventListener("mouseup", ()=>{ dragging=false; document.body.style.cursor=""; });
+    window.addEventListener("touchend", ()=>{ dragging=false; });
   }
+  document.querySelectorAll("#dockTabs button").forEach(b=>{ b.onclick = ()=>setDock(b.dataset.dock); });
+  document.getElementById("btnMod").onclick = ()=> setDock("mod");
   setActiveChan("A");
   syncChanInputUI();
   renderChain();
   loadCollapse();
+  loadSectionOrder();
   refreshStageLeds();
   setInterval(refreshStageLeds, 400);
   document.getElementById("btnChainReset").onclick = ()=>{

@@ -45,6 +45,30 @@ const PRESETS = [
  [{src:"drift",dst:"kaleidoRot",amt:0.15,ch:"A"},{src:"lfo3",dst:"bloom",amt:0.2,ch:"A"},{src:"chaos",dst:"chromaDelay",amt:0.12,ch:"A"}]],
 ["CRT REPHOTO", {bloom:0.5,bloomRad:0.35,halation:0.5,defocus:0.3,grain:0.45,scanlines:0.4,aperture:0.35,curvature:0.4,vignette:0.55,chromaBleed:0.3,ringing:0.25,genLoss:0.2,signalNoise:0.06,hWobble:0.04,tapeWow:0.12,contrast:1.15,saturation:1.1,glow:0.15},
  [{src:"drift",dst:"defocus",amt:0.12,ch:"A"},{src:"lfo3",dst:"bloom",amt:0.15,ch:"A"}]],
+["MOSH · P-FRAME DRAG", {mosh:0.93,moshVec:0.85,flowGain:1.4,moshGate:0.45,flowSharp:0.2,chromaBleed:0.3,saturation:1.25,contrast:1.15,glow:0.2,scanlines:0.14,curvature:0.22,vignette:0.35},
+ [{src:"motion",dst:"moshVec",amt:0.4,ch:"A"},{src:"cut",dst:"mosh",amt:-0.3,ch:"A"},{src:"lfo3",dst:"flowCurl",amt:0.2,ch:"A"}], {ff:0,fe:0}],
+["MOSH · CONTOUR CRAWL", {mosh:0.9,moshVec:0.7,flowCurl:0.35,flowGain:1.6,flowSharp:0.3,contour:0.3,contourBands:9,saturation:1.4,contrast:1.2,glow:0.25,scanlines:0.15,curvature:0.24,vignette:0.36},
+ [{src:"drift",dst:"flowCurl",amt:0.3,ch:"A"},{src:"lfo1",dst:"moshVec",amt:0.2,ch:"A"}], {ff:1,fe:0}],
+["MOSH · VECTOR TRASH", {moshBlock:0.8,moshBlockSize:0.85,moshRate:0.42,mosh:0.6,blockShift:0.25,blockSize:0.5,saturation:1.3,contrast:1.2,chromaNoise:0.15,scanlines:0.15,vignette:0.35},
+ [{src:"spike",dst:"moshBlock",amt:0.5,ch:"A"},{src:"cut",dst:"moshRate",amt:0.45,ch:"A"},{src:"chaos",dst:"moshBlockSize",amt:0.3,ch:"A"}], {ff:0,fe:1}],
+["MOSH · SLOW ORBIT", {mosh:0.95,moshVec:0.55,flowCurl:0.22,flowHue:0.35,flowFade:0.12,flowGain:1.2,saturation:1.5,glow:0.35,chromaBleed:0.35,scanlines:0.18,curvature:0.28,vignette:0.42,bloom:0.3},
+ [{src:"lfo3",dst:"flowCurl",amt:0.25,ch:"A"},{src:"drift",dst:"flowHue",amt:0.3,ch:"A"}], {ff:4,fe:2}],
+["MOSH · GRAVITY DRIP", {melt:0.85,meltDir:0.14,meltGate:0.5,flowGain:1.5,flowSharp:0.25,mosh:0.35,lumaBleed:0.3,saturation:1.5,glow:0.4,chromaBleed:0.4,scanlines:0.15,curvature:0.25,vignette:0.38},
+ [{src:"lfo3",dst:"meltDir",amt:0.3,ch:"A"},{src:"bright",dst:"meltGate",amt:-0.25,ch:"A"},{src:"mid",dst:"melt",amt:0.2,ch:"A"}], {ff:0,fe:0}],
+["MOSH · EDGE PEEL", {flowRepel:0.7,mosh:0.88,moshVec:0.3,flowSharp:0.4,flowGain:1.3,contour:0.25,contourBands:12,contourFill:0.5,saturation:1.35,contrast:1.3,scanlines:0.16,vignette:0.4},
+ [{src:"chaos",dst:"flowRepel",amt:0.35,ch:"A"},{src:"lfo2",dst:"flowStretch",amt:0.2,ch:"A"}], {ff:1,fe:2}],
+["DECK · CHEWED TAPE", {tracking:0.55,trackHunt:0.6,trackPhase:-0.2,crease:0.6,creasePos:0.44,dropout:0.5,dropoutLen:0.7,chromaLoss:0.4,hiss:0.3,genLoss:0.35,genCount:4,headSwitch:0.45,tapeWow:0.35,chromaBleed:0.45,signalNoise:0.12,saturation:1.15,scanlines:0.22,curvature:0.3,vignette:0.45},
+ [{src:"chaos",dst:"trackPhase",amt:0.3,ch:"A"},{src:"spike",dst:"dropout",amt:0.5,ch:"A"},{src:"lfo2",dst:"crease",amt:0.25,ch:"A"}]],
+["DECK · SIXTH GENERATION", {tapeSpeed:0.85,genLoss:0.55,genCount:9,chromaLoss:0.5,hiss:0.35,headSwitch:0.5,tapeWow:0.3,wowRate:0.35,chromaBleed:0.6,dotCrawl:0.3,ringing:0.2,saturation:0.9,contrast:1.1,scanlines:0.26,curvature:0.32,vignette:0.5,defocus:0.15,grain:0.25},
+ [{src:"drift",dst:"tapeSpeed",amt:0.2,ch:"A"},{src:"lfo3",dst:"genLoss",amt:0.15,ch:"A"}]],
+["DECK · HEAD CLOG", {headClog:0.75,azimuth:0.5,tracking:0.3,chromaLoss:0.6,hiss:0.3,dropout:0.35,headSwitch:0.4,chromaBleed:0.4,saturation:1.1,scanlines:0.2,curvature:0.3,vignette:0.45},
+ [{src:"lfo3",dst:"headClog",amt:0.3,ch:"A"},{src:"chaos",dst:"azimuth",amt:0.25,ch:"A"}]],
+["DECK · PAUSE / STILL", {stillNoise:0.8,headSwitch:0.6,tapeStretch:0.3,flutter:0.4,tracking:0.25,hiss:0.25,chromaBleed:0.35,signalNoise:0.1,saturation:1.05,scanlines:0.24,curvature:0.3,vignette:0.45},
+ [{src:"lfo1",dst:"stillNoise",amt:0.2,ch:"A"},{src:"drift",dst:"tapeStretch",amt:0.2,ch:"A"}]],
+["DECK · SHUTTLE SEARCH", {shuttleNz:0.7,tracking:0.4,headSwitch:0.8,hiss:0.4,chromaLoss:0.35,dropout:0.3,tapeSpeed:0.4,chromaBleed:0.4,saturation:1.1,scanlines:0.22,curvature:0.3,vignette:0.45},
+ [{src:"lfo2",dst:"shuttleNz",amt:0.3,ch:"A"},{src:"spike",dst:"tracking",amt:0.35,ch:"A"}]],
+["DECK · DYING SPOOL", {tapeStretch:0.7,flutter:0.7,wowRate:0.6,tapeWow:0.6,edgeDmg:0.6,crease:0.4,creasePos:0.7,printThru:0.5,hiss:0.45,chromaLoss:0.45,genLoss:0.4,genCount:5,dropout:0.45,dropoutLen:0.8,chromaBleed:0.5,saturation:1.0,scanlines:0.25,curvature:0.34,vignette:0.55,grain:0.3},
+ [{src:"chaos",dst:"flutter",amt:0.35,ch:"A"},{src:"drift",dst:"tapeStretch",amt:0.3,ch:"A"},{src:"spike",dst:"edgeDmg",amt:0.3,ch:"A"}]],
 ["JPEGS", {blockShift:0.55,blockSize:0.4,dither:0.8,lumaSteps:0.7,stepCount:6,pixelSort:0.25,sortThresh:0.55,contour:0.25,contourBands:8,contourFill:0.8,saturation:1.35,contrast:1.2,chromaNoise:0.2,glow:0.2,scanlines:0.15,curvature:0.2,vignette:0.35,grain:0.2},
  [{src:"spike",dst:"blockShift",amt:0.4,ch:"A"},{src:"cut",dst:"blockSize",amt:0.35,ch:"A"},{src:"lfo2",dst:"dither",amt:0.2,ch:"A"}]],
 ];
@@ -115,12 +139,14 @@ function loadPreset(i){
   pushHistory();
   applyState(pr[1], pr[2]);
   const tg = pr[3];
+  flowField = (tg && tg.ff) || 0;
+  flowEdge  = (tg && tg.fe) || 0;
   if(tg){
     fbWrap = tg.wrap||0; fbMirror = tg.mir||0; fbBlend = tg.blend||0;
     fbNL = tg.nl||0; fbInvert = !!tg.inv;
     if(tg.model!==undefined) outModel = tg.model;
-    refreshToggles();
   }
+  refreshToggles();
   document.getElementById("selPreset").value = i;
   toast("Preset: "+pr[0]+" \u2192 channel "+(linkChans?"A+B":activeChan));
 }
@@ -174,6 +200,8 @@ function randomizeAll(){
     for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
     chainOrder = arr;
   }
+  if(Math.random()<0.5) flowField = Math.floor(Math.random()*7);
+  if(Math.random()<0.3) flowEdge = Math.floor(Math.random()*3);
   for(const k of LFOKEYS){
     lfoState[k].rate = Math.pow(10, -1.5+Math.random()*2.2);
     if(Math.random()<0.4) lfoState[k].shape = ["sine","tri","saw","sqr","snh"][Math.floor(Math.random()*5)];
@@ -198,7 +226,8 @@ function captureState(){
   const st = {chan:snap.chan, master:snap.master, routes: routes.map(r=>({...r})),
     audioCfg: JSON.parse(JSON.stringify(audioCfg)),
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
-    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc,
+    mixMode2, wipeInv2, mixModeM, wipeInvM,
+    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}};
   for(const k of LFOKEYS) st[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   return st;
@@ -208,12 +237,16 @@ function restoreState(st){
   if(st.chainOrder && st.chainOrder.length>=4) chainOrder = st.chainOrder.slice();
   if(st.stageEnabled) stageEnabled = {...stageEnabled, ...st.stageEnabled};
   if(st.wipeInv !== undefined) wipeInv = st.wipeInv;
-  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","fieldSrc"]){
+  if(st.wipeInv2 !== undefined) wipeInv2 = st.wipeInv2;
+  if(st.wipeInvM !== undefined) wipeInvM = st.wipeInvM;
+  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","fieldSrc","flowField","flowEdge","mixMode2","mixModeM"]){
     if(st[k] !== undefined) eval(k+" = st."+k);
   }
   if(st.fbInvert !== undefined) fbInvert = st.fbInvert;
   if(st.linkChans !== undefined){ linkChans = st.linkChans; const lb=document.getElementById("btnLinkChans"); if(lb) lb.classList.toggle("on", linkChans); }
-  const smEl = document.getElementById("selMixMode"); if(smEl) smEl.value = mixMode;
+  { const a=document.getElementById("selMixMode"); if(a) a.value = mixMode;
+    const b=document.getElementById("selMixMode2"); if(b) b.value = mixMode2;
+    const c=document.getElementById("selMixModeM"); if(c) c.value = mixModeM; }
   if(st.keyChroma !== undefined) keyChroma = st.keyChroma;
   if(st.mixMode !== undefined) mixMode = st.mixMode;
   if(st.edgeMode !== undefined) edgeMode = st.edgeMode;
@@ -253,13 +286,15 @@ function initPatch(){
   pushHistory();
   fbTrailMode=false; rescanMode=false; keyChroma=false;
   mixMode=0; edgeMode=0; showKeyMatte=false; wipeInv=false; linkChans=false;
-  fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbTap=0; outModel=0; fieldSrc=0;
+  fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbTap=0; outModel=0; fieldSrc=0; flowField=0; flowEdge=0;
+  mixMode2=0; wipeInv2=false; mixModeM=0; wipeInvM=false;
   { const lb=document.getElementById("btnLinkChans"); if(lb) lb.classList.remove("on"); }
   for(const ch of CHANNELS) for(const p of CLIST) chanBase[ch][p.id] = p.def;
   for(const p of MLIST) mBase[p.id] = p.def;
-  { const sm=document.getElementById("selMixMode"); if(sm) sm.value=0; }
+  for(const q of ["selMixMode","selMixMode2","selMixModeM"]){ const sm=document.getElementById(q); if(sm) sm.value=0; }
   chainOrder = ["sig","col","glitch","lab","flow"];
   stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true};
+  for(const ch of CHANNELS) if(window.__setTransport) window.__setTransport("play", ch);
   morphOverride.clear();
   morphA=null; morphB=null; morphOverride.clear();
   for(const el of ["morphBtnA","morphBtnB"]){ const b=document.getElementById(el); if(b) b.classList.remove("on"); }
@@ -284,9 +319,10 @@ document.getElementById("btnSave").onclick = ()=>{
   const snap = snapshotAll();
   const state = {app:"bendr", v:5, chan:snap.chan, master:snap.master, routes, audioCfg,
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
-    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc,
+    mixMode2, wipeInv2, mixModeM, wipeInvM,
+    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
-    srcText: {A:{...SRC.A.text}, B:{...SRC.B.text}}};
+    srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   for(const k of LFOKEYS) state[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   const blob = new Blob([JSON.stringify(state,null,1)], {type:"application/json"});
   dl(URL.createObjectURL(blob), "bendr-"+stamp()+".json");
@@ -317,18 +353,19 @@ function dl(url, name){
 function newSource(ch){
   const v = document.createElement("video");
   v.playsInline = true; v.loop = true; v.crossOrigin = "anonymous";
-  if(ch === "B") v.muted = true;
+  if(ch !== "A") v.muted = true;
   const pc = document.createElement("canvas");
   pc.width = 960; pc.height = 540;
   return {ch, video:v, mode:"pattern", pattern:"bars", cam:null,
           patCanvas:pc, pat:pc.getContext("2d"), patClock:0,
-          aspect:16/9, has:0, speed:1, name:"", audioHooked:false,
+          aspect:16/9, has:0, speed:1, tpRate:1, name:"", audioHooked:false,
           text:{body:"BENDR", font:"mono", size:0.2, track:0, x:0.5, y:0.5, rot:0,
                 scrollX:0, scrollY:0, repeat:1, ink:"#ffffff", bg:"#000000", outline:0,
                 shape:"none", shpCount:1, shpSize:0.3, shpX:0.5, shpY:0.5,
                 shpSpin:0, shpFill:"#ff2fa0", shpStroke:0, shpPulse:0}};
 }
-const SRC = {A:newSource("A"), B:newSource("B")};
+const SRC = {};
+for(const ch of CHANNELS) SRC[ch] = newSource(ch);
 /* the A-channel video keeps the old name so audio hookup keeps working */
 const video = SRC.A.video;
 const videoB = SRC.B.video;
@@ -349,7 +386,7 @@ function handleFile(f, ch){
   S.name = f.name;
   S.speed = 1;
   S.video.playbackRate = 1; S.video.defaultPlaybackRate = 1;
-  S.video.muted = (ch === "B") ? true : masterMuted;
+  S.video.muted = (ch !== "A") ? true : masterMuted;
   S.video.play().catch(()=>{ S.video.muted = true; S.video.play().catch(()=>{}); });
   S.mode = "file";
   if(ch === "A"){ hookVideoAudio(); applyMute(); }
@@ -403,15 +440,59 @@ function syncChanInputUI(){
   sp.classList.toggle("hot", Math.abs(S.speed-1) > 0.001);
   const lp = document.getElementById("btnLoop");
   lp.classList.toggle("on", S.video.loop);
-  if(textEd && textEd.classList.contains("show")) syncTextEditor();
+  if(dockTab === "text") syncTextEditor();
 }
 window.__syncChanInputUI = syncChanInputUI;
+/* swap two channels' *sources* (what sits on top), not just their effects */
+window.__swapSources = function(a, b){
+  const A = SRC[a], B = SRC[b];
+  const keys = ["mode","pattern","cam","patClock","aspect","has","speed","tpRate","name","text"];
+  for(const k of keys){ const t = A[k]; A[k] = B[k]; B[k] = t; }
+  /* video elements carry their own media, so swap what each channel points at */
+  const tv = A.video, tp = A.patCanvas, tc = A.pat;
+  A.video = B.video; B.video = tv;
+  A.patCanvas = B.patCanvas; B.patCanvas = tp;
+  A.pat = B.pat; B.pat = tc;
+  A.ch = a; B.ch = b;
+  syncChanInputUI();
+};
 
 /* ---- text / shape generator ---- */
-const FONTS = {mono:'"SF Mono", ui-monospace, Menlo, monospace',
-               sans:'Helvetica, Arial, sans-serif',
-               serif:'Georgia, "Times New Roman", serif',
-               cond:'"Arial Narrow", "Helvetica Neue", sans-serif'};
+const FONTS = {
+  mono:'"SF Mono", ui-monospace, Menlo, monospace',
+  sans:'"Helvetica Neue", Helvetica, Arial, sans-serif',
+  serif:'Georgia, "Times New Roman", serif',
+  cond:'"Arial Narrow", "Helvetica Neue Condensed", sans-serif',
+  impact:'Impact, "Haettenschweiler", sans-serif',
+  courier:'"Courier New", Courier, monospace',
+  times:'"Times New Roman", Times, serif',
+  georgia:'Georgia, serif',
+  garamond:'Garamond, "EB Garamond", serif',
+  palatino:'Palatino, "Palatino Linotype", serif',
+  baskerville:'Baskerville, "Libre Baskerville", serif',
+  didot:'Didot, "Bodoni MT", serif',
+  futura:'Futura, "Century Gothic", sans-serif',
+  gill:'"Gill Sans", "Gill Sans MT", sans-serif',
+  optima:'Optima, Candara, sans-serif',
+  avenir:'Avenir, "Avenir Next", sans-serif',
+  verdana:'Verdana, Geneva, sans-serif',
+  tahoma:'Tahoma, Geneva, sans-serif',
+  trebuchet:'"Trebuchet MS", sans-serif',
+  rockwell:'Rockwell, "Courier Bold", serif',
+  copperplate:'Copperplate, "Copperplate Gothic Light", fantasy',
+  papyrus:'Papyrus, fantasy',
+  chalkduster:'Chalkduster, fantasy',
+  marker:'"Marker Felt", fantasy',
+  bradley:'"Bradley Hand", cursive',
+  snell:'"Snell Roundhand", cursive',
+  zapfino:'Zapfino, cursive',
+  andale:'"Andale Mono", monospace',
+  menlo:'Menlo, monospace',
+  monaco:'Monaco, monospace',
+  cursive:'cursive',
+  fantasy:'fantasy',
+  system:'system-ui, -apple-system, sans-serif'
+};
 function drawTextSource(S, t){
   const g = S.pat, W = S.patCanvas.width, H = S.patCanvas.height, T = S.text;
   g.setTransform(1,0,0,1,0,0);
@@ -486,7 +567,22 @@ function drawTextSource(S, t){
 }
 
 /* text editor wiring */
-const textEd = document.getElementById("textEd");
+let dockTab = "matrix";
+function setDock(t){
+  dockTab = t;
+  const map = {matrix:"matrix", mod:"modgrid", text:"textdock"};
+  for(const k in map){
+    const el = document.getElementById(map[k]);
+    if(el) el.classList.toggle("on", k===t);
+  }
+  document.querySelectorAll("#dockTabs button").forEach(b=>b.classList.toggle("on", b.dataset.dock===t));
+  const hint = document.getElementById("dockHint");
+  if(hint) hint.textContent = t==="mod" ? "right-click any parameter to patch it"
+                            : t==="text" ? "typing here never triggers shortcuts"
+                            : "patch sources into any parameter";
+  if(t==="text") syncTextEditor();
+}
+const textEd = null;
 const TXT_CTRL = [["txtBody","body","s"],["txtFont","font","s"],["txtSize","size","f"],["txtTrack","track","f"],
   ["txtX","x","f"],["txtY","y","f"],["txtRot","rot","f"],["txtScrollX","scrollX","f"],["txtScrollY","scrollY","f"],
   ["txtRepeat","repeat","f"],["txtInk","ink","s"],["txtBg","bg","s"],["txtOutline","outline","f"],
@@ -494,7 +590,8 @@ const TXT_CTRL = [["txtBody","body","s"],["txtFont","font","s"],["txtSize","size
   ["shpSpin","shpSpin","f"],["shpFill","shpFill","s"],["shpStroke","shpStroke","f"],["shpPulse","shpPulse","f"]];
 function syncTextEditor(){
   const T = cur().text;
-  document.getElementById("textEdChan").textContent = "\u2014 CHANNEL "+activeChan;
+  const ce = document.getElementById("textEdChan");
+  if(ce) ce.textContent = "\u2014 CHANNEL "+activeChan;
   for(const [id,key,kind] of TXT_CTRL){
     const el = document.getElementById(id); if(!el) continue;
     el.value = T[key];
@@ -516,11 +613,9 @@ document.getElementById("btnText").onclick = ()=>{
   stopCam(activeChan);
   S.mode = "text"; S.name = "text";
   syncChanInputUI(); syncTextEditor();
-  textEd.classList.add("show");
-  setTimeout(()=>document.getElementById("txtBody").focus(), 50);
+  setDock("text");
+  setTimeout(()=>{ const t=document.getElementById("txtBody"); if(t) t.focus(); }, 60);
 };
-document.getElementById("textEdClose").onclick = ()=> textEd.classList.remove("show");
-textEd.addEventListener("click", e=>{ if(e.target===textEd) textEd.classList.remove("show"); });
 
 /* test pattern drawing — per source */
 const noiseC = document.createElement("canvas"); noiseC.width=240; noiseC.height=135;
@@ -698,6 +793,46 @@ for(const ch of CHANNELS){
     if(Math.abs(S.video.playbackRate-S.speed)>0.01 && !S.video.srcObject) S.video.playbackRate = S.speed;
   });
 }
+/* ---- tape transport: per-channel deck mode ---- */
+const transport = {};
+for(const ch of CHANNELS) transport[ch] = "play";
+const TP_RATE = {play:1, still:0, ff:4, rew:-4, jogf:0.25, jogr:-0.25};
+function setTransport(mode, ch){
+  ch = ch || activeChan;
+  transport[ch] = mode;
+  const S = SRC[ch];
+  if(S.mode === "pattern" || S.mode === "text"){
+    S.tpRate = TP_RATE[mode];
+    if(typeof refreshToggles === "function") refreshToggles();
+    return;
+  }
+  const v = S.video;
+  try{
+    if(mode === "play"){ v.playbackRate = S.speed; if(v.paused) v.play(); }
+    else if(mode === "still"){ v.pause(); }
+    else if(mode === "ff"){ v.playbackRate = Math.min(16, Math.abs(S.speed)*4 || 4); if(v.paused) v.play(); }
+    else { v.pause(); }   // rew / jog are driven frame by frame below
+  }catch(e){}
+  if(typeof refreshToggles === "function") refreshToggles();
+}
+window.__setTransport = setTransport;
+window.__transportOf = ch=>transport[ch||activeChan] || "play";
+/* reverse and jog can't use playbackRate, so scrub currentTime each frame */
+function driveTransport(dt){
+  for(const ch of CHANNELS){
+    const m = transport[ch];
+    if(m === "play" || m === "still" || m === "ff") continue;
+    const S = SRC[ch];
+    if(S.mode === "pattern" || S.mode === "text") continue;
+    const v = S.video;
+    if(!v.duration) continue;
+    const r = TP_RATE[m] * (Math.abs(S.speed) || 1);
+    let nt = v.currentTime + r*dt;
+    if(nt < 0) nt += v.duration;
+    if(nt > v.duration) nt -= v.duration;
+    try{ v.currentTime = nt; }catch(e){}
+  }
+}
 function applyMute(){
   if(typeof outGainNode !== "undefined" && outGainNode){
     outGainNode.gain.value = masterMuted ? 0 : 1;
@@ -734,18 +869,21 @@ function toggleRec(){
     for(const tr of recDest.stream.getAudioTracks()) stream.addTrack(tr);
   }
   let mime = "";
-  for(const m of ["video/webm;codecs=vp9,opus","video/webm;codecs=vp9","video/webm;codecs=vp8,opus","video/webm"]){
+  for(const m of ["video/mp4;codecs=avc1.640028,mp4a.40.2","video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+                  "video/mp4;codecs=avc1.640028","video/mp4",
+                  "video/webm;codecs=vp9,opus","video/webm;codecs=vp9","video/webm;codecs=vp8,opus","video/webm"]){
     if(MediaRecorder.isTypeSupported(m)){ mime=m; break; }
   }
+  const isMp4 = mime.indexOf("mp4") >= 0;
   recChunks = [];
   recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: 16_000_000});
   recorder.ondataavailable = e=>{ if(e.data.size) recChunks.push(e.data); };
   recorder.onstop = ()=>{
-    const blob = new Blob(recChunks, {type:"video/webm"});
-    dl(URL.createObjectURL(blob), "bendr-"+stamp()+".webm");
+    const blob = new Blob(recChunks, {type: isMp4 ? "video/mp4" : "video/webm"});
+    dl(URL.createObjectURL(blob), "bendr-"+stamp()+(isMp4?".mp4":".webm"));
     recorder=null; btnRec.classList.remove("rec-on"); btnRec.textContent="● REC";
     recTime.style.display="none"; clearInterval(recTimer);
-    toast("Recording saved ("+(blob.size/1048576).toFixed(1)+" MB WebM)");
+    toast("Recording saved ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
   };
   recorder.start(250);
   recStart = performance.now();
@@ -831,8 +969,12 @@ for(const b of document.querySelectorAll(".bend[data-bend]")){
 
 /* keyboard */
 const KEYBEND = {q:"sync", w:"roll", e:"rainbow", r_shift:null, t:"melt", y:"kill"};
+function typingNow(e){
+  const t = e.target;
+  return t && (t.tagName==="INPUT" || t.tagName==="SELECT" || t.tagName==="TEXTAREA" || t.isContentEditable);
+}
 window.addEventListener("keydown", e=>{
-  if(e.target.tagName==="INPUT" || e.target.tagName==="SELECT") return;
+  if(typingNow(e)) return;
   const k = e.key.toLowerCase();
   if(k>="1" && k<="9"){ loadPreset(+k-1); return; }
   if(k===" "){ e.preventDefault(); randomizeAll(); return; }
@@ -841,7 +983,7 @@ window.addEventListener("keydown", e=>{
   if(k==="f"){ document.getElementById("btnFull").click(); return; }
   if(k==="s"){ document.getElementById("btnSnap").click(); return; }
   if(k==="h"){ help.classList.toggle("show"); return; }
-  if(k==="d"){ document.getElementById("modpage").classList.toggle("show"); return; }
+  if(k==="d"){ setDock(dockTab==="mod" ? "matrix" : "mod"); return; }
   if(k==="p"){ btnPlay.click(); return; }
   if(k==="b"){ setBypass(true); return; }
   if(k==="q"){ bendHeld.sync=true; markBend("sync",true); }
@@ -852,6 +994,7 @@ window.addEventListener("keydown", e=>{
   if(k==="y"){ bendHeld.kill=true; markBend("kill",true); }
 });
 window.addEventListener("keyup", e=>{
+  if(typingNow(e)) return;
   const k = e.key.toLowerCase();
   if(k==="b") setBypass(false);
   if(k==="q"){ bendHeld.sync=false; markBend("sync",false); }
@@ -891,76 +1034,129 @@ window.addEventListener("drop", e=>{
    grip. We evolve smooth correlated processes per scanline and hand the GPU a
    displacement/gain/noise profile each frame. */
 const SNC = 25;
-const syncOU = new Float32Array(SNC);    // slow drift (Ornstein-Uhlenbeck)
-const syncOUF = new Float32Array(SNC);   // fast chatter (tracking band, head switch)
-let syncEvents = [];                     // loss-of-lock events: shear + recovery down the frame
-let trackC = 0.65, trackV = 0;           // tracking band centre, drifting
-const dispData = new Float32Array(SROWS*4);
+/* per-channel PLL state: each channel is its own deck, so each drifts on its own */
+function newSyncState(){
+  return {ou:new Float32Array(SNC), ouf:new Float32Array(SNC), ev:[],
+          trackC:0.65, trackV:0, hunt:0, huntPh:Math.random()*6.28,
+          clogC:0.5+ (Math.random()-0.5)*0.5, clogV:0, creaseJ:0};
+}
+const syncState = {};
+const dispData = new Float32Array(SROWS*SCHAN*4);
 function gaussR(){ return (Math.random()+Math.random()+Math.random()-1.5)*1.633; }
-function updateSyncModel(dt, t){
-  const jit=getCur("jitter","A"), tear=getCur("tear","A"), tsz=getCur("tearSize","A"), wob=getCur("hWobble","A"),
-        wfq=getCur("wobbleFreq","A"), wow=getCur("tapeWow","A"), trk=getCur("tracking","A"), hsw=getCur("headSwitch","A");
+
+function updateSyncChannel(ch, ci, dt, t){
+  if(!syncState[ch]) syncState[ch] = newSyncState();
+  const S = syncState[ch];
+  const g = id=>getCur(id, ch);
+  const jit=g("jitter"), tear=g("tear"), tsz=g("tearSize"), wob=g("hWobble"), wfq=g("wobbleFreq"),
+        wow=g("tapeWow"), wowR=g("wowRate"), flut=g("flutter"), trk=g("tracking"),
+        tph=g("trackPhase"), hunt=g("trackHunt"), hsw=g("headSwitch"), sp=g("tapeSpeed"),
+        stre=g("tapeStretch"), crs=g("crease"), crsP=g("creasePos"), clog=g("headClog"), azi=g("azimuth");
   const sdt = Math.min(dt, 0.05), rq = Math.sqrt(sdt);
   for(let i=0;i<SNC;i++){
-    syncOU[i]  += -6*syncOU[i]*sdt  + 2.4*rq*gaussR();
-    syncOUF[i] += -45*syncOUF[i]*sdt + 10*rq*gaussR();
+    S.ou[i]  += -6*S.ou[i]*sdt  + 2.4*rq*gaussR();
+    S.ouf[i] += -45*S.ouf[i]*sdt + 10*rq*gaussR();
   }
   /* spawn loss-of-lock events: sharp shear at one line, exponential re-lock below */
-  const rate = tear*tear*15 + trk*1.1;
-  if(Math.random() < rate*sdt && syncEvents.length < 10){
+  const rate = tear*tear*15 + trk*1.1 + sp*0.6;
+  if(Math.random() < rate*sdt && S.ev.length < 10){
     const whole = Math.random() < 0.18;   // occasionally the whole frame gets sucked sideways
-    syncEvents.push({
+    S.ev.push({
       t0:t, r0: whole ? SROWS-1 : Math.floor(Math.random()*SROWS),
       A:(0.05+0.45*Math.random()*Math.random())*(Math.random()<0.5?-1:1)*(0.35+0.65*tear),
       L:(10+tsz*90)*(0.5+Math.random())*(whole?6:1),
       rel:0.08+Math.random()*0.5, env:0});
   }
-  for(const ev of syncEvents){
+  for(const ev of S.ev){
     const age = t-ev.t0;
     ev.env = Math.min(age/0.03,1)*Math.exp(-Math.max(0,age-0.03)/ev.rel);
   }
-  syncEvents = syncEvents.filter(ev=>ev.env>0.012);
+  S.ev = S.ev.filter(ev=>ev.env>0.012);
   /* tracking band drifts vertically like a real mistracking head */
-  trackV += -0.6*trackV*sdt + 0.35*rq*gaussR();
-  trackC += trackV*sdt*0.25;
-  if(trackC<0.08){trackC=0.08; trackV=Math.abs(trackV);}
-  if(trackC>0.92){trackC=0.92; trackV=-Math.abs(trackV);}
-  const hsRows = Math.max(0, Math.floor(SROWS*0.05*hsw));
-  const bw = 0.035+0.05*trk;
+  S.trackV += -0.6*S.trackV*sdt + 0.35*rq*gaussR();
+  S.trackC += S.trackV*sdt*0.25;
+  if(S.trackC<0.08){S.trackC=0.08; S.trackV=Math.abs(S.trackV);}
+  if(S.trackC>0.92){S.trackC=0.92; S.trackV=-Math.abs(S.trackV);}
+  /* servo hunt: the auto-tracking circuit searching, overshooting, snapping back */
+  S.huntPh += sdt*(0.35 + hunt*2.4);
+  const huntTri = Math.abs(((S.huntPh*0.5)%1)*2-1);
+  S.hunt = hunt*(huntTri-0.5)*0.55 + hunt*0.10*Math.sin(S.huntPh*9.3);
+  const bandC = Math.min(0.97, Math.max(0.03, S.trackC + tph*0.45 + S.hunt));
+  /* head clog: a dead band that wanders slowly and kills the signal inside it */
+  S.clogV += -0.25*S.clogV*sdt + 0.10*rq*gaussR();
+  S.clogC += S.clogV*sdt*0.2;
+  if(S.clogC<0.05){S.clogC=0.05; S.clogV=Math.abs(S.clogV);}
+  if(S.clogC>0.95){S.clogC=0.95; S.clogV=-Math.abs(S.clogV);}
+  /* tape crease: a hard fold that shears one band sideways and jitters frame to frame */
+  S.creaseJ += (gaussR()*0.5 - S.creaseJ)*Math.min(1, sdt*22);
+  const hsRows = Math.max(0, Math.floor(SROWS*0.05*hsw*(1.0+sp)));
+  const bw = 0.035+0.05*trk + hunt*0.02;
+  const wowF1 = 5.2*(0.25+wowR*3.0), wowF2 = 17.0*(0.25+wowR*3.0);
+  const wowT1 = t*0.9*(0.3+wowR*2.6), wowT2 = t*1.4*(0.3+wowR*2.6);
+  const clogW = 0.012 + clog*0.075, creaseW = 0.006 + crs*0.03;
+  const off = ci*SROWS*4;
   for(let r=0;r<SROWS;r++){
     const fy = r/SROWS;
-    let d = (Math.sin(fy*5.2+t*0.9)+0.6*Math.sin(fy*17.0-t*1.4))*0.006*wow
+    let d = (Math.sin(fy*wowF1+wowT1)+0.6*Math.sin(fy*wowF2-wowT2))*0.006*wow
           + Math.sin(fy*(6.0+wfq*80.0)+t*4.2)*0.013*wob;
+    /* scrape flutter: fast, low-amplitude, high spatial frequency */
+    if(flut>0.003) d += Math.sin(fy*(120.0+flut*420.0)+t*37.0)*0.004*flut
+                      + Math.sin(fy*(311.0)-t*61.0)*0.0022*flut;
+    /* tape stretch: the top of the frame reads long, so geometry leans */
+    if(stre>0.003){ const k=1.0-fy; d += k*k*0.06*stre; }
     const xc = fy*(SNC-1), ic = Math.min(SNC-2, Math.floor(xc)), fc = xc-ic;
     const sm = fc*fc*(3-2*fc);
-    const ouv  = syncOU[ic]*(1-sm)+syncOU[ic+1]*sm;
-    const oufv = syncOUF[ic]*(1-sm)+syncOUF[ic+1]*sm;
+    const ouv  = S.ou[ic]*(1-sm)+S.ou[ic+1]*sm;
+    const oufv = S.ouf[ic]*(1-sm)+S.ouf[ic+1]*sm;
     d += ouv*0.004*(0.12+jit);            // the picture is never perfectly still
-    const g0 = (fy-trackC)/bw;
+    const g0 = (fy-bandC)/bw;
     const bp = Math.exp(-g0*g0);
     d += bp*trk*oufv*0.02;
     let ng = bp*trk*(0.3+0.4*Math.abs(oufv));
-    for(const ev of syncEvents){
+    let hf = bp*trk*0.35 + sp*0.12;
+    for(const ev of S.ev){
       if(r<=ev.r0) d += ev.A*ev.env*Math.exp(-(ev.r0-r)/ev.L);
     }
     if(r<hsRows){
       const k = (hsRows-r)/hsRows;
       d += (0.045*k*k + 0.02*k*oufv)*hsw;
       ng += hsw*0.9*k*k;
+      hf += hsw*0.5*k;
     }
-    const g = 1 - Math.min(0.38, Math.abs(d)*2.0);
-    const o = r*4;
-    dispData[o]=d; dispData[o+1]=g; dispData[o+2]=ng; dispData[o+3]=0;
+    /* head clog band: no RF, so no chroma and no detail, just noise */
+    if(clog>0.003){
+      const gc = (fy-S.clogC)/clogW;
+      const cb = Math.exp(-gc*gc);
+      ng += cb*clog*1.5;
+      hf += cb*clog;
+    }
+    /* crease */
+    if(crs>0.003){
+      const gk = (fy-crsP)/creaseW;
+      const cb = Math.exp(-gk*gk);
+      d += cb*crs*(0.09 + 0.05*S.creaseJ);
+      ng += cb*crs*0.8;
+      hf += cb*crs*0.7;
+    }
+    /* azimuth error: alternate head passes lose the high band */
+    if(azi>0.003) hf += azi*0.75*(r%2);
+    const gn = 1 - Math.min(0.38, Math.abs(d)*2.0) - Math.min(0.5, ng*0.18);
+    const o = off + r*4;
+    dispData[o]=d; dispData[o+1]=gn; dispData[o+2]=ng; dispData[o+3]=Math.min(1, hf);
   }
+}
+function updateSyncModel(dt, t){
+  for(let ci=0; ci<CHANNELS.length && ci<SCHAN; ci++) updateSyncChannel(CHANNELS[ci], ci, dt, t);
   gl.bindTexture(gl.TEXTURE_2D, dispTex);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,SROWS,1,0,gl.RGBA,gl.FLOAT,dispData);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,SROWS,SCHAN,0,gl.RGBA,gl.FLOAT,dispData);
 }
 
 /* ---------------- main loop ---------------- */
 const osd = document.getElementById("osd");
 let lastT = performance.now()/1000, fpsAcc=0, fpsN=0, fpsShow=0;
-const stutterHeld = {A:false, B:false}, stutterT = {A:0, B:0};
-let offline = false;
+const stutterHeld = {}, stutterT = {};
+for(const ch of CHANNELS){ stutterHeld[ch]=false; stutterT[ch]=0; }
+let offline = false, liveList = "A";
 
 /* video content analysis — the picture itself as a mod source (reads channel A) */
 const anaC = document.createElement("canvas"); anaC.width=32; anaC.height=18;
@@ -1022,6 +1218,10 @@ function sigExtras(pr, now, ch){
   gl.uniform1f(U(pr,"u_vrollpos"), vrollpos[ch]);
   gl.uniform1f(U(pr,"u_humpos"), humpos[ch]);
   gl.uniform1f(U(pr,"u_keyMode"), keyChroma?1:0);
+  gl.uniform1f(U(pr,"u_chanIdx"), Math.max(0, CHANNELS.indexOf(ch)));
+  const tp = transport[ch] || "play";
+  gl.uniform1f(U(pr,"u_tpStill"), tp==="still" ? 0.75 : 0);
+  gl.uniform1f(U(pr,"u_tpShuttle"), tp==="ff" ? 0.55 : (tp==="rew" ? -0.55 : 0));
 }
 function colExtras(pr, now){
   gl.uniform1f(U(pr,"u_time"), now);
@@ -1029,11 +1229,12 @@ function colExtras(pr, now){
   gl.uniform1f(U(pr,"u_keyMode"), keyChroma?1:0);
   gl.uniform1f(U(pr,"u_showKey"), showKeyMatte?1:0);
 }
+const FLOW_IDS = ["mosh","moshVec","melt","swirl","moshBlock","timeGrad","flowStretch","flowRepel","flowNoise","flowHue","flowFade"];
 const LAB_IDS = ["sparseJit","ntscArt","ntscFringe","snow","fmAmt","slitscan","bitCrush","bandKey","rowSmear","moire","fieldMod"];
 function stageNeeded(id, ch){
   if(id === "lab") return LAB_IDS.some(k=>getCur(k,ch)>0.003);
   if(id === "glitch") return getCur("pixelSort",ch)>0.003 || getCur("blockShift",ch)>0.003 || getCur("dotify",ch)>0.003 || getCur("driftWarp",ch)>0.003 || getCur("fmWarp",ch)>0.003;
-  if(id === "flow") return getCur("mosh",ch)>0.003 || getCur("melt",ch)>0.003 || getCur("swirl",ch)>0.003 || getCur("moshBlock",ch)>0.003 || Math.abs(getCur("timeGrad",ch))>0.003;
+  if(id === "flow") return FLOW_IDS.some(k=>Math.abs(getCur(k,ch))>0.003);
   return true;
 }
 function runStage(id, inTex, dstRT, now, ch){
@@ -1046,11 +1247,24 @@ function runStage(id, inTex, dstRT, now, ch){
     gl.uniform1f(U(pr,"u_fieldSrc"), fieldSrc);
   }, ch);
   if(id === "flow"){
+    /* if the stage has been idle, prime its history with the live picture so it
+       doesn't fade up from black (or flash a stale frame) when you turn it on */
+    if(frameNo - (C.flowLast || -99) > 1){
+      runPass(progCOPY, inTex, C.flowA.fbo, procW, procH, null, ch);
+      runPass(progCOPY, inTex, C.flowSrc.fbo, procW, procH, null, ch);
+    }
+    C.flowLast = frameNo;
     runPass(progFLOW, inTex, dstRT.fbo, procW, procH, pr=>{
       gl.uniform1f(U(pr,"u_time"), now);
+      gl.uniform1f(U(pr,"u_flowField"), flowField);
+      gl.uniform1f(U(pr,"u_flowEdge"), flowEdge);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, C.flowA.tex);
       gl.uniform1i(U(pr,"u_flowPrev"), 1);
+      gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, C.flowSrc.tex);
+      gl.uniform1i(U(pr,"u_srcPrev"), 2);
     }, ch);
+    /* keep this frame's input for next frame's motion estimate */
+    runPass(progCOPY, inTex, C.flowSrc.fbo, procW, procH, null, ch);
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, dstRT.fbo);
     gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, C.flowB.fbo);
     gl.blitFramebuffer(0,0,procW,procH, 0,0,procW,procH, gl.COLOR_BUFFER_BIT, gl.NEAREST);
@@ -1072,7 +1286,7 @@ function uploadSource(ch, dt){
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
   if(S.mode === "pattern" || S.mode === "text"){
-    S.patClock += dt*S.speed;
+    S.patClock += dt*S.speed*(S.tpRate===undefined?1:S.tpRate);
     if(S.mode === "text") drawTextSource(S, S.patClock); else drawPattern(S, S.patClock);
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, S.patCanvas);
     S.aspect = S.patCanvas.width/S.patCanvas.height; S.has = 1;
@@ -1164,6 +1378,7 @@ function renderFrame(now, dt){
   frameNo++;
   sizeCanvas();
   updateAudio(dt);
+  driveTransport(dt);
   updateContentAnalysis(dt);
   updateMod(dt, now);
   pushModHistory();
@@ -1185,27 +1400,46 @@ function renderFrame(now, dt){
     humpos[ch] = (humpos[ch] + dt*(0.05 + getCur("humBar",ch)*0.1)) % 1;
   }
 
-  /* channel B only costs anything when it's actually in the mix */
-  const bLive = srcReady("B") && mCur.abMix > 0.0005;
+  /* a channel only costs anything when its fader can actually let it through */
+  const masterLive = mCur.busMix > 0.0005;
+  const live = {
+    A: true,
+    B: srcReady("B") && mCur.abMix > 0.0005,
+    C: masterLive && srcReady("C"),
+    D: masterLive && srcReady("D") && mCur.cdMix > 0.0005
+  };
+  liveList = CHANNELS.filter(c=>live[c]).join("+");
+  for(const ch of CHANNELS){
+    if(!live[ch]) continue;
+    uploadSource(ch, dt);
+    renderChannel(ch, now, dt);
+  }
 
-  uploadSource("A", dt);
-  renderChannel("A", now, dt);
-  if(bLive){ uploadSource("B", dt); renderChannel("B", now, dt); }
-
-  /* mixer */
-  gl.bindFramebuffer(gl.FRAMEBUFFER, mixOut.fbo);
-  gl.viewport(0,0,procW,procH);
-  gl.useProgram(progMIX.prog);
-  gl.uniform2f(U(progMIX,"u_res"), procW, procH);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, chanRT.A.out.tex);
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, chanRT.B.out.tex);
-  gl.uniform1i(U(progMIX,"u_texA"), 0);
-  gl.uniform1i(U(progMIX,"u_texB"), 1);
-  gl.uniform1f(U(progMIX,"u_hasB"), bLive?1:0);
-  gl.uniform1f(U(progMIX,"u_mixMode"), mixMode);
-  gl.uniform1f(U(progMIX,"u_wipeInv"), wipeInv?1:0);
-  setParamUniforms(progMIX, "A");
-  draw();
+  /* mixer tree: BUS 1 = A/B, BUS 2 = C/D, MASTER = BUS 1 / BUS 2 */
+  function mixPass(dstRT, texA, texB, hasB, ids, mode, inv){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dstRT.fbo);
+    gl.viewport(0,0,procW,procH);
+    gl.useProgram(progMIX.prog);
+    gl.uniform2f(U(progMIX,"u_res"), procW, procH);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texA);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texB);
+    gl.uniform1i(U(progMIX,"u_texA"), 0);
+    gl.uniform1i(U(progMIX,"u_texB"), 1);
+    gl.uniform1f(U(progMIX,"u_hasB"), hasB?1:0);
+    gl.uniform1f(U(progMIX,"u_mixMode"), mode);
+    gl.uniform1f(U(progMIX,"u_wipeInv"), inv?1:0);
+    setParamUniforms(progMIX, "A");
+    for(let i=0;i<MIXP.length;i++) gl.uniform1f(U(progMIX,"u_"+MIXP[i]), mCur[ids[i]]);
+    draw();
+  }
+  if(masterLive){
+    mixPass(busOut1, chanRT.A.out.tex, chanRT.B.out.tex, live.B, MIXBUS.b1, mixMode, wipeInv);
+    mixPass(busOut2, chanRT.C.out.tex, chanRT.D.out.tex, live.D, MIXBUS.b2, mixMode2, wipeInv2);
+    mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mixModeM, wipeInvM);
+  } else {
+    /* nothing on bus 2, so bus 1 goes straight to master and costs one pass, as before */
+    mixPass(mixOut, chanRT.A.out.tex, chanRT.B.out.tex, live.B, MIXBUS.b1, mixMode, wipeInv);
+  }
 
   /* CRT -> screen */
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -1255,7 +1489,7 @@ function renderFrame(now, dt){
     }
     fpsAcc += 1/Math.max(dt,1e-4); fpsN++;
     if(fpsN>=30){ fpsShow = Math.round(fpsAcc/fpsN); fpsAcc=0; fpsN=0;
-      osd.textContent = procH+"p · "+fpsShow+" fps"+(bLive?" · A+B":" · A")+(recorder?" · REC":"")+(audioMode!=="off"?" · AUD":"")+(rescanMode?" · RESCAN":"");
+      osd.textContent = procH+"p · "+fpsShow+" fps"+(" · "+liveList)+(recorder?" · REC":"")+(audioMode!=="off"?" · AUD":"")+(rescanMode?" · RESCAN":"");
       updateTempoUI();
     }
   }
@@ -1328,7 +1562,7 @@ async function offlineRender(){
   for(let i=0; i<total && !renderCancel; i++){
     const t = i/fps;
     await seekTo(video, t);
-    if(srcReady("B") && videoB.duration) await seekTo(videoB, t % videoB.duration);
+    for(const ch of ["B","C","D"]){ const v = SRC[ch].video; if(srcReady(ch) && v.duration) await seekTo(v, t % v.duration); }
     renderFrame(t0+t, 1/fps);
     const vf = new VideoFrame(canvas, {timestamp: Math.round(i*1e6/fps), duration: Math.round(1e6/fps)});
     enc.encode(vf, {keyFrame: i%(fps*2)===0});
@@ -1355,14 +1589,14 @@ async function offlineRender(){
   ov.style.display = "none";
   offline = false; lastT = performance.now()/1000;
   if(wasPlaying) video.play();
-  if(SRC.B.mode!=="pattern") videoB.play();
+  for(const ch of ["B","C","D"]) if(SRC[ch].mode==="file") SRC[ch].video.play();
 }
 
 /* ---------------- init ---------------- */
 window.__pcur = (id,ch)=>getCur(id,ch);
 window.__dbg = ()=>({chan:activeChan,
-  A:{mode:SRC.A.mode, rs:SRC.A.video.readyState, has:SRC.A.has, spd:SRC.A.speed, rate:SRC.A.video.playbackRate},
-  B:{mode:SRC.B.mode, rs:SRC.B.video.readyState, has:SRC.B.has, spd:SRC.B.speed, rate:SRC.B.video.playbackRate}});
+  ...Object.fromEntries(CHANNELS.map(ch=>[ch,
+    {mode:SRC[ch].mode, rs:SRC[ch].video.readyState, has:SRC[ch].has, spd:SRC[ch].speed, rate:SRC[ch].video.playbackRate}]))});
 
 /* ---------------- init ---------------- */
 const OUTPUT_MODE = (location.hash === "#output") && !!window.opener;
@@ -1417,15 +1651,31 @@ if(OUTPUT_MODE){
   buildPanel();
   buildModPage();
   setInterval(drawModPage, 50);
+  setDock("matrix");
   {
-    const mp = document.getElementById("modpage");
-    document.getElementById("btnMod").onclick = ()=>{ mp.classList.toggle("show"); };
-    document.getElementById("modPageClose").onclick = ()=> mp.classList.remove("show");
+    const bar = document.getElementById("dragbar"), low = document.getElementById("lower");
+    let dragging = false;
+    const move = e=>{
+      if(!dragging) return;
+      const y = (e.touches ? e.touches[0].clientY : e.clientY);
+      const h = Math.max(110, Math.min(window.innerHeight-220, window.innerHeight - y));
+      low.style.height = h + "px";
+      sizeCanvas();
+    };
+    bar.addEventListener("mousedown", ()=>{ dragging = true; document.body.style.cursor="ns-resize"; });
+    bar.addEventListener("touchstart", ()=>{ dragging = true; }, {passive:true});
+    window.addEventListener("mousemove", move);
+    window.addEventListener("touchmove", move, {passive:true});
+    window.addEventListener("mouseup", ()=>{ dragging=false; document.body.style.cursor=""; });
+    window.addEventListener("touchend", ()=>{ dragging=false; });
   }
+  document.querySelectorAll("#dockTabs button").forEach(b=>{ b.onclick = ()=>setDock(b.dataset.dock); });
+  document.getElementById("btnMod").onclick = ()=> setDock("mod");
   setActiveChan("A");
   syncChanInputUI();
   renderChain();
   loadCollapse();
+  loadSectionOrder();
   refreshStageLeds();
   setInterval(refreshStageLeds, 400);
   document.getElementById("btnChainReset").onclick = ()=>{

@@ -109,7 +109,8 @@ function morphModExtra(){
   return v;
 }
 function snapshotAll(){
-  const st = {chan:{A:{},B:{}}, master:{}};
+  const st = {chan:{}, master:{}};
+  for(const ch of CHANNELS) st.chan[ch] = {};
   for(const ch of CHANNELS) for(const p of CLIST) st.chan[ch][p.id] = chanBase[ch][p.id];
   for(const p of MLIST) st.master[p.id] = mBase[p.id];
   return st;
@@ -146,7 +147,7 @@ function applyParams(dt){
     if(p.master){ mCur[p.id] += d; }
     else {
       const rc = r.ch || "A";
-      if(rc === "AB"){ chanCur.A[p.id] += d; chanCur.B[p.id] += d; }
+      if(rc === "AB"){ for(const ch of CHANNELS) chanCur[ch][p.id] += d; }
       else chanCur[rc][p.id] += d;
     }
   }
@@ -291,8 +292,7 @@ function buildChanBar(){
     b.onclick = ()=>{ setActiveChan(ch); };
     return b;
   };
-  bar.appendChild(mk("A"));
-  bar.appendChild(mk("B"));
+  for(const ch of CHANNELS) bar.appendChild(mk(ch));
   const tools = document.createElement("div");
   tools.className = "chantools";
   const lk = document.createElement("button");
@@ -301,20 +301,22 @@ function buildChanBar(){
   lk.onclick = ()=>{ linkChans = !linkChans; lk.classList.toggle("on", linkChans); };
   const cp = document.createElement("button");
   cp.textContent = "COPY \u2192";
-  cp.title = "Copy this channel's settings to the other channel";
+  cp.title = "Copy this channel's settings to its partner on the same bus (A\u2194B, C\u2194D)";
   cp.onclick = ()=>{
     pushHistory();
-    const other = activeChan === "A" ? "B" : "A";
+    const other = BUSPAIR[activeChan];
     copyChannel(activeChan, other);
     toast("Copied channel "+activeChan+" \u2192 "+other);
   };
   const sw = document.createElement("button");
   sw.textContent = "SWAP";
-  sw.title = "Swap the two channels' settings";
+  sw.title = "Swap this channel with its partner on the same bus (A\u2194B, C\u2194D)";
   sw.onclick = ()=>{
     pushHistory();
-    for(const p of CLIST){ const t = chanBase.A[p.id]; chanBase.A[p.id] = chanBase.B[p.id]; chanBase.B[p.id] = t; }
-    refreshUI(); toast("Channels swapped");
+    const other = BUSPAIR[activeChan];
+    for(const p of CLIST){ const t = chanBase[activeChan][p.id]; chanBase[activeChan][p.id] = chanBase[other][p.id]; chanBase[other][p.id] = t; }
+    if(window.__swapSources) window.__swapSources(activeChan, other);
+    refreshUI(); toast("Swapped "+activeChan+" \u2194 "+other+" (effects and sources)");
   };
   tools.appendChild(lk); tools.appendChild(cp); tools.appendChild(sw);
   bar.appendChild(tools);
@@ -323,8 +325,8 @@ function buildChanBar(){
 function setActiveChan(ch){
   activeChan = ch;
   document.querySelectorAll(".chanbtn").forEach(b=>b.classList.toggle("on", b.dataset.chan===ch));
-  document.body.classList.toggle("chan-b", ch==="B");
-  refreshUI();
+  for(const c of CHANNELS) document.body.classList.toggle("chan-"+c.toLowerCase(), c===ch);
+  refreshUI(); refreshToggles();
   if(window.__syncChanInputUI) window.__syncChanInputUI();
 }
 function buildPanel(){
@@ -341,9 +343,10 @@ function buildPanel(){
     rb.title = "Reset this section to defaults";
     rb.onclick = e=>{ e.stopPropagation(); resetSection(sec.id); };
     h.appendChild(rb);
-    h.title = "Click to collapse / expand";
+    h.title = "Click to collapse / expand \u00b7 drag the handle to reorder";
     h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
     d.appendChild(h);
+    makeSectionDraggable(d, h, sec.id);
     const body = document.createElement("div"); body.className = "secbody";
     d.appendChild(body);
     secEls[sec.id] = d;
@@ -362,7 +365,7 @@ function buildPanel(){
         const v = parseFloat(s.value);
         setBase(p.id, v); val.textContent = fmt(p,v);
         if(p.master) morphOverride.add("M:"+p.id);
-        else if(linkChans){ morphOverride.add("A:"+p.id); morphOverride.add("B:"+p.id); }
+        else if(linkChans){ for(const ch of CHANNELS) morphOverride.add(ch+":"+p.id); }
         else morphOverride.add(activeChan+":"+p.id);
         if(p.id==="abMix" && v>0.03 && !window.__chanHasSource("B")){
           if(!window.__abHintT || performance.now()-window.__abHintT>6000){
@@ -591,18 +594,68 @@ function openModMenu(ev, p){
   m.style.top  = Math.min(ev.clientY, window.innerHeight - h - 8) + "px";
 }
 
-/* ---- collapsible section plumbing ---- */
+/* ---- collapsible + drag-reorderable section plumbing ---- */
 const secEls = {};
+let dragSec = null;
+function makeSectionDraggable(el, head, id){
+  const grab = document.createElement("span");
+  grab.className = "grab"; grab.textContent = "\u2059";
+  grab.draggable = true;
+  grab.title = "Drag to reorder this section";
+  grab.onclick = e=>e.stopPropagation();
+  grab.addEventListener("dragstart", e=>{
+    dragSec = el; el.classList.add("secdrag");
+    e.dataTransfer.effectAllowed = "move";
+    try{ e.dataTransfer.setData("text/plain", id); }catch(err){}
+    e.stopPropagation();
+  });
+  grab.addEventListener("dragend", ()=>{
+    if(dragSec) dragSec.classList.remove("secdrag");
+    dragSec = null;
+    document.querySelectorAll(".sec").forEach(x=>x.classList.remove("secover"));
+    saveSectionOrder();
+  });
+  head.insertBefore(grab, head.firstChild);
+  el.addEventListener("dragover", e=>{
+    if(!dragSec || dragSec===el) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = "move";
+    el.classList.add("secover");
+  });
+  el.addEventListener("dragleave", ()=> el.classList.remove("secover"));
+  el.addEventListener("drop", e=>{
+    if(!dragSec || dragSec===el) return;
+    e.preventDefault(); e.stopPropagation();
+    el.classList.remove("secover");
+    panel.insertBefore(dragSec, el);
+    saveSectionOrder();
+  });
+}
+function saveSectionOrder(){
+  try{
+    const ids = [...panel.querySelectorAll(".sec")].map(el=>{
+      for(const k in secEls) if(secEls[k]===el) return k;
+      return null;
+    }).filter(Boolean);
+    localStorage.setItem("bendr.secorder", JSON.stringify(ids));
+  }catch(e){}
+}
+function loadSectionOrder(){
+  try{
+    const ids = JSON.parse(localStorage.getItem("bendr.secorder")||"[]");
+    for(const id of ids){ const el = secEls[id]; if(el) panel.appendChild(el); }
+  }catch(e){}
+}
 function mkSection(id, cls, name){
   const d = document.createElement("div"); d.className = "sec "+cls;
   const h = document.createElement("h3");
   h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+name;
-  h.title = "Click to collapse / expand";
+  h.title = "Click to collapse / expand \u00b7 drag the handle to reorder";
   h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
   d.appendChild(h);
   const body = document.createElement("div"); body.className = "secbody";
   d.appendChild(body);
   secEls[id] = d;
+  makeSectionDraggable(d, h, id);
   /* callers append to the body */
   d.appendChild = body.appendChild.bind(body);
   return d;
@@ -707,11 +760,13 @@ function refreshStageLeds(){
 function resetSection(id){
   for(const p of PLIST) if(p.sec===id){
     if(p.master){ mBase[p.id] = p.def; morphOverride.add("M:"+p.id); }
-    else if(linkChans){ chanBase.A[p.id]=p.def; chanBase.B[p.id]=p.def; morphOverride.add("A:"+p.id); morphOverride.add("B:"+p.id); }
+    else if(linkChans){ for(const ch of CHANNELS){ chanBase[ch][p.id]=p.def; morphOverride.add(ch+":"+p.id); } }
     else { chanBase[activeChan][p.id] = p.def; morphOverride.add(activeChan+":"+p.id); }
   }
   if(id==="feedback"){ fbTrailMode=false; rescanMode=false; fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; }
   if(id==="lab"){ fieldSrc=0; }
+  if(id==="flow"){ flowField=0; flowEdge=0; }
+  if(id==="vhs" && window.__setTransport){ window.__setTransport("play"); if(tapeBtnRefs[0]) for(const k in tapeBtnRefs[0]) tapeBtnRefs[0][k].classList.toggle("on", k==="play"); }
   if(id==="crt"){ outModel=0; }
   if(id==="mixer"){ mixMode=0; wipeInv=false; const sm=document.getElementById("selMixMode"); if(sm) sm.value=0; }
   if(id==="frame"){ edgeMode=0; }
@@ -733,26 +788,40 @@ function refreshToggles(){
   for(const k in toggleRefs) toggleRefs[k].btn.textContent = toggleRefs[k].labelFn();
   const fm = document.getElementById("fbModeBtn");
   if(fm) fm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX");
+  if(tapeBtnRefs[0] && window.__transportOf){
+    const m = window.__transportOf(activeChan);
+    for(const k in tapeBtnRefs[0]) tapeBtnRefs[0][k].classList.toggle("on", k===m);
+  }
 }
+const tapeBtnRefs = [];
 const MIXMODES = ["FADE","WIPE H","WIPE V","DIAGONAL","BOX","CIRCLE","SPLIT H","SPLIT V",
   "BLINDS V","BLINDS H","CLOCK","DIAG BARS","BLOCKS","LUMA KEY","CHROMA KEY",
   "ADD","DIFFERENCE","MULTIPLY","SCREEN","LIGHTEN"];
 function sectionExtras(id, d){
-  if(id==="mixer"){
+  if(id==="mixer" || id==="mixer2" || id==="mixerM"){
+    const which = id==="mixer" ? 1 : (id==="mixer2" ? 2 : 3);
     const tr = document.createElement("div"); tr.className="trow";
-
     const sel = document.createElement("select");
-    sel.id = "selMixMode"; sel.style.flex = "1";
-    sel.title = "Transition / blend mode between channel A and B";
+    sel.id = which===1 ? "selMixMode" : (which===2 ? "selMixMode2" : "selMixModeM");
+    sel.style.flex = "1";
+    sel.title = "Transition / blend mode for this bus";
     MIXMODES.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=m; sel.appendChild(o); });
-    sel.value = mixMode;
-    sel.onchange = ()=>{ mixMode = parseInt(sel.value); };
+    sel.value = which===1 ? mixMode : (which===2 ? mixMode2 : mixModeM);
+    sel.onchange = ()=>{
+      const v = parseInt(sel.value);
+      if(which===1) mixMode = v; else if(which===2) mixMode2 = v; else mixModeM = v;
+    };
     tr.appendChild(sel);
-    mkToggle(tr, "wipeInv", ()=>"WIPE: "+(wipeInv?"INV":"NORM"), ()=>{ wipeInv=!wipeInv; });
+    if(which===1) mkToggle(tr, "wipeInv", ()=>"WIPE: "+(wipeInv?"INV":"NORM"), ()=>{ wipeInv=!wipeInv; });
+    if(which===2) mkToggle(tr, "wipeInv2", ()=>"WIPE: "+(wipeInv2?"INV":"NORM"), ()=>{ wipeInv2=!wipeInv2; });
+    if(which===3) mkToggle(tr, "wipeInvM", ()=>"WIPE: "+(wipeInvM?"INV":"NORM"), ()=>{ wipeInvM=!wipeInvM; });
     d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
-    note.textContent = "Combines the two finished channels. Run the A>B FADER like a T-bar; wipes use SOFT for edge feather, DETAIL for blind/bar count, CTR X/Y for the origin. Give channel B a source first.";
+    note.textContent =
+      which===1 ? "Bus 1 combines channels A and B. Run the fader like a T-bar; wipes use SOFT for edge feather, DETAIL for blind/bar count, CTR X/Y for the origin. Give channel B a source first."
+    : which===2 ? "Bus 2 combines channels C and D, exactly like bus 1. It only renders when the MASTER fader is above zero, so leaving it alone costs nothing."
+    : "The master crossfade between the two buses \u2014 the same twenty transitions again, one level up. Push it off zero and channels C and D come alive.";
     d.appendChild(note);
   }
   if(id==="morph"){
@@ -836,6 +905,28 @@ function sectionExtras(id, d){
     note.textContent = "Frames this channel's picture inside the raster. Each channel has its own framing.";
     d.appendChild(note);
   }
+  if(id==="vhs"){
+    const tr = document.createElement("div"); tr.className="trow";
+    const MODES = [["rew","\u25c0\u25c0"],["still","\u23f8"],["play","\u25b6"],["ff","\u25b6\u25b6"],["jogr","JOG \u25c0"],["jogf","JOG \u25b6"]];
+    const btns = {};
+    for(const [m,lab] of MODES){
+      const b = document.createElement("button");
+      b.textContent = lab; b.style.flex = "1"; b.style.minWidth = "0";
+      b.title = "Transport: "+m.toUpperCase()+" (this channel)";
+      b.onclick = ()=>{
+        if(window.__setTransport) window.__setTransport(m);
+        for(const k in btns) btns[k].classList.toggle("on", k===m);
+      };
+      btns[m] = b; tr.appendChild(b);
+    }
+    btns.play.classList.add("on");
+    d.appendChild(tr);
+    tapeBtnRefs[0] = btns;
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "A whole deck, per channel. Transport drives this channel's source: STILL parks a noise bar across a held field, shuttle and jog scrub with head-crossing bands. TAPE SPEED runs SP to EP \u2014 the slower the tape, the less bandwidth survives. GENERATIONS compounds GEN LOSS as if the tape had been dubbed that many times. TRACK PHASE places the mistracking band, SERVO HUNT makes the auto-tracking circuit search for it.";
+    d.appendChild(note);
+  }
   if(id==="glitch"){
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
@@ -843,9 +934,15 @@ function sectionExtras(id, d){
     d.appendChild(note);
   }
   if(id==="flow"){
+    const tr = document.createElement("div"); tr.className="trow";
+    const FF = ["MOTION","CONTOUR","CURL NOISE","RADIAL","SPIRAL","CHROMA","WEAVE"];
+    const FE = ["CLAMP","REPEAT","MIRROR"];
+    mkToggle(tr, "flowField", ()=>"FIELD: "+FF[flowField], ()=>{ flowField=(flowField+1)%7; });
+    mkToggle(tr, "flowEdge", ()=>"EDGE: "+FE[flowEdge], ()=>{ flowEdge=(flowEdge+1)%3; });
+    d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
-    note.textContent = "Temporal smear: MOSH HOLD freezes frames while motion keeps pushing them, MELT drips, SWIRL advects, VECTOR TRASH shoves blocks.";
+    note.textContent = "Temporal smear with its own frame store. P-FRAME PUSH advects the held frame along the FIELD \u2014 on MOTION that is real optical flow, which is what makes proper datamosh: the picture stops updating but the movement keeps dragging it. MOSH GATE picks whether only moving (+) or only still (\u2212) parts hold. CURL rotates the whole field, so drift becomes orbit.";
     d.appendChild(note);
   }
 }
@@ -960,6 +1057,10 @@ function refreshUI(){
   }
   const fm = document.getElementById("fbModeBtn");
   if(fm) fm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX");
+  if(tapeBtnRefs[0] && window.__transportOf){
+    const m = window.__transportOf(activeChan);
+    for(const k in tapeBtnRefs[0]) tapeBtnRefs[0][k].classList.toggle("on", k===m);
+  }
 }
 /* mod tick indicators (cheap: 15Hz) */
 setInterval(()=>{
@@ -991,7 +1092,7 @@ function renderRoutes(){
     for(const p of PLIST){ const o=document.createElement("option"); o.value=p.id; o.textContent=p.name+" ("+p.sec+")"; dst.appendChild(o); }
     dst.value = r.dst; dst.onchange = ()=>{ r.dst = dst.value; syncChanSel(); };
     const chSel = document.createElement("select"); chSel.className="rch";
-    for(const c of ["A","B","AB"]){ const o=document.createElement("option"); o.value=c; o.textContent=c; chSel.appendChild(o); }
+    for(const c of CHANNELS.concat(["AB"])){ const o=document.createElement("option"); o.value=c; o.textContent=(c==="AB"?"ALL":c); chSel.appendChild(o); }
     chSel.value = r.ch || "A";
     chSel.title = "Which channel this route modulates";
     chSel.onchange = ()=>{ r.ch = chSel.value; };

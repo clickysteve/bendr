@@ -18,8 +18,16 @@ body{
 }
 /* ---------- header ---------- */
 #hdr{
-  height:46px; flex:0 0 46px; display:flex; align-items:center; gap:10px;
-  padding:0 12px; border-bottom:1px solid var(--line); background:var(--panel);
+  flex:0 0 auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:6px 12px; border-bottom:1px solid var(--line); background:var(--panel);
+}
+.hgrp{
+  position:relative; display:flex; align-items:center; gap:4px;
+  padding:5px 8px 4px; border:1px solid var(--line); border-radius:5px; background:rgba(0,0,0,.18);
+}
+.hgrp::before{
+  content:attr(data-lab); position:absolute; top:-6px; left:7px;
+  font-size:7px; letter-spacing:1.5px; color:var(--dim); background:var(--panel); padding:0 3px;
 }
 #logo{font-size:15px; font-weight:700; letter-spacing:2px; color:var(--amber); white-space:nowrap;}
 #logo b{color:var(--cyan); font-weight:700;}
@@ -214,10 +222,15 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
 }
 .chanbtn b{font-size:17px; letter-spacing:2px; display:block; color:var(--dim);}
 .chanbtn small{font-size:7.5px; letter-spacing:2px; color:#4a4a56; display:block;}
+.chanbtn{flex:1 1 22%;}
 .chanbtn.chA.on{background:rgba(255,122,24,.16); border-color:var(--amber);}
 .chanbtn.chA.on b{color:var(--amber);} .chanbtn.chA.on small{color:var(--amber); opacity:.7;}
 .chanbtn.chB.on{background:rgba(46,230,214,.16); border-color:var(--cyan);}
 .chanbtn.chB.on b{color:var(--cyan);} .chanbtn.chB.on small{color:var(--cyan); opacity:.7;}
+.chanbtn.chC.on{background:rgba(255,47,160,.16); border-color:var(--mag);}
+.chanbtn.chC.on b{color:var(--mag);} .chanbtn.chC.on small{color:var(--mag); opacity:.7;}
+.chanbtn.chD.on{background:rgba(180,255,90,.16); border-color:#b4ff5a;}
+.chanbtn.chD.on b{color:#b4ff5a;} .chanbtn.chD.on small{color:#b4ff5a; opacity:.7;}
 .chantools{display:flex; gap:6px; flex:1 1 100%;}
 .chantools button{flex:1; padding:5px 4px; font-size:8.5px;}
 .sectag{
@@ -227,11 +240,17 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
 .sectag.master{color:var(--dim);}
 .sectag.chan::after{content:"CH A"; }
 body.chan-b .sectag.chan::after{content:"CH B";}
+body.chan-c .sectag.chan::after{content:"CH C";}
+body.chan-d .sectag.chan::after{content:"CH D";}
 .sectag.chan{color:var(--amber); border-color:#3a2a1a;}
 body.chan-b .sectag.chan{color:var(--cyan); border-color:#1d4d48;}
+body.chan-c .sectag.chan{color:var(--mag); border-color:#4d1d3c;}
+body.chan-d .sectag.chan{color:#b4ff5a; border-color:#2f4d1d;}
 /* channel-tinted panel edge so you always know where you are */
 #panel{border-left:3px solid var(--amber);}
 body.chan-b #panel{border-left-color:var(--cyan);}
+body.chan-c #panel{border-left-color:var(--mag);}
+body.chan-d #panel{border-left-color:#b4ff5a;}
 .mrow .rch{width:46px;}
 /* ---------- mobile tab bar (hidden on desktop) ---------- */
 #mtabs{display:none;}
@@ -259,7 +278,42 @@ body.chan-b #panel{border-left-color:var(--cyan);}
 #seek{flex:1;}
 #tcode{color:var(--dim); min-width:100px; text-align:right; font-size:9.5px;}
 /* bends + matrix */
-#lower{flex:0 0 auto; display:flex; border-top:1px solid var(--line); background:var(--panel); max-height:190px;}
+#dragbar{
+  height:6px; cursor:ns-resize; background:var(--panel2); border-top:1px solid var(--line);
+  flex:0 0 6px; position:relative;
+}
+#dragbar::after{content:""; position:absolute; left:50%; top:2px; width:40px; height:2px; margin-left:-20px; background:#3a3a46; border-radius:1px;}
+#lower{flex:0 0 auto; display:flex; border-top:1px solid var(--line); background:var(--panel); height:250px; min-height:110px;}
+#dock{flex:1; display:flex; flex-direction:column; min-width:0;}
+#dockTabs{
+  display:flex; align-items:center; gap:5px; padding:5px 8px 4px;
+  border-bottom:1px solid var(--line); background:var(--panel2);
+}
+#dockTabs button{padding:4px 12px; font-size:9px;}
+#dockHint{font-size:8.5px; color:var(--dim); padding-right:4px;}
+#dockBody{flex:1; overflow:auto; min-height:0; position:relative;}
+#dockBody > div{display:none; height:100%;}
+#dockBody > div.on{display:block;}
+#modgrid{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:8px;
+  padding:8px; align-content:start; overflow-y:auto;
+}
+#textdock{padding:10px 12px; overflow-y:auto;}
+#textdock .edrow{display:flex; align-items:center; gap:8px; padding:5px 0; flex-wrap:wrap;}
+#textdock label{font-size:8.5px; letter-spacing:1.5px; color:var(--dim); white-space:nowrap;}
+#textdock input[type=range]{flex:1 1 80px; min-width:60px;}
+#textdock input[type=color]{width:34px; height:22px; padding:0; border:1px solid var(--line); background:none; cursor:pointer;}
+#textdock textarea{
+  width:100%; background:var(--panel2); color:var(--txt); border:1px solid var(--line);
+  border-radius:4px; padding:8px; font-family:var(--font); font-size:13px; letter-spacing:1px;
+  resize:vertical; outline:none;
+}
+#textdock textarea:focus{border-color:var(--mag);}
+#textdock h4{font-size:9px; letter-spacing:2px; color:var(--dim); padding:10px 0 2px;}
+/* sidebar section drag-reorder */
+.sec.secdrag{opacity:.4;}
+.sec.secover{box-shadow:inset 0 3px 0 var(--cyan);}
+.sec h3 .grab{color:#3a3a46; font-size:9px; cursor:grab; letter-spacing:-1px;}
 #bends{flex:0 0 auto; padding:10px; border-right:1px solid var(--line); display:flex; flex-direction:column; gap:6px;}
 #bends h4, #matrix h4{font-size:8.5px; letter-spacing:2px; color:var(--dim); padding-bottom:2px;}
 .bendbtns{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
@@ -397,15 +451,13 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version — check this matches what you expect after a deploy">v13.0</span>
-  <div class="hsep"></div>
-  <div class="hgrp">
-    <button id="btnFile" title="Load channel A video (any size — it streams from disk)">FILE A</button>
-    <button id="btnFileB" title="Load channel B video for the A/B mixer">B</button>
-    <button id="btnCam" title="Use webcam on channel A">CAM</button>
-    <button id="btnPat" title="Built-in test pattern on this channel">PATTERN</button>
-    <button id="btnText" title="Text / shape generator for this channel">TEXT</button>
-    <select id="selPat" title="Test pattern type">
+  <span id="ver" title="Build version">v14.0</span>
+
+  <div class="hgrp" data-lab="SOURCE">
+    <button id="btnFile" title="Load a video file into this channel">FILE</button>
+    <button id="btnCam" title="Webcam on this channel">CAM</button>
+    <button id="btnPat" title="Test pattern / video-synth source">PATTERN</button>
+    <select id="selPat" title="Pattern type">
       <option value="bars">BARS</option>
       <option value="testcard">TESTCARD</option>
       <option value="osc">OSCILLATOR</option>
@@ -420,14 +472,22 @@ audio,video{display:none;}
       <option value="lissa">LISSAJOUS</option>
       <option value="checker">CHECKER</option>
     </select>
+    <button id="btnText" title="Text / shape generator (opens the dock below)">TEXT</button>
   </div>
-  <div class="hsep"></div>
-  <div class="hgrp">
-    <span style="color:var(--dim); font-size:9px;">AUDIO</span>
+
+  <div class="hgrp" data-lab="PATCH">
+    <select id="selPreset"></select>
+    <button id="btnUndo" class="cy" title="Undo (Z)">UNDO</button>
+    <button id="btnInit" title="Init patch — everything to defaults">INIT</button>
+    <button id="btnSave" title="Save patch as .json">SAVE</button>
+    <button id="btnLoad" title="Open a saved patch">OPEN</button>
+  </div>
+
+  <div class="hgrp" data-lab="ENGINE">
     <select id="selAudio" title="Audio-reactive source">
-      <option value="off">OFF</option>
-      <option value="source">SOURCE</option>
-      <option value="mic">MIC</option>
+      <option value="off">AUDIO OFF</option>
+      <option value="source">AUD: SOURCE</option>
+      <option value="mic">AUD: INPUT</option>
     </select>
     <select id="selRes" title="Internal processing resolution">
       <option value="360">360p</option>
@@ -435,26 +495,18 @@ audio,video{display:none;}
       <option value="720" selected>720p</option>
       <option value="1080">1080p</option>
     </select>
+    <button id="btnMod" title="Modulation dock (D)">MOD</button>
+    <button id="btnMidi" title="MIDI learn">MIDI</button>
   </div>
-  <div class="hsep"></div>
-  <div class="hgrp">
-    <select id="selPreset"></select>
-    <button id="btnUndo" class="cy" title="Undo last randomize / mutate / preset change (Z)">UNDO</button>
-    <button id="btnInit" title="Total reset — init patch, everything back to defaults (undoable)">INIT</button>
-    <button id="btnSave" title="Export current state as .json">SAVE</button>
-    <button id="btnLoad" title="Import a saved .json state">OPEN</button>
-  </div>
-  <div class="spacer"></div>
-  <div class="hgrp">
-    <button id="btnMod" title="Modulation page — see every source moving (D)">MOD</button>
-    <button id="btnMidi" title="MIDI learn: toggle, then click a parameter name, then move a knob">MIDI</button>
-    <button id="btnBypass" title="Hold to see the clean signal (B)">BYPASS</button>
-    <button id="btnSnap" title="Save a PNG still (S)">SNAP</button>
-    <button id="btnRec" title="Record output live to WebM (R)">● REC</button>
-    <button id="btnRender" title="Offline render channel A to MP4 — frame-accurate, no dropped frames">RENDER</button>
+
+  <div class="hgrp" data-lab="OUTPUT">
+    <button id="btnBypass" title="Hold for the clean signal (B)">BYPASS</button>
+    <button id="btnSnap" title="PNG still (S)">SNAP</button>
+    <button id="btnRec" title="Record output (R)">● REC</button>
     <span id="recTime">0:00</span>
-    <button id="btnPop" title="Pop out a clean output window — capture it with OBS or drag to a second display">POP OUT</button>
-    <button id="btnFull" title="Fullscreen output (F)">FULL</button>
+    <button id="btnRender" title="Offline frame-accurate MP4 render of channel A">RENDER</button>
+    <button id="btnPop" title="Pop-out output window for OBS or a second display">POP OUT</button>
+    <button id="btnFull" title="Fullscreen (F)">FULL</button>
     <button id="btnHelp" title="Help (H)">?</button>
   </div>
 </div>
@@ -484,6 +536,7 @@ audio,video{display:none;}
       <input type="range" id="seek" min="0" max="1" step="0.001" value="0">
       <span id="tcode">--:-- / --:--</span>
     </div>
+    <div id="dragbar"></div>
     <div id="lower">
       <div id="bends">
         <h4>BEND — HOLD THESE</h4>
@@ -500,85 +553,57 @@ audio,video{display:none;}
           <button id="bigMut" class="bend" style="flex:1; border-color:#1d4d48; color:var(--cyan);">MUTATE<small>M</small></button>
         </div>
       </div>
+      <div id="dock">
+        <div id="dockTabs">
+          <button data-dock="matrix" class="on">MATRIX</button>
+          <button data-dock="mod">MOD</button>
+          <button data-dock="text">TEXT</button>
+          <span style="flex:1;"></span>
+          <span id="dockHint"></span>
+        </div>
+        <div id="dockBody">
       <div id="matrix">
         <h4>MOD MATRIX — PATCH SOURCES INTO ANY PARAMETER <button id="btnAddRoute" style="margin-left:8px; padding:2px 8px;">+ ROUTE</button></h4>
         <div id="routes"></div>
       </div>
-    </div>
-  </div>
-</div>
-<div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v13.0</span></h2>
-  <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
-  <h3>TWO CHANNELS</h3>
-  <p>BENDR is a two-channel mixer: <b>A</b> and <b>B</b> each have their own input <i>and</i> their own complete set of effects. The big A / B buttons at the top of the panel choose which channel you're editing — everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits both at once, <b>COPY</b> pushes the current channel onto the other, <b>SWAP</b> exchanges them. Sections tagged MASTER (the mixer, morph and CRT) are shared. Then the <b>INPUT MIXER</b> combines the two finished channels with the A&gt;B fader, wipes, keys and blends.</p>
-  <h3>TEXT / SHAPES</h3>
-  <p><b>TEXT</b> turns the selected channel into a text and shape generator — type anything, pick a font, position/scroll/repeat it, add outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric, starburst) with count, spin and pulse. It feeds the channel like any other source, so you can glitch it, feed it back, and mix it against video on the other channel.</p>
-  <h3>INPUT</h3>
-  <p>Each channel takes its own source. <b>FILE</b> loads any video your browser can play into the selected channel (drag &amp; drop works too — files stream from disk, so size doesn't matter). <b>CAM</b> uses your webcam. <b>PATTERN</b> is a built-in test signal — pick BARS, TESTCARD, OSCILLATOR (video-synth colour waves), GRID, RAMP or STATIC from the dropdown.</p>
-  <h3>MASTER OUTPUT</h3>
-  <p>The final stage is a display, not just a filter. <b>DISPLAY</b> cycles the model — flat, aperture grille, slot mask, shadow mask, LCD stripe, mono monitor, green screen — each with its own mask geometry. BEAM WIDTH and BEAM SHAPE set the scanline beam profile (the beam widens with brightness, like a real tube). Then persistence, HV sag (the picture breathes wider as it gets brighter), bloom, halation, defocus, grain, and a full output transform: gamma, black level, white clip, contrast, saturation, warmth. <b>OUTPUT OVERLAY</b> adds letterbox and pillarbox mattes, bezel, glass glare, dust, scratches, screen moiré, rolling shutter and safe-area guides.</p>
-  <h3>FEEDBACK</h3>
-  <p>The loop is the instrument. <b>EDGE</b> decides the whole family — CLAMP gives tunnels and plumes, REPEAT gives lattices, MIRROR gives mandalas. <b>CURVE</b> is the non-linearity (clamp / soft / wrap / fold) and is where structure lives; without it the loop just decays or blows out. <b>INJECT</b> sets how the live picture enters (mix, add, screen, max, min, difference). BLUR plus SHARPEN inside the loop is an activator–inhibitor pair, which is what grows Turing labyrinths and cellular patterns. LOOP NOISE is load-bearing rather than decorative: at zero the loop settles into a dead attractor. VAL / PASS is the loop gain and the most sensitive control in the app. Thirty feedback presets prefixed FB are named after the looks they produce.</p>
-  <h3>SIGNAL LAB</h3>
-  <p>Techniques adapted from the open-source glitch canon: sparse line jitter (only lines past the gate displace, and they displace hard), NTSC crosstalk with separate artifact and fringing controls, shaped snow with clumping, FM wobble, slitscan, row smear, 1-bit crush with ordered dither, moiré, and a multi-band sequential keyer that splits brightness into bands and colours each. <b>FIELD MOD</b> is video-rate modulation: the field varies across the frame, so it modulates hue and warp per-pixel rather than per-frame.</p>
-  <h3>SIGNAL CHAIN</h3>
-  <p>The rail above the picture is the live signal path. <b>Drag the pills to reorder</b> the four processing stages, and click a pill to switch it off. Order changes the result completely: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.</p>
-  <h3>SIGNAL PATH</h3>
-  <p>Feedback → composite/NTSC encode-decode → sync &amp; tape damage → bent enhancer → colour stage → CRT. The <b>BENT ENHANCER</b> section is the circuit-bent video enhancer core: RAINBOW MAP replaces luma with hot posterized rainbows, EDGE RING is the sharpness circuit driven into oscillation (repeating ghost edges), RGB SPLIT tears the channels apart, LUMA HUE makes colour chase brightness, INV FLICKER strobes inversions.</p>
-  <h3>CONTOUR / PALETTE</h3>
-  <p>The bent-enhancer signature: <b>CONTOUR</b> draws the isolines between brightness bands, giving those repeated outlines that trace the shape of a face or a body. BANDS sets how many, LINE WIDTH how heavy, LINE HUE colours them by band, KEEP FILL decides how much of the picture survives between the lines (drop it to zero for lines on black). <b>FLATTEN</b> quantises brightness into hard LEVELS for solid poster-like colour fields, and <b>DITHER</b> breaks the steps into speckle.</p>
-  <h3>KALEIDO</h3>
-  <p>In FRAME / POSITION, <b>KALEIDO</b> folds the picture into radial symmetry. FOLD N = 3 gives triangles; modulate FOLD SPIN with a slow LFO and the whole composition rotates.</p>
-  <h3>CRT REPHOTO</h3>
-  <p>The CRT section models a photograph of a screen rather than a clean render: <b>BLOOM</b> for light spilling out of bright areas, <b>HALATION</b> to warm that spill the way film does, <b>DEFOCUS</b> for glass softness and <b>FILM GRAIN</b> on top.</p>
-  <h3>GLITCH LAB &amp; FLOW / MOSH</h3>
-  <p><b>GLITCH LAB</b> is the digital-corruption stage: PIXEL SORT stretches bright runs into vertical streaks (set SORT THRESH to pick what smears), BLOCK TRASH jumps and corrupts macroblocks like a broken codec, HALFTONE drops everything to brightness-sized dots, DRIFT WARP pushes pixels using their own colour values, FM WARP ripples contours by brightness.</p>
-  <p><b>FLOW / MOSH</b> is the temporal-smear stage, and it holds its own history: MOSH HOLD freezes the frame while motion keeps pushing it (classic datamosh bloom), MELT drips brightness downward, SWIRL advects the image through a slow noise field, VECTOR TRASH shoves macroblocks around like corrupted motion vectors, TIME SHEAR makes the top and bottom of the frame smear by different amounts.</p>
-  <h3>MOVEMENT</h3>
-  <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch four LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
-  <h3>PERFORMANCE</h3>
-  <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
-  <h3>MIXER, MORPH, KEYER &amp; TIME BASE</h3>
-  <p>The <b>INPUT MIXER</b> blends video channel B over A (load B first) — FADE, LUMA KEY or CHROMA KEY modes. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor. CHAIN swaps whether tape damage or the colour/enhancer stage comes first.</p>
-  <h3>VIDEO-REACTIVE</h3>
-  <p>MOTION, BRIGHT and CUT are mod sources computed from the picture itself — patch CUT into TEAR and every edit knocks the sync loose like a real deck.</p>
-  <h3>MODULATION</h3>
-  <p><b>Right-click any parameter</b> to patch a modulator straight onto it, adjust the amount, or remove it. The <b>MOD</b> button (or <kbd>D</kbd>) opens the modulation page: every source drawn live, LFO rate/shape/sync editable in place, and each card lists what it's driving.</p>
-  <h3>TEMPO &amp; MIDI</h3>
-  <p>TAP sets the tempo; LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
-  <h3>KEYS</h3>
-  <p><kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>1</kbd>–<kbd>9</kbd> presets &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> snapshot &nbsp; <kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>H</kbd> this help</p>
-  <h3>OUTPUT</h3>
-  <p><b>REC</b> captures the live output (with source audio when AUDIO=SOURCE) to a WebM file. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
-  <p style="padding-top:10px; color:var(--dim);">Click anywhere to close.</p>
-</div></div>
-<div id="mtabs">
-  <button data-mtab="controls" class="on">CONTROLS</button>
-  <button data-mtab="bends">BEND</button>
-  <button data-mtab="matrix">MATRIX</button>
-  <button data-mtab="video">VIDEO</button>
-</div>
-<div id="modpage">
-  <div class="mphead">
-    <h3>MODULATION</h3>
-    <span style="color:var(--dim); font-size:9px;">Right-click any parameter in the panel to patch it &middot; sources animate live below</span>
-    <span style="flex:1;"></span>
-    <button id="modPageClose">CLOSE</button>
-  </div>
-  <div id="modgrid"></div>
-</div>
-<div id="textEd">
-  <div class="edbox">
-    <h3>TEXT / SHAPE GENERATOR <span id="textEdChan"></span><button id="textEdClose" style="margin-left:auto;">CLOSE</button></h3>
-    <textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
+      <div id="modgrid"></div>
+      <div id="textdock"><textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
     <div class="edrow">
       <label>FONT</label>
       <select id="txtFont">
         <option value="mono">MONO</option>
-        <option value="sans">SANS BOLD</option>
+        <option value="sans">HELVETICA</option>
         <option value="serif">SERIF</option>
         <option value="cond">CONDENSED</option>
+        <option value="impact">IMPACT</option>
+        <option value="courier">COURIER</option>
+        <option value="times">TIMES</option>
+        <option value="georgia">GEORGIA</option>
+        <option value="garamond">GARAMOND</option>
+        <option value="palatino">PALATINO</option>
+        <option value="baskerville">BASKERVILLE</option>
+        <option value="didot">DIDOT</option>
+        <option value="futura">FUTURA</option>
+        <option value="gill">GILL SANS</option>
+        <option value="optima">OPTIMA</option>
+        <option value="avenir">AVENIR</option>
+        <option value="verdana">VERDANA</option>
+        <option value="tahoma">TAHOMA</option>
+        <option value="trebuchet">TREBUCHET</option>
+        <option value="rockwell">ROCKWELL</option>
+        <option value="copperplate">COPPERPLATE</option>
+        <option value="papyrus">PAPYRUS</option>
+        <option value="chalkduster">CHALKDUSTER</option>
+        <option value="marker">MARKER FELT</option>
+        <option value="bradley">BRADLEY HAND</option>
+        <option value="snell">SNELL SCRIPT</option>
+        <option value="zapfino">ZAPFINO</option>
+        <option value="andale">ANDALE MONO</option>
+        <option value="menlo">MENLO</option>
+        <option value="monaco">MONACO</option>
+        <option value="cursive">CURSIVE</option>
+        <option value="fantasy">FANTASY</option>
+        <option value="system">SYSTEM UI</option>
       </select>
       <label>SIZE</label><input type="range" id="txtSize" min="0.03" max="0.6" step="0.005" value="0.2">
       <label>TRACK</label><input type="range" id="txtTrack" min="-0.1" max="0.5" step="0.005" value="0">
@@ -626,7 +651,65 @@ audio,video{display:none;}
       <label>PULSE</label><input type="range" id="shpPulse" min="0" max="1" step="0.01" value="0">
       <span style="color:var(--dim); font-size:9px; flex:1;">Feeds this channel like any other source — glitch it, feed it back, mix it.</span>
     </div>
+        </div>
+      </div>
+    </div>
   </div>
+</div>
+<div id="help"><div id="helpBox">
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v14.0</span></h2>
+  <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
+  <h3>FOUR CHANNELS, THREE BUSES</h3>
+  <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
+  <p>The channels meet in three mixers, each with the same twenty transitions: <b>BUS 1</b> combines A and B, <b>BUS 2</b> combines C and D, and <b>MASTER MIX</b> crossfades bus 1 against bus 2. Everything downstream of that (CRT display, overlay, morph) is shared. Leave the master fader at zero and channels C and D never render, so the two-channel setup costs exactly what it always did — push it off zero and the second bus comes alive.</p>
+  <h3>TEXT / SHAPES</h3>
+  <p><b>TEXT</b> turns the selected channel into a text and shape generator — type anything, pick a font, position/scroll/repeat it, add outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric, starburst) with count, spin and pulse. It feeds the channel like any other source, so you can glitch it, feed it back, and mix it against video on the other channel.</p>
+  <h3>INPUT</h3>
+  <p>All four channels take their own source. <b>FILE</b> loads any video your browser can play into the selected channel (drag &amp; drop works too — files stream from disk, so size doesn't matter). <b>CAM</b> uses your webcam. <b>PATTERN</b> is a built-in test signal — pick BARS, TESTCARD, OSCILLATOR (video-synth colour waves), GRID, RAMP or STATIC from the dropdown.</p>
+  <h3>MASTER OUTPUT</h3>
+  <p>The final stage is a display, not just a filter. <b>DISPLAY</b> cycles the model — flat, aperture grille, slot mask, shadow mask, LCD stripe, mono monitor, green screen — each with its own mask geometry. BEAM WIDTH and BEAM SHAPE set the scanline beam profile (the beam widens with brightness, like a real tube). Then persistence, HV sag (the picture breathes wider as it gets brighter), bloom, halation, defocus, grain, and a full output transform: gamma, black level, white clip, contrast, saturation, warmth. <b>OUTPUT OVERLAY</b> adds letterbox and pillarbox mattes, bezel, glass glare, dust, scratches, screen moiré, rolling shutter and safe-area guides.</p>
+  <h3>FEEDBACK</h3>
+  <p>The loop is the instrument. <b>EDGE</b> decides the whole family — CLAMP gives tunnels and plumes, REPEAT gives lattices, MIRROR gives mandalas. <b>CURVE</b> is the non-linearity (clamp / soft / wrap / fold) and is where structure lives; without it the loop just decays or blows out. <b>INJECT</b> sets how the live picture enters (mix, add, screen, max, min, difference). BLUR plus SHARPEN inside the loop is an activator–inhibitor pair, which is what grows Turing labyrinths and cellular patterns. LOOP NOISE is load-bearing rather than decorative: at zero the loop settles into a dead attractor. VAL / PASS is the loop gain and the most sensitive control in the app. Thirty feedback presets prefixed FB are named after the looks they produce.</p>
+  <h3>SIGNAL LAB</h3>
+  <p>Techniques adapted from the open-source glitch canon: sparse line jitter (only lines past the gate displace, and they displace hard), NTSC crosstalk with separate artifact and fringing controls, shaped snow with clumping, FM wobble, slitscan, row smear, 1-bit crush with ordered dither, moiré, and a multi-band sequential keyer that splits brightness into bands and colours each. <b>FIELD MOD</b> is video-rate modulation: the field varies across the frame, so it modulates hue and warp per-pixel rather than per-frame.</p>
+  <h3>SIGNAL CHAIN</h3>
+  <p>The rail above the picture is the live signal path. <b>Drag the pills to reorder</b> the four processing stages, and click a pill to switch it off. Order changes the result completely: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.</p>
+  <h3>SIGNAL PATH</h3>
+  <p>Feedback → composite/NTSC encode-decode → sync &amp; tape damage → bent enhancer → colour stage → CRT. The <b>BENT ENHANCER</b> section is the circuit-bent video enhancer core: RAINBOW MAP replaces luma with hot posterized rainbows, EDGE RING is the sharpness circuit driven into oscillation (repeating ghost edges), RGB SPLIT tears the channels apart, LUMA HUE makes colour chase brightness, INV FLICKER strobes inversions.</p>
+  <h3>CONTOUR / PALETTE</h3>
+  <p>The bent-enhancer signature: <b>CONTOUR</b> draws the isolines between brightness bands, giving those repeated outlines that trace the shape of a face or a body. BANDS sets how many, LINE WIDTH how heavy, LINE HUE colours them by band, KEEP FILL decides how much of the picture survives between the lines (drop it to zero for lines on black). <b>FLATTEN</b> quantises brightness into hard LEVELS for solid poster-like colour fields, and <b>DITHER</b> breaks the steps into speckle.</p>
+  <h3>KALEIDO</h3>
+  <p>In FRAME / POSITION, <b>KALEIDO</b> folds the picture into radial symmetry. FOLD N = 3 gives triangles; modulate FOLD SPIN with a slow LFO and the whole composition rotates.</p>
+  <h3>CRT REPHOTO</h3>
+  <p>The CRT section models a photograph of a screen rather than a clean render: <b>BLOOM</b> for light spilling out of bright areas, <b>HALATION</b> to warm that spill the way film does, <b>DEFOCUS</b> for glass softness and <b>FILM GRAIN</b> on top.</p>
+  <h3>GLITCH LAB &amp; FLOW / MOSH</h3>
+  <p><b>GLITCH LAB</b> is the digital-corruption stage: PIXEL SORT stretches bright runs into vertical streaks (set SORT THRESH to pick what smears), BLOCK TRASH jumps and corrupts macroblocks like a broken codec, HALFTONE drops everything to brightness-sized dots, DRIFT WARP pushes pixels using their own colour values, FM WARP ripples contours by brightness.</p>
+  <p><b>FLOW / MOSH</b> is the temporal-smear stage, and it holds its own frame store. <b>FIELD</b> picks the vector field everything is advected along: MOTION estimates real optical flow from the picture (frame to frame, per pixel), CONTOUR runs along brightness edges, CURL NOISE churns, RADIAL and SPIRAL push out and around, CHROMA steers by colour, WEAVE crosshatches. <b>P-FRAME PUSH</b> drags the held frame along that field, which on MOTION is what proper datamosh actually is: the picture stops updating while the movement keeps pulling it apart. <b>MOSH HOLD</b> sets how much of the held frame survives each pass and <b>MOSH GATE</b> restricts the holding to the moving parts of the frame (positive) or the still parts (negative). <b>CURL / ROTATE</b> turns the whole field sideways, so drift becomes orbit. Then MELT with its own direction and brightness gate, SWIRL with scale and speed, VECTOR TRASH with block size and rate, STRETCH, EDGE REPEL, FLOW NOISE, per-pass HUE and DECAY, RE-SHARP to claw back the detail resampling eats, TIME SHEAR on either axis, and an EDGE mode (clamp / repeat / mirror) for what happens off the edge of the frame.</p>
+  <h3>TAPE TRANSPORT</h3>
+  <p>A whole deck, per channel. The transport row drives that channel's source: <b>STILL</b> parks the noise bar a paused deck lays across the field, the shuttle and jog buttons scrub with head-crossing bands marching through the picture. <b>TAPE SPEED</b> runs SP to EP — the slower the tape, the less bandwidth survives, so chroma widens and detail goes. <b>GENERATIONS</b> compounds GEN LOSS as if the tape had been dubbed that many times. <b>TRACK PHASE</b> places the mistracking band and <b>SERVO HUNT</b> sets the auto-tracking circuit searching for it. On top: tape crease, head clog, azimuth error, scrape flutter, wow with its own rate, tape stretch, edge damage, print-through, chroma loss, tape hiss, and dropout with adjustable streak length.</p>
+  <h3>MOVEMENT</h3>
+  <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch four LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
+  <h3>PERFORMANCE</h3>
+  <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
+  <h3>MIXER, MORPH, KEYER &amp; TIME BASE</h3>
+  <p>Each of the three <b>MIXERS</b> gets the same twenty modes: a plain fade, twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and a movable origin, luma and chroma key transitions, and add / difference / multiply / screen / lighten blends. Run the fader like a T-bar. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor.</p>
+  <h3>VIDEO-REACTIVE</h3>
+  <p>MOTION, BRIGHT and CUT are mod sources computed from the picture itself — patch CUT into TEAR and every edit knocks the sync loose like a real deck.</p>
+  <h3>MODULATION</h3>
+  <p><b>Right-click any parameter</b> to patch a modulator straight onto it, adjust the amount, or remove it. The <b>MOD</b> button (or <kbd>D</kbd>) opens the modulation page: every source drawn live, LFO rate/shape/sync editable in place, and each card lists what it's driving.</p>
+  <h3>TEMPO &amp; MIDI</h3>
+  <p>TAP sets the tempo; LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
+  <h3>KEYS</h3>
+  <p><kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>1</kbd>–<kbd>9</kbd> presets &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> snapshot &nbsp; <kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>H</kbd> this help</p>
+  <h3>OUTPUT</h3>
+  <p><b>REC</b> captures the live output (with source audio when AUDIO=SOURCE) — MP4 where the browser supports it, WebM otherwise. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
+  <p style="padding-top:10px; color:var(--dim);">Click anywhere to close.</p>
+</div></div>
+<div id="mtabs">
+  <button data-mtab="controls" class="on">CONTROLS</button>
+  <button data-mtab="bends">BEND</button>
+  <button data-mtab="matrix">MATRIX</button>
+  <button data-mtab="video">VIDEO</button>
 </div>
 <div id="toast"></div>
 <div id="renderOv" style="display:none; position:fixed; inset:0; z-index:80; background:rgba(6,6,10,.9); flex-direction:column; align-items:center; justify-content:center; gap:16px;">

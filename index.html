@@ -24,6 +24,10 @@ body{
 #logo{font-size:15px; font-weight:700; letter-spacing:2px; color:var(--amber); white-space:nowrap;}
 #logo b{color:var(--cyan); font-weight:700;}
 #logo small{display:block; font-size:8px; letter-spacing:1.5px; color:var(--dim); font-weight:400;}
+#ver{
+  font-size:9px; letter-spacing:1px; color:var(--dim); border:1px solid var(--line);
+  border-radius:3px; padding:2px 6px; white-space:nowrap; align-self:center;
+}
 .hgrp{display:flex; align-items:center; gap:4px;}
 .hsep{width:1px; height:24px; background:var(--line); margin:0 4px;}
 #hdr .spacer{flex:1;}
@@ -282,6 +286,7 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
+  <span id="ver" title="Build version — check this matches what you expect after a deploy">v9.1</span>
   <div class="hsep"></div>
   <div class="hgrp">
     <button id="btnFile" title="Load channel A video (any size — it streams from disk)">FILE A</button>
@@ -383,7 +388,7 @@ audio,video{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR</h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v9.1</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>INPUT</h3>
   <p><b>FILE</b> loads any video your browser can play (drag &amp; drop works too — files stream from disk, so size doesn't matter). <b>CAM</b> uses your webcam. <b>PATTERN</b> is a built-in test signal — pick BARS, TESTCARD, OSCILLATOR (video-synth colour waves), GRID, RAMP or STATIC from the dropdown.</p>

@@ -27,7 +27,13 @@ function wireMenus(){
       if(!open) m.classList.add("open");
       hideTip();
     });
-    m.querySelector(".menupanel").addEventListener("click", e=>e.stopPropagation());
+    const panel = m.querySelector(".menupanel");
+    panel.addEventListener("click", e=>e.stopPropagation());
+    /* choosing from a dropdown, or pressing a button, is a decision — close up */
+    panel.addEventListener("change", ()=>{ closeMenus(); hideTip(); });
+    for(const btn of panel.querySelectorAll("button")){
+      btn.addEventListener("click", ()=>{ closeMenus(); hideTip(); });
+    }
   }
   addEventListener("click", ()=>closeMenus());
   addEventListener("keydown", e=>{ if(e.key === "Escape") closeMenus(); });
@@ -54,7 +60,7 @@ function attachTip(el, title, body, foot){
     if(tipTimer) clearTimeout(tipTimer);
     tipTimer = setTimeout(()=>{
       showTip(el, (title?"<b>"+title+"</b>":"") + (body||"") + (foot?"<i>"+foot+"</i>":""));
-    }, 260);
+    }, 620);
   });
   el.addEventListener("mouseleave", hideTip);
   el.addEventListener("mousedown", hideTip);
@@ -589,8 +595,9 @@ function buildModPage(){
   }
 }
 function drawModPage(){
-  const page = document.getElementById("modpage");
-  if(!page || !page.classList.contains("show")) return;
+  /* the mod page lives in the dock now, so only draw when that tab is showing */
+  const grid = document.getElementById("modgrid");
+  if(!grid || !grid.classList.contains("on")) return;
   for(const id in modCards){
     const c = modCards[id];
     const g = c.ctx, W = c.cv.width, H = c.cv.height;

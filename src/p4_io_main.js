@@ -168,15 +168,70 @@ function loadPreset(i){
     }
   }
   refreshToggles();
-  document.getElementById("selPreset").value = i;
+  selPreset.value = String(i);
   toast("Preset: "+pr[0]+" \u2192 channel "+(linkChans?"A+B":activeChan));
 }
 const selPreset = document.getElementById("selPreset");
-PRESETS.forEach((p,i)=>{
-  const o = document.createElement("option"); o.value=i; o.textContent = (i+1)+" · "+p[0];
-  selPreset.appendChild(o);
-});
-selPreset.onchange = ()=> loadPreset(+selPreset.value);
+/* ---- presets you save yourself, kept on this machine ---- */
+let userPresets = [];
+function loadUserPresets(){
+  try{ userPresets = JSON.parse(localStorage.getItem("bendr.presets") || "[]") || []; }
+  catch(e){ userPresets = []; }
+}
+function saveUserPresets(){
+  try{ localStorage.setItem("bendr.presets", JSON.stringify(userPresets)); }
+  catch(e){ toast("Could not save — this browser's storage is full or blocked", true); }
+}
+function rebuildPresetList(){
+  const keep = selPreset.value;
+  selPreset.innerHTML = "";
+  const g1 = document.createElement("optgroup"); g1.label = "BUILT IN";
+  PRESETS.forEach((p,i)=>{
+    const o = document.createElement("option"); o.value = String(i);
+    o.textContent = (i+1)+" \u00b7 "+p[0];
+    g1.appendChild(o);
+  });
+  selPreset.appendChild(g1);
+  if(userPresets.length){
+    const g2 = document.createElement("optgroup"); g2.label = "SAVED";
+    userPresets.forEach((p,i)=>{
+      const o = document.createElement("option"); o.value = "u"+i;
+      o.textContent = "\u2605 "+p.name;
+      g2.appendChild(o);
+    });
+    selPreset.appendChild(g2);
+  }
+  if(keep) selPreset.value = keep;
+}
+selPreset.onchange = ()=>{
+  const v = selPreset.value;
+  if(v.charAt(0) === "u"){
+    const up = userPresets[+v.slice(1)];
+    if(up){ pushHistory(); restoreState(JSON.parse(JSON.stringify(up.state))); selPreset.value = v; toast("Preset: "+up.name); }
+  } else loadPreset(+v);
+};
+document.getElementById("btnPresetSave").onclick = ()=>{
+  const suggested = "PATCH "+(userPresets.length+1);
+  const name = (prompt("Name this preset", suggested) || "").trim();
+  if(!name) return;
+  const existing = userPresets.findIndex(p=>p.name.toLowerCase() === name.toLowerCase());
+  const entry = {name, state: captureState()};
+  if(existing >= 0) userPresets[existing] = entry; else userPresets.push(entry);
+  saveUserPresets(); rebuildPresetList();
+  selPreset.value = "u"+(existing >= 0 ? existing : userPresets.length-1);
+  toast("Saved preset \u201c"+name+"\u201d \u2014 it is in the list under SAVED");
+};
+document.getElementById("btnPresetDel").onclick = ()=>{
+  const v = selPreset.value;
+  if(v.charAt(0) !== "u"){ toast("Pick one of your own saved presets to delete", true); return; }
+  const i = +v.slice(1), up = userPresets[i];
+  if(!up) return;
+  userPresets.splice(i,1); saveUserPresets(); rebuildPresetList();
+  selPreset.value = "0";
+  toast("Deleted \u201c"+up.name+"\u201d");
+};
+loadUserPresets();
+rebuildPresetList();
 
 function randomizeAll(){
   pushHistory();
@@ -249,7 +304,10 @@ function captureState(){
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
     mixMode2, wipeInv2, mixModeM, wipeInvM,
     fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc, flowField, flowEdge,
-    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}};
+    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
+    busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
+    genMode: JSON.parse(JSON.stringify(genMode)),
+    srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   for(const k of LFOKEYS) st[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   return st;
 }
@@ -336,7 +394,7 @@ function initPatch(){
   applyState({}, []);
   refreshToggles();
   renderChain();
-  document.getElementById("selPreset").value = 0;
+  selPreset.value = "0";
   toast("Init patch — everything back to defaults (Z to undo)");
 }
 document.getElementById("btnInit").onclick = initPatch;
@@ -846,11 +904,16 @@ document.getElementById("btnLoop").onclick = e=>{
   const v = cur().video; v.loop = !v.loop; e.target.classList.toggle("on", v.loop);
 };
 const spdEl = document.getElementById("spd");
+/* browsers only accept a limited playback-rate range, but the generated
+   sources are happy with anything, so the element gets a clamped copy */
+function videoRate(v){ return Math.min(16, Math.max(0.0625, Math.abs(v) || 1)); }
 function setSpeed(v, ch){
   const S = SRC[ch||activeChan];
   S.speed = v;
-  S.video.playbackRate = v;
-  S.video.defaultPlaybackRate = v;
+  try{
+    S.video.playbackRate = videoRate(v);
+    S.video.defaultPlaybackRate = videoRate(v);
+  }catch(e){}
   if(!ch || ch===activeChan){
     spdEl.value = v;
     spdEl.classList.toggle("hot", Math.abs(v-1) > 0.001);
@@ -860,9 +923,9 @@ spdEl.addEventListener("input", e=>{ setSpeed(parseFloat(e.target.value)); });
 spdEl.addEventListener("dblclick", ()=>{ setSpeed(1); });
 for(const ch of CHANNELS){
   const S = SRC[ch];
-  S.video.addEventListener("loadeddata", ()=>{ S.video.playbackRate = S.speed; });
+  S.video.addEventListener("loadeddata", ()=>{ try{ S.video.playbackRate = videoRate(S.speed); }catch(e){} });
   S.video.addEventListener("ratechange", ()=>{
-    if(Math.abs(S.video.playbackRate-S.speed)>0.01 && !S.video.srcObject) S.video.playbackRate = S.speed;
+    if(Math.abs(S.video.playbackRate-videoRate(S.speed))>0.01 && !S.video.srcObject){ try{ S.video.playbackRate = videoRate(S.speed); }catch(e){} }
   });
 }
 /* ---- tape transport: per-channel deck mode ---- */
@@ -880,9 +943,9 @@ function setTransport(mode, ch){
   }
   const v = S.video;
   try{
-    if(mode === "play"){ v.playbackRate = S.speed; if(v.paused) v.play(); }
+    if(mode === "play"){ v.playbackRate = videoRate(S.speed); if(v.paused) v.play(); }
     else if(mode === "still"){ v.pause(); }
-    else if(mode === "ff"){ v.playbackRate = Math.min(16, Math.abs(S.speed)*4 || 4); if(v.paused) v.play(); }
+    else if(mode === "ff"){ v.playbackRate = videoRate(Math.abs(S.speed)*4 || 4); if(v.paused) v.play(); }
     else { v.pause(); }   // rew / jog are driven frame by frame below
   }catch(e){}
   if(typeof refreshToggles === "function") refreshToggles();
@@ -1027,8 +1090,22 @@ btnPop.onclick = ()=>{
 };
 
 /* big performance randomize/mutate pads */
-document.getElementById("bigRand").onclick = randomizeAll;
-document.getElementById("bigMut").onclick = mutate;
+document.getElementById("btnRnd").onclick = randomizeAll;
+document.getElementById("btnMut").onclick = mutate;
+/* the bend pads are a performance surface, not always wanted — folding them
+   away gives the mod matrix and the text editor the whole width of the dock */
+let bendPane = true;
+function setBendPane(on){
+  if(isTouch) on = true;   /* on a phone the pads live behind their own tab */
+  bendPane = on;
+  document.body.classList.toggle("nobend", !on);
+  const b = document.getElementById("btnBendPane");
+  if(b) b.classList.toggle("on", on);
+  sizeCanvas();
+  try{ localStorage.setItem("bendr.bendpane", on ? "1" : "0"); }catch(e){}
+}
+document.getElementById("btnBendPane").onclick = ()=>setBendPane(!bendPane);
+document.getElementById("btnModPane").onclick = ()=>setDock(dockTab==="mod" ? "matrix" : "mod");
 
 /* bend buttons: mouse + touch */
 for(const b of document.querySelectorAll(".bend[data-bend]")){
@@ -1597,6 +1674,7 @@ function renderGen(ch, now){
   return C.gen.tex;
 }
 function renderChannel(ch, now, dt){
+  ensureChanRT(ch);
   const C = chanRT[ch], S = SRC[ch];
   const chanSrcTex = (S.mode === "synth") ? renderGen(ch, now) : srcTex[ch];
 
@@ -1735,15 +1813,16 @@ function renderFrame(now, dt){
     draw();
   }
   if(masterLive){
-    mixPass(busOut1, chanRT[b1[0]].out.tex, chanRT[b1[1]].out.tex, live[b1[1]], MIXBUS.b1, mixMode, wipeInv);
-    mixPass(busOut2, chanRT[b2[0]].out.tex, chanRT[b2[1]].out.tex, live[b2[1]], MIXBUS.b2, mixMode2, wipeInv2);
+    mixPass(busOut1, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv);
+    mixPass(busOut2, chanOutTex(b2[0]), chanOutTex(b2[1]), live[b2[1]], MIXBUS.b2, mixMode2, wipeInv2);
     mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mixModeM, wipeInvM);
   } else {
     /* nothing on bus 2, so bus 1 goes straight to master and costs one pass, as before */
-    mixPass(mixOut, chanRT[b1[0]].out.tex, chanRT[b1[1]].out.tex, live[b1[1]], MIXBUS.b1, mixMode, wipeInv);
+    mixPass(mixOut, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv);
   }
 
   if(multiView){
+    for(const ch of CHANNELS) ensureChanRT(ch);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0,0,canvas.width,canvas.height);
     gl.useProgram(progMULTI.prog);
@@ -1752,8 +1831,8 @@ function renderFrame(now, dt){
       gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.uniform1i(U(progMULTI,name), unit);
     };
-    bind(0,"u_a",chanRT.A.out.tex); bind(1,"u_b",chanRT.B.out.tex);
-    bind(2,"u_c",chanRT.C.out.tex); bind(3,"u_d",chanRT.D.out.tex);
+    bind(0,"u_a",chanOutTex("A")); bind(1,"u_b",chanOutTex("B"));
+    bind(2,"u_c",chanOutTex("C")); bind(3,"u_d",chanOutTex("D"));
     bind(4,"u_b1",busOut1.tex);     bind(5,"u_pgm",mixOut.tex);
     const cellOf = {A:0,B:1,C:3,D:4};
     gl.uniform1f(U(progMULTI,"u_active"), cellOf[activeChan]);
@@ -1793,6 +1872,7 @@ function renderFrame(now, dt){
   /* full rescan: give each channel a CRT-processed copy to eat next frame */
   if(rescanMode){
     for(const ch of CHANNELS){
+      if(!chanRT[ch].allocated) continue;
       gl.bindFramebuffer(gl.FRAMEBUFFER, chanRT[ch].crt.fbo);
       gl.viewport(0,0,procW,procH);
       gl.uniform2f(U(progCRT,"u_res"), procW, procH);
@@ -2002,7 +2082,6 @@ if(OUTPUT_MODE){
       toast("Processing at "+procW+" \u00d7 "+procH);
     };
   }
-  document.getElementById("btnMod").onclick = ()=> setDock("mod");
   setActiveChan("A");
   syncChanInputUI();
   renderChain();
@@ -2018,6 +2097,7 @@ if(OUTPUT_MODE){
   renderRoutes();
   wireMenus();
   wireDataTips();
+  { let bp = "1"; try{ bp = localStorage.getItem("bendr.bendpane") || "1"; }catch(e){} setBendPane(bp === "1"); }
   loadPreset(1);   /* RAINBOW RITE so it looks alive immediately */
   sizeCanvas();
   requestAnimationFrame(frame);

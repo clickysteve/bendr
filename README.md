@@ -97,10 +97,13 @@ Nothing sits still. The mod matrix patches any source into any parameter:
 
 ![Modulation page](docs/doc_modpage.png)
 
+Presets you build yourself save to the machine and sit in the preset list beside the built-in ones; patches also save as `.json` files to move between machines.
+
 Six momentary bend pads (mouse, `Q W E R T Y`, or MIDI notes C1–F1), MIDI CC learn on every slider, randomize/mutate with undo, per-section resets and a global init.
 
 ## Output
 
+- Processing resolution from 360p to **4K**, independent of window size
 - Live **recording** with source audio, MP4 where the browser supports it and WebM otherwise
 - Frame-accurate **offline MP4 render** via WebCodecs — every frame processed at full quality regardless of realtime performance (video only)
 - PNG stills, fullscreen, and a clean **pop-out output window** for OBS capture or a second display

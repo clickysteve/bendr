@@ -1049,6 +1049,7 @@ const SECTIONS = [
   {id:"time",     name:"TIME BASE",         cls:"mag"},
   {id:"contour",  name:"CONTOUR / PALETTE",  cls:"mag"},
   {id:"glitch",   name:"GLITCH LAB",        cls:"mag"},
+  {id:"lab",      name:"SIGNAL LAB",        cls:"mag"},
   {id:"flow",     name:"FLOW / MOSH",       cls:"mag"},
   {id:"keyer",    name:"KEYER",             cls:"cyan"},
   {id:"signal",   name:"COMPOSITE SIGNAL",  cls:""},
@@ -1056,6 +1057,7 @@ const SECTIONS = [
   {id:"vhs",      name:"TAPE TRANSPORT",    cls:""},
   {id:"color",    name:"COLOUR STAGE",      cls:"cyan"},
   {id:"crt",      name:"CRT DISPLAY",       cls:"cyan"},
+  {id:"overlay",  name:"OUTPUT OVERLAY",    cls:"cyan"},
 ];
 const PDEF = [
   ["abMix","BUS 1 FADER","mixer",0,1,0],
@@ -1621,7 +1623,7 @@ const SECHELP = {
 };
 
 /* Master sections are single-instance; everything else exists once per channel. */
-const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","morph","snap"]);
+const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","overlay","morph","snap"]);
 const CHANNELS = ["A","B","C","D"];
 const BUSPAIR = {A:"B", B:"A", C:"D", D:"C"};   // each channel's partner on its mixer bus
 const P = {};           // id -> param descriptor
@@ -1739,7 +1741,7 @@ function makeRT(w,h){
   return {tex, fbo, w, h};
 }
 let procW=1280, procH=720;
-const RING_N = 30;
+let RING_N = 30;
 
 /* Each channel owns its feedback history, flow history and frame ring;
    scratch buffers are shared because channels render one after the other. */
@@ -1762,16 +1764,25 @@ function clearRing(c){
 function ensureRing(c){
   if(!c.ring){ c.ring=[]; for(let i=0;i<RING_N;i++) c.ring.push(makeRT(procW,procH)); c.ringW=0; c.ringFilled=0; }
 }
+const CH_RTS = ["fbPrev","fbNext","crt","flowA","flowB","flowSrc","gen","out"];
+/* A channel's eight render targets are only allocated once that channel is
+   actually used. At 720p that hardly matters; at 2160p each one is 33 MB, so
+   allocating all four channels up front would cost a gigabyte for nothing. */
+function allocChan(ch){
+  const c = chanRT[ch];
+  for(const k of CH_RTS) freeRT(c[k]);
+  clearRing(c);
+  for(const k of CH_RTS) c[k] = makeRT(procW, procH);
+  c.allocated = true;
+}
+function ensureChanRT(ch){
+  if(!chanRT[ch].allocated) allocChan(ch);
+}
 function allocRTs(){
   for(const ch of CHANNELS){
     const c = chanRT[ch];
-    for(const k of ["fbPrev","fbNext","crt","flowA","flowB","flowSrc","gen","out"]) freeRT(c[k]);
-    clearRing(c);
-    c.fbPrev = makeRT(procW,procH); c.fbNext = makeRT(procW,procH);
-    c.crt    = makeRT(procW,procH);
-    c.flowA  = makeRT(procW,procH); c.flowB  = makeRT(procW,procH);
-    c.flowSrc= makeRT(procW,procH); c.gen = makeRT(procW,procH);
-    c.out    = makeRT(procW,procH);
+    if(c.allocated) allocChan(ch);
+    else { for(const k of CH_RTS) freeRT(c[k]); clearRing(c); }
   }
   freeRT(scratch1); freeRT(scratch2); freeRT(mixOut); freeRT(busOut1); freeRT(busOut2);
   freeRT(persistA); freeRT(persistB);
@@ -1779,11 +1790,21 @@ function allocRTs(){
   busOut1 = makeRT(procW,procH); busOut2 = makeRT(procW,procH);
   persistA = makeRT(procW,procH); persistB = makeRT(procW,procH);
 }
+const MAX_TEX = gl.getParameter(gl.MAX_TEXTURE_SIZE);
 function setProcRes(h){
-  procH = h; procW = Math.round(h*16/9/2)*2;
+  const w = Math.round(h*16/9/2)*2;
+  if(w > MAX_TEX){
+    if(typeof toast === "function") toast("This machine tops out at "+MAX_TEX+" pixels wide", true);
+    return false;
+  }
+  procH = h; procW = w;
+  /* the frame store is the one thing that scales badly: thirty 4K frames is
+     four gigabytes, so the ring gets shorter as the raster gets bigger */
+  RING_N = h >= 2160 ? 6 : h >= 1440 ? 12 : h >= 1080 ? 20 : 30;
   allocRTs();
+  return true;
 }
-setProcRes(720);
+setProcRes(1080);
 
 function makeSrcTex(){
   const t = gl.createTexture();
@@ -1797,6 +1818,9 @@ function makeSrcTex(){
 }
 const srcTex = {};
 for(const ch of CHANNELS) srcTex[ch] = makeSrcTex();
+/* stand-in for a channel that has not been allocated yet */
+const blackTex = makeSrcTex();
+function chanOutTex(ch){ const c = chanRT[ch]; return (c.allocated && c.out) ? c.out.tex : blackTex; }
 
 /* per-scanline sync model texture (written by CPU each frame) */
 const SROWS = 576;

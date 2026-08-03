@@ -14,5 +14,5 @@ out = (p1[:idx]
   + p1[idx:]
   + body
   + '</' + 'script>\n</body>\n</html>\n')
-open('bendr.html', 'w').write(out)
-print('built bendr.html,', len(out), 'bytes')
+open('index.html', 'w').write(out)
+print('built index.html,', len(out), 'bytes')

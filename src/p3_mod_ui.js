@@ -368,6 +368,13 @@ function sectionExtras(id, d){
     mkToggle(tr, "keyMode", ()=>"KEY: "+(keyChroma?"CHROMA":"LUMA"), ()=>{ keyChroma=!keyChroma; });
     d.appendChild(tr);
   }
+  if(id==="frame"){
+    const tr = document.createElement("div"); tr.className="trow";
+    const EDGES = ["BLACK","TILE","MIRROR"];
+    mkToggle(tr, "edgeMode", ()=>"EDGE: "+EDGES[edgeMode], ()=>{ edgeMode=(edgeMode+1)%3; });
+    tr.title = "What appears beyond the picture edge when zoomed out, shifted or rotated";
+    d.appendChild(tr);
+  }
 }
 
 /* ---- audio react section: band ranges, gains, response, live meters ---- */

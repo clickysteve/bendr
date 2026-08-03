@@ -56,6 +56,7 @@ function randomizeAll(){
     let v;
     const r = Math.random();
     if(p.sec==="crt"){ v = p.base; }
+    else if(p.sec==="frame"){ v = Math.random()<0.7 ? p.def : p.def + (Math.random()*2-1)*0.3*(p.max-p.min); }
     else if(p.id==="fbAmount"){ v = Math.random()<0.5 ? Math.random()*0.5 : 0.5+Math.random()*0.45; }
     else if(p.id==="vRoll"){ v = Math.random()<0.75 ? 0 : (Math.random()*2-1)*0.3; }
     else if(p.id==="saturation"){ v = 0.6+Math.random()*1.6; }
@@ -99,7 +100,7 @@ function captureState(){
   const bases = {}; for(const p of PLIST) bases[p.id]=p.base;
   const st = {bases, routes: routes.map(r=>({...r})),
     audioCfg: JSON.parse(JSON.stringify(audioCfg)),
-    fbTrailMode, rescanMode, chainSwap, keyChroma, mixMode};
+    fbTrailMode, rescanMode, chainSwap, keyChroma, mixMode, edgeMode};
   for(const k of LFOKEYS) st[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   return st;
 }
@@ -108,6 +109,7 @@ function restoreState(st){
   if(st.chainSwap !== undefined) chainSwap = st.chainSwap;
   if(st.keyChroma !== undefined) keyChroma = st.keyChroma;
   if(st.mixMode !== undefined) mixMode = st.mixMode;
+  if(st.edgeMode !== undefined) edgeMode = st.edgeMode;
   applyState(st.bases||{}, st.routes||[], st);
   refreshToggles();
 }
@@ -124,7 +126,7 @@ document.getElementById("btnUndo").onclick = undo;
 /* save / load */
 document.getElementById("btnSave").onclick = ()=>{
   const bases = {}; for(const p of PLIST) bases[p.id]=p.base;
-  const state = {app:"bendr", v:3, bases, routes, audioCfg, fbTrailMode, rescanMode, chainSwap, keyChroma, mixMode};
+  const state = {app:"bendr", v:3, bases, routes, audioCfg, fbTrailMode, rescanMode, chainSwap, keyChroma, mixMode, edgeMode};
   for(const k of LFOKEYS) state[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape};
   const blob = new Blob([JSON.stringify(state,null,1)], {type:"application/json"});
   dl(URL.createObjectURL(blob), "bendr-"+stamp()+".json");
@@ -375,55 +377,56 @@ document.getElementById("btnFull").onclick = ()=>{
   else w.requestFullscreen();
 };
 
-/* pop-out output window — clean feed for OBS / second display */
-let popWin = null;
+/* pop-out output window — the app itself opened in #output receiver mode.
+   The popout runs its own render-driving loop, so fullscreening it (which
+   occludes and throttles this window) no longer freezes the picture. */
+let popWin = null, outStream = null, outTrack = null;
+window.__getOutputStream = ()=>{
+  if(!outStream){
+    outStream = canvas.captureStream(0);   // frames pushed manually every tick
+    outTrack = outStream.getVideoTracks()[0];
+  }
+  return outStream;
+};
 const btnPop = document.getElementById("btnPop");
 btnPop.onclick = ()=>{
   if(popWin && !popWin.closed){ popWin.close(); popWin = null; btnPop.classList.remove("on"); return; }
-  popWin = window.open("", "bendr_output", "width=1280,height=720");
-  if(!popWin){ toast("Popup blocked — allow popups for this page", true); return; }
-  const pd = popWin.document;
-  pd.title = "BENDR — OUTPUT";
-  pd.body.style.cssText = "margin:0;background:#000;overflow:hidden;cursor:none;";
-  const pv = pd.createElement("video");
-  pv.muted = true; pv.autoplay = true; pv.playsInline = true;
-  pv.style.cssText = "width:100vw;height:100vh;object-fit:contain;display:block;";
-  pv.srcObject = canvas.captureStream(60);
-  pd.body.appendChild(pv);
-  pv.play().catch(()=>{});
-  pv.ondblclick = ()=>{
-    if(pd.fullscreenElement) pd.exitFullscreen();
-    else pv.requestFullscreen().catch(()=>{});
-  };
+  if(location.protocol.indexOf("http") === 0){
+    /* served over http(s): open the app itself in #output receiver mode (clean URL) */
+    popWin = window.open(location.href.split("#")[0]+"#output", "bendr_output", "width=1280,height=720");
+    if(!popWin){ toast("Popup blocked — allow popups for this page", true); return; }
+  } else {
+    /* file:// — separate files are cross-origin, so build the output page in-window */
+    popWin = window.open("", "bendr_output", "width=1280,height=720");
+    if(!popWin){ toast("Popup blocked — allow popups for this page", true); return; }
+    const pd = popWin.document;
+    pd.title = "BENDR — OUTPUT";
+    pd.body.style.cssText = "margin:0;background:#000;overflow:hidden;cursor:none;";
+    const pv = pd.createElement("video");
+    pv.muted = true; pv.autoplay = true; pv.playsInline = true;
+    pv.style.cssText = "width:100vw;height:100vh;object-fit:contain;display:block;";
+    pv.srcObject = window.__getOutputStream();
+    pd.body.appendChild(pv);
+    pv.play().catch(()=>{});
+    pv.ondblclick = ()=>{
+      if(pd.fullscreenElement) pd.exitFullscreen();
+      else pv.requestFullscreen().catch(()=>{});
+    };
+    /* drive the render loop from the popout: when it goes fullscreen and occludes
+       the main window, Chrome throttles the main rAF — the popout keeps ticking */
+    const w = popWin;
+    (function drive(){
+      if(!w || w.closed) return;
+      try{ w.requestAnimationFrame(drive); }catch(e){ return; }
+      doTick();
+    })();
+  }
   const closePoll = setInterval(()=>{
     if(!popWin || popWin.closed){ clearInterval(closePoll); popWin = null; btnPop.classList.remove("on"); }
   }, 800);
   btnPop.classList.add("on");
-  toast("Output window open — point OBS at it (double-click it for fullscreen)");
+  toast("Output window open — double-click it for fullscreen, or point OBS at it");
 };
-
-/* bypass */
-const btnBypass = document.getElementById("btnBypass");
-function setBypass(v){ bypass = v?1:0; btnBypass.classList.toggle("on", v); }
-btnBypass.onmousedown = ()=>setBypass(true);
-btnBypass.onmouseup = btnBypass.onmouseleave = ()=>setBypass(false);
-
-/* MIDI button */
-document.getElementById("btnMidi").onclick = e=>{
-  midiLearnMode = !midiLearnMode;
-  e.target.classList.toggle("on", midiLearnMode);
-  if(midiLearnMode){ initMidi(); toast("MIDI learn ON — click a parameter name, then move a knob"); }
-  else { midiLearnTarget=null; for(const id in uiRefs) uiRefs[id].label.classList.remove("learn"); }
-};
-
-/* audio + res selectors */
-document.getElementById("selAudio").onchange = e=> setAudioMode(e.target.value);
-document.getElementById("selRes").onchange = e=> setProcRes(parseInt(e.target.value));
-
-/* help */
-const help = document.getElementById("help");
-document.getElementById("btnHelp").onclick = ()=> help.classList.add("show");
-help.onclick = ()=> help.classList.remove("show");
 
 /* big performance randomize/mutate pads */
 document.getElementById("bigRand").onclick = randomizeAll;
@@ -591,6 +594,7 @@ function updateContentAnalysis(dt){
 function sizeCanvas(){
   if(offline) return;
   const wrap = document.getElementById("canvasWrap");
+  if(!wrap) return;
   const dpr = Math.min(window.devicePixelRatio||1, 2);
   const w = Math.floor(wrap.clientWidth*dpr), h = Math.floor(wrap.clientHeight*dpr);
   if(canvas.width!==w || canvas.height!==h){ canvas.width=w; canvas.height=h; }
@@ -699,6 +703,7 @@ function renderFrame(now, dt){
   gl.uniform1f(U(progFB,"u_fbMode"), fbTrailMode?1:0);
   gl.uniform1f(U(progFB,"u_mixMode"), mixMode);
   gl.uniform1f(U(progFB,"u_keyMode"), keyChroma?1:0);
+  gl.uniform1f(U(progFB,"u_edgeMode"), edgeMode);
   setParamUniforms(progFB);
   draw();
 
@@ -755,13 +760,22 @@ function renderFrame(now, dt){
   }
 }
 
-function frame(){
-  requestAnimationFrame(frame);
+let lastTickMs = 0;
+function doTick(){
   if(offline) return;
-  const now = performance.now()/1000;
+  const nowMs = performance.now();
+  if(nowMs - lastTickMs < 6) return;   // both windows may drive; render once per ~frame
+  lastTickMs = nowMs;
+  const now = nowMs/1000;
   let dt = now-lastT; lastT = now;
   dt = Math.min(dt, 0.1);
   renderFrame(now, dt);
+  if(outTrack && outTrack.requestFrame){ try{ outTrack.requestFrame(); }catch(e){} }
+}
+window.__tick = doTick;
+function frame(){
+  requestAnimationFrame(frame);
+  doTick();
 }
 
 /* ---------------- offline MP4 render (WebCodecs) ---------------- */
@@ -845,9 +859,40 @@ async function offlineRender(){
 
 /* ---------------- init ---------------- */
 window.__dbg = ()=>({inputMode, rs:video.readyState, err:video.error&&video.error.message, vw:video.videoWidth, hasSrc, srcAspect, cur:video.currentTime, paused:video.paused, rate:video.playbackRate, spd:playSpeed});
-buildPanel();
-renderRoutes();
-loadPreset(1);   /* BROADCAST DECAY so it looks alive immediately */
-sizeCanvas();
-requestAnimationFrame(frame);
-toast("BENDR ready — drop a video anywhere, or press H for help");
+
+/* ---------------- init ---------------- */
+const OUTPUT_MODE = (location.hash === "#output") && !!window.opener;
+if(OUTPUT_MODE){
+  /* this window is a clean output monitor: show the opener's canvas stream
+     and drive the opener's render loop so the picture never freezes, even
+     when the main window is fully occluded (e.g. this one is fullscreen). */
+  document.title = "BENDR — OUTPUT";
+  document.body.innerHTML = "";
+  document.body.style.cssText = "margin:0;background:#000;overflow:hidden;cursor:none;";
+  const pv = document.createElement("video");
+  pv.muted = true; pv.autoplay = true; pv.playsInline = true;
+  pv.style.cssText = "width:100vw;height:100vh;object-fit:contain;display:block;";
+  document.body.appendChild(pv);
+  const hookStream = ()=>{
+    try{
+      pv.srcObject = window.opener.__getOutputStream();
+      pv.play().catch(()=>{});
+    }catch(e){ setTimeout(hookStream, 300); }
+  };
+  hookStream();
+  pv.ondblclick = ()=>{
+    if(document.fullscreenElement) document.exitFullscreen();
+    else pv.requestFullscreen().catch(()=>{});
+  };
+  (function driveLoop(){
+    requestAnimationFrame(driveLoop);
+    try{ if(window.opener && !window.opener.closed && window.opener.__tick) window.opener.__tick(); }catch(e){}
+  })();
+} else {
+  buildPanel();
+  renderRoutes();
+  loadPreset(1);   /* RAINBOW RITE so it looks alive immediately */
+  sizeCanvas();
+  requestAnimationFrame(frame);
+  toast("BENDR ready — drop a video anywhere, or press H for help");
+}

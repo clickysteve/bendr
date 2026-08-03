@@ -29,19 +29,29 @@ const FS_FB = COMMON + KEYFN +
 "uniform float u_srcAspect,u_srcBAspect,u_hasSrc,u_hasB,u_hasDelay,u_time,u_mixMode,u_keyMode;\n" +
 "uniform float u_fbAmount,u_fbZoom,u_fbRotate,u_fbHue,u_fbShiftX,u_fbShiftY,u_fbMode;\n" +
 "uniform float u_abMix,u_echo,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFb;\n" +
+"uniform float u_srcZoom,u_srcX,u_srcY,u_srcRot,u_edgeMode;\n" +
 "vec3 fitSample(sampler2D tx, vec2 uv, float srcA, float outA){\n" +
 "  vec2 p = uv-0.5;\n" +
 "  if(srcA>outA){ p.y *= srcA/outA; } else { p.x *= outA/srcA; }\n" +
 "  p += 0.5;\n" +
-"  if(p.x<0.0||p.x>1.0||p.y<0.0||p.y>1.0) return vec3(0.0);\n" +
+"  if(u_edgeMode>1.5){ vec2 t = fract(p*0.5)*2.0; p = 1.0-abs(t-1.0); }\n" +
+"  else if(u_edgeMode>0.5){ p = fract(p); }\n" +
+"  else if(p.x<0.0||p.x>1.0||p.y<0.0||p.y>1.0) return vec3(0.0);\n" +
 "  return texture(tx, p).rgb;\n}\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  float outA = u_res.x/u_res.y;\n" +
-"  vec3 a = (u_hasSrc>0.5) ? fitSample(u_src, uv, u_srcAspect, outA) : vec3(0.0);\n" +
+"  /* frame transform: position / zoom / rotate the picture inside the raster */\n" +
+"  vec2 fuv = uv-0.5;\n" +
+"  float fa = u_srcRot*3.14159;\n" +
+"  float fc = cos(fa), fs = sin(fa);\n" +
+"  fuv = mat2(fc,-fs,fs,fc)*fuv;\n" +
+"  fuv /= pow(3.0, u_srcZoom);\n" +
+"  fuv += 0.5 - vec2(u_srcX, u_srcY)*0.6;\n" +
+"  vec3 a = (u_hasSrc>0.5) ? fitSample(u_src, fuv, u_srcAspect, outA) : vec3(0.0);\n" +
 "  vec3 src = a;\n" +
 "  if(u_hasB>0.5 && u_abMix>0.001){\n" +
-"    vec3 b = fitSample(u_srcB, uv, u_srcBAspect, outA);\n" +
+"    vec3 b = fitSample(u_srcB, fuv, u_srcBAspect, outA);\n" +
 "    float m;\n" +
 "    if(u_mixMode<0.5) m = u_abMix;\n" +
 "    else m = u_abMix * keyOf(a, (u_mixMode<1.5)?0.0:1.0, u_keyHue, u_keyThresh, u_keySoft, u_keyInv);\n" +
@@ -73,6 +83,7 @@ const FS_SIG = COMMON + KEYFN +
 "uniform float u_vrollpos,u_humpos;\n" +
 "uniform float u_jitter,u_humBar;\n" +
 "uniform float u_chromaBleed,u_chromaDelay,u_rainbow,u_dotCrawl,u_ringing,u_signalNoise,u_chromaNoise;\n" +
+"uniform float u_lumaBleed,u_bleedDir,u_vBleed;\n" +
 "uniform float u_dropout,u_genLoss;\n" +
 "uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx;\n" +
 "float lum(vec2 p){ return dot(texture(u_tex, fract(p)).rgb, vec3(0.299,0.587,0.114)); }\n" +
@@ -114,6 +125,30 @@ const FS_SIG = COMMON + KEYFN +
 "  float ys = 0.25*(lum(suv-vec2(3.0*px,0.0)) + lum(suv+vec2(3.0*px,0.0)) + lum(suv-vec2(6.0*px,0.0)) + lum(suv+vec2(6.0*px,0.0)));\n" +
 "  y = mix(y, ys, u_genLoss*0.7);\n" +
 "  iq *= 1.0 - u_genLoss*0.45;\n" +
+"  /* luma bleed: hot signal smears along the scan direction */\n" +
+"  if(u_lumaBleed>0.003){\n" +
+"    float bdir = (u_bleedDir>=0.0)?1.0:-1.0;\n" +
+"    float bstep = (2.0+9.0*abs(u_bleedDir))*px*bdir;\n" +
+"    float fall = 0.22*(1.05-u_lumaBleed);\n" +
+"    float acc = y;\n" +
+"    for(int k=1;k<=6;k++){\n" +
+"      float tk = lum(suv - vec2(float(k)*bstep, 0.0)) - float(k)*fall;\n" +
+"      acc = max(acc, tk);\n" +
+"    }\n" +
+"    y = mix(y, acc, min(1.0, u_lumaBleed*1.4));\n" +
+"  }\n" +
+"  /* vertical bleed: colour drips across scanlines */\n" +
+"  if(u_vBleed>0.003){\n" +
+"    float pyx = 1.0/u_res.y;\n" +
+"    vec2 iqv = vec2(0.0);\n" +
+"    float wsum = 0.0;\n" +
+"    for(int k=1;k<=4;k++){\n" +
+"      float w = 1.0/float(k);\n" +
+"      iqv += w*rgb2yiq(texture(u_tex, fract(suv + vec2(0.0, float(k)*(1.0+u_vBleed*5.0)*pyx))).rgb).yz;\n" +
+"      wsum += w;\n" +
+"    }\n" +
+"    iq = mix(iq, iqv/wsum, u_vBleed*0.75);\n" +
+"  }\n" +
 "  /* ---- analogue noise: bandwidth-limited along the line, streaky by row ---- */\n" +
 "  float nx = suv.x*u_res.x/3.5;\n" +
 "  float nseed = rowI*7.13 + floor(t*61.0)*13.7;\n" +
@@ -232,6 +267,7 @@ const FS_CRT = COMMON +
 /* ---------------- parameter registry ---------------- */
 const SECTIONS = [
   {id:"mixer",    name:"MIXER A / B",       cls:"mag"},
+  {id:"frame",    name:"FRAME / POSITION",  cls:"mag"},
   {id:"enhancer", name:"BENT ENHANCER",     cls:"mag"},
   {id:"feedback", name:"FEEDBACK / RESCAN", cls:"mag"},
   {id:"time",     name:"TIME BASE",         cls:"mag"},
@@ -245,6 +281,11 @@ const SECTIONS = [
 const PDEF = [
   ["abMix","A>B MIX","mixer",0,1,0],
   ["morph","MORPH A>B","mixer",0,1,0],
+
+  ["srcZoom","ZOOM","frame",-1,1,0],
+  ["srcX","POS X","frame",-1,1,0],
+  ["srcY","POS Y","frame",-1,1,0],
+  ["srcRot","ROTATE","frame",-1,1,0],
 
   ["echo","ECHO","time",0,1,0],
   ["delayF","DELAY FRM","time",1,9,3],
@@ -275,6 +316,9 @@ const PDEF = [
 
   ["chromaBleed","CHR BLEED","signal",0,1,0.25],
   ["chromaDelay","CHR DELAY","signal",-1,1,0],
+  ["lumaBleed","LUMA BLEED","signal",0,1,0],
+  ["bleedDir","BLEED DIR","signal",-1,1,0.5],
+  ["vBleed","V BLEED","signal",0,1,0],
   ["rainbow","RAINBOW","signal",0,1,0.1],
   ["dotCrawl","DOT CRAWL","signal",0,1,0.1],
   ["ringing","RINGING","signal",0,1,0.15],
@@ -322,6 +366,7 @@ let rescanMode = false;    // true = feedback taps the CRT-processed output (ful
 let chainSwap = false;     // true = colour/enhancer stage runs BEFORE the tape/sync stage
 let keyChroma = false;     // keyer mode: false=luma true=chroma
 let mixMode = 0;           // A/B mixer: 0=fade 1=luma key 2=chroma key
+let edgeMode = 0;          // frame edge: 0=black 1=tile 2=mirror
 
 /* ---------------- GL engine ---------------- */
 const canvas = document.getElementById("glcanvas");

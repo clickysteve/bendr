@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BENDR — circuit-bent video processor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --bg:#0a0a0e; --panel:#131318; --panel2:#191922; --line:#26262f;
+  --txt:#c9c9d4; --dim:#6d6d7c; --amber:#ff7a18; --cyan:#2ee6d6; --mag:#ff3ea5;
+  --red:#ff3b30; --font:"SF Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%; overflow:hidden;}
+body{
+  background:var(--bg); color:var(--txt); font-family:var(--font); font-size:11px;
+  display:flex; flex-direction:column; user-select:none;
+}
+/* ---------- header ---------- */
+#hdr{
+  height:46px; flex:0 0 46px; display:flex; align-items:center; gap:10px;
+  padding:0 12px; border-bottom:1px solid var(--line); background:var(--panel);
+}
+#logo{font-size:15px; font-weight:700; letter-spacing:2px; color:var(--amber); white-space:nowrap;}
+#logo b{color:var(--cyan); font-weight:700;}
+#logo small{display:block; font-size:8px; letter-spacing:1.5px; color:var(--dim); font-weight:400;}
+.hgrp{display:flex; align-items:center; gap:4px;}
+.hsep{width:1px; height:24px; background:var(--line); margin:0 4px;}
+#hdr .spacer{flex:1;}
+button, select{
+  font-family:var(--font); font-size:10px; letter-spacing:0.5px;
+  background:var(--panel2); color:var(--txt); border:1px solid var(--line);
+  padding:5px 9px; cursor:pointer; border-radius:3px; outline:none;
+}
+button:hover{border-color:var(--amber); color:#fff;}
+button.on{background:var(--amber); color:#000; border-color:var(--amber); font-weight:700;}
+button.rec-on{background:var(--red); color:#fff; border-color:var(--red); font-weight:700;}
+button.cy{border-color:#1d4d48;}
+button.cy.on{background:var(--cyan); color:#000; border-color:var(--cyan);}
+select{appearance:none; -webkit-appearance:none; padding-right:16px;
+  background-image:linear-gradient(45deg, transparent 50%, var(--dim) 50%),linear-gradient(135deg, var(--dim) 50%, transparent 50%);
+  background-position:calc(100% - 9px) 55%, calc(100% - 5px) 55%; background-size:4px 4px; background-repeat:no-repeat;}
+#recTime{color:var(--red); font-weight:700; min-width:44px; display:none;}
+/* ---------- layout ---------- */
+#main{flex:1; display:flex; min-height:0;}
+#panel{
+  width:308px; flex:0 0 308px; overflow-y:auto; background:var(--panel);
+  border-right:1px solid var(--line); padding-bottom:40px;
+}
+#panel::-webkit-scrollbar{width:8px;} #panel::-webkit-scrollbar-thumb{background:#2a2a34; border-radius:4px;}
+.sec{border-bottom:1px solid var(--line); padding:8px 10px 10px;}
+.sec h3{
+  font-size:9px; letter-spacing:2.5px; color:var(--amber); font-weight:700;
+  padding:2px 0 6px; display:flex; align-items:center; gap:6px;
+}
+.sec h3 .led{width:5px; height:5px; border-radius:50%; background:var(--amber); box-shadow:0 0 5px var(--amber);}
+.sec.cyan h3{color:var(--cyan);} .sec.cyan h3 .led{background:var(--cyan); box-shadow:0 0 5px var(--cyan);}
+.sec.mag h3{color:var(--mag);} .sec.mag h3 .led{background:var(--mag); box-shadow:0 0 5px var(--mag);}
+.prow{display:flex; align-items:center; gap:8px; padding:2px 0; position:relative;}
+.prow label{
+  width:76px; flex:0 0 76px; color:var(--dim); font-size:9.5px; letter-spacing:0.5px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;
+}
+.prow label:hover{color:var(--txt);}
+.prow label.learn{color:#000; background:var(--mag); border-radius:2px; padding:0 3px;}
+.prow label.mapped::after{content:"·"; color:var(--mag); font-weight:700;}
+.prow .val{width:38px; flex:0 0 38px; text-align:right; color:var(--txt); font-size:9.5px;}
+.sldwrap{flex:1; position:relative; height:16px; display:flex; align-items:center;}
+input[type=range]{
+  -webkit-appearance:none; appearance:none; width:100%; height:16px; background:transparent; cursor:ew-resize; margin:0;
+}
+input[type=range]::-webkit-slider-runnable-track{height:3px; background:#2a2a34; border-radius:2px;}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:11px; height:11px; margin-top:-4px; border-radius:2px;
+  background:var(--amber); border:1px solid #000; box-shadow:0 0 4px rgba(255,122,24,.6);
+}
+input[type=range]::-moz-range-track{height:3px; background:#2a2a34; border-radius:2px;}
+input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; background:var(--amber); border:1px solid #000;}
+.modtick{
+  position:absolute; top:1px; width:2px; height:14px; background:var(--cyan);
+  box-shadow:0 0 4px var(--cyan); pointer-events:none; display:none; left:0;
+}
+/* toggle rows */
+.trow{display:flex; gap:6px; padding:4px 0 2px; flex-wrap:wrap;}
+.trow button{padding:4px 8px; font-size:9px;}
+/* ---------- stage ---------- */
+#stage{flex:1; display:flex; flex-direction:column; min-width:0; background:#000;}
+#canvasWrap{flex:1; position:relative; min-height:0; background:#000; overflow:hidden;}
+#glcanvas{position:absolute; top:0; left:0; width:100%; height:100%; display:block;}
+#canvasWrap:fullscreen{background:#000;}
+#canvasWrap:fullscreen #glcanvas{width:100vw; height:100vh;}
+#dropHint{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  pointer-events:none; opacity:0; transition:opacity .15s; background:rgba(10,10,14,.75);
+  border:2px dashed var(--amber); z-index:5; font-size:14px; letter-spacing:2px; color:var(--amber);
+}
+#dropHint.show{opacity:1;}
+#osd{
+  position:absolute; left:10px; bottom:10px; color:var(--cyan); font-size:10px; letter-spacing:1px;
+  text-shadow:0 0 6px rgba(46,230,214,.8); pointer-events:none; z-index:4; opacity:.85;
+}
+/* transport */
+#transport{
+  flex:0 0 34px; display:flex; align-items:center; gap:8px; padding:0 10px;
+  background:var(--panel); border-top:1px solid var(--line);
+}
+#seek{flex:1;}
+#tcode{color:var(--dim); min-width:100px; text-align:right; font-size:9.5px;}
+/* bends + matrix */
+#lower{flex:0 0 auto; display:flex; border-top:1px solid var(--line); background:var(--panel); max-height:190px;}
+#bends{flex:0 0 auto; padding:10px; border-right:1px solid var(--line); display:flex; flex-direction:column; gap:6px;}
+#bends h4, #matrix h4{font-size:8.5px; letter-spacing:2px; color:var(--dim); padding-bottom:2px;}
+.bendbtns{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
+.bend{
+  padding:10px 6px; font-size:9.5px; font-weight:700; letter-spacing:1px; text-align:center;
+  background:var(--panel2); border:1px solid #3a2a1a; color:var(--amber); border-radius:4px; cursor:pointer;
+}
+.bend:active, .bend.held{background:var(--amber); color:#000; box-shadow:0 0 12px rgba(255,122,24,.7);}
+.bend small{display:block; font-size:7.5px; color:var(--dim); font-weight:400; letter-spacing:0;}
+.bend:active small, .bend.held small{color:#402000;}
+#matrix{flex:1; padding:10px; overflow-y:auto; min-width:0;}
+#matrix::-webkit-scrollbar{width:8px;} #matrix::-webkit-scrollbar-thumb{background:#2a2a34;}
+.mrow{display:flex; align-items:center; gap:6px; padding:2px 0;}
+.mrow select{font-size:9px; padding:3px 14px 3px 5px;}
+.mrow .src{width:86px;} .mrow .dst{width:120px;}
+.mrow input[type=range]{flex:1;}
+.mrow .mamt{width:30px; text-align:right; color:var(--cyan); font-size:9px;}
+.mrow .rm{padding:2px 6px; color:var(--dim);}
+.mrow .rm:hover{color:var(--red); border-color:var(--red);}
+/* overlays */
+#help{
+  position:fixed; inset:0; background:rgba(6,6,10,.92); z-index:50; display:none;
+  align-items:center; justify-content:center;
+}
+#help.show{display:flex;}
+#helpBox{
+  width:560px; max-width:92vw; max-height:86vh; overflow-y:auto; background:var(--panel);
+  border:1px solid var(--amber); border-radius:6px; padding:22px 26px; font-size:11px; line-height:1.65;
+}
+#helpBox h2{color:var(--amber); letter-spacing:2px; font-size:14px; padding-bottom:8px;}
+#helpBox h3{color:var(--cyan); letter-spacing:1px; font-size:11px; padding:10px 0 3px;}
+#helpBox kbd{background:#22222c; border:1px solid var(--line); border-radius:3px; padding:1px 5px; font-size:10px;}
+#helpBox p{color:var(--txt); padding:2px 0;}
+#toast{
+  position:fixed; top:56px; right:14px; z-index:60; display:flex; flex-direction:column; gap:6px; pointer-events:none;
+}
+.toastmsg{
+  background:var(--panel2); border:1px solid var(--cyan); color:var(--txt); padding:8px 12px;
+  border-radius:4px; font-size:10px; max-width:340px; animation:tfade 4s forwards;
+}
+.toastmsg.err{border-color:var(--red); color:#ffb0ab;}
+@keyframes tfade{0%{opacity:0; transform:translateX(10px);}6%{opacity:1; transform:none;}80%{opacity:1;}100%{opacity:0;}}
+audio,video{display:none;}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
+  <div class="hsep"></div>
+  <div class="hgrp">
+    <button id="btnFile" title="Load channel A video (any size — it streams from disk)">FILE A</button>
+    <button id="btnFileB" title="Load channel B video for the A/B mixer">B</button>
+    <button id="btnCam" title="Use webcam on channel A">CAM</button>
+    <button id="btnPat" title="Built-in test pattern on channel A">PATTERN</button>
+    <select id="selPat" title="Test pattern type">
+      <option value="bars">BARS</option>
+      <option value="testcard">TESTCARD</option>
+      <option value="osc">OSCILLATOR</option>
+      <option value="grid">GRID</option>
+      <option value="ramp">RAMP</option>
+      <option value="static">STATIC</option>
+    </select>
+  </div>
+  <div class="hsep"></div>
+  <div class="hgrp">
+    <span style="color:var(--dim); font-size:9px;">AUDIO</span>
+    <select id="selAudio" title="Audio-reactive source">
+      <option value="off">OFF</option>
+      <option value="source">SOURCE</option>
+      <option value="mic">MIC</option>
+    </select>
+    <select id="selRes" title="Internal processing resolution">
+      <option value="360">360p</option>
+      <option value="540">540p</option>
+      <option value="720" selected>720p</option>
+      <option value="1080">1080p</option>
+    </select>
+  </div>
+  <div class="hsep"></div>
+  <div class="hgrp">
+    <select id="selPreset"></select>
+    <button id="btnUndo" class="cy" title="Undo last randomize / mutate / preset change (Z)">UNDO</button>
+    <button id="btnSave" title="Export current state as .json">SAVE</button>
+    <button id="btnLoad" title="Import a saved .json state">OPEN</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="hgrp">
+    <button id="btnMidi" title="MIDI learn: toggle, then click a parameter name, then move a knob">MIDI</button>
+    <button id="btnBypass" title="Hold to see the clean signal (B)">BYPASS</button>
+    <button id="btnSnap" title="Save a PNG still (S)">SNAP</button>
+    <button id="btnRec" title="Record output live to WebM (R)">● REC</button>
+    <button id="btnRender" title="Offline render channel A to MP4 — frame-accurate, no dropped frames">RENDER</button>
+    <span id="recTime">0:00</span>
+    <button id="btnPop" title="Pop out a clean output window — capture it with OBS or drag to a second display">POP OUT</button>
+    <button id="btnFull" title="Fullscreen output (F)">FULL</button>
+    <button id="btnHelp" title="Help (H)">?</button>
+  </div>
+</div>
+<div id="main">
+  <div id="panel"></div>
+  <div id="stage">
+    <div id="canvasWrap">
+      <canvas id="glcanvas"></canvas>
+      <div id="osd"></div>
+      <div id="dropHint">DROP VIDEO / PRESET</div>
+    </div>
+    <div id="transport">
+      <button id="btnPlay">❚❚</button>
+      <button id="btnLoop" class="on" title="Loop playback">LOOP</button>
+      <span style="color:var(--dim); font-size:9px;">SPD</span>
+      <input type="range" id="spd" min="0.1" max="2" step="0.05" value="1" style="width:90px;" title="Playback speed">
+      <input type="range" id="seek" min="0" max="1" step="0.001" value="0">
+      <span id="tcode">--:-- / --:--</span>
+    </div>
+    <div id="lower">
+      <div id="bends">
+        <h4>BEND — HOLD THESE</h4>
+        <div class="bendbtns">
+          <button class="bend" data-bend="sync">SYNC<small>hold Q</small></button>
+          <button class="bend" data-bend="roll">ROLL<small>hold W</small></button>
+          <button class="bend" data-bend="rainbow">RAINBOW<small>hold E</small></button>
+          <button class="bend" data-bend="drop">DROPOUT<small>hold R</small></button>
+          <button class="bend" data-bend="melt">MELT<small>hold T</small></button>
+          <button class="bend" data-bend="kill">V-HOLD<small>hold Y</small></button>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button id="bigRand" class="bend" style="flex:1; border-color:#1d4d48; color:var(--cyan);">RANDOMIZE<small>Space</small></button>
+          <button id="bigMut" class="bend" style="flex:1; border-color:#1d4d48; color:var(--cyan);">MUTATE<small>M</small></button>
+        </div>
+      </div>
+      <div id="matrix">
+        <h4>MOD MATRIX — PATCH SOURCES INTO ANY PARAMETER <button id="btnAddRoute" style="margin-left:8px; padding:2px 8px;">+ ROUTE</button></h4>
+        <div id="routes"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="help"><div id="helpBox">
+  <h2>BENDR</h2>
+  <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
+  <h3>INPUT</h3>
+  <p><b>FILE</b> loads any video your browser can play (drag &amp; drop works too — files stream from disk, so size doesn't matter). <b>CAM</b> uses your webcam. <b>PATTERN</b> is a built-in test signal — pick BARS, TESTCARD, OSCILLATOR (video-synth colour waves), GRID, RAMP or STATIC from the dropdown.</p>
+  <h3>SIGNAL PATH</h3>
+  <p>Feedback → composite/NTSC encode-decode → sync &amp; tape damage → bent enhancer → colour stage → CRT. The <b>BENT ENHANCER</b> section is the circuit-bent video enhancer core: RAINBOW MAP replaces luma with hot posterized rainbows, EDGE RING is the sharpness circuit driven into oscillation (repeating ghost edges), RGB SPLIT tears the channels apart, LUMA HUE makes colour chase brightness, INV FLICKER strobes inversions.</p>
+  <h3>MOVEMENT</h3>
+  <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch four LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
+  <h3>PERFORMANCE</h3>
+  <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
+  <h3>MIXER, KEYER &amp; TIME BASE</h3>
+  <p>Load a second video with <b>B</b> and blend with A&gt;B MIX — FADE, LUMA KEY or CHROMA KEY modes. The <b>KEYER</b> splits the image by brightness (or hue): KEY&gt;FX applies the glitch chain only inside the key, KEY&gt;FB grows feedback only inside the key. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor. CHAIN swaps whether tape damage or the colour/enhancer stage comes first.</p>
+  <h3>VIDEO-REACTIVE</h3>
+  <p>MOTION, BRIGHT and CUT are mod sources computed from the picture itself — patch CUT into TEAR and every edit knocks the sync loose like a real deck.</p>
+  <h3>TEMPO &amp; MIDI</h3>
+  <p>TAP sets the tempo; LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
+  <h3>KEYS</h3>
+  <p><kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>1</kbd>–<kbd>9</kbd> presets &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> snapshot &nbsp; <kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>H</kbd> this help</p>
+  <h3>OUTPUT</h3>
+  <p><b>REC</b> captures the live output (with source audio when AUDIO=SOURCE) to a WebM file. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
+  <p style="padding-top:10px; color:var(--dim);">Click anywhere to close.</p>
+</div></div>
+<div id="toast"></div>
+<div id="renderOv" style="display:none; position:fixed; inset:0; z-index:80; background:rgba(6,6,10,.9); flex-direction:column; align-items:center; justify-content:center; gap:16px;">
+  <div id="renderTxt" style="color:var(--amber); font-size:14px; letter-spacing:2px;">RENDERING…</div>
+  <div style="width:400px; height:6px; background:#22222c; border-radius:3px; overflow:hidden;"><div id="renderBar" style="height:100%; width:0%; background:var(--amber);"></div></div>
+  <button id="btnRenderCancel">CANCEL</button>
+</div>
+<input type="file" id="fileIn" accept="video/*,.json" style="display:none">
+<script>
+"use strict";
+/* ============================================================
+   BENDR — single-file circuit-bent video processor
+   ============================================================ */

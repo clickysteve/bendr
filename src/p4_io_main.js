@@ -429,6 +429,17 @@ function stopCam(ch){
 }
 function syncChanInputUI(){
   const S = cur();
+  const gen = (S.mode === "pattern" || S.mode === "text");
+  /* a generated source has no file to seek, loop or mute — grey those out
+     rather than leaving dead controls sitting there */
+  for(const [id, off] of [["btnPlay",gen],["btnLoop",gen],["btnMute",gen],["btnVari",gen],["seek",gen]]){
+    const el = document.getElementById(id);
+    if(!el) continue;
+    el.disabled = off;
+    el.classList.toggle("dim", off);
+    el.title = off ? "Not available on a generated source — load a file into this channel" : "";
+  }
+  for(const q of document.querySelectorAll(".mchan")) q.textContent = activeChan;
   document.getElementById("btnFile").classList.toggle("on", S.mode==="file");
   document.getElementById("btnCam").classList.toggle("on", S.mode==="cam");
   document.getElementById("btnPat").classList.toggle("on", S.mode==="pattern");
@@ -1684,6 +1695,8 @@ if(OUTPUT_MODE){
     renderChain();
   };
   renderRoutes();
+  wireMenus();
+  wireDataTips();
   loadPreset(1);   /* RAINBOW RITE so it looks alive immediately */
   sizeCanvas();
   requestAnimationFrame(frame);

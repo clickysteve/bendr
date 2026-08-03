@@ -37,6 +37,47 @@ body{
   border-radius:3px; padding:2px 6px; white-space:nowrap; align-self:center;
 }
 .hgrp{display:flex; align-items:center; gap:4px;}
+/* ---------- header menus ---------- */
+.menu{position:relative;}
+.menubtn{letter-spacing:1.5px;}
+.menubtn i{font-style:normal; color:var(--dim); font-size:9px;}
+.menu.open .menubtn{background:var(--panel2); border-color:var(--amber); color:#fff;}
+.menupanel{
+  display:none; position:absolute; top:calc(100% + 7px); left:0; z-index:60;
+  flex-direction:column; gap:5px; min-width:210px; padding:9px 9px 11px;
+  background:var(--panel2); border:1px solid var(--line); border-radius:5px;
+  box-shadow:0 10px 30px rgba(0,0,0,.65);
+}
+.menu.open .menupanel{display:flex;}
+.menupanel select{width:100%;}
+.menupanel > button{width:100%;}
+.mrow2{display:flex; gap:5px;}
+.mrow2 > button{flex:1 1 0; min-width:0;}
+.mlabel{font-size:7.5px; letter-spacing:1.5px; color:var(--dim); padding:3px 0 0;}
+.mlabel .mchan{color:var(--amber);}
+/* ---------- hover tooltip ---------- */
+#tip{
+  position:fixed; z-index:200; display:none; max-width:330px; pointer-events:none;
+  background:#14141c; border:1px solid var(--line); border-left:2px solid var(--amber);
+  border-radius:4px; padding:7px 9px; font-size:10px; line-height:1.45; color:var(--txt);
+  box-shadow:0 8px 26px rgba(0,0,0,.7);
+}
+#tip b{color:var(--amber); letter-spacing:1px; display:block; padding-bottom:3px; font-size:9px;}
+#tip i{color:var(--dim); font-style:normal; display:block; padding-top:5px; font-size:8.5px;}
+/* toggle buttons keep their width when the label changes length */
+.trow{display:flex; gap:5px; padding:2px 0;}
+.trow > button{flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; padding:5px 4px; font-size:9px;}
+.trow > select{flex:1 1 0; min-width:0;}
+/* per-control reset */
+.prst{
+  flex:0 0 auto; opacity:0; padding:0 3px; border:none; background:none; color:var(--dim);
+  font-size:11px; line-height:1; cursor:pointer; transition:opacity .1s;
+}
+.prow:hover .prst{opacity:.75;}
+.prst:hover{color:var(--amber); opacity:1; border:none;}
+button.dim, input.dim, select.dim{opacity:.32; cursor:not-allowed;}
+button.dim:hover{border-color:var(--line); color:var(--txt);}
+
 .hsep{width:1px; height:24px; background:var(--line); margin:0 4px;}
 #hdr .spacer{flex:1;}
 button, select{
@@ -93,8 +134,6 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
   box-shadow:0 0 4px var(--cyan); pointer-events:none; display:none; left:0;
 }
 /* toggle rows */
-.trow{display:flex; gap:6px; padding:4px 0 2px; flex-wrap:wrap;}
-.trow button{padding:4px 8px; font-size:9px;}
 /* collapsible sections */
 .sec h3{cursor:pointer; user-select:none;}
 .sec h3 .caret{color:var(--dim); font-size:8px; width:8px; display:inline-block; transition:transform .12s;}
@@ -451,64 +490,98 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v14.0</span>
+  <span id="ver" title="Build version">v15.0</span>
 
-  <div class="hgrp" data-lab="SOURCE">
-    <button id="btnFile" title="Load a video file into this channel">FILE</button>
-    <button id="btnCam" title="Webcam on this channel">CAM</button>
-    <button id="btnPat" title="Test pattern / video-synth source">PATTERN</button>
-    <select id="selPat" title="Pattern type">
-      <option value="bars">BARS</option>
-      <option value="testcard">TESTCARD</option>
-      <option value="osc">OSCILLATOR</option>
-      <option value="grid">GRID</option>
-      <option value="ramp">RAMP</option>
-      <option value="static">STATIC</option>
-      <option value="hramp">H RAMP</option>
-      <option value="vramp">V RAMP</option>
-      <option value="radial">RADIAL</option>
-      <option value="oscbars">OSC BARS</option>
-      <option value="plasma">PLASMA</option>
-      <option value="lissa">LISSAJOUS</option>
-      <option value="checker">CHECKER</option>
-    </select>
-    <button id="btnText" title="Text / shape generator (opens the dock below)">TEXT</button>
+  <div class="menu" id="mnuSource">
+    <button class="menubtn" data-tip="Choose what this channel is looking at. Each channel has its own source.">SOURCE <i>&#9662;</i></button>
+    <div class="menupanel">
+      <div class="mlabel">INPUT FOR CHANNEL <span class="mchan">A</span></div>
+      <div class="mrow2">
+        <button id="btnFile" data-tip="Load a video file into this channel. Files stream from disk, so a 4GB movie is no heavier than a small one. Drag and drop onto the picture works too.">FILE</button>
+        <button id="btnCam" data-tip="Use a webcam or capture device as this channel's source.">CAM</button>
+      </div>
+      <div class="mrow2">
+        <button id="btnPat" data-tip="Use a built-in generated test signal as this channel's source. No file needed.">PATTERN</button>
+        <button id="btnText" data-tip="Turn this channel into a text and shape generator. Opens the editor in the dock below the picture.">TEXT</button>
+      </div>
+      <div class="mlabel">PATTERN</div>
+      <select id="selPat" data-tip="Which generated pattern this channel produces. OSCILLATOR, PLASMA and LISSAJOUS are video-synth style sources with no camera involved.">
+        <option value="bars">BARS</option>
+        <option value="testcard">TESTCARD</option>
+        <option value="osc">OSCILLATOR</option>
+        <option value="grid">GRID</option>
+        <option value="ramp">RAMP</option>
+        <option value="static">STATIC</option>
+        <option value="hramp">H RAMP</option>
+        <option value="vramp">V RAMP</option>
+        <option value="radial">RADIAL</option>
+        <option value="oscbars">OSC BARS</option>
+        <option value="plasma">PLASMA</option>
+        <option value="lissa">LISSAJOUS</option>
+        <option value="checker">CHECKER</option>
+      </select>
+    </div>
   </div>
 
-  <div class="hgrp" data-lab="PATCH">
-    <select id="selPreset"></select>
-    <button id="btnUndo" class="cy" title="Undo (Z)">UNDO</button>
-    <button id="btnInit" title="Init patch — everything to defaults">INIT</button>
-    <button id="btnSave" title="Save patch as .json">SAVE</button>
-    <button id="btnLoad" title="Open a saved patch">OPEN</button>
+  <div class="menu" id="mnuPatch">
+    <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
+    <div class="menupanel">
+      <div class="mrow2">
+        <button id="btnUndo" class="cy" data-tip="Step back through the last two dozen changes. Keyboard: Z.">UNDO</button>
+        <button id="btnInit" data-tip="Init patch: every control back to its default, both buses, all four channels. Undoable.">INIT</button>
+      </div>
+      <div class="mrow2">
+        <button id="btnSave" data-tip="Save the whole rig - every channel, every route, LFO and toggle - as a .json patch file.">SAVE</button>
+        <button id="btnLoad" data-tip="Open a saved .json patch. You can also drop one onto the picture.">OPEN</button>
+      </div>
+    </div>
   </div>
 
-  <div class="hgrp" data-lab="ENGINE">
-    <select id="selAudio" title="Audio-reactive source">
-      <option value="off">AUDIO OFF</option>
-      <option value="source">AUD: SOURCE</option>
-      <option value="mic">AUD: INPUT</option>
-    </select>
-    <select id="selRes" title="Internal processing resolution">
-      <option value="360">360p</option>
-      <option value="540">540p</option>
-      <option value="720" selected>720p</option>
-      <option value="1080">1080p</option>
-    </select>
-    <button id="btnMod" title="Modulation dock (D)">MOD</button>
-    <button id="btnMidi" title="MIDI learn">MIDI</button>
+  <div class="menu" id="mnuEngine">
+    <button class="menubtn" data-tip="Processing resolution, audio input, modulation and MIDI.">ENGINE <i>&#9662;</i></button>
+    <div class="menupanel">
+      <div class="mlabel">AUDIO REACT</div>
+      <select id="selAudio" data-tip="Where the audio-reactive mod sources listen. SOURCE analyses the loaded video's own soundtrack; INPUT uses a microphone or audio interface.">
+        <option value="off">AUDIO OFF</option>
+        <option value="source">AUD: SOURCE</option>
+        <option value="mic">AUD: INPUT</option>
+      </select>
+      <div class="mlabel">PROCESS RESOLUTION</div>
+      <select id="selRes" data-tip="The internal raster everything is processed at, independent of your window size. Lower is faster and coarser; the scanline and mask geometry scale with it.">
+        <option value="360">360p</option>
+        <option value="540">540p</option>
+        <option value="720" selected>720p</option>
+        <option value="1080">1080p</option>
+      </select>
+      <div class="mrow2">
+        <button id="btnMod" data-tip="Open the modulation page in the dock: every LFO, chaos, drift, spike, audio band and video-reactive source drawn live, with what each is driving. Keyboard: D.">MOD</button>
+        <button id="btnMidi" data-tip="MIDI learn. Turn it on, click a parameter name, then move a hardware knob to map it. MIDI clock overrides tap tempo; notes C1-F1 fire the bend pads.">MIDI</button>
+      </div>
+    </div>
   </div>
 
-  <div class="hgrp" data-lab="OUTPUT">
-    <button id="btnBypass" title="Hold for the clean signal (B)">BYPASS</button>
-    <button id="btnSnap" title="PNG still (S)">SNAP</button>
-    <button id="btnRec" title="Record output (R)">● REC</button>
-    <span id="recTime">0:00</span>
-    <button id="btnRender" title="Offline frame-accurate MP4 render of channel A">RENDER</button>
-    <button id="btnPop" title="Pop-out output window for OBS or a second display">POP OUT</button>
-    <button id="btnFull" title="Fullscreen (F)">FULL</button>
-    <button id="btnHelp" title="Help (H)">?</button>
+  <div class="menu" id="mnuOut">
+    <button class="menubtn" data-tip="Stills, offline render and the clean output window.">OUTPUT <i>&#9662;</i></button>
+    <div class="menupanel">
+      <div class="mrow2">
+        <button id="btnSnap" data-tip="Save the current frame as a PNG at the processing resolution. Keyboard: S.">SNAP</button>
+        <button id="btnRender" data-tip="Offline render: steps channel A through the file frame by frame and encodes every frame at full quality regardless of realtime speed. Video only - use REC if you need the audio.">RENDER</button>
+      </div>
+      <div class="mrow2">
+        <button id="btnPop" data-tip="Open a second window showing only the output, no interface. Point OBS at it or drag it to a projector. Double-click it for fullscreen.">POP OUT</button>
+        <button id="btnHelp" data-tip="The full manual. Keyboard: H.">?</button>
+      </div>
+    </div>
   </div>
+
+  <div class="hsep"></div>
+  <select id="selPreset" data-tip="Sixty-six starting points. Presets load into the channel you are editing (or all of them with LINK on). Keyboard 1-9 for the first nine."></select>
+
+  <div class="spacer"></div>
+  <button id="btnBypass" data-tip="Hold to hear the clean signal - shows the source with the whole chain switched out, so you can see what you have actually done. Keyboard: hold B.">BYPASS</button>
+  <button id="btnRec" data-tip="Record the live output to a file, with the source audio when AUDIO is set to SOURCE. MP4 where the browser allows it, WebM otherwise. Keyboard: R.">&#9679; REC</button>
+  <span id="recTime">0:00</span>
+  <button id="btnFull" data-tip="Fullscreen the picture. Keyboard: F.">FULL</button>
 </div>
 <div id="main">
   <div id="panel"></div>
@@ -519,7 +592,7 @@ audio,video{display:none;}
       <span class="fixed">FEEDBACK</span><span class="arrow">▸</span>
       <span id="chainStages" style="display:flex; align-items:center; gap:6px;"></span>
       <span class="arrow">▸</span><span class="fixed">CRT OUT</span>
-      <button id="btnChainReset" style="margin-left:8px; padding:3px 8px; font-size:8.5px;">RESET ORDER</button>
+      <button id="btnChainReset" style="margin-left:8px; padding:3px 8px; font-size:8.5px;" data-tip="Back to the default stage order: tape, colour, glitch, signal lab, flow.">RESET ORDER</button>
     </div>
     <div id="canvasWrap">
       <canvas id="glcanvas"></canvas>
@@ -527,12 +600,12 @@ audio,video{display:none;}
       <div id="dropHint">DROP VIDEO / PRESET</div>
     </div>
     <div id="transport">
-      <button id="btnPlay">❚❚</button>
-      <button id="btnLoop" class="on" title="Loop playback">LOOP</button>
-      <button id="btnMute" title="Mute file audio (audio-reactivity keeps working)">MUTE</button>
-      <button id="btnVari" title="Varispeed: pitch follows speed like tape (off = time-stretch)">VARI</button>
+      <button id="btnPlay" data-tip="Play or pause this channel's file. Keyboard: P.">❚❚</button>
+      <button id="btnLoop" class="on" data-tip="Loop the file on this channel when it reaches the end.">LOOP</button>
+      <button id="btnMute" data-tip="Mute the file's audio out of the speakers. Audio-reactive modulation keeps working, and recordings still capture the sound.">MUTE</button>
+      <button id="btnVari" data-tip="Varispeed: the pitch follows the speed the way tape does. Off, the browser time-stretches and holds the pitch.">VARI</button>
       <span style="color:var(--dim); font-size:9px;">SPD</span>
-      <input type="range" id="spd" min="0.1" max="2" step="0.05" value="1" style="width:90px;" title="Playback speed — double-click to reset to 1x. Resets when you load a new file.">
+      <input type="range" id="spd" min="0.05" max="4" step="0.05" value="1" style="width:90px;" data-tip="Playback speed for this channel. It also drives the generated patterns and the text scroll, so it works whether or not a file is loaded. Double-click to reset to 1x; it resets on its own when you load a new file.">
       <input type="range" id="seek" min="0" max="1" step="0.001" value="0">
       <span id="tcode">--:-- / --:--</span>
     </div>
@@ -541,29 +614,29 @@ audio,video{display:none;}
       <div id="bends">
         <h4>BEND — HOLD THESE</h4>
         <div class="bendbtns">
-          <button class="bend" data-bend="sync">SYNC<small>hold Q</small></button>
-          <button class="bend" data-bend="roll">ROLL<small>hold W</small></button>
-          <button class="bend" data-bend="rainbow">RAINBOW<small>hold E</small></button>
-          <button class="bend" data-bend="drop">DROPOUT<small>hold R</small></button>
-          <button class="bend" data-bend="melt">MELT<small>hold T</small></button>
-          <button class="bend" data-bend="kill">V-HOLD<small>hold Y</small></button>
+          <button class="bend" data-bend="sync" data-tip="Momentary: slams the sync circuit out of lock while held, then it recovers. Bend pads apply to the channel you are editing (all of them with LINK on).">SYNC<small>hold Q</small></button>
+          <button class="bend" data-bend="roll" data-tip="Momentary: breaks vertical hold so the picture rolls, with the blanking bar travelling through it.">ROLL<small>hold W</small></button>
+          <button class="bend" data-bend="rainbow" data-tip="Momentary: floods the picture with the enhancer's rainbow colour mapping.">RAINBOW<small>hold E</small></button>
+          <button class="bend" data-bend="drop" data-tip="Momentary: heavy tape dropout and tracking failure while held.">DROPOUT<small>hold R</small></button>
+          <button class="bend" data-bend="melt" data-tip="Momentary: the picture melts and smears through the flow stage while held.">MELT<small>hold T</small></button>
+          <button class="bend" data-bend="kill" data-tip="Momentary: total collapse - sync, tracking and vertical hold all at once.">V-HOLD<small>hold Y</small></button>
         </div>
         <div style="display:flex; gap:6px;">
-          <button id="bigRand" class="bend" style="flex:1; border-color:#1d4d48; color:var(--cyan);">RANDOMIZE<small>Space</small></button>
-          <button id="bigMut" class="bend" style="flex:1; border-color:#1d4d48; color:var(--cyan);">MUTATE<small>M</small></button>
+          <button id="bigRand" class="bend" style="flex:1; border-color:#1d4d48; color:var(--cyan);" data-tip="Rolls a whole new patch: every parameter, a handful of new mod routes, new LFO rates, sometimes a new chain order. Weighted so the results are usable rather than uniformly random. Z undoes it.">RANDOMIZE<small>Space</small></button>
+          <button id="bigMut" class="bend" style="flex:1; border-color:#1d4d48; color:var(--cyan);" data-tip="Nudges every control on this channel by a small random amount instead of replacing them. Press it repeatedly to drift somewhere new without losing what you have.">MUTATE<small>M</small></button>
         </div>
       </div>
       <div id="dock">
         <div id="dockTabs">
-          <button data-dock="matrix" class="on">MATRIX</button>
-          <button data-dock="mod">MOD</button>
-          <button data-dock="text">TEXT</button>
+          <button data-dock="matrix" class="on" data-tip="The mod matrix: patch any source into any parameter, on any channel.">MATRIX</button>
+          <button data-dock="mod" data-tip="Every modulation source drawn live, with editable rates and shapes and a list of what each one is driving.">MOD</button>
+          <button data-dock="text" data-tip="The text and shape generator for this channel. Typing here never triggers keyboard shortcuts.">TEXT</button>
           <span style="flex:1;"></span>
           <span id="dockHint"></span>
         </div>
         <div id="dockBody">
       <div id="matrix">
-        <h4>MOD MATRIX — PATCH SOURCES INTO ANY PARAMETER <button id="btnAddRoute" style="margin-left:8px; padding:2px 8px;">+ ROUTE</button></h4>
+        <h4>MOD MATRIX — PATCH SOURCES INTO ANY PARAMETER <button id="btnAddRoute" style="margin-left:8px; padding:2px 8px;" data-tip="Add a modulation route: pick a source, a channel, a destination parameter and an amount. Right-clicking a parameter does the same thing faster.">+ ROUTE</button></h4>
         <div id="routes"></div>
       </div>
       <div id="modgrid"></div>
@@ -657,7 +730,7 @@ audio,video{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v14.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v15.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
@@ -699,6 +772,8 @@ audio,video{display:none;}
   <p><b>Right-click any parameter</b> to patch a modulator straight onto it, adjust the amount, or remove it. The <b>MOD</b> button (or <kbd>D</kbd>) opens the modulation page: every source drawn live, LFO rate/shape/sync editable in place, and each card lists what it's driving.</p>
   <h3>TEMPO &amp; MIDI</h3>
   <p>TAP sets the tempo; LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
+  <h3>FINDING YOUR WAY AROUND</h3>
+  <p>Hover any parameter name and you get a description of what it does and enough of the mechanism to know why it behaves the way it does. The same works on section headers, mode buttons, the bend pads and the menus. To reset one control, double-click its slider or press the <b>&#8634;</b> that appears when you hover the row; shift-clicking that takes it to the bottom of its range instead. RESET at the top of a section does the whole section, INIT does everything. Sections drag by the handle on the left to reorder, and the order is remembered.</p>
   <h3>KEYS</h3>
   <p><kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>1</kbd>–<kbd>9</kbd> presets &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> snapshot &nbsp; <kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>H</kbd> this help</p>
   <h3>OUTPUT</h3>
@@ -711,6 +786,7 @@ audio,video{display:none;}
   <button data-mtab="matrix">MATRIX</button>
   <button data-mtab="video">VIDEO</button>
 </div>
+<div id="tip"></div>
 <div id="toast"></div>
 <div id="renderOv" style="display:none; position:fixed; inset:0; z-index:80; background:rgba(6,6,10,.9); flex-direction:column; align-items:center; justify-content:center; gap:16px;">
   <div id="renderTxt" style="color:var(--amber); font-size:14px; letter-spacing:2px;">RENDERING…</div>

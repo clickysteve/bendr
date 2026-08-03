@@ -1,3 +1,74 @@
+
+/* reset one control: default, or the bottom of its range with shift */
+function resetParam(p, toMin){
+  const v = toMin ? p.min : p.def;
+  pushHistory();
+  setBase(p.id, v);
+  if(p.master) morphOverride.add("M:"+p.id);
+  else if(linkChans){ for(const ch of CHANNELS) morphOverride.add(ch+":"+p.id); }
+  else morphOverride.add(activeChan+":"+p.id);
+  const r = uiRefs[p.id];
+  if(r){ r.slider.value = v; r.val.textContent = fmt(p, v); }
+}
+
+/* ---------------- header menus ---------------- */
+function closeMenus(except){
+  for(const m of document.querySelectorAll(".menu")) if(m !== except) m.classList.remove("open");
+}
+function wireMenus(){
+  for(const m of document.querySelectorAll(".menu")){
+    const btn = m.querySelector(".menubtn");
+    if(!btn || btn.__wired) continue;
+    btn.__wired = true;
+    btn.addEventListener("click", e=>{
+      e.stopPropagation();
+      const open = m.classList.contains("open");
+      closeMenus();
+      if(!open) m.classList.add("open");
+      hideTip();
+    });
+    m.querySelector(".menupanel").addEventListener("click", e=>e.stopPropagation());
+  }
+  addEventListener("click", ()=>closeMenus());
+  addEventListener("keydown", e=>{ if(e.key === "Escape") closeMenus(); });
+}
+
+/* ---------------- hover tooltips ---------------- */
+const tipEl = document.getElementById("tip");
+let tipTimer = null;
+function showTip(el, html){
+  if(!tipEl) return;
+  tipEl.innerHTML = html;
+  tipEl.style.display = "block";
+  const r = el.getBoundingClientRect();
+  const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  let x = r.left, y = r.bottom + 7;
+  if(x + w > innerWidth - 8) x = Math.max(8, innerWidth - w - 8);
+  if(y + h > innerHeight - 8) y = Math.max(8, r.top - h - 7);
+  tipEl.style.left = x+"px"; tipEl.style.top = y+"px";
+}
+function hideTip(){ if(tipTimer){ clearTimeout(tipTimer); tipTimer=null; } if(tipEl) tipEl.style.display="none"; }
+/* attach a tooltip: title is bolded, body follows, foot is dimmed */
+function attachTip(el, title, body, foot){
+  el.addEventListener("mouseenter", ()=>{
+    if(tipTimer) clearTimeout(tipTimer);
+    tipTimer = setTimeout(()=>{
+      showTip(el, (title?"<b>"+title+"</b>":"") + (body||"") + (foot?"<i>"+foot+"</i>":""));
+    }, 260);
+  });
+  el.addEventListener("mouseleave", hideTip);
+  el.addEventListener("mousedown", hideTip);
+}
+/* anything with data-tip gets one automatically */
+function wireDataTips(root){
+  for(const el of (root||document).querySelectorAll("[data-tip]")){
+    if(el.__tipped) continue;
+    el.__tipped = true;
+    attachTip(el, el.dataset.tipTitle || "", el.dataset.tip);
+  }
+}
+addEventListener("scroll", hideTip, true);
+
 /* ---------------- toast ---------------- */
 function toast(msg, err){
   const d = document.createElement("div");
@@ -288,7 +359,7 @@ function buildChanBar(){
     b.className = "chanbtn ch"+ch;
     b.dataset.chan = ch;
     b.innerHTML = "<b>"+ch+"</b><small>CHANNEL</small>";
-    b.title = "Edit channel "+ch+"'s inputs and effects";
+    attachTip(b, "CHANNEL "+ch, "Everything below this bar - the source, the framing, the whole effect chain and the bend pads - belongs to the channel selected here. Channels A and B feed mixer bus 1; C and D feed bus 2.", "Sections tagged MASTER are shared across all four.");
     b.onclick = ()=>{ setActiveChan(ch); };
     return b;
   };
@@ -297,11 +368,11 @@ function buildChanBar(){
   tools.className = "chantools";
   const lk = document.createElement("button");
   lk.id = "btnLinkChans"; lk.textContent = "LINK";
-  lk.title = "Edit both channels at once";
+  attachTip(lk, "LINK", "Edits all four channels at once, so every slider and every bend pad moves them together.");
   lk.onclick = ()=>{ linkChans = !linkChans; lk.classList.toggle("on", linkChans); };
   const cp = document.createElement("button");
   cp.textContent = "COPY \u2192";
-  cp.title = "Copy this channel's settings to its partner on the same bus (A\u2194B, C\u2194D)";
+  attachTip(cp, "COPY", "Copies this channel's effect settings onto its partner on the same bus: A to B, or C to D. Sources are left alone.");
   cp.onclick = ()=>{
     pushHistory();
     const other = BUSPAIR[activeChan];
@@ -310,7 +381,7 @@ function buildChanBar(){
   };
   const sw = document.createElement("button");
   sw.textContent = "SWAP";
-  sw.title = "Swap this channel with its partner on the same bus (A\u2194B, C\u2194D)";
+  attachTip(sw, "SWAP", "Exchanges this channel with its partner on the same bus, sources as well as effects - so whatever was sitting on top swaps places.");
   sw.onclick = ()=>{
     pushHistory();
     const other = BUSPAIR[activeChan];
@@ -340,13 +411,14 @@ function buildPanel(){
     h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+sec.name+tag;
     const rb = document.createElement("button");
     rb.className = "secreset"; rb.textContent = "RESET";
-    rb.title = "Reset this section to defaults";
+    attachTip(rb, "RESET SECTION", "Returns every control in this section to its default, on the channel you are editing.", "Individual controls reset with a double-click, or the \u21ba that appears when you hover the row.");
     rb.onclick = e=>{ e.stopPropagation(); resetSection(sec.id); };
     h.appendChild(rb);
     h.title = "Click to collapse / expand \u00b7 drag the handle to reorder";
     h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
     d.appendChild(h);
     makeSectionDraggable(d, h, sec.id);
+    if(SECHELP[sec.id]) attachTip(h, sec.name, SECHELP[sec.id], "Click to collapse \u00b7 drag the handle to reorder \u00b7 RESET returns the whole section to defaults");
     const body = document.createElement("div"); body.className = "secbody";
     d.appendChild(body);
     secEls[sec.id] = d;
@@ -355,8 +427,10 @@ function buildPanel(){
     for(const p of PLIST.filter(p=>p.sec===sec.id)){
       const row = document.createElement("div"); row.className="prow";
       const lab = document.createElement("label"); lab.textContent = p.name;
-      lab.title = "Right-click to patch a modulator \u00b7 click while MIDI learn is on to map a controller";
+      attachTip(lab, p.name, PHELP[p.id] || "",
+        "Double-click the slider or press \u21ba to reset \u00b7 right-click to patch a modulator \u00b7 click while MIDI learn is on to map a controller");
       lab.onclick = ()=>{ if(midiLearnMode){ setLearnTarget(p.id); } };
+      lab.addEventListener("dblclick", ()=>resetParam(p));
       row.addEventListener("contextmenu", e=>{ e.preventDefault(); openModMenu(e, p); });
       const wrap = document.createElement("div"); wrap.className="sldwrap";
       const s = document.createElement("input");
@@ -378,7 +452,11 @@ function buildPanel(){
       const tick = document.createElement("div"); tick.className="modtick";
       wrap.appendChild(s); wrap.appendChild(tick);
       const val = document.createElement("span"); val.className="val"; val.textContent = fmt(p,getBase(p.id));
-      row.appendChild(lab); row.appendChild(wrap); row.appendChild(val);
+      const rst = document.createElement("button"); rst.className="prst"; rst.textContent="\u21ba";
+      attachTip(rst, "RESET " + p.name, "Back to the default ("+fmt(p,p.def)+").",
+        "Shift-click for the bottom of the range ("+fmt(p,p.min)+"). Double-clicking the slider does the same as a plain click.");
+      rst.onclick = e=>{ e.stopPropagation(); resetParam(p, e.shiftKey); };
+      row.appendChild(lab); row.appendChild(wrap); row.appendChild(val); row.appendChild(rst);
       d2.appendChild(row);
       uiRefs[p.id] = {slider:s, val, tick, row, label:lab};
     }
@@ -649,8 +727,8 @@ function mkSection(id, cls, name){
   const d = document.createElement("div"); d.className = "sec "+cls;
   const h = document.createElement("h3");
   h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+name;
-  h.title = "Click to collapse / expand \u00b7 drag the handle to reorder";
   h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
+  if(SECHELP[id]) attachTip(h, name, SECHELP[id], "Click to collapse \u00b7 drag the handle to reorder");
   d.appendChild(h);
   const body = document.createElement("div"); body.className = "secbody";
   d.appendChild(body);
@@ -668,10 +746,14 @@ function saveCollapse(){
   }catch(e){}
 }
 function loadCollapse(){
-  try{
-    const st = JSON.parse(localStorage.getItem("bendr.collapse")||"{}");
-    for(const k in st) if(secEls[k] && st[k]) secEls[k].classList.add("collapsed");
-  }catch(e){}
+  let st = null;
+  try{ st = JSON.parse(localStorage.getItem("bendr.collapse")); }catch(e){}
+  if(!st){
+    /* first run: the second bus and the master crossfade are folded away, since
+       they do nothing until you bring channels C and D in */
+    st = {mixer2:true, mixerM:true};
+  }
+  for(const k in st) if(secEls[k] && st[k]) secEls[k].classList.add("collapsed");
 }
 function collapseAll(v){
   for(const k in secEls) secEls[k].classList.toggle("collapsed", v);
@@ -776,9 +858,10 @@ function resetSection(id){
 
 /* ---- section toggle rows ---- */
 const toggleRefs = {};
-function mkToggle(parent, id, labelFn, onClick){
+function mkToggle(parent, id, labelFn, onClick, tip){
   const b = document.createElement("button");
   b.textContent = labelFn();
+  if(tip) attachTip(b, labelFn().split(":")[0].trim(), tip);
   b.onclick = ()=>{ onClick(); b.textContent = labelFn(); };
   parent.appendChild(b);
   toggleRefs[id] = {btn:b, labelFn};
@@ -812,9 +895,9 @@ function sectionExtras(id, d){
       if(which===1) mixMode = v; else if(which===2) mixMode2 = v; else mixModeM = v;
     };
     tr.appendChild(sel);
-    if(which===1) mkToggle(tr, "wipeInv", ()=>"WIPE: "+(wipeInv?"INV":"NORM"), ()=>{ wipeInv=!wipeInv; });
-    if(which===2) mkToggle(tr, "wipeInv2", ()=>"WIPE: "+(wipeInv2?"INV":"NORM"), ()=>{ wipeInv2=!wipeInv2; });
-    if(which===3) mkToggle(tr, "wipeInvM", ()=>"WIPE: "+(wipeInvM?"INV":"NORM"), ()=>{ wipeInvM=!wipeInvM; });
+    if(which===1) mkToggle(tr, "wipeInv", ()=>"WIPE: "+(wipeInv?"INV":"NORM"), ()=>{ wipeInv=!wipeInv; }, "Runs the wipe from the other side.");
+    if(which===2) mkToggle(tr, "wipeInv2", ()=>"WIPE: "+(wipeInv2?"INV":"NORM"), ()=>{ wipeInv2=!wipeInv2; }, "Runs the wipe from the other side.");
+    if(which===3) mkToggle(tr, "wipeInvM", ()=>"WIPE: "+(wipeInvM?"INV":"NORM"), ()=>{ wipeInvM=!wipeInvM; }, "Runs the wipe from the other side.");
     d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
@@ -847,18 +930,18 @@ function sectionExtras(id, d){
     const bm = document.createElement("button"); bm.textContent="MODE: MIX"; bm.id="fbModeBtn";
     bm.onclick = ()=>{ fbTrailMode=!fbTrailMode; bm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX"); };
     tr.appendChild(bm);
-    mkToggle(tr, "rescan", ()=>"RESCAN: "+(rescanMode?"FULL":"CLEAN"), ()=>{ rescanMode=!rescanMode; });
+    mkToggle(tr, "rescan", ()=>"RESCAN: "+(rescanMode?"FULL":"CLEAN"), ()=>{ rescanMode=!rescanMode; }, "CLEAN taps the loop before the display stage. FULL taps it after, so scanlines, mask, curvature and bloom all go back round \u2014 the software equivalent of pointing a camera at the monitor it is feeding.");
     d.appendChild(tr);
     const tr2 = document.createElement("div"); tr2.className="trow";
-    const WRAPS=["CLAMP","REPEAT","MIRROR"], MIRS=["NONE","MIRROR H","MIRROR V","QUAD"],
-          BLENDS=["MIX","ADD","SCREEN","MAX/NAM","MIN","DIFFERENCE"], NLS=["CLAMP","SOFT/TANH","WRAP","FOLD"];
-    mkToggle(tr2, "fbWrap", ()=>"EDGE: "+WRAPS[fbWrap], ()=>{ fbWrap=(fbWrap+1)%3; });
-    mkToggle(tr2, "fbMirror", ()=>MIRS[fbMirror], ()=>{ fbMirror=(fbMirror+1)%4; });
+    const WRAPS=["CLAMP","REPEAT","MIRROR"], MIRS=["NO MIRROR","MIRROR H","MIRROR V","QUAD"],
+          BLENDS=["MIX","ADD","SCREEN","MAX","MIN","DIFF"], NLS=["CLAMP","SOFT","WRAP","FOLD"];
+    mkToggle(tr2, "fbWrap", ()=>"EDGE: "+WRAPS[fbWrap], ()=>{ fbWrap=(fbWrap+1)%3; }, "What the loop does with picture that lands outside the frame. CLAMP smears the edge inward and builds tunnels; REPEAT tiles it into lattices; MIRROR reflects it into mandalas. This one choice decides the whole family of shapes the loop can make.");
+    mkToggle(tr2, "fbMirror", ()=>MIRS[fbMirror], ()=>{ fbMirror=(fbMirror+1)%4; }, "Mirrors the fed-back image about the centre before it re-enters, forcing symmetry into the loop. QUAD mirrors both axes.");
     d.appendChild(tr2);
     const tr3 = document.createElement("div"); tr3.className="trow";
-    mkToggle(tr3, "fbBlend", ()=>"INJECT: "+BLENDS[fbBlend], ()=>{ fbBlend=(fbBlend+1)%6; });
-    mkToggle(tr3, "fbNL", ()=>"CURVE: "+NLS[fbNL], ()=>{ fbNL=(fbNL+1)%4; });
-    mkToggle(tr3, "fbInvert", ()=>"INVERT: "+(fbInvert?"ON":"OFF"), ()=>{ fbInvert=!fbInvert; });
+    mkToggle(tr3, "fbBlend", ()=>"INJECT: "+BLENDS[fbBlend], ()=>{ fbBlend=(fbBlend+1)%6; }, "How the live picture is injected into the loop each pass. MIX crossfades; ADD and SCREEN build brightness; MAX keeps the brighter of the two, which is what gives long non-fading trails; DIFF subtracts, and is where the harsh psychedelic looks come from.");
+    mkToggle(tr3, "fbNL", ()=>"CURVE: "+NLS[fbNL], ()=>{ fbNL=(fbNL+1)%4; }, "The non-linearity applied every pass, and the most important structural choice after EDGE. CLAMP simply limits; SOFT saturates gently; WRAP folds values that leave the range back round to the other end, which makes hard banded structure; FOLD reflects them, which makes smoother interference.");
+    mkToggle(tr3, "fbInvert", ()=>"INVERT: "+(fbInvert?"ON":"OFF"), ()=>{ fbInvert=!fbInvert; }, "Inverts the picture on every pass, so the loop alternates polarity and structures strobe.");
     d.appendChild(tr3);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
@@ -868,7 +951,7 @@ function sectionExtras(id, d){
   if(id==="lab"){
     const tr = document.createElement("div"); tr.className="trow";
     const FIELDS=["H RAMP","V RAMP","RADIAL","H SINE","NOISE"];
-    mkToggle(tr, "fieldSrc", ()=>"FIELD: "+FIELDS[fieldSrc], ()=>{ fieldSrc=(fieldSrc+1)%5; });
+    mkToggle(tr, "fieldSrc", ()=>"FIELD: "+FIELDS[fieldSrc], ()=>{ fieldSrc=(fieldSrc+1)%5; }, "The shape of the modulation field: a horizontal or vertical ramp, radial from the centre, a sine, or noise.");
     d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
@@ -878,7 +961,7 @@ function sectionExtras(id, d){
   if(id==="crt"){
     const tr = document.createElement("div"); tr.className="trow";
     const MODELS=["FLAT / RAW","APERTURE GRILLE","SLOT MASK","SHADOW MASK","LCD STRIPE","MONO MONITOR","GREEN SCREEN"];
-    mkToggle(tr, "outModel", ()=>"DISPLAY: "+MODELS[outModel], ()=>{ outModel=(outModel+1)%7; });
+    mkToggle(tr, "outModel", ()=>"DISPLAY: "+MODELS[outModel], ()=>{ outModel=(outModel+1)%7; }, "Which display the output is drawn on. Each model has its own phosphor mask geometry, so the same picture reads as an aperture-grille tube, a shadow mask, an LCD panel or a mono monitor.");
     d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
@@ -887,8 +970,8 @@ function sectionExtras(id, d){
   }
   if(id==="keyer"){
     const tr = document.createElement("div"); tr.className="trow";
-    mkToggle(tr, "keyMode", ()=>"KEY: "+(keyChroma?"CHROMA":"LUMA"), ()=>{ keyChroma=!keyChroma; });
-    mkToggle(tr, "showKey", ()=>"VIEW MATTE: "+(showKeyMatte?"ON":"OFF"), ()=>{ showKeyMatte=!showKeyMatte; });
+    mkToggle(tr, "keyMode", ()=>"KEY: "+(keyChroma?"CHROMA":"LUMA"), ()=>{ keyChroma=!keyChroma; }, "Whether the key selects by brightness or by hue.");
+    mkToggle(tr, "showKey", ()=>"VIEW MATTE: "+(showKeyMatte?"ON":"OFF"), ()=>{ showKeyMatte=!showKeyMatte; }, "Shows the key as a black-and-white matte, so you can see exactly what is selected before you apply anything to it.");
     d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
@@ -898,7 +981,7 @@ function sectionExtras(id, d){
   if(id==="frame"){
     const tr = document.createElement("div"); tr.className="trow";
     const EDGES = ["BLACK","TILE","MIRROR"];
-    mkToggle(tr, "edgeMode", ()=>"EDGE: "+EDGES[edgeMode], ()=>{ edgeMode=(edgeMode+1)%3; });
+    mkToggle(tr, "edgeMode", ()=>"EDGE: "+EDGES[edgeMode], ()=>{ edgeMode=(edgeMode+1)%3; }, "What fills the frame when the picture is zoomed or moved away from the edges: black, a tiled repeat, or a mirrored reflection.");
     d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
@@ -912,7 +995,15 @@ function sectionExtras(id, d){
     for(const [m,lab] of MODES){
       const b = document.createElement("button");
       b.textContent = lab; b.style.flex = "1"; b.style.minWidth = "0";
-      b.title = "Transport: "+m.toUpperCase()+" (this channel)";
+      const TPT = {
+        rew:["REWIND","Scrubs this channel's source backwards, with shuttle noise bands marching through the picture."],
+        still:["STILL","Freezes the source and parks the noise bar a paused deck lays across a held field."],
+        play:["PLAY","Normal playback at the speed set in the transport bar above the picture."],
+        ff:["SHUTTLE","Runs the source forward at four times speed, with shuttle bands."],
+        jogr:["JOG BACK","Creeps the source backwards a quarter speed, frame by frame."],
+        jogf:["JOG FORWARD","Creeps the source forwards a quarter speed."]
+      };
+      attachTip(b, TPT[m][0], TPT[m][1], "Applies to the channel you are editing. Works on generated patterns and text as well as files.");
       b.onclick = ()=>{
         if(window.__setTransport) window.__setTransport(m);
         for(const k in btns) btns[k].classList.toggle("on", k===m);
@@ -935,10 +1026,10 @@ function sectionExtras(id, d){
   }
   if(id==="flow"){
     const tr = document.createElement("div"); tr.className="trow";
-    const FF = ["MOTION","CONTOUR","CURL NOISE","RADIAL","SPIRAL","CHROMA","WEAVE"];
+    const FF = ["MOTION","CONTOUR","CURL","RADIAL","SPIRAL","CHROMA","WEAVE"];
     const FE = ["CLAMP","REPEAT","MIRROR"];
-    mkToggle(tr, "flowField", ()=>"FIELD: "+FF[flowField], ()=>{ flowField=(flowField+1)%7; });
-    mkToggle(tr, "flowEdge", ()=>"EDGE: "+FE[flowEdge], ()=>{ flowEdge=(flowEdge+1)%3; });
+    mkToggle(tr, "flowField", ()=>"FIELD: "+FF[flowField], ()=>{ flowField=(flowField+1)%7; }, "The vector field this stage advects along. MOTION is real optical flow estimated from the picture frame to frame \u2014 that is the one that makes proper datamosh. CONTOUR runs along brightness edges, CURL churns, RADIAL and SPIRAL push out and around, CHROMA steers by colour, WEAVE crosshatches.");
+    mkToggle(tr, "flowEdge", ()=>"EDGE: "+FE[flowEdge], ()=>{ flowEdge=(flowEdge+1)%3; }, "What the flow stage does with picture dragged off the edge of the frame: clamp it, wrap it round, or mirror it.");
     d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";

@@ -408,6 +408,7 @@ function setActiveChan(ch){
 }
 function buildPanel(){
   buildChanBar();
+  buildZones();
   for(const sec of SECTIONS){
     const d = document.createElement("div");
     d.className = "sec "+sec.cls;
@@ -420,11 +421,14 @@ function buildPanel(){
     attachTip(rb, "RESET SECTION", "Returns every control in this section to its default, on the channel you are editing.", "Individual controls reset with a double-click, or the \u21ba that appears when you hover the row.");
     rb.onclick = e=>{ e.stopPropagation(); resetSection(sec.id); };
     h.appendChild(rb);
-    h.title = "Click to collapse / expand \u00b7 drag the handle to reorder";
     h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
     d.appendChild(h);
-    makeSectionDraggable(d, h, sec.id);
-    if(SECHELP[sec.id]) attachTip(h, sec.name, SECHELP[sec.id], "Click to collapse \u00b7 drag the handle to reorder \u00b7 RESET returns the whole section to defaults");
+    /* only the channel signal path reorders — the mix, the master out and the
+       tools stay where they are, because their position carries meaning */
+    if(sec.zone === "chain") makeSectionDraggable(d, h, sec.id);
+    if(SECHELP[sec.id]) attachTip(h, sec.name, SECHELP[sec.id],
+      (sec.zone === "chain" ? "Click to collapse \u00b7 drag the handle to reorder \u00b7 " : "Click to collapse \u00b7 ")
+      + "RESET returns the whole section to defaults");
     const body = document.createElement("div"); body.className = "secbody";
     d.appendChild(body);
     secEls[sec.id] = d;
@@ -466,10 +470,7 @@ function buildPanel(){
       d2.appendChild(row);
       uiRefs[p.id] = {slider:s, val, tick, row, label:lab};
     }
-    if(sec.id==="feedback"){
-      /* LFO settings live under the mod-heavy section */
-    }
-    panel.appendChild(d);
+    (zoneEls[sec.zone] || zoneEls.chain).appendChild(d);
   }
   /* LFO config section */
   const d = mkSection("lfo", "mag", "LFO SETTINGS");
@@ -517,7 +518,6 @@ function buildPanel(){
     d.appendChild(row);
     lfoUIRefs[key] = {slider:s, val, shp, sync, upd};
   }
-  panel.appendChild(d);
   buildAudioSection();
 }
 
@@ -682,6 +682,58 @@ function openModMenu(ev, p){
 /* ---- collapsible + drag-reorderable section plumbing ---- */
 const secEls = {};
 let dragSec = null;
+const zoneEls = {};
+function buildZones(){
+  for(const z of ZONES){
+    const wrap = document.createElement("div");
+    wrap.className = "zone zone-"+z.id;
+    const h = document.createElement("div");
+    h.className = "zonehead";
+    const lab = document.createElement("span");
+    lab.textContent = z.label;
+    h.appendChild(lab);
+    attachTip(h, z.label, z.note);
+    if(z.id === "chain"){
+      const fc = document.createElement("button");
+      fc.textContent = "FOLLOW CHAIN";
+      attachTip(fc, "FOLLOW CHAIN", "Reorders these sections to match the order of the stages on the rail above the picture, so the panel reads in the order the signal is actually processed.");
+      fc.onclick = ()=>{ orderChainZone(true); saveSectionOrder(); toast("Panel follows the signal chain"); };
+      const rs = document.createElement("button");
+      rs.textContent = "RESET";
+      attachTip(rs, "RESET LAYOUT", "Puts these sections back into the default signal-path order.");
+      rs.onclick = ()=>{ orderChainZone(false); saveSectionOrder(); toast("Panel order reset"); };
+      h.appendChild(fc); h.appendChild(rs);
+    }
+    wrap.appendChild(h);
+    const body = document.createElement("div");
+    body.className = "zonebody";
+    wrap.appendChild(body);
+    zoneEls[z.id] = body;
+    panel.appendChild(wrap);
+  }
+}
+/* default: source, framing, frame store, feedback, then the chain stages in
+   rail order, then the keyer */
+const CHAIN_HEAD = ["gen","frame","time","feedback"];
+const CHAIN_TAIL = ["keyer"];
+function chainZoneOrder(followRail){
+  const stageSecs = followRail
+    ? chainOrder.flatMap(k => (STAGE_INFO[k] ? STAGE_INFO[k].sec : []))
+    : ["signal","sync","vhs","enhancer","contour","color","glitch","lab","flow"];
+  const seen = new Set();
+  const out = [];
+  for(const id of CHAIN_HEAD.concat(stageSecs, CHAIN_TAIL)){
+    if(secEls[id] && !seen.has(id)){ seen.add(id); out.push(id); }
+  }
+  /* anything not accounted for keeps its place at the end */
+  for(const sec of SECTIONS) if(sec.zone === "chain" && !seen.has(sec.id) && secEls[sec.id]) out.push(sec.id);
+  return out;
+}
+function orderChainZone(followRail){
+  const body = zoneEls.chain;
+  if(!body) return;
+  for(const id of chainZoneOrder(followRail)) body.appendChild(secEls[id]);
+}
 function makeSectionDraggable(el, head, id){
   const grab = document.createElement("span");
   grab.className = "grab"; grab.textContent = "\u2059";
@@ -711,23 +763,30 @@ function makeSectionDraggable(el, head, id){
     if(!dragSec || dragSec===el) return;
     e.preventDefault(); e.stopPropagation();
     el.classList.remove("secover");
-    panel.insertBefore(dragSec, el);
+    const host = el.parentNode;
+    if(host && host === dragSec.parentNode) host.insertBefore(dragSec, el);
     saveSectionOrder();
   });
 }
 function saveSectionOrder(){
   try{
-    const ids = [...panel.querySelectorAll(".sec")].map(el=>{
+    if(!zoneEls.chain) return;
+    const ids = [...zoneEls.chain.children].map(el=>{
       for(const k in secEls) if(secEls[k]===el) return k;
       return null;
     }).filter(Boolean);
-    localStorage.setItem("bendr.secorder", JSON.stringify(ids));
+    localStorage.setItem("bendr.secorder2", JSON.stringify(ids));
   }catch(e){}
 }
 function loadSectionOrder(){
   try{
-    const ids = JSON.parse(localStorage.getItem("bendr.secorder")||"[]");
-    for(const id of ids){ const el = secEls[id]; if(el) panel.appendChild(el); }
+    const ids = JSON.parse(localStorage.getItem("bendr.secorder2")||"[]");
+    if(!ids.length || !zoneEls.chain) return;
+    const valid = ids.filter(id=>{
+      const sec = SECTIONS.find(x=>x.id===id);
+      return sec && sec.zone === "chain" && secEls[id];
+    });
+    for(const id of valid) zoneEls.chain.appendChild(secEls[id]);
   }catch(e){}
 }
 function mkSection(id, cls, name){
@@ -735,12 +794,12 @@ function mkSection(id, cls, name){
   const h = document.createElement("h3");
   h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+name;
   h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
-  if(SECHELP[id]) attachTip(h, name, SECHELP[id], "Click to collapse \u00b7 drag the handle to reorder");
+  if(SECHELP[id]) attachTip(h, name, SECHELP[id], "Click to collapse");
   d.appendChild(h);
   const body = document.createElement("div"); body.className = "secbody";
   d.appendChild(body);
   secEls[id] = d;
-  makeSectionDraggable(d, h, id);
+  if(zoneEls.tools) zoneEls.tools.appendChild(d);
   /* callers append to the body */
   d.appendChild = body.appendChild.bind(body);
   return d;
@@ -776,7 +835,7 @@ function collapseAll(v){
 /* ---- signal chain rail: drag to reorder, click to bypass ---- */
 const STAGE_INFO = {
   sig:    {name:"TAPE / SYNC",  sec:["signal","sync","vhs"]},
-  col:    {name:"COLOUR / ENH", sec:["enhancer","color"]},
+  col:    {name:"COLOUR / ENH", sec:["enhancer","contour","color"]},
   glitch: {name:"GLITCH LAB",   sec:["glitch"]},
   lab:    {name:"SIGNAL LAB",   sec:["lab"]},
   flow:   {name:"FLOW / MOSH",  sec:["flow"]},
@@ -1262,7 +1321,6 @@ function buildAudioSection(){
     refreshAudioDeviceUI();
     sel.onchange = ()=>{ audioChannel = parseInt(sel.value); if(audioMode==="mic") wireMic(); };
   }
-  panel.appendChild(d);
 }
 let refreshAudioDeviceUI = ()=>{};
 function refreshAudioUI(){ for(const r of audioUIRefs) r.refresh(); }

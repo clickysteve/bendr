@@ -80,6 +80,19 @@ body{
 .snapbtn.full:hover{border-color:var(--amber); color:#fff;}
 button.dim, input.dim, select.dim{opacity:.32; cursor:not-allowed;}
 body.nobend #bends{display:none;}
+/* ---------- panel zones ---------- */
+.zonehead{
+  display:flex; align-items:center; gap:5px;
+  padding:9px 10px 5px; border-top:1px solid var(--line);
+  font-size:7.5px; letter-spacing:2px; color:var(--dim);
+  background:linear-gradient(180deg, rgba(255,255,255,.025), transparent);
+}
+.zone:first-of-type .zonehead{border-top:none;}
+.zonehead span{flex:1;}
+.zonehead button{padding:2px 6px; font-size:7.5px; letter-spacing:1px;}
+.zone-mix .zonehead{color:var(--mag);}
+.zone-chain .zonehead{color:var(--amber);}
+.zone-out .zonehead, .zone-tools .zonehead{color:var(--cyan);}
 #textdock.notext > *:not(#textNeedsSrc){opacity:.3; pointer-events:none;}
 button.dim:hover{border-color:var(--line); color:var(--txt);}
 
@@ -505,7 +518,7 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v17.0</span>
+  <span id="ver" title="Build version">v18.0</span>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -753,7 +766,7 @@ audio,video{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v17.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v18.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
@@ -806,7 +819,8 @@ audio,video{display:none;}
   <p>TAP sets the tempo; LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
   <h3>FINDING YOUR WAY AROUND</h3>
   <p>The top bar holds four menus \u2014 PATCH, SOURCE, ENGINE, OUTPUT \u2014 and everything you touch mid-performance stays out in the open: the preset list, RANDOMIZE and MUTATE, BEND and MOD to fold those panes in and out, and MULTI, BYPASS, REC, POP OUT and FULL on the right.</p>
-  <p>Hover any parameter name and you get a description of what it does and enough of the mechanism to know why it behaves the way it does. The same works on section headers, mode buttons, the bend pads and the menus. To reset one control, double-click its slider or press the <b>&#8634;</b> that appears when you hover the row; shift-clicking that takes it to the bottom of its range instead. RESET at the top of a section does the whole section, INIT does everything. Sections drag by the handle on the left to reorder, and the order is remembered.</p>
+  <p>The panel is in four zones. <b>MIX &middot; PERFORM</b> sits under the channel buttons and does not move: the three mixers and the snapshot bank, which are what you reach for while something is playing. <b>CHANNEL &middot; SIGNAL PATH</b> holds everything belonging to the selected channel, in the order the signal actually travels &mdash; source, framing, frame store, feedback, then the reorderable stages, then the keyer &mdash; and it is the only zone you can rearrange, by dragging the handle on the left of a section. <b>FOLLOW CHAIN</b> in that zone's header re-sorts it to match whatever order you have dragged the stages into on the rail above the picture, and RESET puts it back. <b>MASTER OUT</b> and <b>TOOLS</b> are pinned at the bottom.</p>
+  <p>Hover any parameter name and you get a description of what it does and enough of the mechanism to know why it behaves the way it does. The same works on section headers, mode buttons, the bend pads and the menus. To reset one control, double-click its slider or press the <b>&#8634;</b> that appears when you hover the row; shift-clicking that takes it to the bottom of its range instead. RESET at the top of a section does the whole section, INIT does everything. Sections in the channel zone drag by the handle on the left to reorder, and the order is remembered.</p>
   <h3>KEYS</h3>
   <p><kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>1</kbd>–<kbd>9</kbd> presets &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> snapshot &nbsp; <kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>V</kbd> multiview &nbsp; <kbd>shift</kbd>+<kbd>1</kbd>–<kbd>8</kbd> snapshots &nbsp; <kbd>H</kbd> this help</p>
   <h3>OUTPUT</h3>
@@ -1880,28 +1894,40 @@ const FS_COPY = COMMON +
 "void main(){ O = texture(u_tex, gl_FragCoord.xy/u_res); }\n";
 
 /* ---------------- parameter registry ---------------- */
+/* The panel is laid out in four zones. MIX sits under the channel buttons and
+   never moves, because it is the desk. The CHANNEL zone follows the signal path
+   and is the only part you can reorder. OUT and TOOLS are pinned at the bottom. */
 const SECTIONS = [
-  {id:"mixer",    name:"MIX BUS 1", cls:"mag"},
-  {id:"mixer2",   name:"MIX BUS 2", cls:"mag"},
-  {id:"mixerM",   name:"MASTER MIX", cls:"mag"},
-  {id:"snap",     name:"SNAPSHOTS / PERFORM", cls:"cyan"},
-  {id:"morph",    name:"PRESET MORPH",      cls:"mag"},
-  {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan"},
-  {id:"frame",    name:"FRAME / POSITION",  cls:"mag"},
-  {id:"enhancer", name:"BENT ENHANCER",     cls:"mag"},
-  {id:"feedback", name:"FEEDBACK / RESCAN", cls:"mag"},
-  {id:"time",     name:"TIME BASE",         cls:"mag"},
-  {id:"contour",  name:"CONTOUR / PALETTE",  cls:"mag"},
-  {id:"glitch",   name:"GLITCH LAB",        cls:"mag"},
-  {id:"lab",      name:"SIGNAL LAB",        cls:"mag"},
-  {id:"flow",     name:"FLOW / MOSH",       cls:"mag"},
-  {id:"keyer",    name:"KEYER",             cls:"cyan"},
-  {id:"signal",   name:"COMPOSITE SIGNAL",  cls:""},
-  {id:"sync",     name:"SYNC CORRUPTION",   cls:""},
-  {id:"vhs",      name:"TAPE TRANSPORT",    cls:""},
-  {id:"color",    name:"COLOUR STAGE",      cls:"cyan"},
-  {id:"crt",      name:"CRT DISPLAY",       cls:"cyan"},
-  {id:"overlay",  name:"OUTPUT OVERLAY",    cls:"cyan"},
+  {id:"mixer",    name:"MIX BUS 1",         cls:"mag",  zone:"mix"},
+  {id:"mixer2",   name:"MIX BUS 2",         cls:"mag",  zone:"mix"},
+  {id:"mixerM",   name:"MASTER MIX",        cls:"mag",  zone:"mix"},
+  {id:"snap",     name:"SNAPSHOTS / PERFORM", cls:"cyan", zone:"mix"},
+
+  {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan", zone:"chain"},
+  {id:"frame",    name:"FRAME / POSITION",  cls:"mag",  zone:"chain"},
+  {id:"time",     name:"TIME BASE",         cls:"mag",  zone:"chain"},
+  {id:"feedback", name:"FEEDBACK / RESCAN", cls:"mag",  zone:"chain"},
+  {id:"signal",   name:"COMPOSITE SIGNAL",  cls:"",     zone:"chain"},
+  {id:"sync",     name:"SYNC CORRUPTION",   cls:"",     zone:"chain"},
+  {id:"vhs",      name:"TAPE TRANSPORT",    cls:"",     zone:"chain"},
+  {id:"enhancer", name:"BENT ENHANCER",     cls:"mag",  zone:"chain"},
+  {id:"contour",  name:"CONTOUR / PALETTE", cls:"mag",  zone:"chain"},
+  {id:"color",    name:"COLOUR STAGE",      cls:"cyan", zone:"chain"},
+  {id:"glitch",   name:"GLITCH LAB",        cls:"mag",  zone:"chain"},
+  {id:"lab",      name:"SIGNAL LAB",        cls:"mag",  zone:"chain"},
+  {id:"flow",     name:"FLOW / MOSH",       cls:"mag",  zone:"chain"},
+  {id:"keyer",    name:"KEYER",             cls:"cyan", zone:"chain"},
+
+  {id:"crt",      name:"CRT DISPLAY",       cls:"cyan", zone:"out"},
+  {id:"overlay",  name:"OUTPUT OVERLAY",    cls:"cyan", zone:"out"},
+
+  {id:"morph",    name:"PRESET MORPH",      cls:"mag",  zone:"tools"},
+];
+const ZONES = [
+  {id:"mix",   label:"MIX \u00b7 PERFORM",     note:"How the four channels combine, and the snapshot bank that moves the whole rig at once. Pinned here because it is the desk \u2014 these are the controls you reach for while something is playing."},
+  {id:"chain", label:"CHANNEL \u00b7 SIGNAL PATH", note:"Everything belonging to the channel selected above, in the order the signal actually travels: source, framing, frame store, feedback, then the reorderable stages, then the keyer. Drag by the handle to rearrange."},
+  {id:"out",   label:"MASTER OUT",          note:"The shared display stage, after the mixer. Every channel ends up here."},
+  {id:"tools", label:"TOOLS",               note:"Performance and modulation tools that do not belong to any one channel."},
 ];
 const PDEF = [
   ["abMix","BUS 1 FADER","mixer",0,1,0],
@@ -3100,6 +3126,7 @@ function setActiveChan(ch){
 }
 function buildPanel(){
   buildChanBar();
+  buildZones();
   for(const sec of SECTIONS){
     const d = document.createElement("div");
     d.className = "sec "+sec.cls;
@@ -3112,11 +3139,14 @@ function buildPanel(){
     attachTip(rb, "RESET SECTION", "Returns every control in this section to its default, on the channel you are editing.", "Individual controls reset with a double-click, or the \u21ba that appears when you hover the row.");
     rb.onclick = e=>{ e.stopPropagation(); resetSection(sec.id); };
     h.appendChild(rb);
-    h.title = "Click to collapse / expand \u00b7 drag the handle to reorder";
     h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
     d.appendChild(h);
-    makeSectionDraggable(d, h, sec.id);
-    if(SECHELP[sec.id]) attachTip(h, sec.name, SECHELP[sec.id], "Click to collapse \u00b7 drag the handle to reorder \u00b7 RESET returns the whole section to defaults");
+    /* only the channel signal path reorders — the mix, the master out and the
+       tools stay where they are, because their position carries meaning */
+    if(sec.zone === "chain") makeSectionDraggable(d, h, sec.id);
+    if(SECHELP[sec.id]) attachTip(h, sec.name, SECHELP[sec.id],
+      (sec.zone === "chain" ? "Click to collapse \u00b7 drag the handle to reorder \u00b7 " : "Click to collapse \u00b7 ")
+      + "RESET returns the whole section to defaults");
     const body = document.createElement("div"); body.className = "secbody";
     d.appendChild(body);
     secEls[sec.id] = d;
@@ -3158,10 +3188,7 @@ function buildPanel(){
       d2.appendChild(row);
       uiRefs[p.id] = {slider:s, val, tick, row, label:lab};
     }
-    if(sec.id==="feedback"){
-      /* LFO settings live under the mod-heavy section */
-    }
-    panel.appendChild(d);
+    (zoneEls[sec.zone] || zoneEls.chain).appendChild(d);
   }
   /* LFO config section */
   const d = mkSection("lfo", "mag", "LFO SETTINGS");
@@ -3209,7 +3236,6 @@ function buildPanel(){
     d.appendChild(row);
     lfoUIRefs[key] = {slider:s, val, shp, sync, upd};
   }
-  panel.appendChild(d);
   buildAudioSection();
 }
 
@@ -3374,6 +3400,58 @@ function openModMenu(ev, p){
 /* ---- collapsible + drag-reorderable section plumbing ---- */
 const secEls = {};
 let dragSec = null;
+const zoneEls = {};
+function buildZones(){
+  for(const z of ZONES){
+    const wrap = document.createElement("div");
+    wrap.className = "zone zone-"+z.id;
+    const h = document.createElement("div");
+    h.className = "zonehead";
+    const lab = document.createElement("span");
+    lab.textContent = z.label;
+    h.appendChild(lab);
+    attachTip(h, z.label, z.note);
+    if(z.id === "chain"){
+      const fc = document.createElement("button");
+      fc.textContent = "FOLLOW CHAIN";
+      attachTip(fc, "FOLLOW CHAIN", "Reorders these sections to match the order of the stages on the rail above the picture, so the panel reads in the order the signal is actually processed.");
+      fc.onclick = ()=>{ orderChainZone(true); saveSectionOrder(); toast("Panel follows the signal chain"); };
+      const rs = document.createElement("button");
+      rs.textContent = "RESET";
+      attachTip(rs, "RESET LAYOUT", "Puts these sections back into the default signal-path order.");
+      rs.onclick = ()=>{ orderChainZone(false); saveSectionOrder(); toast("Panel order reset"); };
+      h.appendChild(fc); h.appendChild(rs);
+    }
+    wrap.appendChild(h);
+    const body = document.createElement("div");
+    body.className = "zonebody";
+    wrap.appendChild(body);
+    zoneEls[z.id] = body;
+    panel.appendChild(wrap);
+  }
+}
+/* default: source, framing, frame store, feedback, then the chain stages in
+   rail order, then the keyer */
+const CHAIN_HEAD = ["gen","frame","time","feedback"];
+const CHAIN_TAIL = ["keyer"];
+function chainZoneOrder(followRail){
+  const stageSecs = followRail
+    ? chainOrder.flatMap(k => (STAGE_INFO[k] ? STAGE_INFO[k].sec : []))
+    : ["signal","sync","vhs","enhancer","contour","color","glitch","lab","flow"];
+  const seen = new Set();
+  const out = [];
+  for(const id of CHAIN_HEAD.concat(stageSecs, CHAIN_TAIL)){
+    if(secEls[id] && !seen.has(id)){ seen.add(id); out.push(id); }
+  }
+  /* anything not accounted for keeps its place at the end */
+  for(const sec of SECTIONS) if(sec.zone === "chain" && !seen.has(sec.id) && secEls[sec.id]) out.push(sec.id);
+  return out;
+}
+function orderChainZone(followRail){
+  const body = zoneEls.chain;
+  if(!body) return;
+  for(const id of chainZoneOrder(followRail)) body.appendChild(secEls[id]);
+}
 function makeSectionDraggable(el, head, id){
   const grab = document.createElement("span");
   grab.className = "grab"; grab.textContent = "\u2059";
@@ -3403,23 +3481,30 @@ function makeSectionDraggable(el, head, id){
     if(!dragSec || dragSec===el) return;
     e.preventDefault(); e.stopPropagation();
     el.classList.remove("secover");
-    panel.insertBefore(dragSec, el);
+    const host = el.parentNode;
+    if(host && host === dragSec.parentNode) host.insertBefore(dragSec, el);
     saveSectionOrder();
   });
 }
 function saveSectionOrder(){
   try{
-    const ids = [...panel.querySelectorAll(".sec")].map(el=>{
+    if(!zoneEls.chain) return;
+    const ids = [...zoneEls.chain.children].map(el=>{
       for(const k in secEls) if(secEls[k]===el) return k;
       return null;
     }).filter(Boolean);
-    localStorage.setItem("bendr.secorder", JSON.stringify(ids));
+    localStorage.setItem("bendr.secorder2", JSON.stringify(ids));
   }catch(e){}
 }
 function loadSectionOrder(){
   try{
-    const ids = JSON.parse(localStorage.getItem("bendr.secorder")||"[]");
-    for(const id of ids){ const el = secEls[id]; if(el) panel.appendChild(el); }
+    const ids = JSON.parse(localStorage.getItem("bendr.secorder2")||"[]");
+    if(!ids.length || !zoneEls.chain) return;
+    const valid = ids.filter(id=>{
+      const sec = SECTIONS.find(x=>x.id===id);
+      return sec && sec.zone === "chain" && secEls[id];
+    });
+    for(const id of valid) zoneEls.chain.appendChild(secEls[id]);
   }catch(e){}
 }
 function mkSection(id, cls, name){
@@ -3427,12 +3512,12 @@ function mkSection(id, cls, name){
   const h = document.createElement("h3");
   h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+name;
   h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
-  if(SECHELP[id]) attachTip(h, name, SECHELP[id], "Click to collapse \u00b7 drag the handle to reorder");
+  if(SECHELP[id]) attachTip(h, name, SECHELP[id], "Click to collapse");
   d.appendChild(h);
   const body = document.createElement("div"); body.className = "secbody";
   d.appendChild(body);
   secEls[id] = d;
-  makeSectionDraggable(d, h, id);
+  if(zoneEls.tools) zoneEls.tools.appendChild(d);
   /* callers append to the body */
   d.appendChild = body.appendChild.bind(body);
   return d;
@@ -3468,7 +3553,7 @@ function collapseAll(v){
 /* ---- signal chain rail: drag to reorder, click to bypass ---- */
 const STAGE_INFO = {
   sig:    {name:"TAPE / SYNC",  sec:["signal","sync","vhs"]},
-  col:    {name:"COLOUR / ENH", sec:["enhancer","color"]},
+  col:    {name:"COLOUR / ENH", sec:["enhancer","contour","color"]},
   glitch: {name:"GLITCH LAB",   sec:["glitch"]},
   lab:    {name:"SIGNAL LAB",   sec:["lab"]},
   flow:   {name:"FLOW / MOSH",  sec:["flow"]},
@@ -3954,7 +4039,6 @@ function buildAudioSection(){
     refreshAudioDeviceUI();
     sel.onchange = ()=>{ audioChannel = parseInt(sel.value); if(audioMode==="mic") wireMic(); };
   }
-  panel.appendChild(d);
 }
 let refreshAudioDeviceUI = ()=>{};
 function refreshAudioUI(){ for(const r of audioUIRefs) r.refresh(); }

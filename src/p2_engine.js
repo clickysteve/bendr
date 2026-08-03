@@ -1036,28 +1036,40 @@ const FS_COPY = COMMON +
 "void main(){ O = texture(u_tex, gl_FragCoord.xy/u_res); }\n";
 
 /* ---------------- parameter registry ---------------- */
+/* The panel is laid out in four zones. MIX sits under the channel buttons and
+   never moves, because it is the desk. The CHANNEL zone follows the signal path
+   and is the only part you can reorder. OUT and TOOLS are pinned at the bottom. */
 const SECTIONS = [
-  {id:"mixer",    name:"MIX BUS 1", cls:"mag"},
-  {id:"mixer2",   name:"MIX BUS 2", cls:"mag"},
-  {id:"mixerM",   name:"MASTER MIX", cls:"mag"},
-  {id:"snap",     name:"SNAPSHOTS / PERFORM", cls:"cyan"},
-  {id:"morph",    name:"PRESET MORPH",      cls:"mag"},
-  {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan"},
-  {id:"frame",    name:"FRAME / POSITION",  cls:"mag"},
-  {id:"enhancer", name:"BENT ENHANCER",     cls:"mag"},
-  {id:"feedback", name:"FEEDBACK / RESCAN", cls:"mag"},
-  {id:"time",     name:"TIME BASE",         cls:"mag"},
-  {id:"contour",  name:"CONTOUR / PALETTE",  cls:"mag"},
-  {id:"glitch",   name:"GLITCH LAB",        cls:"mag"},
-  {id:"lab",      name:"SIGNAL LAB",        cls:"mag"},
-  {id:"flow",     name:"FLOW / MOSH",       cls:"mag"},
-  {id:"keyer",    name:"KEYER",             cls:"cyan"},
-  {id:"signal",   name:"COMPOSITE SIGNAL",  cls:""},
-  {id:"sync",     name:"SYNC CORRUPTION",   cls:""},
-  {id:"vhs",      name:"TAPE TRANSPORT",    cls:""},
-  {id:"color",    name:"COLOUR STAGE",      cls:"cyan"},
-  {id:"crt",      name:"CRT DISPLAY",       cls:"cyan"},
-  {id:"overlay",  name:"OUTPUT OVERLAY",    cls:"cyan"},
+  {id:"mixer",    name:"MIX BUS 1",         cls:"mag",  zone:"mix"},
+  {id:"mixer2",   name:"MIX BUS 2",         cls:"mag",  zone:"mix"},
+  {id:"mixerM",   name:"MASTER MIX",        cls:"mag",  zone:"mix"},
+  {id:"snap",     name:"SNAPSHOTS / PERFORM", cls:"cyan", zone:"mix"},
+
+  {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan", zone:"chain"},
+  {id:"frame",    name:"FRAME / POSITION",  cls:"mag",  zone:"chain"},
+  {id:"time",     name:"TIME BASE",         cls:"mag",  zone:"chain"},
+  {id:"feedback", name:"FEEDBACK / RESCAN", cls:"mag",  zone:"chain"},
+  {id:"signal",   name:"COMPOSITE SIGNAL",  cls:"",     zone:"chain"},
+  {id:"sync",     name:"SYNC CORRUPTION",   cls:"",     zone:"chain"},
+  {id:"vhs",      name:"TAPE TRANSPORT",    cls:"",     zone:"chain"},
+  {id:"enhancer", name:"BENT ENHANCER",     cls:"mag",  zone:"chain"},
+  {id:"contour",  name:"CONTOUR / PALETTE", cls:"mag",  zone:"chain"},
+  {id:"color",    name:"COLOUR STAGE",      cls:"cyan", zone:"chain"},
+  {id:"glitch",   name:"GLITCH LAB",        cls:"mag",  zone:"chain"},
+  {id:"lab",      name:"SIGNAL LAB",        cls:"mag",  zone:"chain"},
+  {id:"flow",     name:"FLOW / MOSH",       cls:"mag",  zone:"chain"},
+  {id:"keyer",    name:"KEYER",             cls:"cyan", zone:"chain"},
+
+  {id:"crt",      name:"CRT DISPLAY",       cls:"cyan", zone:"out"},
+  {id:"overlay",  name:"OUTPUT OVERLAY",    cls:"cyan", zone:"out"},
+
+  {id:"morph",    name:"PRESET MORPH",      cls:"mag",  zone:"tools"},
+];
+const ZONES = [
+  {id:"mix",   label:"MIX \u00b7 PERFORM",     note:"How the four channels combine, and the snapshot bank that moves the whole rig at once. Pinned here because it is the desk \u2014 these are the controls you reach for while something is playing."},
+  {id:"chain", label:"CHANNEL \u00b7 SIGNAL PATH", note:"Everything belonging to the channel selected above, in the order the signal actually travels: source, framing, frame store, feedback, then the reorderable stages, then the keyer. Drag by the handle to rearrange."},
+  {id:"out",   label:"MASTER OUT",          note:"The shared display stage, after the mixer. Every channel ends up here."},
+  {id:"tools", label:"TOOLS",               note:"Performance and modulation tools that do not belong to any one channel."},
 ];
 const PDEF = [
   ["abMix","BUS 1 FADER","mixer",0,1,0],

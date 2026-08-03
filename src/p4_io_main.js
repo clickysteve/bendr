@@ -45,6 +45,18 @@ const PRESETS = [
  [{src:"drift",dst:"kaleidoRot",amt:0.15,ch:"A"},{src:"lfo3",dst:"bloom",amt:0.2,ch:"A"},{src:"chaos",dst:"chromaDelay",amt:0.12,ch:"A"}]],
 ["CRT REPHOTO", {bloom:0.5,bloomRad:0.35,halation:0.5,defocus:0.3,grain:0.45,scanlines:0.4,aperture:0.35,curvature:0.4,vignette:0.55,chromaBleed:0.3,ringing:0.25,genLoss:0.2,signalNoise:0.06,hWobble:0.04,tapeWow:0.12,contrast:1.15,saturation:1.1,glow:0.15},
  [{src:"drift",dst:"defocus",amt:0.12,ch:"A"},{src:"lfo3",dst:"bloom",amt:0.15,ch:"A"}]],
+["SYNTH · RAMP CROSS", {genFreqX:0.26,genFreqY:0.19,genFM:0.4,genRate:0.1,genHue:0.55,genSpread:1.2,genSat:0.95,genBright:1,scanlines:0.16,curvature:0.26,vignette:0.36,bloom:0.2},
+ [{src:"lfo1",dst:"genFM",amt:0.3,ch:"A"},{src:"lfo3",dst:"genPhase",amt:0.4,ch:"A"},{src:"drift",dst:"genFreqY",amt:0.12,ch:"A"}], {src:"synth", gm:{shape:0,wave:0,col:1}}],
+["SYNTH · SPIRAL DRIVE", {genFreqX:0.3,genFoldN:6,genRate:0.12,genSpread:1.5,genHue:0.1,genSat:1,genFold:0.25,scanlines:0.2,curvature:0.3,vignette:0.42,bloom:0.35,halation:0.25},
+ [{src:"lfo3",dst:"genRot",amt:0.5,ch:"A"},{src:"bass",dst:"genFold",amt:0.3,ch:"A"}], {src:"synth", gm:{shape:2,wave:1,col:2}}],
+["SYNTH · HARD SHAPES", {genFreqX:0.22,genFoldN:8,genComp:1,genThresh:0.5,genSoft:0.02,genSpread:0.7,genHue:0.85,genSat:1,genRate:0.06,scanlines:0.18,curvature:0.28,vignette:0.4},
+ [{src:"lfo2",dst:"genThresh",amt:0.35,ch:"A"},{src:"spike",dst:"genFoldN",amt:0.4,ch:"A"}], {src:"synth", gm:{shape:6,wave:3,col:3}}],
+["SYNTH · PLASMA BANDS", {genFreqX:0.2,genFreqY:0.16,genFM:0.55,genBands:9,genSpread:1.6,genHue:0.3,genSat:0.95,genRate:0.14,scanlines:0.2,curvature:0.3,vignette:0.4,bloom:0.3},
+ [{src:"drift",dst:"genHue",amt:0.4,ch:"A"},{src:"lfo1",dst:"genFM",amt:0.25,ch:"A"},{src:"mid",dst:"genBands",amt:0.3,ch:"A"}], {src:"synth", gm:{shape:3,wave:0,col:4}}],
+["SYNTH · FOLDED RADIAL", {genFreqX:0.3,genFold:0.6,genWarp:0.45,genSpread:1.3,genHue:0.62,genSat:0.9,genRate:0.09,scanlines:0.18,curvature:0.3,vignette:0.45,bloom:0.4,halation:0.3},
+ [{src:"lfo3",dst:"genWarp",amt:0.3,ch:"A"},{src:"chaos",dst:"genFold",amt:0.2,ch:"A"},{src:"lfo1",dst:"genCX",amt:0.25,ch:"A"}], {src:"synth", gm:{shape:1,wave:0,col:1}}],
+["SYNTH · TUNNEL RUN", {genFreqX:0.34,genFoldN:8,genRate:0.35,genComp:0.6,genThresh:0.45,genSoft:0.08,genSpread:1.1,genHue:0.48,genSat:1,scanlines:0.22,curvature:0.32,vignette:0.5,bloom:0.35},
+ [{src:"lfo3",dst:"genRot",amt:0.4,ch:"A"},{src:"bass",dst:"genFreqX",amt:0.2,ch:"A"}], {src:"synth", gm:{shape:8,wave:1,col:2}}],
 ["MOSH · P-FRAME DRAG", {mosh:0.93,moshVec:0.85,flowGain:1.4,moshGate:0.45,flowSharp:0.2,chromaBleed:0.3,saturation:1.25,contrast:1.15,glow:0.2,scanlines:0.14,curvature:0.22,vignette:0.35},
  [{src:"motion",dst:"moshVec",amt:0.4,ch:"A"},{src:"cut",dst:"mosh",amt:-0.3,ch:"A"},{src:"lfo3",dst:"flowCurl",amt:0.2,ch:"A"}], {ff:0,fe:0}],
 ["MOSH · CONTOUR CRAWL", {mosh:0.9,moshVec:0.7,flowCurl:0.35,flowGain:1.6,flowSharp:0.3,contour:0.3,contourBands:9,saturation:1.4,contrast:1.2,glow:0.25,scanlines:0.15,curvature:0.24,vignette:0.36},
@@ -145,6 +157,15 @@ function loadPreset(i){
     fbWrap = tg.wrap||0; fbMirror = tg.mir||0; fbBlend = tg.blend||0;
     fbNL = tg.nl||0; fbInvert = !!tg.inv;
     if(tg.model!==undefined) outModel = tg.model;
+    if(tg.gm){
+      const tgt = linkChans ? CHANNELS : [activeChan];
+      for(const ch of tgt) genMode[ch] = {...tg.gm};
+    }
+    if(tg.src){
+      const tgt = linkChans ? CHANNELS : [activeChan];
+      for(const ch of tgt){ SRC[ch].mode = tg.src; SRC[ch].name = tg.src; }
+      syncChanInputUI();
+    }
   }
   refreshToggles();
   document.getElementById("selPreset").value = i;
@@ -261,6 +282,12 @@ function restoreState(st){
     applyState(st.bases||{}, st.routes||[], st);   /* legacy single-channel state */
   }
   if(st.srcText){ for(const ch of CHANNELS) if(st.srcText[ch]) Object.assign(SRC[ch].text, st.srcText[ch]); }
+  if(st.busSrc){ if(st.busSrc.b1) busSrc.b1 = st.busSrc.b1.slice(); if(st.busSrc.b2) busSrc.b2 = st.busSrc.b2.slice(); refreshBusUI(); }
+  if(st.genMode) for(const ch of CHANNELS) if(st.genMode[ch]) genMode[ch] = {...st.genMode[ch]};
+  if(st.snapSlots) for(let i=0;i<SNAP_N;i++) snapSlots[i] = st.snapSlots[i] || null;
+  if(st.snapGlide !== undefined) snapGlide = st.snapGlide;
+  if(st.perfTake){ perfRec.data = st.perfTake; perfRec.len = st.perfLen || 0; }
+  if(typeof refreshSnapUI === "function"){ refreshSnapUI(); refreshPerfUI(); }
   if(st.activeChan) setActiveChan(st.activeChan);
   refreshToggles();
   renderChain();
@@ -322,6 +349,9 @@ document.getElementById("btnSave").onclick = ()=>{
     mixMode2, wipeInv2, mixModeM, wipeInvM,
     fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
+    busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
+    genMode: JSON.parse(JSON.stringify(genMode)),
+    snapSlots, snapGlide, perfTake: perfRec.data, perfLen: perfRec.len,
     srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   for(const k of LFOKEYS) state[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   const blob = new Blob([JSON.stringify(state,null,1)], {type:"application/json"});
@@ -415,6 +445,14 @@ document.getElementById("btnPat").onclick = ()=>{
   SRC[ch].mode = "pattern"; SRC[ch].name = "pattern";
   syncChanInputUI();
 };
+document.getElementById("btnSynth").onclick = ()=>{
+  const ch = activeChan;
+  stopCam(ch);
+  SRC[ch].mode = "synth"; SRC[ch].name = "synth";
+  syncChanInputUI();
+  revealSection("gen");
+  toast("Channel "+ch+": pattern synth \u2014 shape it in the PATTERN SYNTH section");
+};
 const selPat = document.getElementById("selPat");
 selPat.onchange = ()=>{
   const S = cur();
@@ -440,11 +478,14 @@ function syncChanInputUI(){
     el.title = off ? "Not available on a generated source — load a file into this channel" : "";
   }
   for(const q of document.querySelectorAll(".mchan")) q.textContent = activeChan;
+  if(typeof refreshDockTabs === "function") refreshDockTabs();
+  if(S.mode !== "text" && dockTab === "text") setDock("matrix");
   document.getElementById("btnFile").classList.toggle("on", S.mode==="file");
   document.getElementById("btnCam").classList.toggle("on", S.mode==="cam");
   document.getElementById("btnPat").classList.toggle("on", S.mode==="pattern");
+  { const b=document.getElementById("btnSynth"); if(b) b.classList.toggle("on", S.mode==="synth"); }
   document.getElementById("btnText").classList.toggle("on", S.mode==="text");
-  document.getElementById("btnFile").textContent = "FILE " + activeChan;
+  document.getElementById("btnFile").textContent = "FILE";
   selPat.value = S.pattern;
   const sp = document.getElementById("spd");
   sp.value = S.speed;
@@ -464,6 +505,7 @@ window.__swapSources = function(a, b){
   A.video = B.video; B.video = tv;
   A.patCanvas = B.patCanvas; B.patCanvas = tp;
   A.pat = B.pat; B.pat = tc;
+  const gm = genMode[a]; genMode[a] = genMode[b]; genMode[b] = gm;
   A.ch = a; B.ch = b;
   syncChanInputUI();
 };
@@ -580,6 +622,12 @@ function drawTextSource(S, t){
 /* text editor wiring */
 let dockTab = "matrix";
 function setDock(t){
+  /* the text editor belongs to a text source, so it is only live on a channel
+     that is actually set to TEXT */
+  if(t === "text" && cur().mode !== "text"){
+    toast("Channel "+activeChan+" is not a text source \u2014 pick TEXT under SOURCE first", true);
+    t = dockTab === "text" ? "matrix" : dockTab;
+  }
   dockTab = t;
   const map = {matrix:"matrix", mod:"modgrid", text:"textdock"};
   for(const k in map){
@@ -592,7 +640,20 @@ function setDock(t){
                             : t==="text" ? "typing here never triggers shortcuts"
                             : "patch sources into any parameter";
   if(t==="text") syncTextEditor();
+  refreshDockTabs();
 }
+/* grey the TEXT tab unless this channel is a text source */
+function refreshDockTabs(){
+  const b = document.querySelector('#dockTabs button[data-dock="text"]');
+  if(!b) return;
+  const ok = cur().mode === "text";
+  b.classList.toggle("dim", !ok);
+  const td = document.getElementById("textdock");
+  if(td) td.classList.toggle("notext", !ok);
+  const note = document.getElementById("textNeedsSrc");
+  if(note) note.style.display = ok ? "none" : "block";
+}
+window.__refreshDockTabs = refreshDockTabs;
 const textEd = null;
 const TXT_CTRL = [["txtBody","body","s"],["txtFont","font","s"],["txtSize","size","f"],["txtTrack","track","f"],
   ["txtX","x","f"],["txtY","y","f"],["txtRot","rot","f"],["txtScrollX","scrollX","f"],["txtScrollY","scrollY","f"],
@@ -978,6 +1039,196 @@ for(const b of document.querySelectorAll(".bend[data-bend]")){
   b.addEventListener("mouseup", up); b.addEventListener("mouseleave", up); b.addEventListener("touchend", up);
 }
 
+
+/* ---------------- multiview ---------------- */
+function setMultiView(on){
+  multiView = on;
+  document.body.classList.toggle("multi", on);
+  const b = document.getElementById("btnMulti");
+  if(b) b.classList.toggle("on", on);
+}
+document.getElementById("btnMulti").onclick = ()=>setMultiView(!multiView);
+
+/* ---------------- snapshot bank ----------------
+   Eight whole-panel states with a glide time. Recall crossfades every value
+   from where it is now to where the slot says, which is the difference between
+   a preset and a performance move. */
+const SNAP_N = 8;
+const snapSlots = new Array(SNAP_N).fill(null);
+let snapStoreArm = false, snapGlide = 0.6;
+let glideFrom = null, glideTo = null, glideT = 0, glideLen = 0;
+function snapCapture(){
+  const st = snapshotAll();
+  return {chan:st.chan, master:st.master,
+    g:{mixMode, mixMode2, mixModeM, wipeInv, wipeInv2, wipeInvM, fbWrap, fbMirror, fbBlend,
+       fbNL, fbInvert, fbTrailMode, rescanMode, keyChroma, edgeMode, fieldSrc, flowField, flowEdge,
+       outModel, b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
+    chain: chainOrder.slice(), stages: {...stageEnabled}};
+}
+function snapStore(i){
+  snapSlots[i] = snapCapture();
+  refreshSnapUI();
+  toast("Snapshot "+(i+1)+" stored");
+}
+function snapRecall(i){
+  const st = snapSlots[i];
+  if(!st){ toast("Snapshot "+(i+1)+" is empty — arm STORE and click it", true); return; }
+  pushHistory();
+  /* discrete things jump; continuous things glide */
+  const g = st.g || {};
+  if(g.b1) busSrc.b1 = g.b1.slice();
+  if(g.b2) busSrc.b2 = g.b2.slice();
+  for(const k of ["mixMode","mixMode2","mixModeM","fbWrap","fbMirror","fbBlend","fbNL",
+                  "edgeMode","fieldSrc","flowField","flowEdge","outModel"]){
+    if(g[k] !== undefined) eval(k+" = g."+k);
+  }
+  for(const k of ["wipeInv","wipeInv2","wipeInvM","fbInvert","fbTrailMode","rescanMode","keyChroma"]){
+    if(g[k] !== undefined) eval(k+" = g."+k);
+  }
+  if(st.chain) chainOrder = st.chain.slice();
+  if(st.stages) stageEnabled = {...stageEnabled, ...st.stages};
+  if(snapGlide < 0.02){
+    applySnapValues(st, 1, null);
+    glideFrom = glideTo = null;
+  } else {
+    glideFrom = snapCapture(); glideTo = st; glideT = 0; glideLen = snapGlide;
+  }
+  morphOverride.clear();
+  refreshUI(); refreshToggles(); renderChain(); refreshSnapUI(); refreshBusUI();
+  toast("Snapshot "+(i+1)+(snapGlide>=0.02 ? " — gliding over "+snapGlide.toFixed(1)+"s" : ""));
+}
+function applySnapValues(to, m, from){
+  for(const ch of CHANNELS){
+    const t = to.chan && to.chan[ch]; if(!t) continue;
+    const f = from && from.chan && from.chan[ch];
+    for(const p of CLIST){
+      if(t[p.id] === undefined) continue;
+      const a = f && f[p.id] !== undefined ? f[p.id] : chanBase[ch][p.id];
+      chanBase[ch][p.id] = a + (t[p.id]-a)*m;
+    }
+  }
+  if(to.master) for(const p of MLIST){
+    if(to.master[p.id] === undefined) continue;
+    const a = from && from.master && from.master[p.id] !== undefined ? from.master[p.id] : mBase[p.id];
+    mBase[p.id] = a + (to.master[p.id]-a)*m;
+  }
+}
+function updateGlide(dt){
+  if(!glideTo) return;
+  glideT = Math.min(1, glideT + dt/Math.max(0.02, glideLen));
+  const m = glideT*glideT*(3-2*glideT);
+  applySnapValues(glideTo, m, glideFrom);
+  if(glideT >= 1){ glideFrom = glideTo = null; refreshUI(); }
+}
+function refreshSnapUI(){
+  for(let i=0;i<SNAP_N;i++){
+    const b = document.getElementById("snap"+i);
+    if(b) b.classList.toggle("full", !!snapSlots[i]);
+  }
+  const sb = document.getElementById("snapStoreBtn");
+  if(sb) sb.classList.toggle("on", snapStoreArm);
+}
+window.__snapHit = i=>{ if(snapStoreArm){ snapStore(i); snapStoreArm=false; } else snapRecall(i); refreshSnapUI(); };
+
+/* ---------------- performance recorder ----------------
+   Samples every base value 24 times a second and stores only what changed, so
+   a long take is a few hundred kilobytes rather than a video. Playing it back
+   moves the controls, which means the same performance can be replayed against
+   different footage. */
+const perfRec = {mode:"off", data:[], t:0, len:0, loop:true, cursor:0, acc:0};
+const PERF_HZ = 24;
+function perfFlat(){
+  const o = {};
+  for(const ch of CHANNELS){ const cb = chanBase[ch]; for(const p of CLIST) o[ch+":"+p.id] = cb[p.id]; }
+  for(const p of MLIST) o["M:"+p.id] = mBase[p.id];
+  for(const k in bendHeld) o["#"+k] = bendHeld[k] ? 1 : 0;
+  o["#mix"] = mixMode; o["#mix2"] = mixMode2; o["#mixM"] = mixModeM;
+  o["#wrap"] = fbWrap; o["#nl"] = fbNL; o["#blend"] = fbBlend; o["#mir"] = fbMirror;
+  o["#ff"] = flowField; o["#fe"] = flowEdge; o["#model"] = outModel; o["#field"] = fieldSrc;
+  return o;
+}
+function perfApply(k, v){
+  if(k.charAt(0) === "#"){
+    const n = k.slice(1);
+    if(n in bendHeld){ bendHeld[n] = !!v; markBend(n, !!v); return; }
+    const map = {mix:"mixMode", mix2:"mixMode2", mixM:"mixModeM", wrap:"fbWrap", nl:"fbNL",
+                 blend:"fbBlend", mir:"fbMirror", ff:"flowField", fe:"flowEdge",
+                 model:"outModel", field:"fieldSrc"};
+    if(map[n]) eval(map[n]+" = v");
+    return;
+  }
+  const i = k.indexOf(":");
+  const ch = k.slice(0,i), id = k.slice(i+1);
+  if(ch === "M") mBase[id] = v; else if(chanBase[ch]) chanBase[ch][id] = v;
+}
+let perfLast = null;
+function perfStart(){
+  perfRec.data = [{t:0, v:perfFlat()}];
+  perfLast = {...perfRec.data[0].v};
+  perfRec.mode = "rec"; perfRec.t = 0; perfRec.acc = 0; perfRec.cursor = 0;
+  refreshPerfUI(); toast("Recording performance — every control you touch is being written down");
+}
+function perfStop(){
+  if(perfRec.mode === "rec") perfRec.len = perfRec.t;
+  perfRec.mode = "off"; refreshPerfUI();
+}
+function perfPlay(){
+  if(!perfRec.data.length){ toast("Nothing recorded yet", true); return; }
+  perfRec.mode = "play"; perfRec.t = 0; perfRec.cursor = 0; perfRec.acc = 0;
+  /* the opening keyframe puts the rig back where the take started */
+  const f0 = perfRec.data[0];
+  for(const k in f0.v) perfApply(k, f0.v[k]);
+  refreshUI(); refreshToggles(); refreshPerfUI();
+}
+function perfClear(){ perfRec.data = []; perfRec.len = 0; perfRec.mode = "off"; refreshPerfUI(); }
+function updatePerf(dt){
+  if(perfRec.mode === "off") return;
+  perfRec.t += dt;
+  if(perfRec.mode === "rec"){
+    perfRec.acc += dt;
+    if(perfRec.acc < 1/PERF_HZ) return;
+    perfRec.acc = 0;
+    const now = perfFlat(), d = {};
+    let n = 0;
+    for(const k in now) if(now[k] !== perfLast[k]){ d[k] = now[k]; perfLast[k] = now[k]; n++; }
+    if(n) perfRec.data.push({t:perfRec.t, v:d});
+    perfRec.len = perfRec.t;
+    if(perfRec.t > 900) perfStop();     /* fifteen minutes is plenty */
+  } else {
+    while(perfRec.cursor < perfRec.data.length && perfRec.data[perfRec.cursor].t <= perfRec.t){
+      const f = perfRec.data[perfRec.cursor++];
+      for(const k in f.v) perfApply(k, f.v[k]);
+    }
+    if(perfRec.cursor >= perfRec.data.length && perfRec.t >= perfRec.len){
+      if(perfRec.loop){
+        perfRec.t = 0; perfRec.cursor = 0;
+        const f0 = perfRec.data[0];
+        for(const k in f0.v) perfApply(k, f0.v[k]);
+      } else { perfRec.mode = "off"; }
+    }
+    refreshUIThrottled();
+  }
+  refreshPerfUI();
+}
+let uiThrottle = 0;
+function refreshUIThrottled(){
+  if(++uiThrottle % 6) return;
+  refreshUI();
+}
+function refreshPerfUI(){
+  const st = document.getElementById("perfState");
+  if(!st) return;
+  const m = perfRec.mode;
+  st.textContent = (m==="off" ? (perfRec.len ? "TAKE "+perfRec.len.toFixed(1)+"s" : "NO TAKE")
+                  : m==="rec" ? "REC "+perfRec.t.toFixed(1)+"s"
+                  : "PLAY "+perfRec.t.toFixed(1)+" / "+perfRec.len.toFixed(1)+"s");
+  const rb = document.getElementById("perfRecBtn"), pb = document.getElementById("perfPlayBtn"),
+        lb = document.getElementById("perfLoopBtn");
+  if(rb) rb.classList.toggle("rec-on", m==="rec");
+  if(pb) pb.classList.toggle("on", m==="play");
+  if(lb) lb.classList.toggle("on", perfRec.loop);
+}
+
 /* keyboard */
 const KEYBEND = {q:"sync", w:"roll", e:"rainbow", r_shift:null, t:"melt", y:"kill"};
 function typingNow(e){
@@ -987,7 +1238,9 @@ function typingNow(e){
 window.addEventListener("keydown", e=>{
   if(typingNow(e)) return;
   const k = e.key.toLowerCase();
+  if(k>="1" && k<="8" && e.shiftKey){ window.__snapHit(+k-1); return; }
   if(k>="1" && k<="9"){ loadPreset(+k-1); return; }
+  if(k==="v"){ setMultiView(!multiView); return; }
   if(k===" "){ e.preventDefault(); randomizeAll(); return; }
   if(k==="m"){ mutate(); return; }
   if(k==="z"){ undo(); return; }
@@ -1202,7 +1455,22 @@ function sizeCanvas(){
   const wrap = document.getElementById("canvasWrap");
   if(!wrap) return;
   const dpr = Math.min(window.devicePixelRatio||1, isTouch ? 1.5 : 2);
-  const w = Math.floor(wrap.clientWidth*dpr), h = Math.floor(wrap.clientHeight*dpr);
+  const cw = Math.max(2, wrap.clientWidth), ch = Math.max(2, wrap.clientHeight);
+  /* the picture keeps the processing raster's aspect and is letterboxed inside
+     the pane, so it is never stretched to whatever shape the window happens to
+     be — and the pop-out, which mirrors this canvas, stays correct too */
+  const ar = procW/procH;
+  let dw = cw, dh = cw/ar;
+  if(dh > ch){ dh = ch; dw = ch*ar; }
+  canvas.style.width = dw+"px"; canvas.style.height = dh+"px";
+  canvas.style.left = Math.round((cw-dw)/2)+"px";
+  canvas.style.top  = Math.round((ch-dh)/2)+"px";
+  const mv = document.getElementById("mvlabels");
+  if(mv){
+    mv.style.width = dw+"px"; mv.style.height = dh+"px";
+    mv.style.left = canvas.style.left; mv.style.top = canvas.style.top;
+  }
+  const w = Math.max(2, Math.floor(dw*dpr)), h = Math.max(2, Math.floor(dh*dpr));
   if(canvas.width!==w || canvas.height!==h){ canvas.width=w; canvas.height=h; }
 }
 window.addEventListener("resize", sizeCanvas);
@@ -1286,7 +1554,7 @@ function runStage(id, inTex, dstRT, now, ch){
 
 function srcReady(ch){
   const S = SRC[ch];
-  if(S.mode === "pattern" || S.mode === "text") return true;
+  if(S.mode === "pattern" || S.mode === "text" || S.mode === "synth") return true;
   return S.video.readyState >= 2 && S.video.videoWidth > 0;
 }
 window.__chanHasSource = srcReady;
@@ -1294,6 +1562,7 @@ window.__chanHasSource = srcReady;
 /* upload a channel's source frame into its texture */
 function uploadSource(ch, dt){
   const S = SRC[ch];
+  if(S.mode === "synth"){ S.aspect = procW/procH; S.has = 1; S.patClock += dt*S.speed; return; }
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
   if(S.mode === "pattern" || S.mode === "text"){
@@ -1311,8 +1580,25 @@ function uploadSource(ch, dt){
 }
 
 /* run one channel's entire chain, leaving the result in chanRT[ch].out */
+/* the pattern synth is computed straight into a render target, so it costs one
+   full-screen pass and needs no canvas upload */
+function renderGen(ch, now){
+  const C = chanRT[ch], M = genMode[ch];
+  gl.bindFramebuffer(gl.FRAMEBUFFER, C.gen.fbo);
+  gl.viewport(0,0,procW,procH);
+  gl.useProgram(progGEN.prog);
+  gl.uniform2f(U(progGEN,"u_res"), procW, procH);
+  gl.uniform1f(U(progGEN,"u_time"), now);
+  gl.uniform1f(U(progGEN,"u_shape"), M.shape);
+  gl.uniform1f(U(progGEN,"u_wave"), M.wave);
+  gl.uniform1f(U(progGEN,"u_colmode"), M.col);
+  setParamUniforms(progGEN, ch);
+  draw();
+  return C.gen.tex;
+}
 function renderChannel(ch, now, dt){
   const C = chanRT[ch], S = SRC[ch];
+  const chanSrcTex = (S.mode === "synth") ? renderGen(ch, now) : srcTex[ch];
 
   /* time base: bent frame store */
   const delayN = Math.max(1, Math.min(RING_N-1, Math.round(getCur("delayF",ch))));
@@ -1332,9 +1618,9 @@ function renderChannel(ch, now, dt){
   gl.viewport(0,0,procW,procH);
   gl.useProgram(progFB.prog);
   gl.uniform2f(U(progFB,"u_res"), procW, procH);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, chanSrcTex);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, (rescanMode?C.crt:C.fbPrev).tex);
-  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, hasDelay?C.ring[readIdx].tex:srcTex[ch]);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, hasDelay?C.ring[readIdx].tex:chanSrcTex);
   gl.uniform1i(U(progFB,"u_src"), 0);
   gl.uniform1i(U(progFB,"u_prev"), 1);
   gl.uniform1i(U(progFB,"u_delayT"), 2);
@@ -1391,6 +1677,8 @@ function renderFrame(now, dt){
   updateAudio(dt);
   driveTransport(dt);
   updateContentAnalysis(dt);
+  updateGlide(dt);
+  updatePerf(dt);
   updateMod(dt, now);
   pushModHistory();
   applyParams(dt);
@@ -1412,13 +1700,15 @@ function renderFrame(now, dt){
   }
 
   /* a channel only costs anything when its fader can actually let it through */
-  const masterLive = mCur.busMix > 0.0005;
-  const live = {
-    A: true,
-    B: srcReady("B") && mCur.abMix > 0.0005,
-    C: masterLive && srcReady("C"),
-    D: masterLive && srcReady("D") && mCur.cdMix > 0.0005
-  };
+  const b1 = busSrc.b1, b2 = busSrc.b2;
+  const masterLive = mCur.busMix > 0.0005 || multiView;
+  const live = {A:false, B:false, C:false, D:false};
+  live[b1[0]] = true;
+  if(srcReady(b1[1]) && (mCur.abMix > 0.0005 || multiView)) live[b1[1]] = true;
+  if(masterLive){
+    if(srcReady(b2[0])) live[b2[0]] = true;
+    if(srcReady(b2[1]) && (mCur.cdMix > 0.0005 || multiView)) live[b2[1]] = true;
+  }
   liveList = CHANNELS.filter(c=>live[c]).join("+");
   for(const ch of CHANNELS){
     if(!live[ch]) continue;
@@ -1426,7 +1716,8 @@ function renderFrame(now, dt){
     renderChannel(ch, now, dt);
   }
 
-  /* mixer tree: BUS 1 = A/B, BUS 2 = C/D, MASTER = BUS 1 / BUS 2 */
+  /* mixer tree: BUS 1 and BUS 2 each take any two channels, then MASTER
+     crossfades the two buses. So A can meet C, or D can meet B. */
   function mixPass(dstRT, texA, texB, hasB, ids, mode, inv){
     gl.bindFramebuffer(gl.FRAMEBUFFER, dstRT.fbo);
     gl.viewport(0,0,procW,procH);
@@ -1444,12 +1735,32 @@ function renderFrame(now, dt){
     draw();
   }
   if(masterLive){
-    mixPass(busOut1, chanRT.A.out.tex, chanRT.B.out.tex, live.B, MIXBUS.b1, mixMode, wipeInv);
-    mixPass(busOut2, chanRT.C.out.tex, chanRT.D.out.tex, live.D, MIXBUS.b2, mixMode2, wipeInv2);
+    mixPass(busOut1, chanRT[b1[0]].out.tex, chanRT[b1[1]].out.tex, live[b1[1]], MIXBUS.b1, mixMode, wipeInv);
+    mixPass(busOut2, chanRT[b2[0]].out.tex, chanRT[b2[1]].out.tex, live[b2[1]], MIXBUS.b2, mixMode2, wipeInv2);
     mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mixModeM, wipeInvM);
   } else {
     /* nothing on bus 2, so bus 1 goes straight to master and costs one pass, as before */
-    mixPass(mixOut, chanRT.A.out.tex, chanRT.B.out.tex, live.B, MIXBUS.b1, mixMode, wipeInv);
+    mixPass(mixOut, chanRT[b1[0]].out.tex, chanRT[b1[1]].out.tex, live[b1[1]], MIXBUS.b1, mixMode, wipeInv);
+  }
+
+  if(multiView){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0,0,canvas.width,canvas.height);
+    gl.useProgram(progMULTI.prog);
+    gl.uniform2f(U(progMULTI,"u_res"), canvas.width, canvas.height);
+    const bind = (unit, name, tex)=>{
+      gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.uniform1i(U(progMULTI,name), unit);
+    };
+    bind(0,"u_a",chanRT.A.out.tex); bind(1,"u_b",chanRT.B.out.tex);
+    bind(2,"u_c",chanRT.C.out.tex); bind(3,"u_d",chanRT.D.out.tex);
+    bind(4,"u_b1",busOut1.tex);     bind(5,"u_pgm",mixOut.tex);
+    const cellOf = {A:0,B:1,C:3,D:4};
+    gl.uniform1f(U(progMULTI,"u_active"), cellOf[activeChan]);
+    for(const ch of CHANNELS) gl.uniform1f(U(progMULTI,"u_live"+ch), live[ch]?1:0);
+    draw();
+    frameEnd(now, dt);
+    return;
   }
 
   /* CRT -> screen */
@@ -1490,19 +1801,21 @@ function renderFrame(now, dt){
     }
   }
 
-  if(!offline){
-    const S = cur();
-    if(S.mode==="file" && S.video.duration && !seeking){
-      seek.value = S.video.currentTime/S.video.duration;
-      tcode.textContent = fmtT(S.video.currentTime)+" / "+fmtT(S.video.duration);
-    } else if(S.mode!=="file"){
-      tcode.textContent = "--:-- / --:--";
-    }
-    fpsAcc += 1/Math.max(dt,1e-4); fpsN++;
-    if(fpsN>=30){ fpsShow = Math.round(fpsAcc/fpsN); fpsAcc=0; fpsN=0;
-      osd.textContent = procH+"p · "+fpsShow+" fps"+(" · "+liveList)+(recorder?" · REC":"")+(audioMode!=="off"?" · AUD":"")+(rescanMode?" · RESCAN":"");
-      updateTempoUI();
-    }
+  frameEnd(now, dt);
+}
+function frameEnd(now, dt){
+  if(offline) return;
+  const S = cur();
+  if(S.mode==="file" && S.video.duration && !seeking){
+    seek.value = S.video.currentTime/S.video.duration;
+    tcode.textContent = fmtT(S.video.currentTime)+" / "+fmtT(S.video.duration);
+  } else if(S.mode!=="file"){
+    tcode.textContent = "--:-- / --:--";
+  }
+  fpsAcc += 1/Math.max(dt,1e-4); fpsN++;
+  if(fpsN>=30){ fpsShow = Math.round(fpsAcc/fpsN); fpsAcc=0; fpsN=0;
+    osd.textContent = procH+"p \u00b7 "+fpsShow+" fps"+(" \u00b7 "+liveList)+(multiView?" \u00b7 MULTI":"")+(recorder?" \u00b7 REC":"")+(perfRec.mode!=="off"?" \u00b7 "+perfRec.mode.toUpperCase():"")+(audioMode!=="off"?" \u00b7 AUD":"")+(rescanMode?" \u00b7 RESCAN":"");
+    updateTempoUI();
   }
 }
 
@@ -1681,6 +1994,14 @@ if(OUTPUT_MODE){
     window.addEventListener("touchend", ()=>{ dragging=false; });
   }
   document.querySelectorAll("#dockTabs button").forEach(b=>{ b.onclick = ()=>setDock(b.dataset.dock); });
+  {
+    const rs = document.getElementById("selRes");
+    rs.onchange = ()=>{
+      setProcRes(parseInt(rs.value));
+      sizeCanvas();
+      toast("Processing at "+procW+" \u00d7 "+procH);
+    };
+  }
   document.getElementById("btnMod").onclick = ()=> setDock("mod");
   setActiveChan("A");
   syncChanInputUI();

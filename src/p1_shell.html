@@ -75,7 +75,11 @@ body{
 }
 .prow:hover .prst{opacity:.75;}
 .prst:hover{color:var(--amber); opacity:1; border:none;}
+.snapbtn{padding:9px 0; font-size:12px; letter-spacing:0;}
+.snapbtn.full{border-color:var(--cyan); color:var(--cyan);}
+.snapbtn.full:hover{border-color:var(--amber); color:#fff;}
 button.dim, input.dim, select.dim{opacity:.32; cursor:not-allowed;}
+#textdock.notext > *:not(#textNeedsSrc){opacity:.3; pointer-events:none;}
 button.dim:hover{border-color:var(--line); color:var(--txt);}
 
 .hsep{width:1px; height:24px; background:var(--line); margin:0 4px;}
@@ -296,7 +300,17 @@ body.chan-d #panel{border-left-color:#b4ff5a;}
 /* ---------- stage ---------- */
 #stage{flex:1; display:flex; flex-direction:column; min-width:0; background:#000;}
 #canvasWrap{flex:1; position:relative; min-height:0; background:#000; overflow:hidden;}
-#glcanvas{position:absolute; top:0; left:0; width:100%; height:100%; display:block;}
+#glcanvas{position:absolute; top:0; left:0; display:block;}
+#mvlabels{
+  position:absolute; display:none; pointer-events:none;
+  grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(2,1fr);
+}
+body.multi #mvlabels{display:grid;}
+#mvlabels span{
+  font-size:8.5px; letter-spacing:2px; color:var(--amber); align-self:start; justify-self:start;
+  margin:5px; padding:2px 6px; background:rgba(6,6,10,.72); border:1px solid rgba(255,122,24,.35);
+  border-radius:3px;
+}
 #canvasWrap:fullscreen{background:#000;}
 #canvasWrap:fullscreen #glcanvas{width:100vw; height:100vh;}
 #dropHint{
@@ -490,7 +504,7 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v15.0</span>
+  <span id="ver" title="Build version">v16.0</span>
 
   <div class="menu" id="mnuSource">
     <button class="menubtn" data-tip="Choose what this channel is looking at. Each channel has its own source.">SOURCE <i>&#9662;</i></button>
@@ -503,6 +517,9 @@ audio,video{display:none;}
       <div class="mrow2">
         <button id="btnPat" data-tip="Use a built-in generated test signal as this channel's source. No file needed.">PATTERN</button>
         <button id="btnText" data-tip="Turn this channel into a text and shape generator. Opens the editor in the dock below the picture.">TEXT</button>
+      </div>
+      <div class="mrow2">
+        <button id="btnSynth" data-tip="Turn this channel into a pattern synthesiser: oscillators, cross-modulation, a wavefolder, a comparator and a colouriser, all computed on the GPU and all modulatable. Shape it in the PATTERN SYNTH section of the panel.">SYNTH</button>
       </div>
       <div class="mlabel">PATTERN</div>
       <select id="selPat" data-tip="Which generated pattern this channel produces. OSCILLATOR, PLASMA and LISSAJOUS are video-synth style sources with no camera involved.">
@@ -578,6 +595,7 @@ audio,video{display:none;}
   <select id="selPreset" data-tip="Sixty-six starting points. Presets load into the channel you are editing (or all of them with LINK on). Keyboard 1-9 for the first nine."></select>
 
   <div class="spacer"></div>
+  <button id="btnMulti" data-tip="Multiview: all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors. The channel you are editing gets the hot border. Keyboard: V.">MULTI</button>
   <button id="btnBypass" data-tip="Hold to hear the clean signal - shows the source with the whole chain switched out, so you can see what you have actually done. Keyboard: hold B.">BYPASS</button>
   <button id="btnRec" data-tip="Record the live output to a file, with the source audio when AUDIO is set to SOURCE. MP4 where the browser allows it, WebM otherwise. Keyboard: R.">&#9679; REC</button>
   <span id="recTime">0:00</span>
@@ -598,6 +616,7 @@ audio,video{display:none;}
       <canvas id="glcanvas"></canvas>
       <div id="osd"></div>
       <div id="dropHint">DROP VIDEO / PRESET</div>
+      <div id="mvlabels"><span>A</span><span>B</span><span>BUS 1</span><span>C</span><span>D</span><span>PROGRAMME</span></div>
     </div>
     <div id="transport">
       <button id="btnPlay" data-tip="Play or pause this channel's file. Keyboard: P.">❚❚</button>
@@ -640,7 +659,7 @@ audio,video{display:none;}
         <div id="routes"></div>
       </div>
       <div id="modgrid"></div>
-      <div id="textdock"><textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
+      <div id="textdock"><div id="textNeedsSrc" style="display:none; color:var(--dim); font-size:9.5px; padding:6px 0 10px;">This channel is not a text source. Pick <b style="color:var(--amber)">TEXT</b> under SOURCE to switch it, and these controls come alive.</div><textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
     <div class="edrow">
       <label>FONT</label>
       <select id="txtFont">
@@ -730,11 +749,20 @@ audio,video{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v15.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v16.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
   <p>The channels meet in three mixers, each with the same twenty transitions: <b>BUS 1</b> combines A and B, <b>BUS 2</b> combines C and D, and <b>MASTER MIX</b> crossfades bus 1 against bus 2. Everything downstream of that (CRT display, overlay, morph) is shared. Leave the master fader at zero and channels C and D never render, so the two-channel setup costs exactly what it always did — push it off zero and the second bus comes alive.</p>
+  <h3>ROUTING</h3>
+  <p>Each bus picks its own two inputs, so the pairings are not fixed: bus 1 can mix <b>A against C</b>, bus 2 can mix <b>D against B</b>, or the same channel can appear on both. The two selectors at the top of each mixer section set it. To get all four in at once, leave the buses on their pairs, set both bus faders part-way, and put the master on ADD, SCREEN or LIGHTEN rather than FADE \u2014 the buses then sum instead of crossfading.</p>
+  <h3>MULTIVIEW</h3>
+  <p><b>MULTI</b> (or <kbd>V</kbd>) shows all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors. The channel you are editing carries the hot border; channels that are not currently rendering are dimmed. It forces everything to render, so it costs more than the normal view \u2014 it is for setting up, not for performing.</p>
+  <h3>PATTERN SYNTH</h3>
+  <p><b>SYNTH</b> under SOURCE turns a channel into a pattern generator rather than a player. It is built like a video synthesiser: coordinates go through a shape (scan, radial, spiral, plasma, lissajous, rings, starburst, grid, tunnel, cells, interference, polygon), then an oscillator with a selectable waveform, then cross-modulation between the axes, a wavefolder, a comparator, and finally a colouriser \u2014 mono, RGB phase, HSV sweep, duotone or hard bands. Every control is a modulation destination, so patching an LFO into CROSS MOD or FREQ X makes it a moving source. It runs entirely on the GPU, so it costs one pass and no file.</p>
+  <h3>SNAPSHOTS AND THE PERFORMANCE RECORDER</h3>
+  <p>Eight slots hold the whole rig \u2014 all four channels, every bus, every mode. Arm <b>STORE</b> and click a slot to save; click a slot to recall (or <kbd>shift</kbd> and a number). <b>GLIDE</b> decides how long the recall takes to travel: at zero it is a hard cut like a preset, wound up it becomes a slow transformation of everything at once, which is the most musical control in the application.</p>
+  <p>The <b>performance recorder</b> writes down every control you move, twenty-four times a second, storing only what changed. It is recording gestures rather than pixels, which means a take built slowly over an hour can be played back in real time \u2014 and played back against completely different footage. Takes are saved inside the patch file. Touching a control while a take plays fights the playback, which is a perfectly good way to perform over your own recording.</p>
   <h3>TEXT / SHAPES</h3>
   <p><b>TEXT</b> turns the selected channel into a text and shape generator — type anything, pick a font, position/scroll/repeat it, add outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric, starburst) with count, spin and pulse. It feeds the channel like any other source, so you can glitch it, feed it back, and mix it against video on the other channel.</p>
   <h3>INPUT</h3>
@@ -775,7 +803,7 @@ audio,video{display:none;}
   <h3>FINDING YOUR WAY AROUND</h3>
   <p>Hover any parameter name and you get a description of what it does and enough of the mechanism to know why it behaves the way it does. The same works on section headers, mode buttons, the bend pads and the menus. To reset one control, double-click its slider or press the <b>&#8634;</b> that appears when you hover the row; shift-clicking that takes it to the bottom of its range instead. RESET at the top of a section does the whole section, INIT does everything. Sections drag by the handle on the left to reorder, and the order is remembered.</p>
   <h3>KEYS</h3>
-  <p><kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>1</kbd>–<kbd>9</kbd> presets &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> snapshot &nbsp; <kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>H</kbd> this help</p>
+  <p><kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>1</kbd>–<kbd>9</kbd> presets &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> snapshot &nbsp; <kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>V</kbd> multiview &nbsp; <kbd>shift</kbd>+<kbd>1</kbd>–<kbd>8</kbd> snapshots &nbsp; <kbd>H</kbd> this help</p>
   <h3>OUTPUT</h3>
   <p><b>REC</b> captures the live output (with source audio when AUDIO=SOURCE) — MP4 where the browser supports it, WebM otherwise. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
   <p style="padding-top:10px; color:var(--dim);">Click anywhere to close.</p>

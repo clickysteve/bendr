@@ -75,7 +75,11 @@ body{
 }
 .prow:hover .prst{opacity:.75;}
 .prst:hover{color:var(--amber); opacity:1; border:none;}
+.snapbtn{padding:9px 0; font-size:12px; letter-spacing:0;}
+.snapbtn.full{border-color:var(--cyan); color:var(--cyan);}
+.snapbtn.full:hover{border-color:var(--amber); color:#fff;}
 button.dim, input.dim, select.dim{opacity:.32; cursor:not-allowed;}
+#textdock.notext > *:not(#textNeedsSrc){opacity:.3; pointer-events:none;}
 button.dim:hover{border-color:var(--line); color:var(--txt);}
 
 .hsep{width:1px; height:24px; background:var(--line); margin:0 4px;}
@@ -296,7 +300,17 @@ body.chan-d #panel{border-left-color:#b4ff5a;}
 /* ---------- stage ---------- */
 #stage{flex:1; display:flex; flex-direction:column; min-width:0; background:#000;}
 #canvasWrap{flex:1; position:relative; min-height:0; background:#000; overflow:hidden;}
-#glcanvas{position:absolute; top:0; left:0; width:100%; height:100%; display:block;}
+#glcanvas{position:absolute; top:0; left:0; display:block;}
+#mvlabels{
+  position:absolute; display:none; pointer-events:none;
+  grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(2,1fr);
+}
+body.multi #mvlabels{display:grid;}
+#mvlabels span{
+  font-size:8.5px; letter-spacing:2px; color:var(--amber); align-self:start; justify-self:start;
+  margin:5px; padding:2px 6px; background:rgba(6,6,10,.72); border:1px solid rgba(255,122,24,.35);
+  border-radius:3px;
+}
 #canvasWrap:fullscreen{background:#000;}
 #canvasWrap:fullscreen #glcanvas{width:100vw; height:100vh;}
 #dropHint{
@@ -490,7 +504,7 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v15.0</span>
+  <span id="ver" title="Build version">v16.0</span>
 
   <div class="menu" id="mnuSource">
     <button class="menubtn" data-tip="Choose what this channel is looking at. Each channel has its own source.">SOURCE <i>&#9662;</i></button>
@@ -503,6 +517,9 @@ audio,video{display:none;}
       <div class="mrow2">
         <button id="btnPat" data-tip="Use a built-in generated test signal as this channel's source. No file needed.">PATTERN</button>
         <button id="btnText" data-tip="Turn this channel into a text and shape generator. Opens the editor in the dock below the picture.">TEXT</button>
+      </div>
+      <div class="mrow2">
+        <button id="btnSynth" data-tip="Turn this channel into a pattern synthesiser: oscillators, cross-modulation, a wavefolder, a comparator and a colouriser, all computed on the GPU and all modulatable. Shape it in the PATTERN SYNTH section of the panel.">SYNTH</button>
       </div>
       <div class="mlabel">PATTERN</div>
       <select id="selPat" data-tip="Which generated pattern this channel produces. OSCILLATOR, PLASMA and LISSAJOUS are video-synth style sources with no camera involved.">
@@ -578,6 +595,7 @@ audio,video{display:none;}
   <select id="selPreset" data-tip="Sixty-six starting points. Presets load into the channel you are editing (or all of them with LINK on). Keyboard 1-9 for the first nine."></select>
 
   <div class="spacer"></div>
+  <button id="btnMulti" data-tip="Multiview: all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors. The channel you are editing gets the hot border. Keyboard: V.">MULTI</button>
   <button id="btnBypass" data-tip="Hold to hear the clean signal - shows the source with the whole chain switched out, so you can see what you have actually done. Keyboard: hold B.">BYPASS</button>
   <button id="btnRec" data-tip="Record the live output to a file, with the source audio when AUDIO is set to SOURCE. MP4 where the browser allows it, WebM otherwise. Keyboard: R.">&#9679; REC</button>
   <span id="recTime">0:00</span>
@@ -598,6 +616,7 @@ audio,video{display:none;}
       <canvas id="glcanvas"></canvas>
       <div id="osd"></div>
       <div id="dropHint">DROP VIDEO / PRESET</div>
+      <div id="mvlabels"><span>A</span><span>B</span><span>BUS 1</span><span>C</span><span>D</span><span>PROGRAMME</span></div>
     </div>
     <div id="transport">
       <button id="btnPlay" data-tip="Play or pause this channel's file. Keyboard: P.">❚❚</button>
@@ -640,7 +659,7 @@ audio,video{display:none;}
         <div id="routes"></div>
       </div>
       <div id="modgrid"></div>
-      <div id="textdock"><textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
+      <div id="textdock"><div id="textNeedsSrc" style="display:none; color:var(--dim); font-size:9.5px; padding:6px 0 10px;">This channel is not a text source. Pick <b style="color:var(--amber)">TEXT</b> under SOURCE to switch it, and these controls come alive.</div><textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
     <div class="edrow">
       <label>FONT</label>
       <select id="txtFont">
@@ -730,11 +749,20 @@ audio,video{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v15.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v16.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
   <p>The channels meet in three mixers, each with the same twenty transitions: <b>BUS 1</b> combines A and B, <b>BUS 2</b> combines C and D, and <b>MASTER MIX</b> crossfades bus 1 against bus 2. Everything downstream of that (CRT display, overlay, morph) is shared. Leave the master fader at zero and channels C and D never render, so the two-channel setup costs exactly what it always did — push it off zero and the second bus comes alive.</p>
+  <h3>ROUTING</h3>
+  <p>Each bus picks its own two inputs, so the pairings are not fixed: bus 1 can mix <b>A against C</b>, bus 2 can mix <b>D against B</b>, or the same channel can appear on both. The two selectors at the top of each mixer section set it. To get all four in at once, leave the buses on their pairs, set both bus faders part-way, and put the master on ADD, SCREEN or LIGHTEN rather than FADE \u2014 the buses then sum instead of crossfading.</p>
+  <h3>MULTIVIEW</h3>
+  <p><b>MULTI</b> (or <kbd>V</kbd>) shows all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors. The channel you are editing carries the hot border; channels that are not currently rendering are dimmed. It forces everything to render, so it costs more than the normal view \u2014 it is for setting up, not for performing.</p>
+  <h3>PATTERN SYNTH</h3>
+  <p><b>SYNTH</b> under SOURCE turns a channel into a pattern generator rather than a player. It is built like a video synthesiser: coordinates go through a shape (scan, radial, spiral, plasma, lissajous, rings, starburst, grid, tunnel, cells, interference, polygon), then an oscillator with a selectable waveform, then cross-modulation between the axes, a wavefolder, a comparator, and finally a colouriser \u2014 mono, RGB phase, HSV sweep, duotone or hard bands. Every control is a modulation destination, so patching an LFO into CROSS MOD or FREQ X makes it a moving source. It runs entirely on the GPU, so it costs one pass and no file.</p>
+  <h3>SNAPSHOTS AND THE PERFORMANCE RECORDER</h3>
+  <p>Eight slots hold the whole rig \u2014 all four channels, every bus, every mode. Arm <b>STORE</b> and click a slot to save; click a slot to recall (or <kbd>shift</kbd> and a number). <b>GLIDE</b> decides how long the recall takes to travel: at zero it is a hard cut like a preset, wound up it becomes a slow transformation of everything at once, which is the most musical control in the application.</p>
+  <p>The <b>performance recorder</b> writes down every control you move, twenty-four times a second, storing only what changed. It is recording gestures rather than pixels, which means a take built slowly over an hour can be played back in real time \u2014 and played back against completely different footage. Takes are saved inside the patch file. Touching a control while a take plays fights the playback, which is a perfectly good way to perform over your own recording.</p>
   <h3>TEXT / SHAPES</h3>
   <p><b>TEXT</b> turns the selected channel into a text and shape generator — type anything, pick a font, position/scroll/repeat it, add outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric, starburst) with count, spin and pulse. It feeds the channel like any other source, so you can glitch it, feed it back, and mix it against video on the other channel.</p>
   <h3>INPUT</h3>
@@ -775,7 +803,7 @@ audio,video{display:none;}
   <h3>FINDING YOUR WAY AROUND</h3>
   <p>Hover any parameter name and you get a description of what it does and enough of the mechanism to know why it behaves the way it does. The same works on section headers, mode buttons, the bend pads and the menus. To reset one control, double-click its slider or press the <b>&#8634;</b> that appears when you hover the row; shift-clicking that takes it to the bottom of its range instead. RESET at the top of a section does the whole section, INIT does everything. Sections drag by the handle on the left to reorder, and the order is remembered.</p>
   <h3>KEYS</h3>
-  <p><kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>1</kbd>–<kbd>9</kbd> presets &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> snapshot &nbsp; <kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>H</kbd> this help</p>
+  <p><kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>1</kbd>–<kbd>9</kbd> presets &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> snapshot &nbsp; <kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>V</kbd> multiview &nbsp; <kbd>shift</kbd>+<kbd>1</kbd>–<kbd>8</kbd> snapshots &nbsp; <kbd>H</kbd> this help</p>
   <h3>OUTPUT</h3>
   <p><b>REC</b> captures the live output (with source audio when AUDIO=SOURCE) — MP4 where the browser supports it, WebM otherwise. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
   <p style="padding-top:10px; color:var(--dim);">Click anywhere to close.</p>
@@ -1691,6 +1719,156 @@ const FS_LAB = COMMON +
 "  }\n" +
 "  O = vec4(c,1.0);\n}\n";
 
+/* pass: PATTERN SYNTH — a shape and pattern generator per channel, built like a
+   video synthesiser: ramps and oscillators, cross-modulation, a wavefolder, a
+   comparator, then a colouriser. No camera, no file: the picture is computed. */
+const FS_GEN = COMMON +
+"uniform float u_time,u_shape,u_wave,u_colmode;\n" +
+"uniform float u_genFreqX,u_genFreqY,u_genPhase,u_genRate,u_genRot,u_genSkew;\n" +
+"uniform float u_genFM,u_genPulse,u_genFold,u_genComp,u_genThresh,u_genSoft;\n" +
+"uniform float u_genFoldN,u_genCX,u_genCY,u_genWarp,u_genHue,u_genSpread;\n" +
+"uniform float u_genSat,u_genBright,u_genBands,u_genZoom;\n" +
+"#define TAU 6.2831853\n" +
+"float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);\n" +
+"  return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y); }\n" +
+"vec3 hsv(float h, float s, float v){\n" +
+"  vec3 k = fract(vec3(h) + vec3(0.0, 2.0/3.0, 1.0/3.0));\n" +
+"  return v * mix(vec3(1.0), clamp(abs(k*6.0-3.0)-1.0, 0.0, 1.0), s);\n}\n" +
+"/* the oscillator: one cycle of the selected waveform per unit of phase */\n" +
+"float wv(float x){\n" +
+"  x = fract(x);\n" +
+"  if(u_wave<0.5) return 0.5+0.5*sin(x*TAU);\n" +
+"  if(u_wave<1.5) return abs(x*2.0-1.0);\n" +
+"  if(u_wave<2.5) return x;\n" +
+"  if(u_wave<3.5) return step(0.5, x);\n" +
+"  if(u_wave<4.5) return step(1.0-clamp(u_genPulse,0.02,0.98), x);\n" +
+"  return h21(vec2(floor(x*48.0), 7.31));\n}\n" +
+"void main(){\n" +
+"  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  float t = u_time*u_genRate;\n" +
+"  float ar = u_res.x/u_res.y;\n" +
+"  vec2 p = uv - 0.5 - vec2(u_genCX, u_genCY)*0.5;\n" +
+"  p.x *= ar;\n" +
+"  float zm = pow(2.0, u_genZoom*2.0);\n" +
+"  p *= zm;\n" +
+"  float a0 = u_genRot*3.14159;\n" +
+"  p = vec2(p.x*cos(a0) - p.y*sin(a0), p.x*sin(a0) + p.y*cos(a0));\n" +
+"  p.x += p.y*u_genSkew*2.0;\n" +
+"  /* domain warp: the coordinate system itself breathes */\n" +
+"  if(u_genWarp>0.003){\n" +
+"    p += (vec2(vn(p*3.0 + t*0.2), vn(p*3.0 + 17.3 - t*0.15)) - 0.5)*u_genWarp*1.2;\n" +
+"  }\n" +
+"  float fx = 0.2 + u_genFreqX*u_genFreqX*40.0;\n" +
+"  float fy = 0.2 + u_genFreqY*u_genFreqY*40.0;\n" +
+"  float ph = u_genPhase;\n" +
+"  float nf = max(1.0, floor(u_genFoldN));\n" +
+"  float r = length(p);\n" +
+"  float ang = atan(p.y, p.x)/TAU + 0.5;\n" +
+"  float f;\n" +
+"  if(u_shape<0.5){\n" +                     /* SCAN — two ramps cross-modulating */
+"    float b = wv(p.y*fy + t*0.7);\n" +
+"    float a = wv(p.x*fx + ph + t + b*u_genFM*3.0);\n" +
+"    f = 0.5*(a + b);\n" +
+"  } else if(u_shape<1.5){\n" +              /* RADIAL */
+"    f = wv(r*fx + ph + t + wv(ang*nf)*u_genFM*2.0);\n" +
+"  } else if(u_shape<2.5){\n" +              /* SPIRAL */
+"    f = wv(r*fx + ang*nf + ph + t);\n" +
+"  } else if(u_shape<3.5){\n" +              /* PLASMA */
+"    f = 0.25*(wv(p.x*fx*0.5 + t) + wv(p.y*fy*0.5 - t*0.8)\n" +
+"            + wv((p.x+p.y)*fx*0.35 + t*1.3) + wv(r*fy*0.5 - t*0.6));\n" +
+"    f = fract(f*(1.0 + u_genFM*3.0));\n" +
+"  } else if(u_shape<4.5){\n" +              /* LISSAJOUS */
+"    float lx = sin(p.x*fx + t), ly = sin(p.y*fy + t*1.37 + ph*TAU);\n" +
+"    f = wv(lx*ly*(0.5 + u_genFM*3.0) + ph);\n" +
+"  } else if(u_shape<5.5){\n" +              /* RINGS */
+"    f = wv(floor(r*fx*0.5 + t)/max(1.0,nf) + ph);\n" +
+"  } else if(u_shape<6.5){\n" +             /* STARBURST */
+"    f = wv(ang*nf + ph + t + r*fx*0.06*u_genFM*10.0);\n" +
+"  } else if(u_shape<7.5){\n" +             /* GRID */
+"    f = max(wv(p.x*fx + ph + t), wv(p.y*fy - t));\n" +
+"  } else if(u_shape<8.5){\n" +             /* TUNNEL */
+"    float rr = 0.35/max(r, 0.02);\n" +
+"    f = 0.5*(wv(rr*fx*0.25 + t) + wv(ang*nf + ph));\n" +
+"  } else if(u_shape<9.5){\n" +             /* CELLS */
+"    vec2 g = p*max(1.0, fx*0.25);\n" +
+"    vec2 gi = floor(g), gf = fract(g);\n" +
+"    float md = 8.0;\n" +
+"    for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){\n" +
+"      vec2 o = vec2(float(x), float(y));\n" +
+"      vec2 pt = o + 0.5 + 0.5*vec2(sin(h21(gi+o)*TAU + t*2.0), cos(h21(gi+o+3.1)*TAU + t*1.7));\n" +
+"      md = min(md, length(pt - gf));\n" +
+"    }\n" +
+"    f = wv(md*(0.5 + u_genFM*3.0) + ph);\n" +
+"  } else if(u_shape<10.5){\n" +            /* INTERFERENCE — two point sources beating */
+"    float d1 = length(p - vec2(0.28, 0.0)), d2 = length(p + vec2(0.28, 0.0));\n" +
+"    f = 0.5*(wv(d1*fx + t) + wv(d2*fy - t));\n" +
+"  } else {\n" +                            /* POLYGON */
+"    float aa = atan(p.y, p.x);\n" +
+"    float seg = TAU/nf;\n" +
+"    float rp = r*cos(mod(aa, seg) - seg*0.5)/max(cos(seg*0.5), 0.01);\n" +
+"    f = wv(rp*fx*0.5 + ph + t);\n" +
+"  }\n" +
+"  /* wavefolder: keeps folding the signal back on itself, which is where the\n" +
+"     hard banded video-synth structure comes from */\n" +
+"  if(u_genFold>0.003){\n" +
+"    float k = 1.0 + u_genFold*7.0;\n" +
+"    f = abs(fract(f*k)*2.0 - 1.0);\n" +
+"  }\n" +
+"  /* comparator: the hard-edged shape maker */\n" +
+"  if(u_genComp>0.003){\n" +
+"    float sf = max(0.001, u_genSoft*0.5);\n" +
+"    f = mix(f, smoothstep(u_genThresh-sf, u_genThresh+sf, f), u_genComp);\n" +
+"  }\n" +
+"  f = clamp(f, 0.0, 1.0);\n" +
+"  vec3 c;\n" +
+"  float sp = u_genSpread;\n" +
+"  if(u_colmode<0.5){ c = vec3(f); }\n" +
+"  else if(u_colmode<1.5){\n" +             /* RGB PHASE — three channels of the same osc, offset */
+"    c = vec3(wv(f + u_genHue), wv(f + u_genHue + sp*0.33), wv(f + u_genHue + sp*0.66));\n" +
+"  }\n" +
+"  else if(u_colmode<2.5){ c = hsv(u_genHue + f*sp, u_genSat, mix(1.0, f, 0.25)); }\n" +
+"  else if(u_colmode<3.5){\n" +             /* DUOTONE */
+"    c = mix(hsv(u_genHue, u_genSat, 1.0), hsv(fract(u_genHue+sp*0.5), u_genSat, 1.0), f);\n" +
+"  }\n" +
+"  else {\n" +                              /* BANDS */
+"    float nb = max(2.0, floor(u_genBands));\n" +
+"    float q = floor(f*nb)/nb;\n" +
+"    c = hsv(u_genHue + q*sp, u_genSat, 1.0);\n" +
+"  }\n" +
+"  O = vec4(clamp(c*u_genBright, 0.0, 1.0), 1.0);\n}\n";
+
+/* pass: MULTIVIEW — every channel and both buses at once, like a vision mixer's
+   preview monitors. 3 x 2 cells: A / B / BUS 1 over C / D / PROGRAM. */
+const FS_MULTI = COMMON +
+"uniform sampler2D u_a; uniform sampler2D u_b; uniform sampler2D u_c;\n" +
+"uniform sampler2D u_d; uniform sampler2D u_b1; uniform sampler2D u_pgm;\n" +
+"uniform float u_active, u_liveA, u_liveB, u_liveC, u_liveD;\n" +
+"void main(){\n" +
+"  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  vec2 g = vec2(3.0, 2.0);\n" +
+"  vec2 cell = floor(uv*g);\n" +
+"  vec2 luv = fract(uv*g);\n" +
+"  /* gl_FragCoord runs bottom-up, so row 0 of the grid is the bottom one */\n" +
+"  int row = 1 - int(cell.y);\n" +
+"  int idx = row*3 + int(cell.x);\n" +
+"  vec3 c;\n" +
+"  float lit = 1.0;\n" +
+"  if(idx==0){ c = texture(u_a, luv).rgb; lit = u_liveA; }\n" +
+"  else if(idx==1){ c = texture(u_b, luv).rgb; lit = u_liveB; }\n" +
+"  else if(idx==2){ c = texture(u_b1, luv).rgb; }\n" +
+"  else if(idx==3){ c = texture(u_c, luv).rgb; lit = u_liveC; }\n" +
+"  else if(idx==4){ c = texture(u_d, luv).rgb; lit = u_liveD; }\n" +
+"  else { c = texture(u_pgm, luv).rgb; }\n" +
+"  c *= mix(0.18, 1.0, lit);\n" +
+"  /* cell borders, and a hot border on the channel you are editing */\n" +
+"  vec2 e = min(luv, 1.0-luv)*vec2(u_res.x/3.0, u_res.y/2.0);\n" +
+"  float edge = 1.0 - smoothstep(0.0, 1.5, min(e.x, e.y));\n" +
+"  float sel = (float(idx) == u_active) ? 1.0 : 0.0;\n" +
+"  float hot = 1.0 - smoothstep(0.0, 3.0, min(e.x, e.y));\n" +
+"  c = mix(c, vec3(0.09,0.09,0.11), edge*0.85);\n" +
+"  c = mix(c, vec3(1.0,0.48,0.09), hot*sel);\n" +
+"  O = vec4(c, 1.0);\n}\n";
+
 /* pass: plain copy */
 const FS_COPY = COMMON +
 "uniform sampler2D u_tex;\n" +
@@ -1698,10 +1876,12 @@ const FS_COPY = COMMON +
 
 /* ---------------- parameter registry ---------------- */
 const SECTIONS = [
-  {id:"mixer",    name:"MIX BUS 1 \u00b7 A+B", cls:"mag"},
-  {id:"mixer2",   name:"MIX BUS 2 \u00b7 C+D", cls:"mag"},
-  {id:"mixerM",   name:"MASTER MIX \u00b7 BUS 1+2", cls:"mag"},
+  {id:"mixer",    name:"MIX BUS 1", cls:"mag"},
+  {id:"mixer2",   name:"MIX BUS 2", cls:"mag"},
+  {id:"mixerM",   name:"MASTER MIX", cls:"mag"},
+  {id:"snap",     name:"SNAPSHOTS / PERFORM", cls:"cyan"},
   {id:"morph",    name:"PRESET MORPH",      cls:"mag"},
+  {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag"},
   {id:"enhancer", name:"BENT ENHANCER",     cls:"mag"},
   {id:"feedback", name:"FEEDBACK / RESCAN", cls:"mag"},
@@ -1717,7 +1897,7 @@ const SECTIONS = [
   {id:"crt",      name:"CRT DISPLAY",       cls:"cyan"},
 ];
 const PDEF = [
-  ["abMix","FADER A>B","mixer",0,1,0],
+  ["abMix","BUS 1 FADER","mixer",0,1,0],
   ["wipeSoft","WIPE SOFT","mixer",0,1,0.03],
   ["wipeDetail","WIPE DETAIL","mixer",0,1,0.3],
   ["wipeX","WIPE CTR X","mixer",-1,1,0],
@@ -1727,7 +1907,7 @@ const PDEF = [
   ["mixKeyInv","KEY INVERT","mixer",0,1,0],
   ["mixKeyHue","KEY HUE","mixer",0,1,0.33],
 
-  ["cdMix","FADER C>D","mixer2",0,1,0],
+  ["cdMix","BUS 2 FADER","mixer2",0,1,0],
   ["wipeSoft2","WIPE SOFT","mixer2",0,1,0.03],
   ["wipeDetail2","WIPE DETAIL","mixer2",0,1,0.3],
   ["wipeX2","WIPE CTR X","mixer2",-1,1,0],
@@ -1737,7 +1917,7 @@ const PDEF = [
   ["mixKeyInv2","KEY INVERT","mixer2",0,1,0],
   ["mixKeyHue2","KEY HUE","mixer2",0,1,0.33],
 
-  ["busMix","FADER BUS 1>2","mixerM",0,1,0],
+  ["busMix","MASTER FADER","mixerM",0,1,0],
   ["wipeSoftM","WIPE SOFT","mixerM",0,1,0.03],
   ["wipeDetailM","WIPE DETAIL","mixerM",0,1,0.3],
   ["wipeXM","WIPE CTR X","mixerM",-1,1,0],
@@ -1748,6 +1928,29 @@ const PDEF = [
   ["mixKeyHueM","KEY HUE","mixerM",0,1,0.33],
 
   ["morph","MORPH A>B","morph",0,1,0],
+
+  ["genFreqX","FREQ X","gen",0,1,0.18],
+  ["genFreqY","FREQ Y","gen",0,1,0.12],
+  ["genPhase","PHASE","gen",-1,1,0],
+  ["genRate","RATE","gen",-1,1,0.08],
+  ["genFM","CROSS MOD","gen",0,1,0],
+  ["genFold","WAVEFOLD","gen",0,1,0],
+  ["genPulse","PULSE WIDTH","gen",0,1,0.5],
+  ["genComp","COMPARATOR","gen",0,1,0],
+  ["genThresh","COMP THRESH","gen",0,1,0.5],
+  ["genSoft","COMP SOFT","gen",0,1,0.12],
+  ["genFoldN","SYMMETRY","gen",1,16,4],
+  ["genZoom","SCALE","gen",-1,1,0],
+  ["genRot","ROTATE","gen",-1,1,0],
+  ["genSkew","SKEW","gen",-1,1,0],
+  ["genCX","CENTRE X","gen",-1,1,0],
+  ["genCY","CENTRE Y","gen",-1,1,0],
+  ["genWarp","DOMAIN WARP","gen",0,1,0],
+  ["genHue","HUE","gen",0,1,0.55],
+  ["genSpread","HUE SPREAD","gen",0,2,1],
+  ["genSat","SATURATION","gen",0,1,0.9],
+  ["genBright","BRIGHTNESS","gen",0,1.5,1],
+  ["genBands","COLOUR BANDS","gen",2,16,6],
 
   ["srcZoom","ZOOM","frame",-1,1,0],
   ["srcX","POS X","frame",-1,1,0],
@@ -1963,8 +2166,8 @@ const PDEF = [
    the way it does. Shown on hover over the parameter name. */
 const PHELP = {
   /* ---- mixers (bus 1, bus 2, master) ---- */
-  abMix:"Crossfades channel B over channel A. At 0 you see only A, at 1 only B; in between the MODE dropdown decides how they meet — a plain dissolve, one of twelve wipe shapes, a key, or a blend. Run it like a T-bar.",
-  cdMix:"The same fader for bus 2: crossfades channel D over channel C. Bus 2 only renders at all while the MASTER fader is above zero.",
+  abMix:"Crossfades bus 1's second input over its first (A over B by default, but the two selectors above set which channels the bus is actually mixing). At 0 you see only A, at 1 only B; in between the MODE dropdown decides how they meet — a plain dissolve, one of twelve wipe shapes, a key, or a blend. Run it like a T-bar.",
+  cdMix:"The same fader for bus 2, crossfading its second input over its first. Bus 2 only renders at all while the MASTER fader is above zero.",
   busMix:"The master crossfade between the two buses. At 0 you see bus 1 (A/B) and channels C and D cost nothing; push it up and the second bus comes alive and fades in.",
   wipeSoft:"How feathered the wipe edge is. At zero it is a hard cut line; wound up it becomes a soft gradient, which reads as a dissolve that travels.",
   wipeDetail:"Means different things per mode: the number of slats for BLINDS, bars for DIAG BARS, cells for BLOCKS, and the size of the shape for BOX and CIRCLE.",
@@ -1977,6 +2180,28 @@ const PHELP = {
   morph:"Blends every slider on the panel between the two snapshots stored with STORE A and STORE B. Put an LFO on this and the whole rig evolves on its own. Touching any individual slider takes that one control back out of the morph.",
 
   /* ---- frame / position ---- */
+  genFreqX:"Horizontal frequency of the oscillator, from a single slow sweep across the frame up to about forty cycles. In the radial and tunnel shapes this becomes the frequency along the radius instead.",
+  genFreqY:"Vertical frequency. Set it against FREQ X and the two beat against each other, which is where most patterns come from.",
+  genPhase:"Slides the whole pattern along its own waveform. Modulate this rather than the frequency when you want movement without the shape changing.",
+  genRate:"How fast the generator animates on its own. Negative runs it backwards. At zero the picture is completely still, which is useful when you want something else to be the only moving thing.",
+  genFM:"Cross-modulation: one axis modulates the other. This is the single most productive control here \u2014 a plain grid becomes wavy, then braided, then chaotic, as you wind it up.",
+  genFold:"A wavefolder. Instead of clipping the signal when it leaves the range, it folds it back on itself, over and over. This is where the hard banded structure of analogue video synthesis comes from.",
+  genPulse:"Duty cycle, for the PULSE waveform only. At the extremes it becomes thin lines on a field; in the middle it is a square wave.",
+  genComp:"How much of the comparator is applied. A comparator turns a smooth gradient into a hard-edged shape by asking whether the signal is above or below a threshold \u2014 it is what makes solid graphic shapes rather than washes.",
+  genThresh:"Where that comparator trips. Sweep it and shapes grow and shrink.",
+  genSoft:"How gradual the comparator edge is. Small values give a hard cut; large values give an airbrushed edge.",
+  genFoldN:"Rotational symmetry: the number of arms, segments, sides or spiral turns, depending on the shape.",
+  genZoom:"Scales the whole pattern. Because it is applied before everything else, zooming out reveals the structure repeating.",
+  genRot:"Rotates the pattern.",
+  genSkew:"Shears it, so vertical structures lean.",
+  genCX:"Moves the pattern's centre horizontally, which matters for the radial, spiral and tunnel shapes.",
+  genCY:"Moves the centre vertically.",
+  genWarp:"Warps the coordinate system itself with slow noise before the pattern is drawn, so straight lines bend and breathe rather than staying geometric.",
+  genHue:"The base colour. What it does depends on the COLOUR mode: it offsets the phase in RGB PHASE, sets the start of the sweep in HSV, and picks the first ink in DUOTONE.",
+  genSpread:"How far the colour travels across the pattern. Small values give a tint, large values give a full spectrum inside one shape.",
+  genSat:"Colour intensity of the generator, before anything downstream touches it.",
+  genBright:"Output level of the generator.",
+  genBands:"For the BANDS colour mode: how many flat colour steps the pattern is quantised into.",
   srcZoom:"Scales this channel's picture inside the raster. Negative pulls it away from the edges and lets the EDGE mode (black, tile or mirror) show.",
   srcX:"Slides the picture horizontally within the frame.",
   srcY:"Slides the picture vertically within the frame.",
@@ -2212,7 +2437,9 @@ const SECHELP = {
   mixer:"Bus 1 of three. Combines the two finished channels A and B with a fader and twenty transition modes.",
   mixer2:"Bus 2. Identical to bus 1 but for channels C and D. It only renders while the MASTER fader is above zero, so leaving it alone is free.",
   mixerM:"The master crossfade between the two buses, with the same twenty transitions one level up.",
+  snap:"Eight whole-rig snapshots with a glide time, and a performance recorder that writes down every control you move so the take can be replayed against other footage.",
   morph:"Snapshot two entire panel states and blend every slider between them. The fastest way to build a long evolving performance.",
+  gen:"A shape and pattern generator built like a video synthesiser rather than a list of test cards: ramps and oscillators, cross-modulation, a wavefolder, a comparator and a colouriser. Everything here is modulatable, so it is a moving source rather than a still one.",
   frame:"How this channel's picture sits in the raster, before anything is done to it. Also where the kaleidoscope fold lives.",
   enhancer:"The circuit-bent video enhancer core: a colour processor pushed past its design limits. Rainbow mapping, an oscillating sharpness circuit, channel separation.",
   feedback:"The loop, and the most generative part of the instrument. The output is transformed and fed back into the input, so the picture becomes a dynamical system rather than a filter chain.",
@@ -2233,7 +2460,7 @@ const SECHELP = {
 };
 
 /* Master sections are single-instance; everything else exists once per channel. */
-const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","morph"]);
+const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","morph","snap"]);
 const CHANNELS = ["A","B","C","D"];
 const BUSPAIR = {A:"B", B:"A", C:"D", D:"C"};   // each channel's partner on its mixer bus
 const P = {};           // id -> param descriptor
@@ -2277,6 +2504,14 @@ let mixMode2 = 0, wipeInv2 = false;   // BUS 2 (C/D)
 let mixModeM = 0, wipeInvM = false;   // MASTER (bus 1 / bus 2)
 /* the mixer shader has one set of uniform names; each bus feeds it its own params */
 const MIXP = ["abMix","wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue"];
+/* which channel feeds each side of each bus — any channel can meet any other */
+const busSrc = {b1:["A","B"], b2:["C","D"]};
+/* pattern synth mode selectors, one set per channel */
+const GEN_SHAPES = ["SCAN","RADIAL","SPIRAL","PLASMA","LISSAJOUS","RINGS","STARBURST","GRID","TUNNEL","CELLS","INTERFERE","POLYGON"];
+const GEN_WAVES  = ["SINE","TRIANGLE","SAW","SQUARE","PULSE","S&H"];
+const GEN_COLS   = ["MONO","RGB PHASE","HSV SWEEP","DUOTONE","BANDS"];
+const genMode = {};
+let multiView = false;
 const MIXBUS = {
   b1: MIXP,
   b2: ["cdMix","wipeSoft2","wipeDetail2","wipeX2","wipeY2","mixKeyThresh2","mixKeySoft2","mixKeyInv2","mixKeyHue2"],
@@ -2325,6 +2560,8 @@ function U(pr, name){
 const progFB = makeProg(FS_FB), progSIG = makeProg(FS_SIG), progCOL = makeProg(FS_COL), progCRT = makeProg(FS_CRT);
 const progGLITCH = makeProg(FS_GLITCH), progFLOW = makeProg(FS_FLOW), progCOPY = makeProg(FS_COPY);
 const progMIX = makeProg(FS_MIX);
+const progMULTI = makeProg(FS_MULTI);
+const progGEN = makeProg(FS_GEN);
 const progLAB = makeProg(FS_LAB);
 
 function makeRT(w,h){
@@ -2346,11 +2583,11 @@ const RING_N = 30;
 /* Each channel owns its feedback history, flow history and frame ring;
    scratch buffers are shared because channels render one after the other. */
 function newChanRT(){
-  return {fbPrev:null, fbNext:null, crt:null, flowA:null, flowB:null, flowSrc:null, out:null,
+  return {fbPrev:null, fbNext:null, crt:null, flowA:null, flowB:null, flowSrc:null, gen:null, out:null,
           ring:null, ringW:0, ringFilled:0};
 }
 const chanRT = {};
-for(const ch of CHANNELS) chanRT[ch] = newChanRT();
+for(const ch of CHANNELS){ chanRT[ch] = newChanRT(); genMode[ch] = {shape:0, wave:0, col:1}; }
 let scratch1, scratch2, mixOut, busOut1, busOut2, persistA, persistB;
 let fieldSrc = 0;   // field-modulation source
 const autoGain = {};
@@ -2367,12 +2604,12 @@ function ensureRing(c){
 function allocRTs(){
   for(const ch of CHANNELS){
     const c = chanRT[ch];
-    for(const k of ["fbPrev","fbNext","crt","flowA","flowB","flowSrc","out"]) freeRT(c[k]);
+    for(const k of ["fbPrev","fbNext","crt","flowA","flowB","flowSrc","gen","out"]) freeRT(c[k]);
     clearRing(c);
     c.fbPrev = makeRT(procW,procH); c.fbNext = makeRT(procW,procH);
     c.crt    = makeRT(procW,procH);
     c.flowA  = makeRT(procW,procH); c.flowB  = makeRT(procW,procH);
-    c.flowSrc= makeRT(procW,procH);
+    c.flowSrc= makeRT(procW,procH); c.gen = makeRT(procW,procH);
     c.out    = makeRT(procW,procH);
   }
   freeRT(scratch1); freeRT(scratch2); freeRT(mixOut); freeRT(busOut1); freeRT(busOut2);
@@ -3177,9 +3414,15 @@ function loadCollapse(){
   if(!st){
     /* first run: the second bus and the master crossfade are folded away, since
        they do nothing until you bring channels C and D in */
-    st = {mixer2:true, mixerM:true};
+    st = {mixer2:true, mixerM:true, gen:true};
   }
   for(const k in st) if(secEls[k] && st[k]) secEls[k].classList.add("collapsed");
+}
+function revealSection(id){
+  const d = secEls[id];
+  if(!d) return;
+  d.classList.remove("collapsed"); saveCollapse();
+  d.scrollIntoView({block:"start", behavior:"smooth"});
 }
 function collapseAll(v){
   for(const k in secEls) secEls[k].classList.toggle("collapsed", v);
@@ -3274,6 +3517,7 @@ function resetSection(id){
   if(id==="feedback"){ fbTrailMode=false; rescanMode=false; fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; }
   if(id==="lab"){ fieldSrc=0; }
   if(id==="flow"){ flowField=0; flowEdge=0; }
+  if(id==="gen"){ genMode[activeChan] = {shape:0, wave:0, col:1}; }
   if(id==="vhs" && window.__setTransport){ window.__setTransport("play"); if(tapeBtnRefs[0]) for(const k in tapeBtnRefs[0]) tapeBtnRefs[0][k].classList.toggle("on", k==="play"); }
   if(id==="crt"){ outModel=0; }
   if(id==="mixer"){ mixMode=0; wipeInv=false; const sm=document.getElementById("selMixMode"); if(sm) sm.value=0; }
@@ -3292,6 +3536,12 @@ function mkToggle(parent, id, labelFn, onClick, tip){
   parent.appendChild(b);
   toggleRefs[id] = {btn:b, labelFn};
   return b;
+}
+function refreshBusUI(){
+  for(const key of ["b1","b2"]) for(const side of [0,1]){
+    const el = document.getElementById("busSrc"+key+side);
+    if(el) el.value = busSrc[key][side];
+  }
 }
 function refreshToggles(){
   for(const k in toggleRefs) toggleRefs[k].btn.textContent = toggleRefs[k].labelFn();
@@ -3321,6 +3571,31 @@ function sectionExtras(id, d){
       if(which===1) mixMode = v; else if(which===2) mixMode2 = v; else mixModeM = v;
     };
     tr.appendChild(sel);
+    if(which<3){
+      /* which two channels this bus is actually mixing */
+      const rr = document.createElement("div"); rr.className="trow";
+      const key = which===1 ? "b1" : "b2";
+      for(const side of [0,1]){
+        const sel = document.createElement("select");
+        sel.id = "busSrc"+key+side;
+        attachTip(sel, side===0 ? "BUS INPUT A" : "BUS INPUT B",
+          "Which channel feeds this side of the bus. Any channel can be routed to any bus, so A can wipe against C, or D against B.",
+          "To mix all four at once, leave the buses on their pairs, set both bus faders part-way, and put the master on ADD or LIGHTEN.");
+        for(const c of CHANNELS){
+          const o = document.createElement("option"); o.value=c; o.textContent="CH "+c; sel.appendChild(o);
+        }
+        sel.value = busSrc[key][side];
+        sel.onchange = ()=>{ busSrc[key][side] = sel.value; toast("Bus "+which+": "+busSrc[key][0]+" \u2194 "+busSrc[key][1]); };
+        rr.appendChild(sel);
+        if(side===0){
+          const arrow = document.createElement("span");
+          arrow.style.cssText="color:var(--dim); font-size:9px; align-self:center; padding:0 2px;";
+          arrow.textContent = "\u2194";
+          rr.appendChild(arrow);
+        }
+      }
+      d.appendChild(rr);
+    }
     if(which===1) mkToggle(tr, "wipeInv", ()=>"WIPE: "+(wipeInv?"INV":"NORM"), ()=>{ wipeInv=!wipeInv; }, "Runs the wipe from the other side.");
     if(which===2) mkToggle(tr, "wipeInv2", ()=>"WIPE: "+(wipeInv2?"INV":"NORM"), ()=>{ wipeInv2=!wipeInv2; }, "Runs the wipe from the other side.");
     if(which===3) mkToggle(tr, "wipeInvM", ()=>"WIPE: "+(wipeInvM?"INV":"NORM"), ()=>{ wipeInvM=!wipeInvM; }, "Runs the wipe from the other side.");
@@ -3331,6 +3606,77 @@ function sectionExtras(id, d){
       which===1 ? "Bus 1 combines channels A and B. Run the fader like a T-bar; wipes use SOFT for edge feather, DETAIL for blind/bar count, CTR X/Y for the origin. Give channel B a source first."
     : which===2 ? "Bus 2 combines channels C and D, exactly like bus 1. It only renders when the MASTER fader is above zero, so leaving it alone costs nothing."
     : "The master crossfade between the two buses \u2014 the same twenty transitions again, one level up. Push it off zero and channels C and D come alive.";
+    d.appendChild(note);
+  }
+  if(id==="snap"){
+    const grid = document.createElement("div");
+    grid.style.cssText = "display:grid; grid-template-columns:repeat(4,1fr); gap:5px; padding:2px 0 4px;";
+    for(let i=0;i<8;i++){
+      const b = document.createElement("button");
+      b.id = "snap"+i; b.className = "snapbtn"; b.textContent = (i+1);
+      attachTip(b, "SNAPSHOT "+(i+1),
+        "Click to recall this slot, gliding every control from where it is now to where the slot says. Arm STORE first to save into it instead.",
+        "Keyboard: shift+"+(i+1)+". A filled slot is outlined.");
+      b.onclick = ()=>window.__snapHit(i);
+      grid.appendChild(b);
+    }
+    d.appendChild(grid);
+    const tr = document.createElement("div"); tr.className="trow";
+    const sb = document.createElement("button"); sb.id="snapStoreBtn"; sb.textContent="STORE";
+    attachTip(sb, "STORE", "Arm this, then click a slot to write the whole rig into it. It disarms itself afterwards.");
+    sb.onclick = ()=>{ snapStoreArm = !snapStoreArm; refreshSnapUI(); };
+    tr.appendChild(sb);
+    const cl = document.createElement("button"); cl.textContent="CLEAR ALL";
+    attachTip(cl, "CLEAR ALL", "Empties all eight slots.");
+    cl.onclick = ()=>{ for(let i=0;i<8;i++) snapSlots[i]=null; refreshSnapUI(); toast("Snapshots cleared"); };
+    tr.appendChild(cl);
+    d.appendChild(tr);
+    /* glide time */
+    {
+      const row = document.createElement("div"); row.className="prow";
+      const lab = document.createElement("label"); lab.textContent = "GLIDE";
+      attachTip(lab, "GLIDE", "How long a snapshot recall takes to travel. At zero it is a hard cut, like a preset; wound up it becomes a slow transformation of the whole rig and is the most musical control in this section.");
+      const wrap = document.createElement("div"); wrap.className="sldwrap";
+      const sl = document.createElement("input");
+      sl.type="range"; sl.min=0; sl.max=12; sl.step=0.05; sl.value=snapGlide;
+      const v = document.createElement("span"); v.className="val"; v.textContent = snapGlide.toFixed(2)+"s";
+      sl.addEventListener("input", ()=>{ snapGlide = parseFloat(sl.value); v.textContent = snapGlide.toFixed(2)+"s"; });
+      wrap.appendChild(sl);
+      row.appendChild(lab); row.appendChild(wrap); row.appendChild(v);
+      d.appendChild(row);
+    }
+    const hr = document.createElement("div");
+    hr.style.cssText = "height:1px; background:var(--line); margin:8px 0 6px;";
+    d.appendChild(hr);
+    const pl = document.createElement("div");
+    pl.style.cssText = "font-size:7.5px; letter-spacing:1.5px; color:var(--dim); padding-bottom:3px;";
+    pl.textContent = "PERFORMANCE RECORDER";
+    d.appendChild(pl);
+    const tr2 = document.createElement("div"); tr2.className="trow";
+    const rb = document.createElement("button"); rb.id="perfRecBtn"; rb.textContent="\u25cf REC";
+    attachTip(rb, "RECORD PERFORMANCE",
+      "Writes down every control you move, twenty-four times a second, storing only what changed. Not video \u2014 gestures.",
+      "Because it is gestures, you can play the take back against completely different footage.");
+    rb.onclick = ()=>{ if(perfRec.mode==="rec") perfStop(); else perfStart(); };
+    const pb = document.createElement("button"); pb.id="perfPlayBtn"; pb.textContent="\u25b6 PLAY";
+    attachTip(pb, "PLAY TAKE", "Replays the recorded take, moving the controls as you moved them. Touching anything while it plays fights the playback, which is a legitimate way to perform over your own take.");
+    pb.onclick = ()=>{ if(perfRec.mode==="play") perfStop(); else perfPlay(); };
+    const lb = document.createElement("button"); lb.id="perfLoopBtn"; lb.textContent="LOOP";
+    attachTip(lb, "LOOP TAKE", "Runs the take round and round instead of stopping at the end.");
+    lb.onclick = ()=>{ perfRec.loop = !perfRec.loop; refreshPerfUI(); };
+    const cb = document.createElement("button"); cb.textContent="CLR";
+    attachTip(cb, "CLEAR TAKE", "Throws the recorded take away.");
+    cb.onclick = ()=>{ perfClear(); toast("Take cleared"); };
+    tr2.appendChild(rb); tr2.appendChild(pb); tr2.appendChild(lb); tr2.appendChild(cb);
+    d.appendChild(tr2);
+    const stt = document.createElement("div");
+    stt.id = "perfState";
+    stt.style.cssText = "color:var(--cyan); font-size:9px; letter-spacing:1.5px; padding:4px 0 2px;";
+    stt.textContent = "NO TAKE";
+    d.appendChild(stt);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Snapshots hold the whole rig \u2014 all four channels, every bus, every mode \u2014 and GLIDE decides how long it takes to get there. The recorder captures the moves rather than the picture, so a take built slowly over an hour can be replayed in real time, against other footage, and recorded out.";
     d.appendChild(note);
   }
   if(id==="morph"){
@@ -3442,6 +3788,25 @@ function sectionExtras(id, d){
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
     note.textContent = "A whole deck, per channel. Transport drives this channel's source: STILL parks a noise bar across a held field, shuttle and jog scrub with head-crossing bands. TAPE SPEED runs SP to EP \u2014 the slower the tape, the less bandwidth survives. GENERATIONS compounds GEN LOSS as if the tape had been dubbed that many times. TRACK PHASE places the mistracking band, SERVO HUNT makes the auto-tracking circuit search for it.";
+    d.appendChild(note);
+  }
+  if(id==="gen"){
+    const tr = document.createElement("div"); tr.className="trow";
+    mkToggle(tr, "genShape", ()=>GEN_SHAPES[genMode[activeChan].shape],
+      ()=>{ const M=genMode[activeChan]; M.shape=(M.shape+1)%GEN_SHAPES.length; },
+      "The geometry the oscillator is drawn through. SCAN is two ramps crossing, which is the classic video-synth starting point; the others bend the coordinate system into rings, spirals, tunnels, cells and polygons before the oscillator ever sees it.");
+    d.appendChild(tr);
+    const tr2 = document.createElement("div"); tr2.className="trow";
+    mkToggle(tr2, "genWave", ()=>GEN_WAVES[genMode[activeChan].wave],
+      ()=>{ const M=genMode[activeChan]; M.wave=(M.wave+1)%GEN_WAVES.length; },
+      "The oscillator waveform. SINE gives soft gradients, TRIANGLE gives clean ramps up and down, SAW gives hard sawtooth edges, SQUARE and PULSE give solid shapes, and S&H gives stepped random values.");
+    mkToggle(tr2, "genCol", ()=>GEN_COLS[genMode[activeChan].col],
+      ()=>{ const M=genMode[activeChan]; M.col=(M.col+1)%GEN_COLS.length; },
+      "How the pattern is coloured. MONO leaves it as brightness; RGB PHASE runs the same oscillator into the three channels at different phases, which is how analogue video synths make colour; HSV SWEEP maps the pattern to hue; DUOTONE mixes two inks; BANDS quantises into flat colour steps.");
+    d.appendChild(tr2);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Set this channel to SYNTH under SOURCE and the picture is computed rather than filmed. Signal flow: coordinates \u2192 shape \u2192 oscillator \u2192 cross modulation \u2192 wavefolder \u2192 comparator \u2192 colouriser. Every control here is a modulation destination, so patch an LFO into FREQ X or CROSS MOD and it becomes a moving source.";
     d.appendChild(note);
   }
   if(id==="glitch"){
@@ -3745,6 +4110,18 @@ const PRESETS = [
  [{src:"drift",dst:"kaleidoRot",amt:0.15,ch:"A"},{src:"lfo3",dst:"bloom",amt:0.2,ch:"A"},{src:"chaos",dst:"chromaDelay",amt:0.12,ch:"A"}]],
 ["CRT REPHOTO", {bloom:0.5,bloomRad:0.35,halation:0.5,defocus:0.3,grain:0.45,scanlines:0.4,aperture:0.35,curvature:0.4,vignette:0.55,chromaBleed:0.3,ringing:0.25,genLoss:0.2,signalNoise:0.06,hWobble:0.04,tapeWow:0.12,contrast:1.15,saturation:1.1,glow:0.15},
  [{src:"drift",dst:"defocus",amt:0.12,ch:"A"},{src:"lfo3",dst:"bloom",amt:0.15,ch:"A"}]],
+["SYNTH · RAMP CROSS", {genFreqX:0.26,genFreqY:0.19,genFM:0.4,genRate:0.1,genHue:0.55,genSpread:1.2,genSat:0.95,genBright:1,scanlines:0.16,curvature:0.26,vignette:0.36,bloom:0.2},
+ [{src:"lfo1",dst:"genFM",amt:0.3,ch:"A"},{src:"lfo3",dst:"genPhase",amt:0.4,ch:"A"},{src:"drift",dst:"genFreqY",amt:0.12,ch:"A"}], {src:"synth", gm:{shape:0,wave:0,col:1}}],
+["SYNTH · SPIRAL DRIVE", {genFreqX:0.3,genFoldN:6,genRate:0.12,genSpread:1.5,genHue:0.1,genSat:1,genFold:0.25,scanlines:0.2,curvature:0.3,vignette:0.42,bloom:0.35,halation:0.25},
+ [{src:"lfo3",dst:"genRot",amt:0.5,ch:"A"},{src:"bass",dst:"genFold",amt:0.3,ch:"A"}], {src:"synth", gm:{shape:2,wave:1,col:2}}],
+["SYNTH · HARD SHAPES", {genFreqX:0.22,genFoldN:8,genComp:1,genThresh:0.5,genSoft:0.02,genSpread:0.7,genHue:0.85,genSat:1,genRate:0.06,scanlines:0.18,curvature:0.28,vignette:0.4},
+ [{src:"lfo2",dst:"genThresh",amt:0.35,ch:"A"},{src:"spike",dst:"genFoldN",amt:0.4,ch:"A"}], {src:"synth", gm:{shape:6,wave:3,col:3}}],
+["SYNTH · PLASMA BANDS", {genFreqX:0.2,genFreqY:0.16,genFM:0.55,genBands:9,genSpread:1.6,genHue:0.3,genSat:0.95,genRate:0.14,scanlines:0.2,curvature:0.3,vignette:0.4,bloom:0.3},
+ [{src:"drift",dst:"genHue",amt:0.4,ch:"A"},{src:"lfo1",dst:"genFM",amt:0.25,ch:"A"},{src:"mid",dst:"genBands",amt:0.3,ch:"A"}], {src:"synth", gm:{shape:3,wave:0,col:4}}],
+["SYNTH · FOLDED RADIAL", {genFreqX:0.3,genFold:0.6,genWarp:0.45,genSpread:1.3,genHue:0.62,genSat:0.9,genRate:0.09,scanlines:0.18,curvature:0.3,vignette:0.45,bloom:0.4,halation:0.3},
+ [{src:"lfo3",dst:"genWarp",amt:0.3,ch:"A"},{src:"chaos",dst:"genFold",amt:0.2,ch:"A"},{src:"lfo1",dst:"genCX",amt:0.25,ch:"A"}], {src:"synth", gm:{shape:1,wave:0,col:1}}],
+["SYNTH · TUNNEL RUN", {genFreqX:0.34,genFoldN:8,genRate:0.35,genComp:0.6,genThresh:0.45,genSoft:0.08,genSpread:1.1,genHue:0.48,genSat:1,scanlines:0.22,curvature:0.32,vignette:0.5,bloom:0.35},
+ [{src:"lfo3",dst:"genRot",amt:0.4,ch:"A"},{src:"bass",dst:"genFreqX",amt:0.2,ch:"A"}], {src:"synth", gm:{shape:8,wave:1,col:2}}],
 ["MOSH · P-FRAME DRAG", {mosh:0.93,moshVec:0.85,flowGain:1.4,moshGate:0.45,flowSharp:0.2,chromaBleed:0.3,saturation:1.25,contrast:1.15,glow:0.2,scanlines:0.14,curvature:0.22,vignette:0.35},
  [{src:"motion",dst:"moshVec",amt:0.4,ch:"A"},{src:"cut",dst:"mosh",amt:-0.3,ch:"A"},{src:"lfo3",dst:"flowCurl",amt:0.2,ch:"A"}], {ff:0,fe:0}],
 ["MOSH · CONTOUR CRAWL", {mosh:0.9,moshVec:0.7,flowCurl:0.35,flowGain:1.6,flowSharp:0.3,contour:0.3,contourBands:9,saturation:1.4,contrast:1.2,glow:0.25,scanlines:0.15,curvature:0.24,vignette:0.36},
@@ -3845,6 +4222,15 @@ function loadPreset(i){
     fbWrap = tg.wrap||0; fbMirror = tg.mir||0; fbBlend = tg.blend||0;
     fbNL = tg.nl||0; fbInvert = !!tg.inv;
     if(tg.model!==undefined) outModel = tg.model;
+    if(tg.gm){
+      const tgt = linkChans ? CHANNELS : [activeChan];
+      for(const ch of tgt) genMode[ch] = {...tg.gm};
+    }
+    if(tg.src){
+      const tgt = linkChans ? CHANNELS : [activeChan];
+      for(const ch of tgt){ SRC[ch].mode = tg.src; SRC[ch].name = tg.src; }
+      syncChanInputUI();
+    }
   }
   refreshToggles();
   document.getElementById("selPreset").value = i;
@@ -3961,6 +4347,12 @@ function restoreState(st){
     applyState(st.bases||{}, st.routes||[], st);   /* legacy single-channel state */
   }
   if(st.srcText){ for(const ch of CHANNELS) if(st.srcText[ch]) Object.assign(SRC[ch].text, st.srcText[ch]); }
+  if(st.busSrc){ if(st.busSrc.b1) busSrc.b1 = st.busSrc.b1.slice(); if(st.busSrc.b2) busSrc.b2 = st.busSrc.b2.slice(); refreshBusUI(); }
+  if(st.genMode) for(const ch of CHANNELS) if(st.genMode[ch]) genMode[ch] = {...st.genMode[ch]};
+  if(st.snapSlots) for(let i=0;i<SNAP_N;i++) snapSlots[i] = st.snapSlots[i] || null;
+  if(st.snapGlide !== undefined) snapGlide = st.snapGlide;
+  if(st.perfTake){ perfRec.data = st.perfTake; perfRec.len = st.perfLen || 0; }
+  if(typeof refreshSnapUI === "function"){ refreshSnapUI(); refreshPerfUI(); }
   if(st.activeChan) setActiveChan(st.activeChan);
   refreshToggles();
   renderChain();
@@ -4022,6 +4414,9 @@ document.getElementById("btnSave").onclick = ()=>{
     mixMode2, wipeInv2, mixModeM, wipeInvM,
     fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
+    busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
+    genMode: JSON.parse(JSON.stringify(genMode)),
+    snapSlots, snapGlide, perfTake: perfRec.data, perfLen: perfRec.len,
     srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   for(const k of LFOKEYS) state[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   const blob = new Blob([JSON.stringify(state,null,1)], {type:"application/json"});
@@ -4115,6 +4510,14 @@ document.getElementById("btnPat").onclick = ()=>{
   SRC[ch].mode = "pattern"; SRC[ch].name = "pattern";
   syncChanInputUI();
 };
+document.getElementById("btnSynth").onclick = ()=>{
+  const ch = activeChan;
+  stopCam(ch);
+  SRC[ch].mode = "synth"; SRC[ch].name = "synth";
+  syncChanInputUI();
+  revealSection("gen");
+  toast("Channel "+ch+": pattern synth \u2014 shape it in the PATTERN SYNTH section");
+};
 const selPat = document.getElementById("selPat");
 selPat.onchange = ()=>{
   const S = cur();
@@ -4140,11 +4543,14 @@ function syncChanInputUI(){
     el.title = off ? "Not available on a generated source — load a file into this channel" : "";
   }
   for(const q of document.querySelectorAll(".mchan")) q.textContent = activeChan;
+  if(typeof refreshDockTabs === "function") refreshDockTabs();
+  if(S.mode !== "text" && dockTab === "text") setDock("matrix");
   document.getElementById("btnFile").classList.toggle("on", S.mode==="file");
   document.getElementById("btnCam").classList.toggle("on", S.mode==="cam");
   document.getElementById("btnPat").classList.toggle("on", S.mode==="pattern");
+  { const b=document.getElementById("btnSynth"); if(b) b.classList.toggle("on", S.mode==="synth"); }
   document.getElementById("btnText").classList.toggle("on", S.mode==="text");
-  document.getElementById("btnFile").textContent = "FILE " + activeChan;
+  document.getElementById("btnFile").textContent = "FILE";
   selPat.value = S.pattern;
   const sp = document.getElementById("spd");
   sp.value = S.speed;
@@ -4164,6 +4570,7 @@ window.__swapSources = function(a, b){
   A.video = B.video; B.video = tv;
   A.patCanvas = B.patCanvas; B.patCanvas = tp;
   A.pat = B.pat; B.pat = tc;
+  const gm = genMode[a]; genMode[a] = genMode[b]; genMode[b] = gm;
   A.ch = a; B.ch = b;
   syncChanInputUI();
 };
@@ -4280,6 +4687,12 @@ function drawTextSource(S, t){
 /* text editor wiring */
 let dockTab = "matrix";
 function setDock(t){
+  /* the text editor belongs to a text source, so it is only live on a channel
+     that is actually set to TEXT */
+  if(t === "text" && cur().mode !== "text"){
+    toast("Channel "+activeChan+" is not a text source \u2014 pick TEXT under SOURCE first", true);
+    t = dockTab === "text" ? "matrix" : dockTab;
+  }
   dockTab = t;
   const map = {matrix:"matrix", mod:"modgrid", text:"textdock"};
   for(const k in map){
@@ -4292,7 +4705,20 @@ function setDock(t){
                             : t==="text" ? "typing here never triggers shortcuts"
                             : "patch sources into any parameter";
   if(t==="text") syncTextEditor();
+  refreshDockTabs();
 }
+/* grey the TEXT tab unless this channel is a text source */
+function refreshDockTabs(){
+  const b = document.querySelector('#dockTabs button[data-dock="text"]');
+  if(!b) return;
+  const ok = cur().mode === "text";
+  b.classList.toggle("dim", !ok);
+  const td = document.getElementById("textdock");
+  if(td) td.classList.toggle("notext", !ok);
+  const note = document.getElementById("textNeedsSrc");
+  if(note) note.style.display = ok ? "none" : "block";
+}
+window.__refreshDockTabs = refreshDockTabs;
 const textEd = null;
 const TXT_CTRL = [["txtBody","body","s"],["txtFont","font","s"],["txtSize","size","f"],["txtTrack","track","f"],
   ["txtX","x","f"],["txtY","y","f"],["txtRot","rot","f"],["txtScrollX","scrollX","f"],["txtScrollY","scrollY","f"],
@@ -4678,6 +5104,196 @@ for(const b of document.querySelectorAll(".bend[data-bend]")){
   b.addEventListener("mouseup", up); b.addEventListener("mouseleave", up); b.addEventListener("touchend", up);
 }
 
+
+/* ---------------- multiview ---------------- */
+function setMultiView(on){
+  multiView = on;
+  document.body.classList.toggle("multi", on);
+  const b = document.getElementById("btnMulti");
+  if(b) b.classList.toggle("on", on);
+}
+document.getElementById("btnMulti").onclick = ()=>setMultiView(!multiView);
+
+/* ---------------- snapshot bank ----------------
+   Eight whole-panel states with a glide time. Recall crossfades every value
+   from where it is now to where the slot says, which is the difference between
+   a preset and a performance move. */
+const SNAP_N = 8;
+const snapSlots = new Array(SNAP_N).fill(null);
+let snapStoreArm = false, snapGlide = 0.6;
+let glideFrom = null, glideTo = null, glideT = 0, glideLen = 0;
+function snapCapture(){
+  const st = snapshotAll();
+  return {chan:st.chan, master:st.master,
+    g:{mixMode, mixMode2, mixModeM, wipeInv, wipeInv2, wipeInvM, fbWrap, fbMirror, fbBlend,
+       fbNL, fbInvert, fbTrailMode, rescanMode, keyChroma, edgeMode, fieldSrc, flowField, flowEdge,
+       outModel, b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
+    chain: chainOrder.slice(), stages: {...stageEnabled}};
+}
+function snapStore(i){
+  snapSlots[i] = snapCapture();
+  refreshSnapUI();
+  toast("Snapshot "+(i+1)+" stored");
+}
+function snapRecall(i){
+  const st = snapSlots[i];
+  if(!st){ toast("Snapshot "+(i+1)+" is empty — arm STORE and click it", true); return; }
+  pushHistory();
+  /* discrete things jump; continuous things glide */
+  const g = st.g || {};
+  if(g.b1) busSrc.b1 = g.b1.slice();
+  if(g.b2) busSrc.b2 = g.b2.slice();
+  for(const k of ["mixMode","mixMode2","mixModeM","fbWrap","fbMirror","fbBlend","fbNL",
+                  "edgeMode","fieldSrc","flowField","flowEdge","outModel"]){
+    if(g[k] !== undefined) eval(k+" = g."+k);
+  }
+  for(const k of ["wipeInv","wipeInv2","wipeInvM","fbInvert","fbTrailMode","rescanMode","keyChroma"]){
+    if(g[k] !== undefined) eval(k+" = g."+k);
+  }
+  if(st.chain) chainOrder = st.chain.slice();
+  if(st.stages) stageEnabled = {...stageEnabled, ...st.stages};
+  if(snapGlide < 0.02){
+    applySnapValues(st, 1, null);
+    glideFrom = glideTo = null;
+  } else {
+    glideFrom = snapCapture(); glideTo = st; glideT = 0; glideLen = snapGlide;
+  }
+  morphOverride.clear();
+  refreshUI(); refreshToggles(); renderChain(); refreshSnapUI(); refreshBusUI();
+  toast("Snapshot "+(i+1)+(snapGlide>=0.02 ? " — gliding over "+snapGlide.toFixed(1)+"s" : ""));
+}
+function applySnapValues(to, m, from){
+  for(const ch of CHANNELS){
+    const t = to.chan && to.chan[ch]; if(!t) continue;
+    const f = from && from.chan && from.chan[ch];
+    for(const p of CLIST){
+      if(t[p.id] === undefined) continue;
+      const a = f && f[p.id] !== undefined ? f[p.id] : chanBase[ch][p.id];
+      chanBase[ch][p.id] = a + (t[p.id]-a)*m;
+    }
+  }
+  if(to.master) for(const p of MLIST){
+    if(to.master[p.id] === undefined) continue;
+    const a = from && from.master && from.master[p.id] !== undefined ? from.master[p.id] : mBase[p.id];
+    mBase[p.id] = a + (to.master[p.id]-a)*m;
+  }
+}
+function updateGlide(dt){
+  if(!glideTo) return;
+  glideT = Math.min(1, glideT + dt/Math.max(0.02, glideLen));
+  const m = glideT*glideT*(3-2*glideT);
+  applySnapValues(glideTo, m, glideFrom);
+  if(glideT >= 1){ glideFrom = glideTo = null; refreshUI(); }
+}
+function refreshSnapUI(){
+  for(let i=0;i<SNAP_N;i++){
+    const b = document.getElementById("snap"+i);
+    if(b) b.classList.toggle("full", !!snapSlots[i]);
+  }
+  const sb = document.getElementById("snapStoreBtn");
+  if(sb) sb.classList.toggle("on", snapStoreArm);
+}
+window.__snapHit = i=>{ if(snapStoreArm){ snapStore(i); snapStoreArm=false; } else snapRecall(i); refreshSnapUI(); };
+
+/* ---------------- performance recorder ----------------
+   Samples every base value 24 times a second and stores only what changed, so
+   a long take is a few hundred kilobytes rather than a video. Playing it back
+   moves the controls, which means the same performance can be replayed against
+   different footage. */
+const perfRec = {mode:"off", data:[], t:0, len:0, loop:true, cursor:0, acc:0};
+const PERF_HZ = 24;
+function perfFlat(){
+  const o = {};
+  for(const ch of CHANNELS){ const cb = chanBase[ch]; for(const p of CLIST) o[ch+":"+p.id] = cb[p.id]; }
+  for(const p of MLIST) o["M:"+p.id] = mBase[p.id];
+  for(const k in bendHeld) o["#"+k] = bendHeld[k] ? 1 : 0;
+  o["#mix"] = mixMode; o["#mix2"] = mixMode2; o["#mixM"] = mixModeM;
+  o["#wrap"] = fbWrap; o["#nl"] = fbNL; o["#blend"] = fbBlend; o["#mir"] = fbMirror;
+  o["#ff"] = flowField; o["#fe"] = flowEdge; o["#model"] = outModel; o["#field"] = fieldSrc;
+  return o;
+}
+function perfApply(k, v){
+  if(k.charAt(0) === "#"){
+    const n = k.slice(1);
+    if(n in bendHeld){ bendHeld[n] = !!v; markBend(n, !!v); return; }
+    const map = {mix:"mixMode", mix2:"mixMode2", mixM:"mixModeM", wrap:"fbWrap", nl:"fbNL",
+                 blend:"fbBlend", mir:"fbMirror", ff:"flowField", fe:"flowEdge",
+                 model:"outModel", field:"fieldSrc"};
+    if(map[n]) eval(map[n]+" = v");
+    return;
+  }
+  const i = k.indexOf(":");
+  const ch = k.slice(0,i), id = k.slice(i+1);
+  if(ch === "M") mBase[id] = v; else if(chanBase[ch]) chanBase[ch][id] = v;
+}
+let perfLast = null;
+function perfStart(){
+  perfRec.data = [{t:0, v:perfFlat()}];
+  perfLast = {...perfRec.data[0].v};
+  perfRec.mode = "rec"; perfRec.t = 0; perfRec.acc = 0; perfRec.cursor = 0;
+  refreshPerfUI(); toast("Recording performance — every control you touch is being written down");
+}
+function perfStop(){
+  if(perfRec.mode === "rec") perfRec.len = perfRec.t;
+  perfRec.mode = "off"; refreshPerfUI();
+}
+function perfPlay(){
+  if(!perfRec.data.length){ toast("Nothing recorded yet", true); return; }
+  perfRec.mode = "play"; perfRec.t = 0; perfRec.cursor = 0; perfRec.acc = 0;
+  /* the opening keyframe puts the rig back where the take started */
+  const f0 = perfRec.data[0];
+  for(const k in f0.v) perfApply(k, f0.v[k]);
+  refreshUI(); refreshToggles(); refreshPerfUI();
+}
+function perfClear(){ perfRec.data = []; perfRec.len = 0; perfRec.mode = "off"; refreshPerfUI(); }
+function updatePerf(dt){
+  if(perfRec.mode === "off") return;
+  perfRec.t += dt;
+  if(perfRec.mode === "rec"){
+    perfRec.acc += dt;
+    if(perfRec.acc < 1/PERF_HZ) return;
+    perfRec.acc = 0;
+    const now = perfFlat(), d = {};
+    let n = 0;
+    for(const k in now) if(now[k] !== perfLast[k]){ d[k] = now[k]; perfLast[k] = now[k]; n++; }
+    if(n) perfRec.data.push({t:perfRec.t, v:d});
+    perfRec.len = perfRec.t;
+    if(perfRec.t > 900) perfStop();     /* fifteen minutes is plenty */
+  } else {
+    while(perfRec.cursor < perfRec.data.length && perfRec.data[perfRec.cursor].t <= perfRec.t){
+      const f = perfRec.data[perfRec.cursor++];
+      for(const k in f.v) perfApply(k, f.v[k]);
+    }
+    if(perfRec.cursor >= perfRec.data.length && perfRec.t >= perfRec.len){
+      if(perfRec.loop){
+        perfRec.t = 0; perfRec.cursor = 0;
+        const f0 = perfRec.data[0];
+        for(const k in f0.v) perfApply(k, f0.v[k]);
+      } else { perfRec.mode = "off"; }
+    }
+    refreshUIThrottled();
+  }
+  refreshPerfUI();
+}
+let uiThrottle = 0;
+function refreshUIThrottled(){
+  if(++uiThrottle % 6) return;
+  refreshUI();
+}
+function refreshPerfUI(){
+  const st = document.getElementById("perfState");
+  if(!st) return;
+  const m = perfRec.mode;
+  st.textContent = (m==="off" ? (perfRec.len ? "TAKE "+perfRec.len.toFixed(1)+"s" : "NO TAKE")
+                  : m==="rec" ? "REC "+perfRec.t.toFixed(1)+"s"
+                  : "PLAY "+perfRec.t.toFixed(1)+" / "+perfRec.len.toFixed(1)+"s");
+  const rb = document.getElementById("perfRecBtn"), pb = document.getElementById("perfPlayBtn"),
+        lb = document.getElementById("perfLoopBtn");
+  if(rb) rb.classList.toggle("rec-on", m==="rec");
+  if(pb) pb.classList.toggle("on", m==="play");
+  if(lb) lb.classList.toggle("on", perfRec.loop);
+}
+
 /* keyboard */
 const KEYBEND = {q:"sync", w:"roll", e:"rainbow", r_shift:null, t:"melt", y:"kill"};
 function typingNow(e){
@@ -4687,7 +5303,9 @@ function typingNow(e){
 window.addEventListener("keydown", e=>{
   if(typingNow(e)) return;
   const k = e.key.toLowerCase();
+  if(k>="1" && k<="8" && e.shiftKey){ window.__snapHit(+k-1); return; }
   if(k>="1" && k<="9"){ loadPreset(+k-1); return; }
+  if(k==="v"){ setMultiView(!multiView); return; }
   if(k===" "){ e.preventDefault(); randomizeAll(); return; }
   if(k==="m"){ mutate(); return; }
   if(k==="z"){ undo(); return; }
@@ -4902,7 +5520,22 @@ function sizeCanvas(){
   const wrap = document.getElementById("canvasWrap");
   if(!wrap) return;
   const dpr = Math.min(window.devicePixelRatio||1, isTouch ? 1.5 : 2);
-  const w = Math.floor(wrap.clientWidth*dpr), h = Math.floor(wrap.clientHeight*dpr);
+  const cw = Math.max(2, wrap.clientWidth), ch = Math.max(2, wrap.clientHeight);
+  /* the picture keeps the processing raster's aspect and is letterboxed inside
+     the pane, so it is never stretched to whatever shape the window happens to
+     be — and the pop-out, which mirrors this canvas, stays correct too */
+  const ar = procW/procH;
+  let dw = cw, dh = cw/ar;
+  if(dh > ch){ dh = ch; dw = ch*ar; }
+  canvas.style.width = dw+"px"; canvas.style.height = dh+"px";
+  canvas.style.left = Math.round((cw-dw)/2)+"px";
+  canvas.style.top  = Math.round((ch-dh)/2)+"px";
+  const mv = document.getElementById("mvlabels");
+  if(mv){
+    mv.style.width = dw+"px"; mv.style.height = dh+"px";
+    mv.style.left = canvas.style.left; mv.style.top = canvas.style.top;
+  }
+  const w = Math.max(2, Math.floor(dw*dpr)), h = Math.max(2, Math.floor(dh*dpr));
   if(canvas.width!==w || canvas.height!==h){ canvas.width=w; canvas.height=h; }
 }
 window.addEventListener("resize", sizeCanvas);
@@ -4986,7 +5619,7 @@ function runStage(id, inTex, dstRT, now, ch){
 
 function srcReady(ch){
   const S = SRC[ch];
-  if(S.mode === "pattern" || S.mode === "text") return true;
+  if(S.mode === "pattern" || S.mode === "text" || S.mode === "synth") return true;
   return S.video.readyState >= 2 && S.video.videoWidth > 0;
 }
 window.__chanHasSource = srcReady;
@@ -4994,6 +5627,7 @@ window.__chanHasSource = srcReady;
 /* upload a channel's source frame into its texture */
 function uploadSource(ch, dt){
   const S = SRC[ch];
+  if(S.mode === "synth"){ S.aspect = procW/procH; S.has = 1; S.patClock += dt*S.speed; return; }
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
   if(S.mode === "pattern" || S.mode === "text"){
@@ -5011,8 +5645,25 @@ function uploadSource(ch, dt){
 }
 
 /* run one channel's entire chain, leaving the result in chanRT[ch].out */
+/* the pattern synth is computed straight into a render target, so it costs one
+   full-screen pass and needs no canvas upload */
+function renderGen(ch, now){
+  const C = chanRT[ch], M = genMode[ch];
+  gl.bindFramebuffer(gl.FRAMEBUFFER, C.gen.fbo);
+  gl.viewport(0,0,procW,procH);
+  gl.useProgram(progGEN.prog);
+  gl.uniform2f(U(progGEN,"u_res"), procW, procH);
+  gl.uniform1f(U(progGEN,"u_time"), now);
+  gl.uniform1f(U(progGEN,"u_shape"), M.shape);
+  gl.uniform1f(U(progGEN,"u_wave"), M.wave);
+  gl.uniform1f(U(progGEN,"u_colmode"), M.col);
+  setParamUniforms(progGEN, ch);
+  draw();
+  return C.gen.tex;
+}
 function renderChannel(ch, now, dt){
   const C = chanRT[ch], S = SRC[ch];
+  const chanSrcTex = (S.mode === "synth") ? renderGen(ch, now) : srcTex[ch];
 
   /* time base: bent frame store */
   const delayN = Math.max(1, Math.min(RING_N-1, Math.round(getCur("delayF",ch))));
@@ -5032,9 +5683,9 @@ function renderChannel(ch, now, dt){
   gl.viewport(0,0,procW,procH);
   gl.useProgram(progFB.prog);
   gl.uniform2f(U(progFB,"u_res"), procW, procH);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, chanSrcTex);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, (rescanMode?C.crt:C.fbPrev).tex);
-  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, hasDelay?C.ring[readIdx].tex:srcTex[ch]);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, hasDelay?C.ring[readIdx].tex:chanSrcTex);
   gl.uniform1i(U(progFB,"u_src"), 0);
   gl.uniform1i(U(progFB,"u_prev"), 1);
   gl.uniform1i(U(progFB,"u_delayT"), 2);
@@ -5091,6 +5742,8 @@ function renderFrame(now, dt){
   updateAudio(dt);
   driveTransport(dt);
   updateContentAnalysis(dt);
+  updateGlide(dt);
+  updatePerf(dt);
   updateMod(dt, now);
   pushModHistory();
   applyParams(dt);
@@ -5112,13 +5765,15 @@ function renderFrame(now, dt){
   }
 
   /* a channel only costs anything when its fader can actually let it through */
-  const masterLive = mCur.busMix > 0.0005;
-  const live = {
-    A: true,
-    B: srcReady("B") && mCur.abMix > 0.0005,
-    C: masterLive && srcReady("C"),
-    D: masterLive && srcReady("D") && mCur.cdMix > 0.0005
-  };
+  const b1 = busSrc.b1, b2 = busSrc.b2;
+  const masterLive = mCur.busMix > 0.0005 || multiView;
+  const live = {A:false, B:false, C:false, D:false};
+  live[b1[0]] = true;
+  if(srcReady(b1[1]) && (mCur.abMix > 0.0005 || multiView)) live[b1[1]] = true;
+  if(masterLive){
+    if(srcReady(b2[0])) live[b2[0]] = true;
+    if(srcReady(b2[1]) && (mCur.cdMix > 0.0005 || multiView)) live[b2[1]] = true;
+  }
   liveList = CHANNELS.filter(c=>live[c]).join("+");
   for(const ch of CHANNELS){
     if(!live[ch]) continue;
@@ -5126,7 +5781,8 @@ function renderFrame(now, dt){
     renderChannel(ch, now, dt);
   }
 
-  /* mixer tree: BUS 1 = A/B, BUS 2 = C/D, MASTER = BUS 1 / BUS 2 */
+  /* mixer tree: BUS 1 and BUS 2 each take any two channels, then MASTER
+     crossfades the two buses. So A can meet C, or D can meet B. */
   function mixPass(dstRT, texA, texB, hasB, ids, mode, inv){
     gl.bindFramebuffer(gl.FRAMEBUFFER, dstRT.fbo);
     gl.viewport(0,0,procW,procH);
@@ -5144,12 +5800,32 @@ function renderFrame(now, dt){
     draw();
   }
   if(masterLive){
-    mixPass(busOut1, chanRT.A.out.tex, chanRT.B.out.tex, live.B, MIXBUS.b1, mixMode, wipeInv);
-    mixPass(busOut2, chanRT.C.out.tex, chanRT.D.out.tex, live.D, MIXBUS.b2, mixMode2, wipeInv2);
+    mixPass(busOut1, chanRT[b1[0]].out.tex, chanRT[b1[1]].out.tex, live[b1[1]], MIXBUS.b1, mixMode, wipeInv);
+    mixPass(busOut2, chanRT[b2[0]].out.tex, chanRT[b2[1]].out.tex, live[b2[1]], MIXBUS.b2, mixMode2, wipeInv2);
     mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mixModeM, wipeInvM);
   } else {
     /* nothing on bus 2, so bus 1 goes straight to master and costs one pass, as before */
-    mixPass(mixOut, chanRT.A.out.tex, chanRT.B.out.tex, live.B, MIXBUS.b1, mixMode, wipeInv);
+    mixPass(mixOut, chanRT[b1[0]].out.tex, chanRT[b1[1]].out.tex, live[b1[1]], MIXBUS.b1, mixMode, wipeInv);
+  }
+
+  if(multiView){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0,0,canvas.width,canvas.height);
+    gl.useProgram(progMULTI.prog);
+    gl.uniform2f(U(progMULTI,"u_res"), canvas.width, canvas.height);
+    const bind = (unit, name, tex)=>{
+      gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.uniform1i(U(progMULTI,name), unit);
+    };
+    bind(0,"u_a",chanRT.A.out.tex); bind(1,"u_b",chanRT.B.out.tex);
+    bind(2,"u_c",chanRT.C.out.tex); bind(3,"u_d",chanRT.D.out.tex);
+    bind(4,"u_b1",busOut1.tex);     bind(5,"u_pgm",mixOut.tex);
+    const cellOf = {A:0,B:1,C:3,D:4};
+    gl.uniform1f(U(progMULTI,"u_active"), cellOf[activeChan]);
+    for(const ch of CHANNELS) gl.uniform1f(U(progMULTI,"u_live"+ch), live[ch]?1:0);
+    draw();
+    frameEnd(now, dt);
+    return;
   }
 
   /* CRT -> screen */
@@ -5190,19 +5866,21 @@ function renderFrame(now, dt){
     }
   }
 
-  if(!offline){
-    const S = cur();
-    if(S.mode==="file" && S.video.duration && !seeking){
-      seek.value = S.video.currentTime/S.video.duration;
-      tcode.textContent = fmtT(S.video.currentTime)+" / "+fmtT(S.video.duration);
-    } else if(S.mode!=="file"){
-      tcode.textContent = "--:-- / --:--";
-    }
-    fpsAcc += 1/Math.max(dt,1e-4); fpsN++;
-    if(fpsN>=30){ fpsShow = Math.round(fpsAcc/fpsN); fpsAcc=0; fpsN=0;
-      osd.textContent = procH+"p · "+fpsShow+" fps"+(" · "+liveList)+(recorder?" · REC":"")+(audioMode!=="off"?" · AUD":"")+(rescanMode?" · RESCAN":"");
-      updateTempoUI();
-    }
+  frameEnd(now, dt);
+}
+function frameEnd(now, dt){
+  if(offline) return;
+  const S = cur();
+  if(S.mode==="file" && S.video.duration && !seeking){
+    seek.value = S.video.currentTime/S.video.duration;
+    tcode.textContent = fmtT(S.video.currentTime)+" / "+fmtT(S.video.duration);
+  } else if(S.mode!=="file"){
+    tcode.textContent = "--:-- / --:--";
+  }
+  fpsAcc += 1/Math.max(dt,1e-4); fpsN++;
+  if(fpsN>=30){ fpsShow = Math.round(fpsAcc/fpsN); fpsAcc=0; fpsN=0;
+    osd.textContent = procH+"p \u00b7 "+fpsShow+" fps"+(" \u00b7 "+liveList)+(multiView?" \u00b7 MULTI":"")+(recorder?" \u00b7 REC":"")+(perfRec.mode!=="off"?" \u00b7 "+perfRec.mode.toUpperCase():"")+(audioMode!=="off"?" \u00b7 AUD":"")+(rescanMode?" \u00b7 RESCAN":"");
+    updateTempoUI();
   }
 }
 
@@ -5381,6 +6059,14 @@ if(OUTPUT_MODE){
     window.addEventListener("touchend", ()=>{ dragging=false; });
   }
   document.querySelectorAll("#dockTabs button").forEach(b=>{ b.onclick = ()=>setDock(b.dataset.dock); });
+  {
+    const rs = document.getElementById("selRes");
+    rs.onchange = ()=>{
+      setProcRes(parseInt(rs.value));
+      sizeCanvas();
+      toast("Processing at "+procW+" \u00d7 "+procH);
+    };
+  }
   document.getElementById("btnMod").onclick = ()=> setDock("mod");
   setActiveChan("A");
   syncChanInputUI();

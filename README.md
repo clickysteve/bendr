@@ -18,7 +18,11 @@ Works on phones and tablets too: the picture stays pinned at the top, controls /
 
 BENDR is a four-channel mixer. **A**, **B**, **C** and **D** each have their own input *and* their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; LINK edits all four, COPY and SWAP move settings between a channel and its partner on the same bus.
 
-The channels meet in three mixers, each with the same twenty transitions: **BUS 1** combines A and B, **BUS 2** combines C and D, and **MASTER MIX** crossfades bus 1 against bus 2. Everything downstream (display, overlay, morph) is shared. Leave the master fader at zero and channels C and D never render, so a two-channel setup costs exactly what it always did.
+The channels meet in three mixers, each with the same twenty transitions. Each bus picks its own two inputs, so the pairings are not fixed: bus 1 can mix A against C, bus 2 can mix D against B. **MASTER MIX** then crossfades bus 1 against bus 2. To get all four in at once, set both bus faders part-way and put the master on ADD, SCREEN or LIGHTEN so the buses sum instead of crossfading. Everything downstream (display, overlay, morph) is shared. Leave the master fader at zero and channels C and D never render, so a two-channel setup costs exactly what it always did.
+
+**MULTI** shows all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors.
+
+![Multiview](docs/doc_multiview.png)
 
 ![Four channels through three buses](docs/doc_quad.png)
 
@@ -62,6 +66,18 @@ per channel (A B C D):  INPUT → framing → FEEDBACK / RESCAN → frame store
 
 Presets named after the glitch art series on [allmyfriendsarejpegs.com](https://allmyfriendsarejpegs.com): VOL I / II / III, TRIANGLES, 80S TRIANGLE, BLADE RUNNER TRIANGLE, CRT REPHOTO and JPEGS.
 
+## Pattern synth
+
+Any channel can be a generator rather than a player. It is built like a video synthesiser: coordinates go through a shape (scan, radial, spiral, plasma, lissajous, rings, starburst, grid, tunnel, cells, interference, polygon), then an oscillator with a selectable waveform, then cross-modulation between the axes, a wavefolder, a comparator, and a colouriser — mono, RGB phase, HSV sweep, duotone or hard bands. It runs entirely on the GPU and every control is a modulation destination, so patching an LFO into CROSS MOD turns it into a moving source with no file involved.
+
+![Pattern synth](docs/doc_synth.png)
+
+## Snapshots and the performance recorder
+
+Eight slots hold the whole rig — all four channels, every bus, every mode — with a **glide** time. At zero a recall is a hard cut; wound up it becomes a slow transformation of everything at once.
+
+The **performance recorder** writes down every control you move, twenty-four times a second, storing only what changed. It records gestures rather than pixels, so a take built slowly over an hour can be played back in real time, against completely different footage. Takes are saved inside the patch file.
+
 ## Text and shapes
 
 Any channel can be a text/shape generator instead of a video source: type anything, choose from thirty-three fonts, set size, tracking, position, rotation, scroll and repeat, add an outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric rings, starburst) with count, spin, stroke and pulse. It behaves exactly like any other source, so it can be glitched, fed back and mixed against video on the other channel.
@@ -91,7 +107,7 @@ Six momentary bend pads (mouse, `Q W E R T Y`, or MIDI notes C1–F1), MIDI CC l
 
 ## Keys
 
-`Space` randomize · `M` mutate · `Z` undo · `1–9` presets · `Q W E R T Y` hold bends · `B` bypass · `F` fullscreen · `S` snapshot · `R` record · `P` play/pause · `H` help
+`Space` randomize · `M` mutate · `Z` undo · `1–9` presets · `shift`+`1–8` snapshots · `Q W E R T Y` hold bends · `B` bypass · `V` multiview · `F` fullscreen · `S` snapshot · `R` record · `P` play/pause · `H` help
 
 ## Development
 

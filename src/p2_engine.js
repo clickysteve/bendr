@@ -880,6 +880,156 @@ const FS_LAB = COMMON +
 "  }\n" +
 "  O = vec4(c,1.0);\n}\n";
 
+/* pass: PATTERN SYNTH — a shape and pattern generator per channel, built like a
+   video synthesiser: ramps and oscillators, cross-modulation, a wavefolder, a
+   comparator, then a colouriser. No camera, no file: the picture is computed. */
+const FS_GEN = COMMON +
+"uniform float u_time,u_shape,u_wave,u_colmode;\n" +
+"uniform float u_genFreqX,u_genFreqY,u_genPhase,u_genRate,u_genRot,u_genSkew;\n" +
+"uniform float u_genFM,u_genPulse,u_genFold,u_genComp,u_genThresh,u_genSoft;\n" +
+"uniform float u_genFoldN,u_genCX,u_genCY,u_genWarp,u_genHue,u_genSpread;\n" +
+"uniform float u_genSat,u_genBright,u_genBands,u_genZoom;\n" +
+"#define TAU 6.2831853\n" +
+"float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);\n" +
+"  return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y); }\n" +
+"vec3 hsv(float h, float s, float v){\n" +
+"  vec3 k = fract(vec3(h) + vec3(0.0, 2.0/3.0, 1.0/3.0));\n" +
+"  return v * mix(vec3(1.0), clamp(abs(k*6.0-3.0)-1.0, 0.0, 1.0), s);\n}\n" +
+"/* the oscillator: one cycle of the selected waveform per unit of phase */\n" +
+"float wv(float x){\n" +
+"  x = fract(x);\n" +
+"  if(u_wave<0.5) return 0.5+0.5*sin(x*TAU);\n" +
+"  if(u_wave<1.5) return abs(x*2.0-1.0);\n" +
+"  if(u_wave<2.5) return x;\n" +
+"  if(u_wave<3.5) return step(0.5, x);\n" +
+"  if(u_wave<4.5) return step(1.0-clamp(u_genPulse,0.02,0.98), x);\n" +
+"  return h21(vec2(floor(x*48.0), 7.31));\n}\n" +
+"void main(){\n" +
+"  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  float t = u_time*u_genRate;\n" +
+"  float ar = u_res.x/u_res.y;\n" +
+"  vec2 p = uv - 0.5 - vec2(u_genCX, u_genCY)*0.5;\n" +
+"  p.x *= ar;\n" +
+"  float zm = pow(2.0, u_genZoom*2.0);\n" +
+"  p *= zm;\n" +
+"  float a0 = u_genRot*3.14159;\n" +
+"  p = vec2(p.x*cos(a0) - p.y*sin(a0), p.x*sin(a0) + p.y*cos(a0));\n" +
+"  p.x += p.y*u_genSkew*2.0;\n" +
+"  /* domain warp: the coordinate system itself breathes */\n" +
+"  if(u_genWarp>0.003){\n" +
+"    p += (vec2(vn(p*3.0 + t*0.2), vn(p*3.0 + 17.3 - t*0.15)) - 0.5)*u_genWarp*1.2;\n" +
+"  }\n" +
+"  float fx = 0.2 + u_genFreqX*u_genFreqX*40.0;\n" +
+"  float fy = 0.2 + u_genFreqY*u_genFreqY*40.0;\n" +
+"  float ph = u_genPhase;\n" +
+"  float nf = max(1.0, floor(u_genFoldN));\n" +
+"  float r = length(p);\n" +
+"  float ang = atan(p.y, p.x)/TAU + 0.5;\n" +
+"  float f;\n" +
+"  if(u_shape<0.5){\n" +                     /* SCAN — two ramps cross-modulating */
+"    float b = wv(p.y*fy + t*0.7);\n" +
+"    float a = wv(p.x*fx + ph + t + b*u_genFM*3.0);\n" +
+"    f = 0.5*(a + b);\n" +
+"  } else if(u_shape<1.5){\n" +              /* RADIAL */
+"    f = wv(r*fx + ph + t + wv(ang*nf)*u_genFM*2.0);\n" +
+"  } else if(u_shape<2.5){\n" +              /* SPIRAL */
+"    f = wv(r*fx + ang*nf + ph + t);\n" +
+"  } else if(u_shape<3.5){\n" +              /* PLASMA */
+"    f = 0.25*(wv(p.x*fx*0.5 + t) + wv(p.y*fy*0.5 - t*0.8)\n" +
+"            + wv((p.x+p.y)*fx*0.35 + t*1.3) + wv(r*fy*0.5 - t*0.6));\n" +
+"    f = fract(f*(1.0 + u_genFM*3.0));\n" +
+"  } else if(u_shape<4.5){\n" +              /* LISSAJOUS */
+"    float lx = sin(p.x*fx + t), ly = sin(p.y*fy + t*1.37 + ph*TAU);\n" +
+"    f = wv(lx*ly*(0.5 + u_genFM*3.0) + ph);\n" +
+"  } else if(u_shape<5.5){\n" +              /* RINGS */
+"    f = wv(floor(r*fx*0.5 + t)/max(1.0,nf) + ph);\n" +
+"  } else if(u_shape<6.5){\n" +             /* STARBURST */
+"    f = wv(ang*nf + ph + t + r*fx*0.06*u_genFM*10.0);\n" +
+"  } else if(u_shape<7.5){\n" +             /* GRID */
+"    f = max(wv(p.x*fx + ph + t), wv(p.y*fy - t));\n" +
+"  } else if(u_shape<8.5){\n" +             /* TUNNEL */
+"    float rr = 0.35/max(r, 0.02);\n" +
+"    f = 0.5*(wv(rr*fx*0.25 + t) + wv(ang*nf + ph));\n" +
+"  } else if(u_shape<9.5){\n" +             /* CELLS */
+"    vec2 g = p*max(1.0, fx*0.25);\n" +
+"    vec2 gi = floor(g), gf = fract(g);\n" +
+"    float md = 8.0;\n" +
+"    for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){\n" +
+"      vec2 o = vec2(float(x), float(y));\n" +
+"      vec2 pt = o + 0.5 + 0.5*vec2(sin(h21(gi+o)*TAU + t*2.0), cos(h21(gi+o+3.1)*TAU + t*1.7));\n" +
+"      md = min(md, length(pt - gf));\n" +
+"    }\n" +
+"    f = wv(md*(0.5 + u_genFM*3.0) + ph);\n" +
+"  } else if(u_shape<10.5){\n" +            /* INTERFERENCE — two point sources beating */
+"    float d1 = length(p - vec2(0.28, 0.0)), d2 = length(p + vec2(0.28, 0.0));\n" +
+"    f = 0.5*(wv(d1*fx + t) + wv(d2*fy - t));\n" +
+"  } else {\n" +                            /* POLYGON */
+"    float aa = atan(p.y, p.x);\n" +
+"    float seg = TAU/nf;\n" +
+"    float rp = r*cos(mod(aa, seg) - seg*0.5)/max(cos(seg*0.5), 0.01);\n" +
+"    f = wv(rp*fx*0.5 + ph + t);\n" +
+"  }\n" +
+"  /* wavefolder: keeps folding the signal back on itself, which is where the\n" +
+"     hard banded video-synth structure comes from */\n" +
+"  if(u_genFold>0.003){\n" +
+"    float k = 1.0 + u_genFold*7.0;\n" +
+"    f = abs(fract(f*k)*2.0 - 1.0);\n" +
+"  }\n" +
+"  /* comparator: the hard-edged shape maker */\n" +
+"  if(u_genComp>0.003){\n" +
+"    float sf = max(0.001, u_genSoft*0.5);\n" +
+"    f = mix(f, smoothstep(u_genThresh-sf, u_genThresh+sf, f), u_genComp);\n" +
+"  }\n" +
+"  f = clamp(f, 0.0, 1.0);\n" +
+"  vec3 c;\n" +
+"  float sp = u_genSpread;\n" +
+"  if(u_colmode<0.5){ c = vec3(f); }\n" +
+"  else if(u_colmode<1.5){\n" +             /* RGB PHASE — three channels of the same osc, offset */
+"    c = vec3(wv(f + u_genHue), wv(f + u_genHue + sp*0.33), wv(f + u_genHue + sp*0.66));\n" +
+"  }\n" +
+"  else if(u_colmode<2.5){ c = hsv(u_genHue + f*sp, u_genSat, mix(1.0, f, 0.25)); }\n" +
+"  else if(u_colmode<3.5){\n" +             /* DUOTONE */
+"    c = mix(hsv(u_genHue, u_genSat, 1.0), hsv(fract(u_genHue+sp*0.5), u_genSat, 1.0), f);\n" +
+"  }\n" +
+"  else {\n" +                              /* BANDS */
+"    float nb = max(2.0, floor(u_genBands));\n" +
+"    float q = floor(f*nb)/nb;\n" +
+"    c = hsv(u_genHue + q*sp, u_genSat, 1.0);\n" +
+"  }\n" +
+"  O = vec4(clamp(c*u_genBright, 0.0, 1.0), 1.0);\n}\n";
+
+/* pass: MULTIVIEW — every channel and both buses at once, like a vision mixer's
+   preview monitors. 3 x 2 cells: A / B / BUS 1 over C / D / PROGRAM. */
+const FS_MULTI = COMMON +
+"uniform sampler2D u_a; uniform sampler2D u_b; uniform sampler2D u_c;\n" +
+"uniform sampler2D u_d; uniform sampler2D u_b1; uniform sampler2D u_pgm;\n" +
+"uniform float u_active, u_liveA, u_liveB, u_liveC, u_liveD;\n" +
+"void main(){\n" +
+"  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  vec2 g = vec2(3.0, 2.0);\n" +
+"  vec2 cell = floor(uv*g);\n" +
+"  vec2 luv = fract(uv*g);\n" +
+"  /* gl_FragCoord runs bottom-up, so row 0 of the grid is the bottom one */\n" +
+"  int row = 1 - int(cell.y);\n" +
+"  int idx = row*3 + int(cell.x);\n" +
+"  vec3 c;\n" +
+"  float lit = 1.0;\n" +
+"  if(idx==0){ c = texture(u_a, luv).rgb; lit = u_liveA; }\n" +
+"  else if(idx==1){ c = texture(u_b, luv).rgb; lit = u_liveB; }\n" +
+"  else if(idx==2){ c = texture(u_b1, luv).rgb; }\n" +
+"  else if(idx==3){ c = texture(u_c, luv).rgb; lit = u_liveC; }\n" +
+"  else if(idx==4){ c = texture(u_d, luv).rgb; lit = u_liveD; }\n" +
+"  else { c = texture(u_pgm, luv).rgb; }\n" +
+"  c *= mix(0.18, 1.0, lit);\n" +
+"  /* cell borders, and a hot border on the channel you are editing */\n" +
+"  vec2 e = min(luv, 1.0-luv)*vec2(u_res.x/3.0, u_res.y/2.0);\n" +
+"  float edge = 1.0 - smoothstep(0.0, 1.5, min(e.x, e.y));\n" +
+"  float sel = (float(idx) == u_active) ? 1.0 : 0.0;\n" +
+"  float hot = 1.0 - smoothstep(0.0, 3.0, min(e.x, e.y));\n" +
+"  c = mix(c, vec3(0.09,0.09,0.11), edge*0.85);\n" +
+"  c = mix(c, vec3(1.0,0.48,0.09), hot*sel);\n" +
+"  O = vec4(c, 1.0);\n}\n";
+
 /* pass: plain copy */
 const FS_COPY = COMMON +
 "uniform sampler2D u_tex;\n" +
@@ -887,10 +1037,12 @@ const FS_COPY = COMMON +
 
 /* ---------------- parameter registry ---------------- */
 const SECTIONS = [
-  {id:"mixer",    name:"MIX BUS 1 \u00b7 A+B", cls:"mag"},
-  {id:"mixer2",   name:"MIX BUS 2 \u00b7 C+D", cls:"mag"},
-  {id:"mixerM",   name:"MASTER MIX \u00b7 BUS 1+2", cls:"mag"},
+  {id:"mixer",    name:"MIX BUS 1", cls:"mag"},
+  {id:"mixer2",   name:"MIX BUS 2", cls:"mag"},
+  {id:"mixerM",   name:"MASTER MIX", cls:"mag"},
+  {id:"snap",     name:"SNAPSHOTS / PERFORM", cls:"cyan"},
   {id:"morph",    name:"PRESET MORPH",      cls:"mag"},
+  {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag"},
   {id:"enhancer", name:"BENT ENHANCER",     cls:"mag"},
   {id:"feedback", name:"FEEDBACK / RESCAN", cls:"mag"},
@@ -906,7 +1058,7 @@ const SECTIONS = [
   {id:"crt",      name:"CRT DISPLAY",       cls:"cyan"},
 ];
 const PDEF = [
-  ["abMix","FADER A>B","mixer",0,1,0],
+  ["abMix","BUS 1 FADER","mixer",0,1,0],
   ["wipeSoft","WIPE SOFT","mixer",0,1,0.03],
   ["wipeDetail","WIPE DETAIL","mixer",0,1,0.3],
   ["wipeX","WIPE CTR X","mixer",-1,1,0],
@@ -916,7 +1068,7 @@ const PDEF = [
   ["mixKeyInv","KEY INVERT","mixer",0,1,0],
   ["mixKeyHue","KEY HUE","mixer",0,1,0.33],
 
-  ["cdMix","FADER C>D","mixer2",0,1,0],
+  ["cdMix","BUS 2 FADER","mixer2",0,1,0],
   ["wipeSoft2","WIPE SOFT","mixer2",0,1,0.03],
   ["wipeDetail2","WIPE DETAIL","mixer2",0,1,0.3],
   ["wipeX2","WIPE CTR X","mixer2",-1,1,0],
@@ -926,7 +1078,7 @@ const PDEF = [
   ["mixKeyInv2","KEY INVERT","mixer2",0,1,0],
   ["mixKeyHue2","KEY HUE","mixer2",0,1,0.33],
 
-  ["busMix","FADER BUS 1>2","mixerM",0,1,0],
+  ["busMix","MASTER FADER","mixerM",0,1,0],
   ["wipeSoftM","WIPE SOFT","mixerM",0,1,0.03],
   ["wipeDetailM","WIPE DETAIL","mixerM",0,1,0.3],
   ["wipeXM","WIPE CTR X","mixerM",-1,1,0],
@@ -937,6 +1089,29 @@ const PDEF = [
   ["mixKeyHueM","KEY HUE","mixerM",0,1,0.33],
 
   ["morph","MORPH A>B","morph",0,1,0],
+
+  ["genFreqX","FREQ X","gen",0,1,0.18],
+  ["genFreqY","FREQ Y","gen",0,1,0.12],
+  ["genPhase","PHASE","gen",-1,1,0],
+  ["genRate","RATE","gen",-1,1,0.08],
+  ["genFM","CROSS MOD","gen",0,1,0],
+  ["genFold","WAVEFOLD","gen",0,1,0],
+  ["genPulse","PULSE WIDTH","gen",0,1,0.5],
+  ["genComp","COMPARATOR","gen",0,1,0],
+  ["genThresh","COMP THRESH","gen",0,1,0.5],
+  ["genSoft","COMP SOFT","gen",0,1,0.12],
+  ["genFoldN","SYMMETRY","gen",1,16,4],
+  ["genZoom","SCALE","gen",-1,1,0],
+  ["genRot","ROTATE","gen",-1,1,0],
+  ["genSkew","SKEW","gen",-1,1,0],
+  ["genCX","CENTRE X","gen",-1,1,0],
+  ["genCY","CENTRE Y","gen",-1,1,0],
+  ["genWarp","DOMAIN WARP","gen",0,1,0],
+  ["genHue","HUE","gen",0,1,0.55],
+  ["genSpread","HUE SPREAD","gen",0,2,1],
+  ["genSat","SATURATION","gen",0,1,0.9],
+  ["genBright","BRIGHTNESS","gen",0,1.5,1],
+  ["genBands","COLOUR BANDS","gen",2,16,6],
 
   ["srcZoom","ZOOM","frame",-1,1,0],
   ["srcX","POS X","frame",-1,1,0],
@@ -1152,8 +1327,8 @@ const PDEF = [
    the way it does. Shown on hover over the parameter name. */
 const PHELP = {
   /* ---- mixers (bus 1, bus 2, master) ---- */
-  abMix:"Crossfades channel B over channel A. At 0 you see only A, at 1 only B; in between the MODE dropdown decides how they meet — a plain dissolve, one of twelve wipe shapes, a key, or a blend. Run it like a T-bar.",
-  cdMix:"The same fader for bus 2: crossfades channel D over channel C. Bus 2 only renders at all while the MASTER fader is above zero.",
+  abMix:"Crossfades bus 1's second input over its first (A over B by default, but the two selectors above set which channels the bus is actually mixing). At 0 you see only A, at 1 only B; in between the MODE dropdown decides how they meet — a plain dissolve, one of twelve wipe shapes, a key, or a blend. Run it like a T-bar.",
+  cdMix:"The same fader for bus 2, crossfading its second input over its first. Bus 2 only renders at all while the MASTER fader is above zero.",
   busMix:"The master crossfade between the two buses. At 0 you see bus 1 (A/B) and channels C and D cost nothing; push it up and the second bus comes alive and fades in.",
   wipeSoft:"How feathered the wipe edge is. At zero it is a hard cut line; wound up it becomes a soft gradient, which reads as a dissolve that travels.",
   wipeDetail:"Means different things per mode: the number of slats for BLINDS, bars for DIAG BARS, cells for BLOCKS, and the size of the shape for BOX and CIRCLE.",
@@ -1166,6 +1341,28 @@ const PHELP = {
   morph:"Blends every slider on the panel between the two snapshots stored with STORE A and STORE B. Put an LFO on this and the whole rig evolves on its own. Touching any individual slider takes that one control back out of the morph.",
 
   /* ---- frame / position ---- */
+  genFreqX:"Horizontal frequency of the oscillator, from a single slow sweep across the frame up to about forty cycles. In the radial and tunnel shapes this becomes the frequency along the radius instead.",
+  genFreqY:"Vertical frequency. Set it against FREQ X and the two beat against each other, which is where most patterns come from.",
+  genPhase:"Slides the whole pattern along its own waveform. Modulate this rather than the frequency when you want movement without the shape changing.",
+  genRate:"How fast the generator animates on its own. Negative runs it backwards. At zero the picture is completely still, which is useful when you want something else to be the only moving thing.",
+  genFM:"Cross-modulation: one axis modulates the other. This is the single most productive control here \u2014 a plain grid becomes wavy, then braided, then chaotic, as you wind it up.",
+  genFold:"A wavefolder. Instead of clipping the signal when it leaves the range, it folds it back on itself, over and over. This is where the hard banded structure of analogue video synthesis comes from.",
+  genPulse:"Duty cycle, for the PULSE waveform only. At the extremes it becomes thin lines on a field; in the middle it is a square wave.",
+  genComp:"How much of the comparator is applied. A comparator turns a smooth gradient into a hard-edged shape by asking whether the signal is above or below a threshold \u2014 it is what makes solid graphic shapes rather than washes.",
+  genThresh:"Where that comparator trips. Sweep it and shapes grow and shrink.",
+  genSoft:"How gradual the comparator edge is. Small values give a hard cut; large values give an airbrushed edge.",
+  genFoldN:"Rotational symmetry: the number of arms, segments, sides or spiral turns, depending on the shape.",
+  genZoom:"Scales the whole pattern. Because it is applied before everything else, zooming out reveals the structure repeating.",
+  genRot:"Rotates the pattern.",
+  genSkew:"Shears it, so vertical structures lean.",
+  genCX:"Moves the pattern's centre horizontally, which matters for the radial, spiral and tunnel shapes.",
+  genCY:"Moves the centre vertically.",
+  genWarp:"Warps the coordinate system itself with slow noise before the pattern is drawn, so straight lines bend and breathe rather than staying geometric.",
+  genHue:"The base colour. What it does depends on the COLOUR mode: it offsets the phase in RGB PHASE, sets the start of the sweep in HSV, and picks the first ink in DUOTONE.",
+  genSpread:"How far the colour travels across the pattern. Small values give a tint, large values give a full spectrum inside one shape.",
+  genSat:"Colour intensity of the generator, before anything downstream touches it.",
+  genBright:"Output level of the generator.",
+  genBands:"For the BANDS colour mode: how many flat colour steps the pattern is quantised into.",
   srcZoom:"Scales this channel's picture inside the raster. Negative pulls it away from the edges and lets the EDGE mode (black, tile or mirror) show.",
   srcX:"Slides the picture horizontally within the frame.",
   srcY:"Slides the picture vertically within the frame.",
@@ -1401,7 +1598,9 @@ const SECHELP = {
   mixer:"Bus 1 of three. Combines the two finished channels A and B with a fader and twenty transition modes.",
   mixer2:"Bus 2. Identical to bus 1 but for channels C and D. It only renders while the MASTER fader is above zero, so leaving it alone is free.",
   mixerM:"The master crossfade between the two buses, with the same twenty transitions one level up.",
+  snap:"Eight whole-rig snapshots with a glide time, and a performance recorder that writes down every control you move so the take can be replayed against other footage.",
   morph:"Snapshot two entire panel states and blend every slider between them. The fastest way to build a long evolving performance.",
+  gen:"A shape and pattern generator built like a video synthesiser rather than a list of test cards: ramps and oscillators, cross-modulation, a wavefolder, a comparator and a colouriser. Everything here is modulatable, so it is a moving source rather than a still one.",
   frame:"How this channel's picture sits in the raster, before anything is done to it. Also where the kaleidoscope fold lives.",
   enhancer:"The circuit-bent video enhancer core: a colour processor pushed past its design limits. Rainbow mapping, an oscillating sharpness circuit, channel separation.",
   feedback:"The loop, and the most generative part of the instrument. The output is transformed and fed back into the input, so the picture becomes a dynamical system rather than a filter chain.",
@@ -1422,7 +1621,7 @@ const SECHELP = {
 };
 
 /* Master sections are single-instance; everything else exists once per channel. */
-const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","morph"]);
+const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","morph","snap"]);
 const CHANNELS = ["A","B","C","D"];
 const BUSPAIR = {A:"B", B:"A", C:"D", D:"C"};   // each channel's partner on its mixer bus
 const P = {};           // id -> param descriptor
@@ -1466,6 +1665,14 @@ let mixMode2 = 0, wipeInv2 = false;   // BUS 2 (C/D)
 let mixModeM = 0, wipeInvM = false;   // MASTER (bus 1 / bus 2)
 /* the mixer shader has one set of uniform names; each bus feeds it its own params */
 const MIXP = ["abMix","wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue"];
+/* which channel feeds each side of each bus — any channel can meet any other */
+const busSrc = {b1:["A","B"], b2:["C","D"]};
+/* pattern synth mode selectors, one set per channel */
+const GEN_SHAPES = ["SCAN","RADIAL","SPIRAL","PLASMA","LISSAJOUS","RINGS","STARBURST","GRID","TUNNEL","CELLS","INTERFERE","POLYGON"];
+const GEN_WAVES  = ["SINE","TRIANGLE","SAW","SQUARE","PULSE","S&H"];
+const GEN_COLS   = ["MONO","RGB PHASE","HSV SWEEP","DUOTONE","BANDS"];
+const genMode = {};
+let multiView = false;
 const MIXBUS = {
   b1: MIXP,
   b2: ["cdMix","wipeSoft2","wipeDetail2","wipeX2","wipeY2","mixKeyThresh2","mixKeySoft2","mixKeyInv2","mixKeyHue2"],
@@ -1514,6 +1721,8 @@ function U(pr, name){
 const progFB = makeProg(FS_FB), progSIG = makeProg(FS_SIG), progCOL = makeProg(FS_COL), progCRT = makeProg(FS_CRT);
 const progGLITCH = makeProg(FS_GLITCH), progFLOW = makeProg(FS_FLOW), progCOPY = makeProg(FS_COPY);
 const progMIX = makeProg(FS_MIX);
+const progMULTI = makeProg(FS_MULTI);
+const progGEN = makeProg(FS_GEN);
 const progLAB = makeProg(FS_LAB);
 
 function makeRT(w,h){
@@ -1535,11 +1744,11 @@ const RING_N = 30;
 /* Each channel owns its feedback history, flow history and frame ring;
    scratch buffers are shared because channels render one after the other. */
 function newChanRT(){
-  return {fbPrev:null, fbNext:null, crt:null, flowA:null, flowB:null, flowSrc:null, out:null,
+  return {fbPrev:null, fbNext:null, crt:null, flowA:null, flowB:null, flowSrc:null, gen:null, out:null,
           ring:null, ringW:0, ringFilled:0};
 }
 const chanRT = {};
-for(const ch of CHANNELS) chanRT[ch] = newChanRT();
+for(const ch of CHANNELS){ chanRT[ch] = newChanRT(); genMode[ch] = {shape:0, wave:0, col:1}; }
 let scratch1, scratch2, mixOut, busOut1, busOut2, persistA, persistB;
 let fieldSrc = 0;   // field-modulation source
 const autoGain = {};
@@ -1556,12 +1765,12 @@ function ensureRing(c){
 function allocRTs(){
   for(const ch of CHANNELS){
     const c = chanRT[ch];
-    for(const k of ["fbPrev","fbNext","crt","flowA","flowB","flowSrc","out"]) freeRT(c[k]);
+    for(const k of ["fbPrev","fbNext","crt","flowA","flowB","flowSrc","gen","out"]) freeRT(c[k]);
     clearRing(c);
     c.fbPrev = makeRT(procW,procH); c.fbNext = makeRT(procW,procH);
     c.crt    = makeRT(procW,procH);
     c.flowA  = makeRT(procW,procH); c.flowB  = makeRT(procW,procH);
-    c.flowSrc= makeRT(procW,procH);
+    c.flowSrc= makeRT(procW,procH); c.gen = makeRT(procW,procH);
     c.out    = makeRT(procW,procH);
   }
   freeRT(scratch1); freeRT(scratch2); freeRT(mixOut); freeRT(busOut1); freeRT(busOut2);

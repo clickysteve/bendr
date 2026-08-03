@@ -751,9 +751,15 @@ function loadCollapse(){
   if(!st){
     /* first run: the second bus and the master crossfade are folded away, since
        they do nothing until you bring channels C and D in */
-    st = {mixer2:true, mixerM:true};
+    st = {mixer2:true, mixerM:true, gen:true};
   }
   for(const k in st) if(secEls[k] && st[k]) secEls[k].classList.add("collapsed");
+}
+function revealSection(id){
+  const d = secEls[id];
+  if(!d) return;
+  d.classList.remove("collapsed"); saveCollapse();
+  d.scrollIntoView({block:"start", behavior:"smooth"});
 }
 function collapseAll(v){
   for(const k in secEls) secEls[k].classList.toggle("collapsed", v);
@@ -848,6 +854,7 @@ function resetSection(id){
   if(id==="feedback"){ fbTrailMode=false; rescanMode=false; fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; }
   if(id==="lab"){ fieldSrc=0; }
   if(id==="flow"){ flowField=0; flowEdge=0; }
+  if(id==="gen"){ genMode[activeChan] = {shape:0, wave:0, col:1}; }
   if(id==="vhs" && window.__setTransport){ window.__setTransport("play"); if(tapeBtnRefs[0]) for(const k in tapeBtnRefs[0]) tapeBtnRefs[0][k].classList.toggle("on", k==="play"); }
   if(id==="crt"){ outModel=0; }
   if(id==="mixer"){ mixMode=0; wipeInv=false; const sm=document.getElementById("selMixMode"); if(sm) sm.value=0; }
@@ -866,6 +873,12 @@ function mkToggle(parent, id, labelFn, onClick, tip){
   parent.appendChild(b);
   toggleRefs[id] = {btn:b, labelFn};
   return b;
+}
+function refreshBusUI(){
+  for(const key of ["b1","b2"]) for(const side of [0,1]){
+    const el = document.getElementById("busSrc"+key+side);
+    if(el) el.value = busSrc[key][side];
+  }
 }
 function refreshToggles(){
   for(const k in toggleRefs) toggleRefs[k].btn.textContent = toggleRefs[k].labelFn();
@@ -895,6 +908,31 @@ function sectionExtras(id, d){
       if(which===1) mixMode = v; else if(which===2) mixMode2 = v; else mixModeM = v;
     };
     tr.appendChild(sel);
+    if(which<3){
+      /* which two channels this bus is actually mixing */
+      const rr = document.createElement("div"); rr.className="trow";
+      const key = which===1 ? "b1" : "b2";
+      for(const side of [0,1]){
+        const sel = document.createElement("select");
+        sel.id = "busSrc"+key+side;
+        attachTip(sel, side===0 ? "BUS INPUT A" : "BUS INPUT B",
+          "Which channel feeds this side of the bus. Any channel can be routed to any bus, so A can wipe against C, or D against B.",
+          "To mix all four at once, leave the buses on their pairs, set both bus faders part-way, and put the master on ADD or LIGHTEN.");
+        for(const c of CHANNELS){
+          const o = document.createElement("option"); o.value=c; o.textContent="CH "+c; sel.appendChild(o);
+        }
+        sel.value = busSrc[key][side];
+        sel.onchange = ()=>{ busSrc[key][side] = sel.value; toast("Bus "+which+": "+busSrc[key][0]+" \u2194 "+busSrc[key][1]); };
+        rr.appendChild(sel);
+        if(side===0){
+          const arrow = document.createElement("span");
+          arrow.style.cssText="color:var(--dim); font-size:9px; align-self:center; padding:0 2px;";
+          arrow.textContent = "\u2194";
+          rr.appendChild(arrow);
+        }
+      }
+      d.appendChild(rr);
+    }
     if(which===1) mkToggle(tr, "wipeInv", ()=>"WIPE: "+(wipeInv?"INV":"NORM"), ()=>{ wipeInv=!wipeInv; }, "Runs the wipe from the other side.");
     if(which===2) mkToggle(tr, "wipeInv2", ()=>"WIPE: "+(wipeInv2?"INV":"NORM"), ()=>{ wipeInv2=!wipeInv2; }, "Runs the wipe from the other side.");
     if(which===3) mkToggle(tr, "wipeInvM", ()=>"WIPE: "+(wipeInvM?"INV":"NORM"), ()=>{ wipeInvM=!wipeInvM; }, "Runs the wipe from the other side.");
@@ -905,6 +943,77 @@ function sectionExtras(id, d){
       which===1 ? "Bus 1 combines channels A and B. Run the fader like a T-bar; wipes use SOFT for edge feather, DETAIL for blind/bar count, CTR X/Y for the origin. Give channel B a source first."
     : which===2 ? "Bus 2 combines channels C and D, exactly like bus 1. It only renders when the MASTER fader is above zero, so leaving it alone costs nothing."
     : "The master crossfade between the two buses \u2014 the same twenty transitions again, one level up. Push it off zero and channels C and D come alive.";
+    d.appendChild(note);
+  }
+  if(id==="snap"){
+    const grid = document.createElement("div");
+    grid.style.cssText = "display:grid; grid-template-columns:repeat(4,1fr); gap:5px; padding:2px 0 4px;";
+    for(let i=0;i<8;i++){
+      const b = document.createElement("button");
+      b.id = "snap"+i; b.className = "snapbtn"; b.textContent = (i+1);
+      attachTip(b, "SNAPSHOT "+(i+1),
+        "Click to recall this slot, gliding every control from where it is now to where the slot says. Arm STORE first to save into it instead.",
+        "Keyboard: shift+"+(i+1)+". A filled slot is outlined.");
+      b.onclick = ()=>window.__snapHit(i);
+      grid.appendChild(b);
+    }
+    d.appendChild(grid);
+    const tr = document.createElement("div"); tr.className="trow";
+    const sb = document.createElement("button"); sb.id="snapStoreBtn"; sb.textContent="STORE";
+    attachTip(sb, "STORE", "Arm this, then click a slot to write the whole rig into it. It disarms itself afterwards.");
+    sb.onclick = ()=>{ snapStoreArm = !snapStoreArm; refreshSnapUI(); };
+    tr.appendChild(sb);
+    const cl = document.createElement("button"); cl.textContent="CLEAR ALL";
+    attachTip(cl, "CLEAR ALL", "Empties all eight slots.");
+    cl.onclick = ()=>{ for(let i=0;i<8;i++) snapSlots[i]=null; refreshSnapUI(); toast("Snapshots cleared"); };
+    tr.appendChild(cl);
+    d.appendChild(tr);
+    /* glide time */
+    {
+      const row = document.createElement("div"); row.className="prow";
+      const lab = document.createElement("label"); lab.textContent = "GLIDE";
+      attachTip(lab, "GLIDE", "How long a snapshot recall takes to travel. At zero it is a hard cut, like a preset; wound up it becomes a slow transformation of the whole rig and is the most musical control in this section.");
+      const wrap = document.createElement("div"); wrap.className="sldwrap";
+      const sl = document.createElement("input");
+      sl.type="range"; sl.min=0; sl.max=12; sl.step=0.05; sl.value=snapGlide;
+      const v = document.createElement("span"); v.className="val"; v.textContent = snapGlide.toFixed(2)+"s";
+      sl.addEventListener("input", ()=>{ snapGlide = parseFloat(sl.value); v.textContent = snapGlide.toFixed(2)+"s"; });
+      wrap.appendChild(sl);
+      row.appendChild(lab); row.appendChild(wrap); row.appendChild(v);
+      d.appendChild(row);
+    }
+    const hr = document.createElement("div");
+    hr.style.cssText = "height:1px; background:var(--line); margin:8px 0 6px;";
+    d.appendChild(hr);
+    const pl = document.createElement("div");
+    pl.style.cssText = "font-size:7.5px; letter-spacing:1.5px; color:var(--dim); padding-bottom:3px;";
+    pl.textContent = "PERFORMANCE RECORDER";
+    d.appendChild(pl);
+    const tr2 = document.createElement("div"); tr2.className="trow";
+    const rb = document.createElement("button"); rb.id="perfRecBtn"; rb.textContent="\u25cf REC";
+    attachTip(rb, "RECORD PERFORMANCE",
+      "Writes down every control you move, twenty-four times a second, storing only what changed. Not video \u2014 gestures.",
+      "Because it is gestures, you can play the take back against completely different footage.");
+    rb.onclick = ()=>{ if(perfRec.mode==="rec") perfStop(); else perfStart(); };
+    const pb = document.createElement("button"); pb.id="perfPlayBtn"; pb.textContent="\u25b6 PLAY";
+    attachTip(pb, "PLAY TAKE", "Replays the recorded take, moving the controls as you moved them. Touching anything while it plays fights the playback, which is a legitimate way to perform over your own take.");
+    pb.onclick = ()=>{ if(perfRec.mode==="play") perfStop(); else perfPlay(); };
+    const lb = document.createElement("button"); lb.id="perfLoopBtn"; lb.textContent="LOOP";
+    attachTip(lb, "LOOP TAKE", "Runs the take round and round instead of stopping at the end.");
+    lb.onclick = ()=>{ perfRec.loop = !perfRec.loop; refreshPerfUI(); };
+    const cb = document.createElement("button"); cb.textContent="CLR";
+    attachTip(cb, "CLEAR TAKE", "Throws the recorded take away.");
+    cb.onclick = ()=>{ perfClear(); toast("Take cleared"); };
+    tr2.appendChild(rb); tr2.appendChild(pb); tr2.appendChild(lb); tr2.appendChild(cb);
+    d.appendChild(tr2);
+    const stt = document.createElement("div");
+    stt.id = "perfState";
+    stt.style.cssText = "color:var(--cyan); font-size:9px; letter-spacing:1.5px; padding:4px 0 2px;";
+    stt.textContent = "NO TAKE";
+    d.appendChild(stt);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Snapshots hold the whole rig \u2014 all four channels, every bus, every mode \u2014 and GLIDE decides how long it takes to get there. The recorder captures the moves rather than the picture, so a take built slowly over an hour can be replayed in real time, against other footage, and recorded out.";
     d.appendChild(note);
   }
   if(id==="morph"){
@@ -1016,6 +1125,25 @@ function sectionExtras(id, d){
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
     note.textContent = "A whole deck, per channel. Transport drives this channel's source: STILL parks a noise bar across a held field, shuttle and jog scrub with head-crossing bands. TAPE SPEED runs SP to EP \u2014 the slower the tape, the less bandwidth survives. GENERATIONS compounds GEN LOSS as if the tape had been dubbed that many times. TRACK PHASE places the mistracking band, SERVO HUNT makes the auto-tracking circuit search for it.";
+    d.appendChild(note);
+  }
+  if(id==="gen"){
+    const tr = document.createElement("div"); tr.className="trow";
+    mkToggle(tr, "genShape", ()=>GEN_SHAPES[genMode[activeChan].shape],
+      ()=>{ const M=genMode[activeChan]; M.shape=(M.shape+1)%GEN_SHAPES.length; },
+      "The geometry the oscillator is drawn through. SCAN is two ramps crossing, which is the classic video-synth starting point; the others bend the coordinate system into rings, spirals, tunnels, cells and polygons before the oscillator ever sees it.");
+    d.appendChild(tr);
+    const tr2 = document.createElement("div"); tr2.className="trow";
+    mkToggle(tr2, "genWave", ()=>GEN_WAVES[genMode[activeChan].wave],
+      ()=>{ const M=genMode[activeChan]; M.wave=(M.wave+1)%GEN_WAVES.length; },
+      "The oscillator waveform. SINE gives soft gradients, TRIANGLE gives clean ramps up and down, SAW gives hard sawtooth edges, SQUARE and PULSE give solid shapes, and S&H gives stepped random values.");
+    mkToggle(tr2, "genCol", ()=>GEN_COLS[genMode[activeChan].col],
+      ()=>{ const M=genMode[activeChan]; M.col=(M.col+1)%GEN_COLS.length; },
+      "How the pattern is coloured. MONO leaves it as brightness; RGB PHASE runs the same oscillator into the three channels at different phases, which is how analogue video synths make colour; HSV SWEEP maps the pattern to hue; DUOTONE mixes two inks; BANDS quantises into flat colour steps.");
+    d.appendChild(tr2);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Set this channel to SYNTH under SOURCE and the picture is computed rather than filmed. Signal flow: coordinates \u2192 shape \u2192 oscillator \u2192 cross modulation \u2192 wavefolder \u2192 comparator \u2192 colouriser. Every control here is a modulation destination, so patch an LFO into FREQ X or CROSS MOD and it becomes a moving source.";
     d.appendChild(note);
   }
   if(id==="glitch"){

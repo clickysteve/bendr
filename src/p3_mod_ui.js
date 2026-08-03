@@ -630,6 +630,7 @@ const STAGE_INFO = {
   sig:    {name:"TAPE / SYNC",  sec:["signal","sync","vhs"]},
   col:    {name:"COLOUR / ENH", sec:["enhancer","color"]},
   glitch: {name:"GLITCH LAB",   sec:["glitch"]},
+  lab:    {name:"SIGNAL LAB",   sec:["lab"]},
   flow:   {name:"FLOW / MOSH",  sec:["flow"]},
 };
 let dragStage = null;
@@ -709,7 +710,9 @@ function resetSection(id){
     else if(linkChans){ chanBase.A[p.id]=p.def; chanBase.B[p.id]=p.def; morphOverride.add("A:"+p.id); morphOverride.add("B:"+p.id); }
     else { chanBase[activeChan][p.id] = p.def; morphOverride.add(activeChan+":"+p.id); }
   }
-  if(id==="feedback"){ fbTrailMode=false; rescanMode=false; }
+  if(id==="feedback"){ fbTrailMode=false; rescanMode=false; fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; }
+  if(id==="lab"){ fieldSrc=0; }
+  if(id==="crt"){ outModel=0; }
   if(id==="mixer"){ mixMode=0; wipeInv=false; const sm=document.getElementById("selMixMode"); if(sm) sm.value=0; }
   if(id==="frame"){ edgeMode=0; }
   if(id==="keyer"){ keyChroma=false; showKeyMatte=false; }
@@ -777,6 +780,41 @@ function sectionExtras(id, d){
     tr.appendChild(bm);
     mkToggle(tr, "rescan", ()=>"RESCAN: "+(rescanMode?"FULL":"CLEAN"), ()=>{ rescanMode=!rescanMode; });
     d.appendChild(tr);
+    const tr2 = document.createElement("div"); tr2.className="trow";
+    const WRAPS=["CLAMP","REPEAT","MIRROR"], MIRS=["NONE","MIRROR H","MIRROR V","QUAD"],
+          BLENDS=["MIX","ADD","SCREEN","MAX/NAM","MIN","DIFFERENCE"], NLS=["CLAMP","SOFT/TANH","WRAP","FOLD"];
+    mkToggle(tr2, "fbWrap", ()=>"EDGE: "+WRAPS[fbWrap], ()=>{ fbWrap=(fbWrap+1)%3; });
+    mkToggle(tr2, "fbMirror", ()=>MIRS[fbMirror], ()=>{ fbMirror=(fbMirror+1)%4; });
+    d.appendChild(tr2);
+    const tr3 = document.createElement("div"); tr3.className="trow";
+    mkToggle(tr3, "fbBlend", ()=>"INJECT: "+BLENDS[fbBlend], ()=>{ fbBlend=(fbBlend+1)%6; });
+    mkToggle(tr3, "fbNL", ()=>"CURVE: "+NLS[fbNL], ()=>{ fbNL=(fbNL+1)%4; });
+    mkToggle(tr3, "fbInvert", ()=>"INVERT: "+(fbInvert?"ON":"OFF"), ()=>{ fbInvert=!fbInvert; });
+    d.appendChild(tr3);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "EDGE decides the family: CLAMP = tunnels, REPEAT = lattices, MIRROR = mandalas. CURVE is where the structure lives. LOOP NOISE keeps patterns regenerating — at zero the loop dies into a flat attractor.";
+    d.appendChild(note);
+  }
+  if(id==="lab"){
+    const tr = document.createElement("div"); tr.className="trow";
+    const FIELDS=["H RAMP","V RAMP","RADIAL","H SINE","NOISE"];
+    mkToggle(tr, "fieldSrc", ()=>"FIELD: "+FIELDS[fieldSrc], ()=>{ fieldSrc=(fieldSrc+1)%5; });
+    d.appendChild(tr);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "FIELD MOD is video-rate modulation: the field varies across the frame, so FIELD>HUE and FIELD>WARP modulate per-pixel rather than per-frame.";
+    d.appendChild(note);
+  }
+  if(id==="crt"){
+    const tr = document.createElement("div"); tr.className="trow";
+    const MODELS=["FLAT / RAW","APERTURE GRILLE","SLOT MASK","SHADOW MASK","LCD STRIPE","MONO MONITOR","GREEN SCREEN"];
+    mkToggle(tr, "outModel", ()=>"DISPLAY: "+MODELS[outModel], ()=>{ outModel=(outModel+1)%7; });
+    d.appendChild(tr);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "The master display stage: pick a tube, set the beam profile, then the output transform (gamma / levels / warmth) and persistence.";
+    d.appendChild(note);
   }
   if(id==="keyer"){
     const tr = document.createElement("div"); tr.className="trow";

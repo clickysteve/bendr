@@ -397,7 +397,7 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version — check this matches what you expect after a deploy">v12.0</span>
+  <span id="ver" title="Build version — check this matches what you expect after a deploy">v13.0</span>
   <div class="hsep"></div>
   <div class="hgrp">
     <button id="btnFile" title="Load channel A video (any size — it streams from disk)">FILE A</button>
@@ -412,6 +412,13 @@ audio,video{display:none;}
       <option value="grid">GRID</option>
       <option value="ramp">RAMP</option>
       <option value="static">STATIC</option>
+      <option value="hramp">H RAMP</option>
+      <option value="vramp">V RAMP</option>
+      <option value="radial">RADIAL</option>
+      <option value="oscbars">OSC BARS</option>
+      <option value="plasma">PLASMA</option>
+      <option value="lissa">LISSAJOUS</option>
+      <option value="checker">CHECKER</option>
     </select>
   </div>
   <div class="hsep"></div>
@@ -501,7 +508,7 @@ audio,video{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v12.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v13.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>TWO CHANNELS</h3>
   <p>BENDR is a two-channel mixer: <b>A</b> and <b>B</b> each have their own input <i>and</i> their own complete set of effects. The big A / B buttons at the top of the panel choose which channel you're editing — everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits both at once, <b>COPY</b> pushes the current channel onto the other, <b>SWAP</b> exchanges them. Sections tagged MASTER (the mixer, morph and CRT) are shared. Then the <b>INPUT MIXER</b> combines the two finished channels with the A&gt;B fader, wipes, keys and blends.</p>
@@ -509,6 +516,12 @@ audio,video{display:none;}
   <p><b>TEXT</b> turns the selected channel into a text and shape generator — type anything, pick a font, position/scroll/repeat it, add outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric, starburst) with count, spin and pulse. It feeds the channel like any other source, so you can glitch it, feed it back, and mix it against video on the other channel.</p>
   <h3>INPUT</h3>
   <p>Each channel takes its own source. <b>FILE</b> loads any video your browser can play into the selected channel (drag &amp; drop works too — files stream from disk, so size doesn't matter). <b>CAM</b> uses your webcam. <b>PATTERN</b> is a built-in test signal — pick BARS, TESTCARD, OSCILLATOR (video-synth colour waves), GRID, RAMP or STATIC from the dropdown.</p>
+  <h3>MASTER OUTPUT</h3>
+  <p>The final stage is a display, not just a filter. <b>DISPLAY</b> cycles the model — flat, aperture grille, slot mask, shadow mask, LCD stripe, mono monitor, green screen — each with its own mask geometry. BEAM WIDTH and BEAM SHAPE set the scanline beam profile (the beam widens with brightness, like a real tube). Then persistence, HV sag (the picture breathes wider as it gets brighter), bloom, halation, defocus, grain, and a full output transform: gamma, black level, white clip, contrast, saturation, warmth. <b>OUTPUT OVERLAY</b> adds letterbox and pillarbox mattes, bezel, glass glare, dust, scratches, screen moiré, rolling shutter and safe-area guides.</p>
+  <h3>FEEDBACK</h3>
+  <p>The loop is the instrument. <b>EDGE</b> decides the whole family — CLAMP gives tunnels and plumes, REPEAT gives lattices, MIRROR gives mandalas. <b>CURVE</b> is the non-linearity (clamp / soft / wrap / fold) and is where structure lives; without it the loop just decays or blows out. <b>INJECT</b> sets how the live picture enters (mix, add, screen, max, min, difference). BLUR plus SHARPEN inside the loop is an activator–inhibitor pair, which is what grows Turing labyrinths and cellular patterns. LOOP NOISE is load-bearing rather than decorative: at zero the loop settles into a dead attractor. VAL / PASS is the loop gain and the most sensitive control in the app. Thirty feedback presets prefixed FB are named after the looks they produce.</p>
+  <h3>SIGNAL LAB</h3>
+  <p>Techniques adapted from the open-source glitch canon: sparse line jitter (only lines past the gate displace, and they displace hard), NTSC crosstalk with separate artifact and fringing controls, shaped snow with clumping, FM wobble, slitscan, row smear, 1-bit crush with ordered dither, moiré, and a multi-band sequential keyer that splits brightness into bands and colours each. <b>FIELD MOD</b> is video-rate modulation: the field varies across the frame, so it modulates hue and warp per-pixel rather than per-frame.</p>
   <h3>SIGNAL CHAIN</h3>
   <p>The rail above the picture is the live signal path. <b>Drag the pills to reorder</b> the four processing stages, and click a pill to switch it off. Order changes the result completely: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.</p>
   <h3>SIGNAL PATH</h3>

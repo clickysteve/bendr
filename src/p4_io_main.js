@@ -48,6 +48,49 @@ const PRESETS = [
 ["JPEGS", {blockShift:0.55,blockSize:0.4,dither:0.8,lumaSteps:0.7,stepCount:6,pixelSort:0.25,sortThresh:0.55,contour:0.25,contourBands:8,contourFill:0.8,saturation:1.35,contrast:1.2,chromaNoise:0.2,glow:0.2,scanlines:0.15,curvature:0.2,vignette:0.35,grain:0.2},
  [{src:"spike",dst:"blockShift",amt:0.4,ch:"A"},{src:"cut",dst:"blockSize",amt:0.35,ch:"A"},{src:"lfo2",dst:"dither",amt:0.2,ch:"A"}]],
 ];
+
+/* ---- feedback recipes: named look -> parameters ---- */
+const FBK = [
+["FB · DROSTE TUNNEL",     {fbAmount:0.9,fbZoom:0.2,fbRotate:0,fbBlur:0.06,fbNoise:0.05}, {wrap:0,nl:1}],
+["FB · RAINBOW TUNNEL",    {fbAmount:0.92,fbZoom:0.2,fbHue:0.05,fbSat:1.02,fbBlur:0.06,fbNoise:0.05}, {wrap:0,nl:1}],
+["FB · SLOW VORTEX",       {fbAmount:0.94,fbZoom:0.05,fbRotate:0.07,fbHue:0.02,fbBlur:0.09,fbNoise:0.05}, {wrap:0,nl:1}],
+["FB · OPEN SPIRAL ARMS",  {fbAmount:0.95,fbZoom:0.004,fbRotate:0.21,fbHue:0.03,fbBlur:0.11,fbNoise:0.04}, {wrap:0,nl:1}],
+["FB · 9-FOLD MANDALA",    {fbAmount:0.94,fbZoom:0.017,fbRotate:0.7,fbBlur:0.07,fbSharp:0.3,fbNoise:0.04}, {wrap:2,nl:1}],
+["FB · 6-FOLD ROSETTE",    {fbAmount:0.93,fbZoom:0.033,fbRotate:1.05,fbHue:0.025,fbBlur:0.07,fbSharp:0.3,fbNoise:0.05}, {wrap:2,nl:1}],
+["FB · KALEIDOSCOPE",      {fbAmount:0.88,fbZoom:0.1,fbRotate:0.12,fbHue:0.03,fbBlur:0.05,fbSharp:0.5,fbNoise:0.05}, {wrap:2,mir:3,nl:1}],
+["FB · ROLLING BOIL",      {fbAmount:0.96,fbZoom:0,fbRotate:0.035,fbShiftX:0.013,fbShiftY:0.007,fbBlur:0.17,fbSharp:0.8,fbDrive:2.0,fbNoise:0.8,fbAuto:0.7}, {wrap:0,nl:1}],
+["FB · TURING LABYRINTH",  {fbAmount:0.97,fbBlur:0.13,fbBlur2:0.4,fbSharp:1.1,fbThresh:0.5,fbThreshSoft:0.05,fbNoise:0.5,fbAuto:0.6}, {wrap:0,nl:0}],
+["FB · CELLULAR",          {fbAmount:0.96,fbZoom:-0.007,fbBlur:0.22,fbSharp:1.2,fbThresh:0.48,fbThreshSoft:0.02,fbNoise:0.45,fbAuto:0.8}, {wrap:1,nl:0}],
+["FB · COMET TRAILS",      {fbAmount:0.9,fbShiftX:0.066,fbNoise:0.03}, {wrap:0,nl:0,blend:3}],
+["FB · LONG TRAILS",       {fbAmount:0.955,contrast:1.5,fbNoise:0.03,fbBlur:0.03}, {wrap:0,nl:0}],
+["FB · HOWL-AROUND",       {fbAmount:0.99,fbZoom:-0.033,fbRotate:-0.05,fbShiftX:0.017,fbShiftY:-0.033,fbSharp:1.0,fbDrive:3.0,fbNoise:0.6,fbBlur:0.04}, {wrap:0,nl:0}],
+["FB · PINWHEEL",          {fbAmount:0.94,fbZoom:0.017,fbRotate:0.1,fbBlur:0.11,fbNoise:0.05}, {wrap:0,nl:1,inv:1}],
+["FB · NOISE BURSTS",      {fbAmount:0.97,fbZoom:-0.066,fbRotate:0.14,fbHue:0.06,fbBlur:0.07,fbSharp:0.4,fbNoise:1.0,fbDrive:1.4}, {wrap:0,nl:0}],
+["FB · FIRE COLUMN",       {fbAmount:0.95,fbZoom:-0.04,fbShiftY:-0.04,fbHue:-0.03,fbBlur:0.11,fbDrive:1.5,fbGainR:1.15,fbGainB:0.8,fbNoise:0.25}, {wrap:0,nl:1}],
+["FB · WATERFALL",         {fbAmount:0.93,fbZoom:0.066,fbShiftY:0.05,fbHue:0.02,fbBlur:0.09,fbNoise:0.08}, {wrap:0,nl:1}],
+["FB · SOLARISED CELLS",   {fbAmount:0.96,fbRotate:0.017,fbShiftX:0.01,fbBlur:0.13,fbSharp:0.6,fbDrive:2.5,fbPost:0.55,fbNoise:0.3}, {wrap:0,nl:3}],
+["FB · WRAPPED PSYCH",     {fbAmount:0.95,fbZoom:0.033,fbRotate:0.09,fbHue:0.1,fbGainR:1.05,fbGainB:0.95,fbBlur:0.06,fbDrive:1.2,fbNoise:0.2}, {wrap:0,nl:2}],
+["FB · CHROMATIC GHOST",   {fbAmount:0.92,fbZoom:0.033,fbChromOff:0.4,fbBlur:0.05,fbNoise:0.05}, {wrap:0,nl:1}],
+["FB · BREATHING RINGS",   {fbAmount:0.93,fbZoom:0.033,fbRotate:0.05,fbHue:0.03,fbBlur:0.08,echo:0.5,delayF:6,fbNoise:0.06}, {wrap:0,nl:1}],
+["FB · ECHO STAIRCASE",    {fbAmount:0.86,fbZoom:0.13,fbRotate:0.17,fbShiftX:0.033,fbHue:0.13,echo:0.6,delayF:12}, {wrap:0,nl:0}],
+["FB · ROLLING UNTIMED",   {fbAmount:0.93,fbRoll:0.09,fbNoise:0.05,fbBlur:0.02}, {wrap:0,nl:0}],
+["FB · TILING LATTICE",    {fbAmount:0.94,fbZoom:0.017,fbRotate:0.05,fbShiftX:0.02,fbShiftY:0.013,fbHue:0.02,fbBlur:0.07,fbSharp:0.4,fbNoise:0.06}, {wrap:1,nl:1}],
+["FB · CRYSTALLINE",       {fbAmount:0.94,fbZoom:0.033,fbRotate:0.26,fbBlur:0.01,fbSharp:1.5,fbNoise:0.05}, {wrap:2,nl:0}],
+["FB · NEBULA",            {fbAmount:0.95,fbZoom:0.05,fbRotate:0.09,fbShiftX:0.013,fbHue:0.02,fbBlur:0.4,fbNoise:0.07,contrast:0.9}, {wrap:0,nl:1}],
+["FB · EDGE WIREFRAME",    {fbAmount:0.9,fbZoom:0.033,fbRotate:0.035,fbBlur:0.05,fbSharp:1.8,fbThresh:0.35,saturation:0.3,colorize:0.5,fbNoise:0.06}, {wrap:0,nl:0}],
+["FB · STROBED",           {fbAmount:0.93,fbZoom:0.066,fbRotate:0.1,fbHue:0.05,fbJitter:0.6,fbBlur:0.05,fbNoise:0.08}, {wrap:0,nl:1}],
+["FB · ASYMMETRIC PLUME",  {fbAmount:0.97,fbRotate:0.017,fbShiftX:0.017,fbShearX:0.25,fbHue:0.02,fbBlur:0.11,fbSharp:0.5,fbNoise:0.15,fbAuto:0.5}, {wrap:0,nl:1}],
+["FB · QUAD MIRROR BLOOM", {fbAmount:0.95,fbZoom:0.05,fbRotate:0.04,fbHue:0.04,fbBlur:0.09,fbNoise:0.08,bloom:0.4,halation:0.3}, {wrap:2,mir:3,nl:1}],
+];
+for(const [name, base, tog] of FBK){
+  /* loop gain: the single most sensitive control — just under unity so the loop
+     loses a little energy each pass instead of running away to white */
+  if(base.fbVal === undefined) base.fbVal = 0.955;
+  PRESETS.push([name, Object.assign({fbAmount:0.9, scanlines:0.2, curvature:0.28, vignette:0.4}, base),
+    [{src:"drift",dst:"fbRotate",amt:0.08,ch:"A"},{src:"lfo3",dst:"fbHue",amt:0.1,ch:"A"}],
+    tog]);
+}
+
 function applyState(bases, rts, extra, chOnly){
   /* a preset's flat value map loads into the target channel (default: active) plus master */
   const targets = chOnly ? [chOnly] : (linkChans ? CHANNELS : [activeChan]);
@@ -71,6 +114,13 @@ function loadPreset(i){
   const pr = PRESETS[i]; if(!pr) return;
   pushHistory();
   applyState(pr[1], pr[2]);
+  const tg = pr[3];
+  if(tg){
+    fbWrap = tg.wrap||0; fbMirror = tg.mir||0; fbBlend = tg.blend||0;
+    fbNL = tg.nl||0; fbInvert = !!tg.inv;
+    if(tg.model!==undefined) outModel = tg.model;
+    refreshToggles();
+  }
   document.getElementById("selPreset").value = i;
   toast("Preset: "+pr[0]+" \u2192 channel "+(linkChans?"A+B":activeChan));
 }
@@ -93,7 +143,8 @@ function randomizeAll(){
     else if(p.sec==="frame"){ v = Math.random()<0.7 ? p.def : p.def + (Math.random()*2-1)*0.3*(p.max-p.min); }
     else if(p.id==="contour"){ v = Math.random()<0.6 ? 0 : Math.random()*0.9; }
     else if(p.sec==="contour"){ v = Math.random()<0.5 ? p.def : p.min + Math.random()*(p.max-p.min); }
-    else if(p.sec==="mixer" || p.sec==="morph"){ v = getBase(p.id); }
+    else if(p.sec==="mixer" || p.sec==="morph" || p.sec==="overlay"){ v = getBase(p.id); }
+    else if(p.sec==="lab"){ v = Math.random()<0.6 ? p.def : p.min + Math.pow(Math.random(),1.8)*(p.max-p.min); }
     else if(p.id==="mosh"){ v = Math.random()<0.6 ? 0 : Math.random()*0.85; }
     else if(p.sec==="glitch"||p.sec==="flow"){ v = Math.random()<0.45 ? p.def : p.min + Math.pow(Math.random(),1.5)*(p.max-p.min); }
     else if(p.id==="fbAmount"){ v = Math.random()<0.5 ? Math.random()*0.5 : 0.5+Math.random()*0.45; }
@@ -147,15 +198,20 @@ function captureState(){
   const st = {chan:snap.chan, master:snap.master, routes: routes.map(r=>({...r})),
     audioCfg: JSON.parse(JSON.stringify(audioCfg)),
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
+    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}};
   for(const k of LFOKEYS) st[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   return st;
 }
 function restoreState(st){
   if(st.rescanMode !== undefined) rescanMode = st.rescanMode;
-  if(st.chainOrder && st.chainOrder.length===4) chainOrder = st.chainOrder.slice();
+  if(st.chainOrder && st.chainOrder.length>=4) chainOrder = st.chainOrder.slice();
   if(st.stageEnabled) stageEnabled = {...stageEnabled, ...st.stageEnabled};
   if(st.wipeInv !== undefined) wipeInv = st.wipeInv;
+  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","fieldSrc"]){
+    if(st[k] !== undefined) eval(k+" = st."+k);
+  }
+  if(st.fbInvert !== undefined) fbInvert = st.fbInvert;
   if(st.linkChans !== undefined){ linkChans = st.linkChans; const lb=document.getElementById("btnLinkChans"); if(lb) lb.classList.toggle("on", linkChans); }
   const smEl = document.getElementById("selMixMode"); if(smEl) smEl.value = mixMode;
   if(st.keyChroma !== undefined) keyChroma = st.keyChroma;
@@ -197,12 +253,13 @@ function initPatch(){
   pushHistory();
   fbTrailMode=false; rescanMode=false; keyChroma=false;
   mixMode=0; edgeMode=0; showKeyMatte=false; wipeInv=false; linkChans=false;
+  fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbTap=0; outModel=0; fieldSrc=0;
   { const lb=document.getElementById("btnLinkChans"); if(lb) lb.classList.remove("on"); }
   for(const ch of CHANNELS) for(const p of CLIST) chanBase[ch][p.id] = p.def;
   for(const p of MLIST) mBase[p.id] = p.def;
   { const sm=document.getElementById("selMixMode"); if(sm) sm.value=0; }
-  chainOrder = ["sig","col","glitch","flow"];
-  stageEnabled = {sig:true, col:true, glitch:true, flow:true};
+  chainOrder = ["sig","col","glitch","lab","flow"];
+  stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true};
   morphOverride.clear();
   morphA=null; morphB=null; morphOverride.clear();
   for(const el of ["morphBtnA","morphBtnB"]){ const b=document.getElementById(el); if(b) b.classList.remove("on"); }
@@ -227,6 +284,7 @@ document.getElementById("btnSave").onclick = ()=>{
   const snap = snapshotAll();
   const state = {app:"bendr", v:5, chan:snap.chan, master:snap.master, routes, audioCfg,
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
+    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
     srcText: {A:{...SRC.A.text}, B:{...SRC.B.text}}};
   for(const k of LFOKEYS) state[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
@@ -538,6 +596,63 @@ function drawPattern(S, t){
     for(let i=0;i<n;i++){
       pat.fillStyle = "hsl("+Math.floor((i/n*360 + t*30)%360)+",90%,55%)";
       pat.fillRect(i*w/n, h*0.5, w/n+1, h*0.5);
+    }
+  } else if(patternType === "hramp" || patternType === "vramp" || patternType === "radial"){
+    const img = pat.createImageData(w, h), d = img.data;
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      const i=(y*w+x)*4;
+      let v;
+      if(patternType==="hramp") v = x/w;
+      else if(patternType==="vramp") v = 1-y/h;
+      else v = Math.min(1, Math.hypot(x/w-0.5, y/h-0.5)*2);
+      const g = (v*255)|0;
+      d[i]=g; d[i+1]=g; d[i+2]=g; d[i+3]=255;
+    }
+    pat.putImageData(img,0,0);
+  } else if(patternType === "oscbars"){
+    const img = pat.createImageData(w, h), d = img.data;
+    const f1 = 0.06 + 0.05*Math.sin(t*0.23), f2 = 0.021 + 0.02*Math.sin(t*0.17);
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      const i=(y*w+x)*4;
+      d[i]   = 128+127*Math.sin(x*f1 + t*2.0);
+      d[i+1] = 128+127*Math.sin(y*f2 + t*1.3);
+      d[i+2] = 128+127*Math.sin((x*f1+y*f2)*0.7 - t*1.7);
+      d[i+3] = 255;
+    }
+    pat.putImageData(img,0,0);
+  } else if(patternType === "plasma"){
+    const img = pat.createImageData(w, h), d = img.data;
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      const i=(y*w+x)*4, u=x/w, v=y/h;
+      const a = Math.sin(u*9+t) + Math.sin(v*11-t*0.7) + Math.sin((u+v)*7+t*0.5)
+              + Math.sin(Math.hypot(u-0.5,v-0.5)*18 - t*1.3);
+      d[i]   = 128+110*Math.sin(a*1.1);
+      d[i+1] = 128+110*Math.sin(a*1.1+2.1);
+      d[i+2] = 128+110*Math.sin(a*1.1+4.2);
+      d[i+3] = 255;
+    }
+    pat.putImageData(img,0,0);
+  } else if(patternType === "lissa"){
+    pat.fillStyle="#000"; pat.fillRect(0,0,w,h);
+    pat.lineWidth = 2.5;
+    for(let k=0;k<3;k++){
+      pat.strokeStyle = ["#ff2fa0","#2ee6d6","#ffd400"][k];
+      pat.beginPath();
+      const a = 3+k, b = 4+k*2, ph = t*(0.4+k*0.15);
+      for(let i=0;i<=400;i++){
+        const th = i/400*Math.PI*2;
+        const x = w/2 + Math.sin(a*th+ph)*w*0.4;
+        const y = h/2 + Math.sin(b*th)*h*0.4;
+        i? pat.lineTo(x,y) : pat.moveTo(x,y);
+      }
+      pat.stroke();
+    }
+  } else if(patternType === "checker"){
+    const n = 8, cw = w/n, chh = h/(n/2);
+    const off = Math.floor(t*2)%2;
+    for(let yy=0;yy<n/2;yy++) for(let xx=0;xx<n;xx++){
+      pat.fillStyle = ((xx+yy+off)%2) ? "#fff" : "#000";
+      pat.fillRect(xx*cw, yy*chh, cw+1, chh+1);
     }
   } else if(patternType === "static"){
     const d = noiseImg.data;
@@ -914,7 +1029,9 @@ function colExtras(pr, now){
   gl.uniform1f(U(pr,"u_keyMode"), keyChroma?1:0);
   gl.uniform1f(U(pr,"u_showKey"), showKeyMatte?1:0);
 }
+const LAB_IDS = ["sparseJit","ntscArt","ntscFringe","snow","fmAmt","slitscan","bitCrush","bandKey","rowSmear","moire","fieldMod"];
 function stageNeeded(id, ch){
+  if(id === "lab") return LAB_IDS.some(k=>getCur(k,ch)>0.003);
   if(id === "glitch") return getCur("pixelSort",ch)>0.003 || getCur("blockShift",ch)>0.003 || getCur("dotify",ch)>0.003 || getCur("driftWarp",ch)>0.003 || getCur("fmWarp",ch)>0.003;
   if(id === "flow") return getCur("mosh",ch)>0.003 || getCur("melt",ch)>0.003 || getCur("swirl",ch)>0.003 || getCur("moshBlock",ch)>0.003 || Math.abs(getCur("timeGrad",ch))>0.003;
   return true;
@@ -924,6 +1041,10 @@ function runStage(id, inTex, dstRT, now, ch){
   if(id === "sig")    return runPass(progSIG, inTex, dstRT.fbo, procW, procH, pr=>sigExtras(pr,now,ch), ch);
   if(id === "col")    return runPass(progCOL, inTex, dstRT.fbo, procW, procH, pr=>colExtras(pr,now), ch);
   if(id === "glitch") return runPass(progGLITCH, inTex, dstRT.fbo, procW, procH, pr=>{ gl.uniform1f(U(pr,"u_time"), now); }, ch);
+  if(id === "lab")    return runPass(progLAB, inTex, dstRT.fbo, procW, procH, pr=>{
+    gl.uniform1f(U(pr,"u_time"), now); gl.uniform1f(U(pr,"u_frame"), frameNo);
+    gl.uniform1f(U(pr,"u_fieldSrc"), fieldSrc);
+  }, ch);
   if(id === "flow"){
     runPass(progFLOW, inTex, dstRT.fbo, procW, procH, pr=>{
       gl.uniform1f(U(pr,"u_time"), now);
@@ -999,6 +1120,12 @@ function renderChannel(ch, now, dt){
   gl.uniform1f(U(progFB,"u_fbMode"), fbTrailMode?1:0);
   gl.uniform1f(U(progFB,"u_keyMode"), keyChroma?1:0);
   gl.uniform1f(U(progFB,"u_edgeMode"), edgeMode);
+  gl.uniform1f(U(progFB,"u_fbWrap"), fbWrap);
+  gl.uniform1f(U(progFB,"u_fbMirror"), fbMirror);
+  gl.uniform1f(U(progFB,"u_fbBlend"), fbBlend);
+  gl.uniform1f(U(progFB,"u_fbNL"), fbNL);
+  gl.uniform1f(U(progFB,"u_fbInvert"), fbInvert?1:0);
+  gl.uniform1f(U(progFB,"u_autoGain"), autoGain[ch]);
   setParamUniforms(progFB, ch);
   draw();
 
@@ -1042,6 +1169,15 @@ function renderFrame(now, dt){
   pushModHistory();
   applyParams(dt);
   updateSyncModel(dt, now);
+  /* feedback auto-level servo — keeps the loop off the black/white attractors */
+  for(const ch of CHANNELS){
+    const amt = getCur("fbAuto", ch);
+    if(amt > 0.003){
+      const target = 0.42;
+      const err = target - (modVal.bright || 0.4);
+      autoGain[ch] = Math.max(0.6, Math.min(1.4, autoGain[ch] + err*dt*1.2*amt));
+    } else autoGain[ch] += (1-autoGain[ch])*Math.min(1, dt*3);
+  }
 
   for(const ch of CHANNELS){
     const vr = getCur("vRoll",ch);
@@ -1080,8 +1216,23 @@ function renderFrame(now, dt){
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, mixOut.tex);
   gl.uniform1i(U(progCRT,"u_tex"), 0);
   gl.uniform1f(U(progCRT,"u_time"), now);
+  gl.uniform1f(U(progCRT,"u_outModel"), outModel);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, persistA.tex);
+  gl.uniform1i(U(progCRT,"u_persist"), 1);
+  gl.uniform1f(U(progCRT,"u_hasPersist"), mCur.phosphor>0.003?1:0);
   setParamUniforms(progCRT, "A");
   draw();
+
+  /* phosphor persistence store */
+  if(mCur.phosphor > 0.003){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, persistB.fbo);
+    gl.viewport(0,0,procW,procH);
+    gl.useProgram(progCRT.prog);
+    gl.uniform2f(U(progCRT,"u_res"), procW, procH);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, mixOut.tex);
+    draw();
+    const t = persistA; persistA = persistB; persistB = t;
+  }
 
   /* full rescan: give each channel a CRT-processed copy to eat next frame */
   if(rescanMode){
@@ -1278,8 +1429,8 @@ if(OUTPUT_MODE){
   refreshStageLeds();
   setInterval(refreshStageLeds, 400);
   document.getElementById("btnChainReset").onclick = ()=>{
-    chainOrder = ["sig","col","glitch","flow"];
-    stageEnabled = {sig:true, col:true, glitch:true, flow:true};
+    chainOrder = ["sig","col","glitch","lab","flow"];
+    stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true};
     renderChain();
   };
   renderRoutes();

@@ -25,7 +25,8 @@ The rail above the picture is the live signal path. **Drag the pills to reorder 
 ```
 per channel:  INPUT → framing → FEEDBACK / RESCAN → frame store
                 → [ TAPE/SYNC · COLOUR/ENH · GLITCH LAB · FLOW/MOSH ]  ← reorderable
-        both:  → MIXER (fader · wipes · keys · blends) → CRT OUT
+                   with SIGNAL LAB in the same reorderable chain
+        both:  → MIXER (fader · wipes · keys · blends) → MASTER OUTPUT → OVERLAY
 ```
 
 - **Tape / sync** — a per-scanline PLL simulation runs on the CPU every frame: correlated drift, loss-of-lock shear with exponential re-lock, a drifting tracking band, head-switch skew, AGC breathing, a rolling blanking bar when v-hold slips. Composite rot on top: chroma bleed and delay, directional luma bleed, vertical colour bleed, rainbow fringing, dot crawl, ringing, streaky bandwidth-limited noise, comet-tail dropouts.
@@ -35,10 +36,12 @@ per channel:  INPUT → framing → FEEDBACK / RESCAN → frame store
 - **CRT rephoto** — bloom, film-style halation, glass defocus and grain, for the look of a photograph *of* a screen rather than a clean render.
 - **Glitch lab** — pixel sorting (bright runs stretch into streaks), macroblock databending, halftone dropout, channel-driven drift warp, FM contour warp.
 - **Flow / mosh** — holds its own history and advects it: mosh hold freezes frames while motion keeps pushing them, melt drips brightness downward, swirl advects through a noise field, vector trash shoves macroblocks like corrupted motion vectors, time shear smears top and bottom differently.
-- **Feedback / rescan** — zoom/rotate/hue-spin feedback; RESCAN: FULL feeds the CRT output (scanlines, curvature and all) back through the entire chain.
+- **Feedback / rescan** — a full feedback rig: zoom, rotate, shear, offset and mirror in the loop, edge mode (clamp for tunnels, repeat for lattices, mirror for mandalas), per-pass colour rotation, saturation, value gain and per-channel RGB gain, chromatic displacement, blur plus sharpen (an activator–inhibitor pair that grows Turing patterns), a four-way non-linearity (clamp / soft / wrap / fold) with drive and pivot, threshold, loop noise, vertical roll, sync jitter and an auto-level servo. RESCAN: FULL feeds the display output back through the entire chain. Thirty presets prefixed **FB** are named after the looks they produce.
+- **Signal lab** — sparse line jitter, NTSC crosstalk with separate artifact and fringing controls, shaped snow with clumping, FM wobble, slitscan, row smear, 1-bit crush with ordered dither, moiré, a multi-band sequential keyer, and field modulation that varies across the frame rather than per-frame.
 - **Keyer** — luma or chroma key with a matte viewer; masks the glitch chain and/or the feedback.
 - **Mixer** — combines the two fully-processed channels: a fader plus twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and movable origin, key transitions, and add/difference/multiply/screen/lighten blends.
 - **Preset morph** — snapshot two whole panel states and blend every slider between them.
+- **Master output** — a display stage rather than a filter: seven display models (flat, aperture grille, slot mask, shadow mask, LCD stripe, mono monitor, green screen) with beam-profile scanlines that widen with brightness, phosphor persistence, HV sag, bloom, halation, defocus, grain, and a full output transform. Plus an overlay stage: letterbox and pillarbox mattes, bezel, glass glare, dust, scratches, screen moiré, rolling shutter and safe-area guides.
 
 | ![Datamosh](docs/doc_out_datamosh.png) | ![Halftone](docs/doc_out_dots.png) | ![Liquid melt](docs/doc_out_melt.png) |
 |---|---|---|
@@ -60,7 +63,7 @@ Any channel can be a text/shape generator instead of a video source: type anythi
 
 Nothing sits still. The mod matrix patches any source into any parameter:
 
-- Four LFOs (sine/tri/saw/square/S&H), free-running or tempo-synced via tap tempo or MIDI clock
+- Four LFOs, ten shapes, free-running or tempo-synced via tap tempo or MIDI clock
 - Chaos, drift and spike generators
 - Audio bands with adjustable frequency ranges, gain, response, input device and channel selection for audio interfaces
 - Video-reactive sources computed from the picture itself: motion, brightness, and scene-cut detection — patch CUT into TEAR and every edit knocks the sync loose

@@ -31,6 +31,30 @@ const FS_FB = COMMON + KEYFN +
 "uniform float u_echo,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFb;\n" +
 "uniform float u_srcZoom,u_srcX,u_srcY,u_srcRot,u_edgeMode;\n" +
 "uniform float u_kaleido,u_kaleidoN,u_kaleidoRot,u_kaleidoX,u_kaleidoY;\n" +
+"uniform float u_fbShearX,u_fbShearY,u_fbGainR,u_fbGainG,u_fbGainB,u_fbSat,u_fbVal,u_fbPost,u_fbChromOff;\n" +
+"uniform float u_fbBlur,u_fbBlur2,u_fbSharp,u_fbDrive,u_fbPivot,u_fbThresh,u_fbThreshSoft;\n" +
+"uniform float u_fbNoise,u_fbNoiseScale,u_fbRoll,u_fbJitter;\n" +
+"uniform float u_fbWrap,u_fbMirror,u_fbBlend,u_fbNL,u_fbInvert,u_autoGain;\n" +
+"vec2 wrapUV(vec2 p){\n" +
+"  if(u_fbWrap>1.5){ vec2 t=fract(p*0.5)*2.0; return 1.0-abs(t-1.0); }\n" +
+"  if(u_fbWrap>0.5) return fract(p);\n" +
+"  return clamp(p, 0.0, 1.0);\n}\n" +
+"vec3 tapPrev(vec2 p){ return texture(u_prev, wrapUV(p)).rgb; }\n" +
+"vec3 blurPrev(vec2 p, float r){\n" +
+"  if(r<0.002) return tapPrev(p);\n" +
+"  vec2 px = r*9.0/u_res;\n" +
+"  vec3 a = tapPrev(p)*0.28;\n" +
+"  a += tapPrev(p+vec2(px.x,0))*0.12 + tapPrev(p-vec2(px.x,0))*0.12;\n" +
+"  a += tapPrev(p+vec2(0,px.y))*0.12 + tapPrev(p-vec2(0,px.y))*0.12;\n" +
+"  a += tapPrev(p+px*0.7)*0.06 + tapPrev(p-px*0.7)*0.06;\n" +
+"  a += tapPrev(p+vec2(px.x,-px.y)*0.7)*0.06 + tapPrev(p+vec2(-px.x,px.y)*0.7)*0.06;\n" +
+"  return a/1.0;\n}\n" +
+"vec3 nonlin(vec3 c){\n" +
+"  c = (c - u_fbPivot)*u_fbDrive + u_fbPivot;\n" +
+"  if(u_fbNL<0.5) return clamp(c, 0.0, 1.0);\n" +
+"  if(u_fbNL<1.5) return vec3(0.5) + tanh((c-0.5)*1.9)*0.5;\n" +
+"  if(u_fbNL<2.5) return fract(max(c,0.0));\n" +
+"  vec3 f = abs(fract(max(c,0.0)*0.5)*2.0-1.0); return f;\n}\n" +
 "vec2 frameXf(vec2 uv, float rot, float zoom, float px, float py){\n" +
 "  vec2 q = uv-0.5;\n" +
 "  float a = rot*3.14159;\n" +
@@ -63,24 +87,70 @@ const FS_FB = COMMON + KEYFN +
 "  }\n" +
 "  vec2 fuv = frameXf(kuv, u_srcRot, u_srcZoom, u_srcX, u_srcY);\n" +
 "  vec3 src = (u_hasSrc>0.5) ? fitSample(u_src, fuv, u_srcAspect, outA) : vec3(0.0);\n" +
+"  /* ---- feedback loop warp ---- */\n" +
 "  vec2 p = uv-0.5;\n" +
+"  if(u_fbMirror>0.5){\n" +
+"    if(u_fbMirror<1.5) p.x = abs(p.x);\n" +
+"    else if(u_fbMirror<2.5) p.y = abs(p.y);\n" +
+"    else p = abs(p);\n" +
+"  }\n" +
 "  float ang = u_fbRotate*1.0;\n" +
 "  float ca = cos(ang), sa = sin(ang);\n" +
 "  p = mat2(ca,-sa,sa,ca)*p;\n" +
+"  p += vec2(p.y*u_fbShearX*0.4, p.x*u_fbShearY*0.4);\n" +
 "  p *= (1.0 - u_fbZoom*0.3);\n" +
 "  p += vec2(u_fbShiftX,u_fbShiftY)*0.3;\n" +
-"  vec3 prev = texture(u_prev, p+0.5).rgb;\n" +
+"  p.y += u_fbRoll*0.05;\n" +
+"  if(u_fbJitter>0.003 && h21(vec2(floor(u_time*60.0),7.0)) < u_fbJitter*0.4) p.y += 0.01;\n" +
+"  p += 0.5;\n" +
+"  /* ---- loop filter: blur, DoG sharpen ---- */\n" +
+"  vec3 prev = blurPrev(p, u_fbBlur);\n" +
+"  if(u_fbSharp>0.003 || u_fbBlur2>0.003){\n" +
+"    vec3 wide = blurPrev(p, max(u_fbBlur2, u_fbBlur*3.0+0.05));\n" +
+"    prev += (prev - wide)*u_fbSharp;\n" +
+"  }\n" +
+"  /* ---- chromatic displacement in the loop ---- */\n" +
+"  if(abs(u_fbChromOff)>0.003){\n" +
+"    float co = u_fbChromOff*6.0/u_res.x;\n" +
+"    prev.r = tapPrev(p+vec2(co,0.0)).r;\n" +
+"    prev.b = tapPrev(p-vec2(co,0.0)).b;\n" +
+"  }\n" +
+"  /* ---- colour per pass ---- */\n" +
 "  float ha = u_fbHue*1.2;\n" +
 "  vec3 py = rgb2yiq(prev);\n" +
 "  float hc=cos(ha), hs=sin(ha);\n" +
 "  py.yz = mat2(hc,-hs,hs,hc)*py.yz;\n" +
+"  py.yz *= u_fbSat;\n" +
+"  py.x *= u_fbVal;\n" +
 "  prev = yiq2rgb(py);\n" +
+"  prev *= vec3(u_fbGainR, u_fbGainG, u_fbGainB) * u_autoGain;\n" +
+"  if(u_fbInvert>0.5) prev = 1.0-prev;\n" +
+"  if(u_fbPost>0.003){ float L=2.0+(1.0-u_fbPost)*14.0; prev = mix(prev, floor(prev*L+0.5)/L, min(u_fbPost*2.0,1.0)); }\n" +
+"  if(u_fbThresh>0.003){\n" +
+"    float lv = dot(prev, vec3(0.299,0.587,0.114));\n" +
+"    float k = smoothstep(u_fbThresh-u_fbThreshSoft, u_fbThresh+u_fbThreshSoft, lv);\n" +
+"    prev = mix(prev*0.15, prev, k);\n" +
+"  }\n" +
+"  if(u_fbNoise>0.003){\n" +
+"    float ns = mix(120.0, 6.0, u_fbNoiseScale);\n" +
+"    vec3 n3 = vec3(h21(floor(uv*ns)+fract(u_time)*17.0),\n" +
+"                   h21(floor(uv*ns)+fract(u_time)*31.0+5.0),\n" +
+"                   h21(floor(uv*ns)+fract(u_time)*43.0+9.0)) - 0.5;\n" +
+"    prev += n3*u_fbNoise*0.06;\n" +
+"  }\n" +
+"  prev = nonlin(prev);\n" +
+"  /* ---- inject the live source ---- */\n" +
 "  float fbA = u_fbAmount * mix(1.0, keyOf(src, u_keyMode, u_keyHue, u_keyThresh, u_keySoft, u_keyInv), u_keyFb);\n" +
 "  vec3 col;\n" +
 "  if(u_fbMode>0.5) col = max(src, prev*fbA);\n" +
-"  else col = mix(src, prev, fbA);\n" +
+"  else if(u_fbBlend<0.5) col = mix(src, prev, fbA);\n" +
+"  else if(u_fbBlend<1.5) col = src + prev*fbA;\n" +
+"  else if(u_fbBlend<2.5) col = 1.0-(1.0-src)*(1.0-prev*fbA);\n" +
+"  else if(u_fbBlend<3.5) col = max(src, prev*fbA);\n" +
+"  else if(u_fbBlend<4.5) col = mix(src, min(src, prev), fbA);\n" +
+"  else col = mix(src, abs(src-prev), fbA);\n" +
 "  if(u_hasDelay>0.5) col = mix(col, texture(u_delayT, uv).rgb, u_echo);\n" +
-"  O = vec4(col,1.0);\n}\n";
+"  O = vec4(clamp(col, -0.5, 2.0),1.0);\n}\n";
 
 /* mixer: combines the two fully-processed channels — fader, wipes, keys, blends */
 const FS_MIX = COMMON + KEYFN +
@@ -334,20 +404,57 @@ const FS_COL = COMMON + KEYFN +
 "  }\n" +
 "  O = vec4(clamp(c,0.0,1.4), 1.0);\n}\n";
 
-/* pass 4: CRT to screen */
+/* MASTER OUTPUT — display model, phosphor, overlays, output transform */
 const FS_CRT = COMMON +
-"uniform sampler2D u_tex;\n" +
+"uniform sampler2D u_tex; uniform sampler2D u_persist;\n" +
 "uniform vec2 u_procRes;\n" +
-"uniform float u_scanlines,u_aperture,u_curvature,u_vignette,u_time;\n" +
+"uniform float u_scanlines,u_beamWidth,u_beamShape,u_aperture,u_maskDark,u_curvature,u_cornerRound;\n" +
+"uniform float u_vignette,u_time,u_outModel,u_hasPersist;\n" +
 "uniform float u_bloom,u_bloomRad,u_halation,u_defocus,u_grain;\n" +
+"uniform float u_outGamma,u_outBright,u_outContrast,u_outSat,u_outWarmth,u_blackLevel,u_whiteClip;\n" +
+"uniform float u_phosphor,u_hvSag;\n" +
+"uniform float u_letterbox,u_pillarbox,u_bezel,u_glassRefl,u_dust,u_scratches,u_ovMoire,u_rollShutter,u_safeArea;\n" +
+"float lum3(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }\n" +
+/* --- shadow-mask families --- */
+"vec3 maskAt(vec2 fc, float model){\n" +
+"  float dark = 1.0 - u_maskDark*0.55;\n" +
+"  if(model<1.5){ float m = mod(fc.x, 3.0);\n" +                                    /* aperture grille */
+"    return vec3(m<1.0?1.0:dark, (m>=1.0&&m<2.0)?1.0:dark, m>=2.0?1.0:dark); }\n" +
+"  if(model<2.5){ vec2 g = floor(fc/vec2(3.0,6.0));\n" +                            /* slot mask */
+"    float off = mod(g.y,2.0)*1.5;\n" +
+"    float m = mod(fc.x+off, 3.0);\n" +
+"    float v = mod(fc.y, 6.0) < 5.0 ? 1.0 : dark;\n" +
+"    return vec3(m<1.0?1.0:dark, (m>=1.0&&m<2.0)?1.0:dark, m>=2.0?1.0:dark)*v; }\n" +
+"  if(model<3.5){ vec2 q = fc/vec2(6.0,6.0);\n" +                                   /* shadow (dot triad) */
+"    vec2 f = fract(q)-0.5;\n" +
+"    float r = length(f);\n" +
+"    float tri = mod(floor(q.x)+floor(q.y)*2.0, 3.0);\n" +
+"    vec3 t = vec3(tri<0.5?1.0:dark, (tri>=0.5&&tri<1.5)?1.0:dark, tri>=1.5?1.0:dark);\n" +
+"    return t*(1.0-smoothstep(0.28,0.5,r)*u_maskDark); }\n" +
+"  if(model<4.5){ float m = mod(fc.x, 2.0);\n" +                                    /* LCD stripe */
+"    return mix(vec3(1.0), vec3(m<1.0?1.06:dark), 0.85); }\n" +
+"  return vec3(1.0);\n}\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  vec2 p = uv*2.0-1.0;\n" +
-"  p *= 1.0 + u_curvature*0.09*dot(p,p);\n" +
+"  /* geometry: barrel + HV sag (picture breathes wider as it gets brighter) */\n" +
+"  float sag = 0.0;\n" +
+"  if(u_hvSag>0.003){ sag = u_hvSag*0.035*(lum3(texture(u_tex, vec2(0.5)).rgb)+0.35); }\n" +
+"  p *= 1.0 + u_curvature*0.09*dot(p,p) - sag;\n" +
 "  vec2 cuv = p*0.5+0.5;\n" +
-"  if(cuv.x<0.0||cuv.x>1.0||cuv.y<0.0||cuv.y>1.0){ O=vec4(0.0,0.0,0.0,1.0); return; }\n" +
-"  vec3 c = texture(u_tex, cuv).rgb;\n" +
-"  /* defocus + bloom: light spreading in the glass and the camera lens */\n" +
+"  /* rounded corners / tube edge */\n" +
+"  vec2 ab = abs(p) - vec2(1.0 - u_cornerRound*0.18);\n" +
+"  float corner = length(max(ab,0.0)) - u_cornerRound*0.18;\n" +
+"  if(cuv.x<0.0||cuv.x>1.0||cuv.y<0.0||cuv.y>1.0 || corner>0.0){ O=vec4(0.0,0.0,0.0,1.0); return; }\n" +
+"  /* rolling shutter beat against the field rate */\n" +
+"  if(u_rollShutter>0.003){ cuv.y += sin((uv.y*3.0 + u_time*0.7)*3.14159)*u_rollShutter*0.004; }\n" +
+"  vec3 c = texture(u_tex, clamp(cuv,0.0,1.0)).rgb;\n" +
+"  /* phosphor persistence */\n" +
+"  if(u_phosphor>0.003 && u_hasPersist>0.5){\n" +
+"    vec3 pv = texture(u_persist, clamp(cuv,0.0,1.0)).rgb;\n" +
+"    c = max(c, pv*u_phosphor);\n" +
+"  }\n" +
+"  /* defocus + bloom + halation */\n" +
 "  if(u_defocus>0.003 || u_bloom>0.003){\n" +
 "    vec2 px = 1.0/u_res;\n" +
 "    vec3 blur = vec3(0.0); float wsum = 0.0;\n" +
@@ -367,18 +474,68 @@ const FS_CRT = COMMON +
 "      c += hot*u_bloom*1.5*tint;\n" +
 "    }\n" +
 "  }\n" +
-"  float scan = 1.0 - u_scanlines*0.4*(0.5+0.5*cos(cuv.y*u_procRes.y*6.2832));\n" +
-"  c *= scan;\n" +
-"  float m = mod(gl_FragCoord.x, 3.0);\n" +
-"  vec3 mask = vec3(m<1.0?1.0:0.6, (m>=1.0&&m<2.0)?1.0:0.6, m>=2.0?1.0:0.6);\n" +
-"  c *= mix(vec3(1.0), mask*1.25, u_aperture*0.7);\n" +
+"  /* ---- display model ---- */\n" +
+"  float model = u_outModel;\n" +
+"  if(model > 0.5){\n" +
+"    /* beam profile scanlines (Lottes-style: gaussian beam whose width tracks brightness) */\n" +
+"    float lines = u_procRes.y;\n" +
+"    float fy = fract(cuv.y*lines) - 0.5;\n" +
+"    float bright = lum3(c);\n" +
+"    float w = u_beamWidth*(0.35 + 0.65*mix(1.0, bright, u_beamShape));\n" +
+"    float beam = exp(-(fy*fy)/max(0.005, w*w*0.22));\n" +
+"    c *= mix(1.0, beam*1.35, u_scanlines);\n" +
+"    c *= mix(vec3(1.0), maskAt(gl_FragCoord.xy, model), u_aperture);\n" +
+"    if(model>4.5) c = mix(c, vec3(lum3(c)), 0.85);\n" +                 /* mono monitor */
+"    if(model>5.5) c *= vec3(0.75,1.0,0.8);\n" +                          /* green screen */
+"  }\n" +
+"  /* ---- output transform ---- */\n" +
+"  c = max(c - u_blackLevel, 0.0);\n" +
+"  c = pow(max(c,0.0), vec3(1.0/max(0.05,u_outGamma)));\n" +
+"  c = (c-0.5)*u_outContrast + 0.5 + u_outBright;\n" +
+"  float L = lum3(c);\n" +
+"  c = mix(vec3(L), c, u_outSat);\n" +
+"  c *= mix(vec3(1.0), vec3(1.12,1.0,0.86), max(u_outWarmth,0.0)) * mix(vec3(1.0), vec3(0.86,1.0,1.14), max(-u_outWarmth,0.0));\n" +
+"  c = min(c, vec3(u_whiteClip));\n" +
+"  /* ---- overlays ---- */\n" +
 "  c *= 1.0 - u_vignette*0.9*pow(length(p*0.75), 2.6);\n" +
+"  if(u_glassRefl>0.003){\n" +
+"    float g = smoothstep(0.75, 0.0, length(uv-vec2(0.28,0.78)));\n" +
+"    c += g*u_glassRefl*0.16;\n" +
+"    c += smoothstep(0.5,0.0,abs(uv.x-uv.y*0.4-0.15))*u_glassRefl*0.05;\n" +
+"  }\n" +
+"  if(u_bezel>0.003){\n" +
+"    float edge = smoothstep(0.0, 0.06, min(min(cuv.x,1.0-cuv.x), min(cuv.y,1.0-cuv.y)));\n" +
+"    c = mix(c*0.15, c, mix(1.0, edge, u_bezel));\n" +
+"  }\n" +
+"  if(u_ovMoire>0.003){\n" +
+"    float mo = sin(gl_FragCoord.x*2.399)*sin(gl_FragCoord.y*2.017);\n" +
+"    c *= 1.0 + mo*u_ovMoire*0.18;\n" +
+"  }\n" +
+"  if(u_dust>0.003){\n" +
+"    float d = h21(floor(uv*vec2(180.0,140.0)) + floor(u_time*8.0)*13.0);\n" +
+"    if(d > 1.0-u_dust*0.012) c += 0.7;\n" +
+"    float dk = h21(floor(uv*vec2(150.0,120.0)) + 77.0);\n" +
+"    if(dk > 1.0-u_dust*0.008) c *= 0.25;\n" +
+"  }\n" +
+"  if(u_scratches>0.003){\n" +
+"    float sx = h21(vec2(floor(uv.x*90.0), floor(u_time*3.0)));\n" +
+"    if(sx > 1.0-u_scratches*0.05) c += vec3(0.35)*smoothstep(0.0,0.3,uv.y);\n" +
+"  }\n" +
 "  if(u_grain>0.003){\n" +
 "    float gn = h21(gl_FragCoord.xy + fract(u_time)*vec2(37.7,71.3));\n" +
-"    c += (gn-0.5)*u_grain*0.16*(0.35+0.65*(1.0-dot(c,vec3(0.333))));\n" +
+"    c += (gn-0.5)*u_grain*0.16*(0.35+0.65*(1.0-lum3(c)));\n" +
+"  }\n" +
+"  /* mattes and guides last */\n" +
+"  if(u_letterbox>0.001 && (uv.y < u_letterbox || uv.y > 1.0-u_letterbox)) c = vec3(0.0);\n" +
+"  if(u_pillarbox>0.001 && (uv.x < u_pillarbox || uv.x > 1.0-u_pillarbox)) c = vec3(0.0);\n" +
+"  if(u_safeArea>0.003){\n" +
+"    vec2 d90 = abs(uv-0.5)-vec2(0.45,0.45);\n" +
+"    vec2 d80 = abs(uv-0.5)-vec2(0.40,0.40);\n" +
+"    float g1 = step(-0.002, max(d90.x,d90.y))*step(max(d90.x,d90.y), 0.002);\n" +
+"    float g2 = step(-0.002, max(d80.x,d80.y))*step(max(d80.x,d80.y), 0.002);\n" +
+"    c = mix(c, vec3(0.2,1.0,0.9), (g1+g2)*u_safeArea*0.8);\n" +
 "  }\n" +
 "  O = vec4(max(c,0.0),1.0);\n}\n";
-
 
 /* pass: GLITCH LAB — databending, pixel sort, halftone dropout, drift/FM warp */
 const FS_GLITCH = COMMON +
@@ -477,6 +634,117 @@ const FS_FLOW = COMMON +
 "  pers = clamp(pers + u_timeGrad*(uv.y-0.5)*1.4, 0.0, 0.99);\n" +
 "  O = vec4(mix(cur, prev, pers), 1.0);\n}\n";
 
+
+/* pass: SIGNAL LAB — techniques adapted from the open-source glitch canon */
+const FS_LAB = COMMON +
+"uniform sampler2D u_tex;\n" +
+"uniform float u_time,u_frame;\n" +
+"uniform float u_sparseJit,u_jitThresh,u_ntscArt,u_ntscFringe,u_snow,u_snowAniso;\n" +
+"uniform float u_fmAmt,u_fmCarrier,u_slitscan,u_slitDir,u_bitCrush,u_bitScale;\n" +
+"uniform float u_bandKey,u_bandN,u_bandHue,u_rowSmear,u_moire,u_moireFreq;\n" +
+"uniform float u_fieldMod,u_fieldHue,u_fieldWarp,u_fieldSrc;\n" +
+"float lum3(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }\n" +
+"float fieldAt(vec2 uv){\n" +
+"  if(u_fieldSrc<0.5) return uv.x;\n" +                                   /* H ramp */
+"  if(u_fieldSrc<1.5) return 1.0-uv.y;\n" +                               /* V ramp */
+"  if(u_fieldSrc<2.5) return clamp(length(uv-0.5)*1.9,0.0,1.0);\n" +      /* radial */
+"  if(u_fieldSrc<3.5) return 0.5+0.5*sin(uv.x*20.0+u_time);\n" +          /* h sine */
+"  return h21(floor(uv*40.0));\n}\n" +                                     /* noise */
+"void main(){\n" +
+"  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  vec2 suv = uv;\n" +
+"  float fld = fieldAt(uv);\n" +
+"  /* field modulation warps space per-pixel (video-rate modulation) */\n" +
+"  if(u_fieldMod>0.003 && abs(u_fieldWarp)>0.003)\n" +
+"    suv.x += (fld-0.5)*u_fieldWarp*u_fieldMod*0.15;\n" +
+"  /* sparse line jitter — only lines past the gate displace, and they displace hard */\n" +
+"  if(u_sparseJit>0.003){\n" +
+"    float row = floor(uv.y*u_res.y/2.0);\n" +
+"    float j = h21(vec2(row, floor(u_time*24.0)))*2.0-1.0;\n" +
+"    j *= step(u_jitThresh, abs(j));\n" +
+"    suv.x += j*u_sparseJit*0.25;\n" +
+"  }\n" +
+"  /* FM wobble — image treated as a frequency-modulated carrier */\n" +
+"  if(u_fmAmt>0.003){\n" +
+"    float car = mix(2.0, 60.0, u_fmCarrier);\n" +
+"    float m = lum3(texture(u_tex, fract(suv)).rgb);\n" +
+"    suv.x += sin((uv.y*car + m*8.0 + u_time)*3.14159)*u_fmAmt*0.03;\n" +
+"  }\n" +
+"  /* slitscan — each row (or column) samples a different moment of the frame */\n" +
+"  if(u_slitscan>0.003){\n" +
+"    float axis = mix(uv.y, uv.x, step(0.5,u_slitDir));\n" +
+"    float sh = (axis-0.5)*u_slitscan*0.35;\n" +
+"    suv += mix(vec2(sh,0.0), vec2(0.0,sh), step(0.5,u_slitDir));\n" +
+"  }\n" +
+"  /* row smear — reconstructing rows with the wrong predictor */\n" +
+"  if(u_rowSmear>0.003){\n" +
+"    float amt = u_rowSmear*0.35;\n" +
+"    suv.x -= amt*fract(uv.y*u_res.y*0.5)*0.4;\n" +
+"    suv.y -= amt*0.02;\n" +
+"  }\n" +
+"  vec3 c = texture(u_tex, fract(suv)).rgb;\n" +
+"  /* NTSC crosstalk: two scalars for the two canonical composite artefacts */\n" +
+"  if(u_ntscArt>0.003 || u_ntscFringe>0.003){\n" +
+"    float px = 1.0/u_res.x;\n" +
+"    vec3 yq = rgb2yiq(c);\n" +
+"    vec3 l = rgb2yiq(texture(u_tex, fract(suv-vec2(px*2.0,0.0))).rgb);\n" +
+"    vec3 r = rgb2yiq(texture(u_tex, fract(suv+vec2(px*2.0,0.0))).rgb);\n" +
+"    float carrier = sin(suv.x*u_res.x*1.8 + floor(suv.y*u_res.y)*2.4 + u_time*9.0);\n" +
+"    /* luma leaking into chroma = artifact colour; chroma leaking into luma = fringing */\n" +
+"    yq.yz += (yq.x - 0.5*(l.x+r.x))*u_ntscArt*2.2*vec2(carrier, carrier*0.87);\n" +
+"    yq.x  += (length(yq.yz))*u_ntscFringe*carrier*0.5;\n" +
+"    c = yiq2rgb(yq);\n" +
+"  }\n" +
+"  /* snow: sparse shaped transients, clumped by anisotropy */\n" +
+"  if(u_snow>0.003){\n" +
+"    float row = floor(uv.y*u_res.y);\n" +
+"    float lineGate = mix(1.0, step(0.82, h21(vec2(row, floor(u_time*30.0)))), u_snowAniso);\n" +
+"    float seed = h21(floor(uv*vec2(u_res.x/3.0, u_res.y)) + fract(u_time)*91.0);\n" +
+"    float hit = step(1.0 - u_snow*0.06*lineGate*3.0, seed);\n" +
+"    if(hit>0.5){\n" +
+"      float tail = fract(uv.x*u_res.x/3.0);\n" +
+"      c += vec3(1.0-tail)*u_snow*1.2;\n" +
+"    }\n" +
+"  }\n" +
+"  /* moire — interference against a virtual grid */\n" +
+"  if(u_moire>0.003){\n" +
+"    float f = mix(40.0, 400.0, u_moireFreq);\n" +
+"    float m = sin(uv.x*f)*sin(uv.y*f*1.03+u_time*0.4);\n" +
+"    c *= 1.0 + m*u_moire*0.5;\n" +
+"  }\n" +
+"  /* 1-bit crush: smooth downscale, threshold, hard upscale */\n" +
+"  if(u_bitCrush>0.003){\n" +
+"    float cell = mix(1.5, 14.0, u_bitScale);\n" +
+"    vec2 cuv = (floor(uv*u_res/cell)+0.5)*cell/u_res;\n" +
+"    vec3 sm = (texture(u_tex, cuv).rgb\n" +
+"             + texture(u_tex, cuv+vec2(cell,0.0)/u_res).rgb\n" +
+"             + texture(u_tex, cuv-vec2(cell,0.0)/u_res).rgb\n" +
+"             + texture(u_tex, cuv+vec2(0.0,cell)/u_res).rgb\n" +
+"             + texture(u_tex, cuv-vec2(0.0,cell)/u_res).rgb)/5.0;\n" +
+"    float L = lum3(sm);\n" +
+"    ivec2 bp = ivec2(mod(gl_FragCoord.xy/cell, 4.0));\n" +
+"    float bayer[16] = float[16](0.0,8.0,2.0,10.0, 12.0,4.0,14.0,6.0, 3.0,11.0,1.0,9.0, 15.0,7.0,13.0,5.0);\n" +
+"    float th = bayer[bp.y*4+bp.x]/16.0;\n" +
+"    c = mix(c, vec3(step(th, L)), u_bitCrush);\n" +
+"  }\n" +
+"  /* multi-band sequential keyer: split luma into N bands, colour each */\n" +
+"  if(u_bandKey>0.003){\n" +
+"    float L = lum3(c);\n" +
+"    float N = max(2.0, floor(u_bandN));\n" +
+"    float band = floor(L*N);\n" +
+"    vec3 bc = 0.5+0.5*cos(6.2832*(band/N + u_bandHue + vec3(0.0,0.33,0.67)));\n" +
+"    c = mix(c, bc*(0.35+0.75*band/N), u_bandKey);\n" +
+"  }\n" +
+"  /* field modulation into hue */\n" +
+"  if(u_fieldMod>0.003 && abs(u_fieldHue)>0.003){\n" +
+"    vec3 yq = rgb2yiq(c);\n" +
+"    float a = fld*u_fieldHue*u_fieldMod*6.2832;\n" +
+"    float cc=cos(a), ss=sin(a);\n" +
+"    yq.yz = mat2(cc,-ss,ss,cc)*yq.yz;\n" +
+"    c = yiq2rgb(yq);\n" +
+"  }\n" +
+"  O = vec4(c,1.0);\n}\n";
+
 /* pass: plain copy */
 const FS_COPY = COMMON +
 "uniform sampler2D u_tex;\n" +
@@ -535,6 +803,28 @@ const PDEF = [
   ["stepCount","LEVELS","contour",2,16,5],
   ["dither","DITHER","contour",0,1,0],
 
+  ["sparseJit","SPARSE JITTER","lab",0,1,0],
+  ["jitThresh","JITTER GATE","lab",0,1,0.7],
+  ["ntscArt","NTSC ARTIFACT","lab",0,1,0],
+  ["ntscFringe","NTSC FRINGE","lab",0,1,0],
+  ["snow","SNOW","lab",0,1,0],
+  ["snowAniso","SNOW CLUMP","lab",0,1,0.4],
+  ["fmAmt","FM WOBBLE","lab",0,1,0],
+  ["fmCarrier","FM CARRIER","lab",0,1,0.35],
+  ["slitscan","SLITSCAN","lab",0,1,0],
+  ["slitDir","SLIT DIR","lab",0,1,0],
+  ["bitCrush","1-BIT CRUSH","lab",0,1,0],
+  ["bitScale","CRUSH SCALE","lab",0,1,0.4],
+  ["bandKey","BAND KEYER","lab",0,1,0],
+  ["bandN","BANDS","lab",2,12,5],
+  ["bandHue","BAND HUE","lab",0,1,0.3],
+  ["rowSmear","ROW SMEAR","lab",0,1,0],
+  ["moire","MOIRE","lab",0,1,0],
+  ["moireFreq","MOIRE FREQ","lab",0,1,0.4],
+  ["fieldMod","FIELD MOD","lab",0,1,0],
+  ["fieldHue","FIELD > HUE","lab",-1,1,0],
+  ["fieldWarp","FIELD > WARP","lab",-1,1,0],
+
   ["pixelSort","PIXEL SORT","glitch",0,1,0],
   ["sortThresh","SORT THRESH","glitch",0,1,0.45],
   ["blockShift","BLOCK TRASH","glitch",0,1,0],
@@ -572,6 +862,27 @@ const PDEF = [
   ["fbHue","HUE SPIN","feedback",0,1,0],
   ["fbShiftX","SHIFT X","feedback",-1,1,0],
   ["fbShiftY","SHIFT Y","feedback",-1,1,0],
+  ["fbShearX","SHEAR X","feedback",-1,1,0],
+  ["fbShearY","SHEAR Y","feedback",-1,1,0],
+  ["fbGainR","GAIN R","feedback",0,1.5,1],
+  ["fbGainG","GAIN G","feedback",0,1.5,1],
+  ["fbGainB","GAIN B","feedback",0,1.5,1],
+  ["fbSat","SAT / PASS","feedback",0.5,1.5,1],
+  ["fbVal","VAL / PASS","feedback",0.5,1.5,1],
+  ["fbPost","POSTERIZE","feedback",0,1,0],
+  ["fbChromOff","CHROMA OFF","feedback",-1,1,0],
+  ["fbBlur","BLUR","feedback",0,1,0],
+  ["fbBlur2","BLUR 2 (DoG)","feedback",0,1,0],
+  ["fbSharp","SHARPEN","feedback",0,2,0],
+  ["fbDrive","DRIVE","feedback",0.2,4,1],
+  ["fbPivot","PIVOT","feedback",0,1,0.5],
+  ["fbThresh","THRESHOLD","feedback",0,1,0],
+  ["fbThreshSoft","THRESH SOFT","feedback",0.005,0.5,0.05],
+  ["fbNoise","LOOP NOISE","feedback",0,1,0],
+  ["fbNoiseScale","NOISE SCALE","feedback",0,1,0.5],
+  ["fbRoll","V ROLL / PASS","feedback",-1,1,0],
+  ["fbJitter","SYNC JITTER","feedback",0,1,0],
+  ["fbAuto","AUTO LEVEL","feedback",0,1,0],
 
   ["chromaBleed","CHR BLEED","signal",0,1,0.25],
   ["chromaDelay","CHR DELAY","signal",-1,1,0],
@@ -610,14 +921,37 @@ const PDEF = [
   ["glow","GLOW","color",0,1,0.15],
 
   ["scanlines","SCANLINES","crt",0,1,0.18],
-  ["aperture","RGB MASK","crt",0,1,0.12],
+  ["beamWidth","BEAM WIDTH","crt",0.1,3,1],
+  ["beamShape","BEAM SHAPE","crt",0,1,0.5],
+  ["aperture","MASK STRENGTH","crt",0,1,0.12],
+  ["maskDark","MASK DARK","crt",0,1,0.5],
   ["curvature","CURVATURE","crt",0,1,0.3],
+  ["cornerRound","CORNER","crt",0,1,0.2],
   ["vignette","VIGNETTE","crt",0,1,0.35],
   ["bloom","BLOOM","crt",0,1,0],
   ["bloomRad","BLOOM SIZE","crt",0,1,0.4],
   ["halation","HALATION","crt",0,1,0],
   ["defocus","DEFOCUS","crt",0,1,0],
   ["grain","FILM GRAIN","crt",0,1,0],
+  ["outGamma","GAMMA","crt",0.4,2.5,1],
+  ["outBright","BRIGHTNESS","crt",-0.5,0.5,0],
+  ["outContrast","CONTRAST","crt",0.3,2.5,1],
+  ["outSat","SATURATION","crt",0,2,1],
+  ["outWarmth","WARMTH","crt",-1,1,0],
+  ["blackLevel","BLACK LEVEL","crt",-0.2,0.3,0],
+  ["whiteClip","WHITE CLIP","crt",0.5,1.5,1],
+  ["phosphor","PERSISTENCE","crt",0,0.95,0],
+  ["hvSag","HV SAG","crt",0,1,0],
+
+  ["letterbox","LETTERBOX","overlay",0,0.4,0],
+  ["pillarbox","PILLARBOX","overlay",0,0.4,0],
+  ["bezel","BEZEL","overlay",0,1,0],
+  ["glassRefl","GLASS GLARE","overlay",0,1,0],
+  ["dust","DUST","overlay",0,1,0],
+  ["scratches","SCRATCHES","overlay",0,1,0],
+  ["ovMoire","SCREEN MOIRE","overlay",0,1,0],
+  ["rollShutter","ROLL SHUTTER","overlay",0,1,0],
+  ["safeArea","SAFE GUIDES","overlay",0,1,0],
 ];
 /* Master sections are single-instance; everything else exists once per channel. */
 const MASTER_SECS = new Set(["mixer","crt","morph"]);
@@ -653,11 +987,18 @@ function getCur(id, ch){ const p=P[id]; return p.master ? mCur[id] : chanCur[ch|
 function copyChannel(from, to){ for(const p of CLIST) chanBase[to][p.id] = chanBase[from][p.id]; }
 let fbTrailMode = false;   // false=MIX  true=TRAIL(lighten)
 let rescanMode = false;    // true = feedback taps the CRT-processed output (full rescan)
-let chainOrder = ["sig","col","glitch","flow"];    // drag-to-reorder signal chain
-let stageEnabled = {sig:true, col:true, glitch:true, flow:true};
+let chainOrder = ["sig","col","glitch","lab","flow"];    // drag-to-reorder signal chain
+let stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true};
 let keyChroma = false;     // keyer mode: false=luma true=chroma
 let mixMode = 0;           // A/B mixer transition/blend mode (see MIXMODES)
 let wipeInv = false;
+let fbWrap = 0;        // 0 clamp 1 repeat 2 mirror
+let fbMirror = 0;      // 0 none 1 H 2 V 3 quad
+let fbBlend = 0;       // 0 mix 1 add 2 screen 3 max 4 min 5 difference
+let fbNL = 0;          // 0 clamp 1 tanh 2 wrap 3 fold
+let fbInvert = false;  // invert each pass
+let fbTap = 0;         // 0 pre-display  1 post-display (rescan)
+let outModel = 0;      // display model index
 let edgeMode = 0;          // frame edge: 0=black 1=tile 2=mirror
 let showKeyMatte = false;  // keyer matte viewer
 
@@ -692,6 +1033,7 @@ function U(pr, name){
 const progFB = makeProg(FS_FB), progSIG = makeProg(FS_SIG), progCOL = makeProg(FS_COL), progCRT = makeProg(FS_CRT);
 const progGLITCH = makeProg(FS_GLITCH), progFLOW = makeProg(FS_FLOW), progCOPY = makeProg(FS_COPY);
 const progMIX = makeProg(FS_MIX);
+const progLAB = makeProg(FS_LAB);
 
 function makeRT(w,h){
   const tex = gl.createTexture();
@@ -716,7 +1058,9 @@ function newChanRT(){
           ring:null, ringW:0, ringFilled:0};
 }
 const chanRT = {A:newChanRT(), B:newChanRT()};
-let scratch1, scratch2, mixOut;
+let scratch1, scratch2, mixOut, persistA, persistB;
+let fieldSrc = 0;   // field-modulation source
+const autoGain = {A:1, B:1};
 
 function freeRT(rt){ if(rt){ gl.deleteTexture(rt.tex); gl.deleteFramebuffer(rt.fbo); } }
 function clearRing(c){
@@ -736,8 +1080,9 @@ function allocRTs(){
     c.flowA  = makeRT(procW,procH); c.flowB  = makeRT(procW,procH);
     c.out    = makeRT(procW,procH);
   }
-  freeRT(scratch1); freeRT(scratch2); freeRT(mixOut);
+  freeRT(scratch1); freeRT(scratch2); freeRT(mixOut); freeRT(persistA); freeRT(persistB);
   scratch1 = makeRT(procW,procH); scratch2 = makeRT(procW,procH); mixOut = makeRT(procW,procH);
+  persistA = makeRT(procW,procH); persistB = makeRT(procW,procH);
 }
 function setProcRes(h){
   procH = h; procW = Math.round(h*16/9/2)*2;

@@ -157,7 +157,15 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
   display:flex; align-items:center; gap:4px; background:rgba(0,0,0,.2);
 }
 #mixCollapse i{font-style:normal; font-size:8px; transition:transform .12s;}
+#mixCollapse .mixhint{display:none;}
+body.nomix #mixstrip{background:rgba(255,122,24,.06);}
+body.nomix #mixCollapse{
+  flex:1 1 auto; justify-content:center; gap:9px; padding:9px 10px;
+  border-right:none; color:var(--amber); font-size:9px; letter-spacing:3px;
+}
+body.nomix #mixCollapse:hover{background:rgba(255,122,24,.14);}
 body.nomix #mixCollapse i{transform:rotate(-90deg);}
+body.nomix #mixCollapse .mixhint{display:inline; color:var(--dim); letter-spacing:2px; font-size:8px;}
 body.nomix #mixbuses{display:none;}
 #mixbuses{flex:1; display:flex; min-width:0;}
 .mixbus{
@@ -251,10 +259,7 @@ body.nomix #mixbuses{display:none;}
 #modpage.show{display:flex;}
 #modpage .mphead{display:flex; align-items:center; gap:10px;}
 #modpage .mphead h3{font-size:11px; letter-spacing:2.5px; color:var(--cyan);}
-#modgrid{
-  display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:10px;
-  overflow-y:auto; flex:1; align-content:start;
-}
+#modgrid{overflow-y:auto; flex:1;}
 .modcard{
   background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:9px 10px;
 }
@@ -394,14 +399,17 @@ body.multi #mvlabels{display:grid;}
 #dockBody{flex:1; overflow:auto; min-height:0; position:relative;}
 #dockBody > div{display:none; height:100%;}
 #dockBody > div.on{display:block;}
-#modgrid{
-  display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:8px;
-  padding:8px; align-content:start; overflow-y:auto;
+#dockBody > #modgrid.on{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 262px)); gap:8px;
+  padding:8px; align-content:start; justify-content:start; overflow-y:auto;
 }
 #textdock{padding:10px 12px; overflow-y:auto;}
 #bendrow .bendbtns{grid-template-columns:repeat(6,1fr); max-width:900px;}
 #dockBody > #performdock.on{display:flex; flex-direction:column; gap:16px;}
 #pfmain{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;}
+#dockBody > #mixdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
+#mixdock .sec{flex:1 1 0; min-width:230px; border-bottom:none; padding:0;}
+#mixdock .sec h3{padding-top:0;}
 #bendrow{border-top:1px solid var(--line); padding-top:10px;}
 #bendrow h4{padding-bottom:6px;}
 .pfcol{flex:0 0 auto; display:flex; flex-direction:column; gap:6px;}
@@ -491,7 +499,15 @@ audio,video{display:none;}
   display:flex; align-items:center; gap:4px; background:rgba(0,0,0,.2);
 }
 #mixCollapse i{font-style:normal; font-size:8px; transition:transform .12s;}
+#mixCollapse .mixhint{display:none;}
+body.nomix #mixstrip{background:rgba(255,122,24,.06);}
+body.nomix #mixCollapse{
+  flex:1 1 auto; justify-content:center; gap:9px; padding:9px 10px;
+  border-right:none; color:var(--amber); font-size:9px; letter-spacing:3px;
+}
+body.nomix #mixCollapse:hover{background:rgba(255,122,24,.14);}
 body.nomix #mixCollapse i{transform:rotate(-90deg);}
+body.nomix #mixCollapse .mixhint{display:inline; color:var(--dim); letter-spacing:2px; font-size:8px;}
 body.nomix #mixbuses{display:none;}
 #mixbuses{flex:1; display:flex; min-width:0;}
 .mixbus{
@@ -596,7 +612,7 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v21.0</span>
+  <span id="ver" title="Build version">v22.0</span>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -715,10 +731,6 @@ body.nomix #mixbuses{display:none;}
       <div id="dropHint">DROP VIDEO / PRESET</div>
       <div id="mvlabels"><span>A</span><span>B</span><span>BUS 1</span><span>C</span><span>D</span><span>PROGRAMME</span></div>
     </div>
-    <div id="mixstrip">
-      <button id="mixCollapse" data-tip="Fold the mixer strip away when you need the height. It stays folded until you bring it back.">MIX<i>&#9662;</i></button>
-      <div id="mixbuses"></div>
-    </div>
     <div id="transport">
       <button id="btnPlay" data-tip="Play or pause this channel's file. Keyboard: P.">❚❚</button>
       <button id="btnLoop" class="on" data-tip="Loop the file on this channel when it reaches the end.">LOOP</button>
@@ -729,6 +741,10 @@ body.nomix #mixbuses{display:none;}
       <input type="range" id="seek" min="0" max="1" step="0.001" value="0">
       <span id="tcode">--:-- / --:--</span>
     </div>
+    <div id="mixstrip">
+      <button id="mixCollapse" data-tip="Fold the mixer strip away when you need the height. It stays folded until you bring it back."><i>&#9662;</i>MIX<span class="mixhint">SHOW THE FADERS</span></button>
+      <div id="mixbuses"></div>
+    </div>
     <div id="dragbar"></div>
     <div id="lower">
       <div id="dock">
@@ -736,11 +752,13 @@ body.nomix #mixbuses{display:none;}
           <button data-dock="matrix" class="on" data-tip="The mod matrix: patch any source into any parameter, on any channel.">MATRIX</button>
           <button data-dock="mod" data-tip="Every modulation source drawn live, with editable rates and shapes and a list of what each one is driving.">MOD</button>
           <button data-dock="text" data-tip="The text and shape generator for this channel. Typing here never triggers keyboard shortcuts.">TEXT</button>
+          <button data-dock="mix" data-tip="The detail behind each transition: wipe softness and geometry, and the key settings. The faders themselves are on the strip under the picture.">MIX</button>
           <button data-dock="perform" data-tip="Everything you play with while it is running: eight whole-rig snapshots with a glide time, the performance recorder, and the six bend pads.">PERFORM</button>
           <span style="flex:1;"></span>
           <span id="dockHint"></span>
         </div>
         <div id="dockBody">
+      <div id="mixdock"></div>
       <div id="performdock">
         <div id="pfmain"></div>
         <div id="bendrow">
@@ -850,12 +868,12 @@ body.nomix #mixbuses{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v21.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v22.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
-  <p>The channels meet in three mixers, laid out as a strip directly under the picture: bus 1, bus 2, and a master crossfade between them. Each strip has its own two input selectors, so the pairings are not fixed \u2014 bus 1 can mix <b>A against C</b>, bus 2 can mix <b>D against B</b>. To get all four in at once, set both bus faders part-way and put the master on ADD, SCREEN or LIGHTEN rather than FADE, so the buses sum instead of crossfading. Fold the strip away with <b>MIX</b> on its left when you want the height back.</p>
-  <p>The faders live under the picture rather than in the sidebar because a crossfader wants to be horizontal and should never be hidden behind a tab \u2014 it is the one control you ride while looking at something else. The detail behind each transition (softness, wipe geometry, key threshold) stays in the sidebar, where it is setup rather than performance.</p>
+  <p>The channels meet in three mixers, laid out as a strip directly under the picture: bus 1, bus 2, and a master crossfade between them. Each strip has its own two input selectors, so the pairings are not fixed \u2014 bus 1 can mix <b>A against C</b>, bus 2 can mix <b>D against B</b>. To get all four in at once, set both bus faders part-way and put the master on ADD, SCREEN or LIGHTEN rather than FADE, so the buses sum instead of crossfading. The strip sits just under the transport bar, and folds away with <b>MIX</b> on its left when you want the height back.</p>
+  <p>The faders live under the picture rather than in the sidebar because a crossfader wants to be horizontal and should never be hidden behind a tab \u2014 it is the one control you ride while looking at something else. The detail behind each transition (softness, wipe geometry, key threshold) lives on the MIX tab of the dock, where it is setup rather than performance. INV only greys in when the transition is a wipe, since a fade, a key and a blend have no direction to reverse.</p>
   <h3>MULTIVIEW</h3>
   <p><b>MULTI</b> (or <kbd>V</kbd>) shows all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors. The channel you are editing carries the hot border; channels that are not currently rendering are dimmed. It forces everything to render, so it costs more than the normal view \u2014 it is for setting up, not for performing.</p>
   <h3>PATTERN SYNTH</h3>
@@ -891,7 +909,7 @@ body.nomix #mixbuses{display:none;}
   <h3>MOVEMENT</h3>
   <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch four LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
   <h3>PERFORMANCE</h3>
-  <p>The dock under the picture has four tabs: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b> and <b>PERFORM</b>. PERFORM holds everything you play with while it is running \u2014 the snapshot bank, the recorder and the bend pads. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
+  <p>The dock under the picture has five tabs: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b>, <b>MIX</b> and <b>PERFORM</b>. MIX holds the detail behind each transition \u2014 wipe softness and geometry, key threshold and hue \u2014 while the faders themselves stay on the strip. PERFORM holds everything you play with while it is running \u2014 the snapshot bank, the recorder and the bend pads. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
   <h3>MIXER, MORPH, KEYER &amp; TIME BASE</h3>
   <p>Each of the three <b>MIXERS</b> gets the same twenty modes: a plain fade, twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and a movable origin, luma and chroma key transitions, and add / difference / multiply / screen / lighten blends. Run the fader like a T-bar. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor.</p>
@@ -2007,7 +2025,6 @@ const SECTIONS = [
   {id:"morph",    name:"PRESET MORPH",      cls:"mag",  zone:"tools"},
 ];
 const ZONES = [
-  {id:"mix",   label:"MIX \u00b7 TRANSITION DETAIL", note:"How each bus\u2019s transition is shaped. The faders, routing and transition modes are on the strip under the picture; this is the detail behind them."},
   {id:"chain", label:"CHANNEL \u00b7 SIGNAL PATH", note:"Everything belonging to the channel selected above, in the order the signal actually travels: source, framing, frame store, feedback, then the reorderable stages, then the keyer. Drag by the handle to rearrange."},
   {id:"out",   label:"MASTER OUT",          note:"The shared display stage, after the mixer. Every channel ends up here."},
   {id:"tools", label:"TOOLS",               note:"Performance and modulation tools that do not belong to any one channel."},
@@ -3260,14 +3277,16 @@ function buildMixStrip(){
       "How the two sides meet: a plain dissolve, one of twelve wipe shapes, a luma or chroma key, or a blend. The softness, wipe geometry and key settings live in the sidebar.");
     MIXMODES.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=m; mode.appendChild(o); });
     mode.value = bus.get();
-    mode.onchange = ()=>{ bus.set(parseInt(mode.value)); };
+    mode.onchange = ()=>{ bus.set(parseInt(mode.value)); refreshToggles(); };
     row.appendChild(mode);
     const iv = document.createElement("button");
     iv.textContent = "INV";
-    attachTip(iv, "INVERT WIPE", "Runs the wipe from the other side.");
+    attachTip(iv, "INVERT WIPE",
+      "Runs the wipe from the other side.",
+      "Only wipes have a direction to reverse, so this greys out on FADE, on the keys and on the blend modes. Keys have their own KEY INVERT in the MIX tab.");
     iv.classList.toggle("on", bus.inv());
-    iv.onclick = ()=>{ bus.tinv(); iv.classList.toggle("on", bus.inv()); };
-    stripInvBtns[bus.key] = {btn:iv, get:bus.inv};
+    iv.onclick = ()=>{ if(iv.disabled) return; bus.tinv(); iv.classList.toggle("on", bus.inv()); };
+    stripInvBtns[bus.key] = {btn:iv, get:bus.inv, mode:bus.get};
     row.appendChild(iv);
     el.appendChild(row);
 
@@ -3361,7 +3380,9 @@ function buildPanel(){
       d2.appendChild(row);
       uiRefs[p.id] = {slider:s, val, tick, row, label:lab};
     }
-    (zoneEls[sec.zone] || zoneEls.chain).appendChild(d);
+    /* the three transition sections live in the dock's MIX tab, not the sidebar */
+    const host = sec.zone === "mix" ? document.getElementById("mixdock") : (zoneEls[sec.zone] || zoneEls.chain);
+    host.appendChild(d);
   }
   /* LFO config section */
   const d = mkSection("lfo", "mag", "LFO SETTINGS");
@@ -3708,7 +3729,9 @@ function loadCollapse(){
   if(!st){
     /* first run: the second bus and the master crossfade are folded away, since
        they do nothing until you bring channels C and D in */
-    st = {mixer2:true, mixerM:true, gen:true};
+    /* the three transition columns share a dock tab now, so there is room for
+       all of them; only the pattern synth starts folded */
+    st = {gen:true};
   }
   for(const k in st) if(secEls[k] && st[k]) secEls[k].classList.add("collapsed");
 }
@@ -3838,7 +3861,14 @@ function refreshBusUI(){
   }
 }
 function refreshToggles(){
-  for(const k in stripInvBtns) stripInvBtns[k].btn.classList.toggle("on", stripInvBtns[k].get());
+  for(const k in stripInvBtns){
+    const r = stripInvBtns[k];
+    /* a wipe is the only transition with a direction to reverse */
+    const isWipe = r.mode() >= 1 && r.mode() <= 12;
+    r.btn.disabled = !isWipe;
+    r.btn.classList.toggle("dim", !isWipe);
+    r.btn.classList.toggle("on", isWipe && r.get());
+  }
   for(const k in toggleRefs) toggleRefs[k].btn.textContent = toggleRefs[k].labelFn();
   const fm = document.getElementById("fbModeBtn");
   if(fm) fm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX");
@@ -5014,7 +5044,7 @@ function setDock(t){
     t = dockTab === "text" ? "matrix" : dockTab;
   }
   dockTab = t;
-  const map = {matrix:"matrix", mod:"modgrid", text:"textdock", perform:"performdock"};
+  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);
     if(el) el.classList.toggle("on", k===t);
@@ -5024,6 +5054,7 @@ function setDock(t){
   if(hint) hint.textContent = t==="mod" ? "right-click any parameter to patch it"
                             : t==="text" ? "typing here never triggers shortcuts"
                             : t==="perform" ? "shift and a number recalls a snapshot \u00b7 Q W E R T Y hold the pads"
+                            : t==="mix" ? "the faders themselves are on the strip under the picture"
                             : "patch sources into any parameter";
   if(t==="text") syncTextEditor();
   refreshDockTabs();

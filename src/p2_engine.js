@@ -1065,7 +1065,6 @@ const SECTIONS = [
   {id:"morph",    name:"PRESET MORPH",      cls:"mag",  zone:"tools"},
 ];
 const ZONES = [
-  {id:"mix",   label:"MIX \u00b7 TRANSITION DETAIL", note:"How each bus\u2019s transition is shaped. The faders, routing and transition modes are on the strip under the picture; this is the detail behind them."},
   {id:"chain", label:"CHANNEL \u00b7 SIGNAL PATH", note:"Everything belonging to the channel selected above, in the order the signal actually travels: source, framing, frame store, feedback, then the reorderable stages, then the keyer. Drag by the handle to rearrange."},
   {id:"out",   label:"MASTER OUT",          note:"The shared display stage, after the mixer. Every channel ends up here."},
   {id:"tools", label:"TOOLS",               note:"Performance and modulation tools that do not belong to any one channel."},

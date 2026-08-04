@@ -459,14 +459,16 @@ function buildMixStrip(){
       "How the two sides meet: a plain dissolve, one of twelve wipe shapes, a luma or chroma key, or a blend. The softness, wipe geometry and key settings live in the sidebar.");
     MIXMODES.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=m; mode.appendChild(o); });
     mode.value = bus.get();
-    mode.onchange = ()=>{ bus.set(parseInt(mode.value)); };
+    mode.onchange = ()=>{ bus.set(parseInt(mode.value)); refreshToggles(); };
     row.appendChild(mode);
     const iv = document.createElement("button");
     iv.textContent = "INV";
-    attachTip(iv, "INVERT WIPE", "Runs the wipe from the other side.");
+    attachTip(iv, "INVERT WIPE",
+      "Runs the wipe from the other side.",
+      "Only wipes have a direction to reverse, so this greys out on FADE, on the keys and on the blend modes. Keys have their own KEY INVERT in the MIX tab.");
     iv.classList.toggle("on", bus.inv());
-    iv.onclick = ()=>{ bus.tinv(); iv.classList.toggle("on", bus.inv()); };
-    stripInvBtns[bus.key] = {btn:iv, get:bus.inv};
+    iv.onclick = ()=>{ if(iv.disabled) return; bus.tinv(); iv.classList.toggle("on", bus.inv()); };
+    stripInvBtns[bus.key] = {btn:iv, get:bus.inv, mode:bus.get};
     row.appendChild(iv);
     el.appendChild(row);
 
@@ -560,7 +562,9 @@ function buildPanel(){
       d2.appendChild(row);
       uiRefs[p.id] = {slider:s, val, tick, row, label:lab};
     }
-    (zoneEls[sec.zone] || zoneEls.chain).appendChild(d);
+    /* the three transition sections live in the dock's MIX tab, not the sidebar */
+    const host = sec.zone === "mix" ? document.getElementById("mixdock") : (zoneEls[sec.zone] || zoneEls.chain);
+    host.appendChild(d);
   }
   /* LFO config section */
   const d = mkSection("lfo", "mag", "LFO SETTINGS");
@@ -907,7 +911,9 @@ function loadCollapse(){
   if(!st){
     /* first run: the second bus and the master crossfade are folded away, since
        they do nothing until you bring channels C and D in */
-    st = {mixer2:true, mixerM:true, gen:true};
+    /* the three transition columns share a dock tab now, so there is room for
+       all of them; only the pattern synth starts folded */
+    st = {gen:true};
   }
   for(const k in st) if(secEls[k] && st[k]) secEls[k].classList.add("collapsed");
 }
@@ -1037,7 +1043,14 @@ function refreshBusUI(){
   }
 }
 function refreshToggles(){
-  for(const k in stripInvBtns) stripInvBtns[k].btn.classList.toggle("on", stripInvBtns[k].get());
+  for(const k in stripInvBtns){
+    const r = stripInvBtns[k];
+    /* a wipe is the only transition with a direction to reverse */
+    const isWipe = r.mode() >= 1 && r.mode() <= 12;
+    r.btn.disabled = !isWipe;
+    r.btn.classList.toggle("dim", !isWipe);
+    r.btn.classList.toggle("on", isWipe && r.get());
+  }
   for(const k in toggleRefs) toggleRefs[k].btn.textContent = toggleRefs[k].labelFn();
   const fm = document.getElementById("fbModeBtn");
   if(fm) fm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX");

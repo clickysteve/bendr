@@ -406,6 +406,96 @@ function setActiveChan(ch){
   refreshUI(); refreshToggles();
   if(window.__syncChanInputUI) window.__syncChanInputUI();
 }
+
+/* ---- mixer strip: the fader bank, always visible under the picture ----
+   A crossfader wants to be horizontal, and the one control you ride while
+   looking at something else should never be behind a tab. The transition
+   detail (softness, wipe geometry, key) stays in the sidebar, where it is
+   setup rather than performance. */
+const STRIP_PARAMS = new Set(["abMix","cdMix","busMix"]);
+function buildMixStrip(){
+  const host = document.getElementById("mixbuses");
+  if(!host) return;
+  host.innerHTML = "";
+  const buses = [
+    {key:"b1", pid:"abMix", label:"BUS 1", routed:true,
+     get:()=>mixMode, set:v=>{mixMode=v;}, inv:()=>wipeInv, tinv:()=>{wipeInv=!wipeInv;}},
+    {key:"b2", pid:"cdMix", label:"BUS 2", routed:true,
+     get:()=>mixMode2, set:v=>{mixMode2=v;}, inv:()=>wipeInv2, tinv:()=>{wipeInv2=!wipeInv2;}},
+    {key:"bM", pid:"busMix", label:"MASTER · BUS 1 ↔ BUS 2", routed:false,
+     get:()=>mixModeM, set:v=>{mixModeM=v;}, inv:()=>wipeInvM, tinv:()=>{wipeInvM=!wipeInvM;}},
+  ];
+  for(const bus of buses){
+    const p = P[bus.pid];
+    const el = document.createElement("div");
+    el.className = "mixbus" + (bus.routed ? "" : " mixmaster");
+    const h = document.createElement("h5");
+    h.textContent = bus.label;
+    attachTip(h, bus.label, SECHELP[bus.routed ? (bus.key==="b1"?"mixer":"mixer2") : "mixerM"]);
+    el.appendChild(h);
+
+    const row = document.createElement("div"); row.className = "mixrow";
+    if(bus.routed){
+      for(const side of [0,1]){
+        const sel = document.createElement("select");
+        sel.id = "busSrc"+bus.key+side;
+        attachTip(sel, side===0 ? "BUS INPUT A" : "BUS INPUT B",
+          "Which channel feeds this side of the bus. Any channel can go to any bus, so A can wipe against C, or D against B.");
+        for(const c of CHANNELS){
+          const o = document.createElement("option"); o.value=c; o.textContent="CH "+c; sel.appendChild(o);
+        }
+        sel.value = busSrc[bus.key][side];
+        sel.onchange = ()=>{ busSrc[bus.key][side] = sel.value; };
+        row.appendChild(sel);
+        if(side===0){
+          const a = document.createElement("span"); a.className="arrow"; a.textContent="↔";
+          row.appendChild(a);
+        }
+      }
+    }
+    const mode = document.createElement("select");
+    mode.id = bus.key==="b1" ? "selMixMode" : (bus.key==="b2" ? "selMixMode2" : "selMixModeM");
+    attachTip(mode, "TRANSITION",
+      "How the two sides meet: a plain dissolve, one of twelve wipe shapes, a luma or chroma key, or a blend. The softness, wipe geometry and key settings live in the sidebar.");
+    MIXMODES.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=m; mode.appendChild(o); });
+    mode.value = bus.get();
+    mode.onchange = ()=>{ bus.set(parseInt(mode.value)); };
+    row.appendChild(mode);
+    const iv = document.createElement("button");
+    iv.textContent = "INV";
+    attachTip(iv, "INVERT WIPE", "Runs the wipe from the other side.");
+    iv.classList.toggle("on", bus.inv());
+    iv.onclick = ()=>{ bus.tinv(); iv.classList.toggle("on", bus.inv()); };
+    stripInvBtns[bus.key] = {btn:iv, get:bus.inv};
+    row.appendChild(iv);
+    el.appendChild(row);
+
+    const fr = document.createElement("div"); fr.className = "mixfader";
+    const wrap = document.createElement("div"); wrap.className = "sldwrap";
+    const sl = document.createElement("input");
+    sl.type = "range"; sl.min = p.min; sl.max = p.max; sl.step = (p.max-p.min)/400;
+    sl.value = getBase(p.id);
+    attachTip(sl, p.name, PHELP[p.id] || "", "Double-click to return it to zero.");
+    const val = document.createElement("span"); val.className = "mval";
+    val.textContent = fmt(p, getBase(p.id));
+    sl.addEventListener("input", ()=>{
+      const v = parseFloat(sl.value);
+      setBase(p.id, v); val.textContent = fmt(p, v);
+      morphOverride.add("M:"+p.id);
+    });
+    sl.addEventListener("dblclick", ()=>{ resetParam(p); });
+    const tick = document.createElement("div"); tick.className = "modtick";
+    wrap.appendChild(sl); wrap.appendChild(tick);
+    fr.appendChild(wrap); fr.appendChild(val);
+    el.appendChild(fr);
+    /* registering here means refreshUI and the modulation ticks drive it too */
+    uiRefs[p.id] = {slider:sl, val, tick, row:el, label:h};
+    host.appendChild(el);
+  }
+  refreshBusUI(); refreshToggles();
+}
+const stripInvBtns = {};
+
 function buildPanel(){
   buildChanBar();
   buildZones();
@@ -434,7 +524,7 @@ function buildPanel(){
     secEls[sec.id] = d;
     sectionExtras(sec.id, body);
     const dOuter = d; const d2 = body;
-    for(const p of PLIST.filter(p=>p.sec===sec.id)){
+    for(const p of PLIST.filter(p=>p.sec===sec.id && !STRIP_PARAMS.has(p.id))){
       const row = document.createElement("div"); row.className="prow";
       const lab = document.createElement("label"); lab.textContent = p.name;
       attachTip(lab, p.name, PHELP[p.id] || "",
@@ -947,6 +1037,7 @@ function refreshBusUI(){
   }
 }
 function refreshToggles(){
+  for(const k in stripInvBtns) stripInvBtns[k].btn.classList.toggle("on", stripInvBtns[k].get());
   for(const k in toggleRefs) toggleRefs[k].btn.textContent = toggleRefs[k].labelFn();
   const fm = document.getElementById("fbModeBtn");
   if(fm) fm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX");
@@ -962,7 +1053,7 @@ const MIXMODES = ["FADE","WIPE H","WIPE V","DIAGONAL","BOX","CIRCLE","SPLIT H","
 
 /* ---- PERFORM dock: snapshot bank + performance recorder ---- */
 function buildPerformDock(){
-  const host = document.getElementById("performdock");
+  const host = document.getElementById("pfmain");
   if(!host) return;
   host.innerHTML = "";
 
@@ -1037,53 +1128,12 @@ function buildPerformDock(){
 function sectionExtras(id, d){
   if(id==="mixer" || id==="mixer2" || id==="mixerM"){
     const which = id==="mixer" ? 1 : (id==="mixer2" ? 2 : 3);
-    const tr = document.createElement("div"); tr.className="trow";
-    const sel = document.createElement("select");
-    sel.id = which===1 ? "selMixMode" : (which===2 ? "selMixMode2" : "selMixModeM");
-    sel.style.flex = "1";
-    sel.title = "Transition / blend mode for this bus";
-    MIXMODES.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=m; sel.appendChild(o); });
-    sel.value = which===1 ? mixMode : (which===2 ? mixMode2 : mixModeM);
-    sel.onchange = ()=>{
-      const v = parseInt(sel.value);
-      if(which===1) mixMode = v; else if(which===2) mixMode2 = v; else mixModeM = v;
-    };
-    tr.appendChild(sel);
-    if(which<3){
-      /* which two channels this bus is actually mixing */
-      const rr = document.createElement("div"); rr.className="trow";
-      const key = which===1 ? "b1" : "b2";
-      for(const side of [0,1]){
-        const sel = document.createElement("select");
-        sel.id = "busSrc"+key+side;
-        attachTip(sel, side===0 ? "BUS INPUT A" : "BUS INPUT B",
-          "Which channel feeds this side of the bus. Any channel can be routed to any bus, so A can wipe against C, or D against B.",
-          "To mix all four at once, leave the buses on their pairs, set both bus faders part-way, and put the master on ADD or LIGHTEN.");
-        for(const c of CHANNELS){
-          const o = document.createElement("option"); o.value=c; o.textContent="CH "+c; sel.appendChild(o);
-        }
-        sel.value = busSrc[key][side];
-        sel.onchange = ()=>{ busSrc[key][side] = sel.value; toast("Bus "+which+": "+busSrc[key][0]+" \u2194 "+busSrc[key][1]); };
-        rr.appendChild(sel);
-        if(side===0){
-          const arrow = document.createElement("span");
-          arrow.style.cssText="color:var(--dim); font-size:9px; align-self:center; padding:0 2px;";
-          arrow.textContent = "\u2194";
-          rr.appendChild(arrow);
-        }
-      }
-      d.appendChild(rr);
-    }
-    if(which===1) mkToggle(tr, "wipeInv", ()=>"WIPE: "+(wipeInv?"INV":"NORM"), ()=>{ wipeInv=!wipeInv; }, "Runs the wipe from the other side.");
-    if(which===2) mkToggle(tr, "wipeInv2", ()=>"WIPE: "+(wipeInv2?"INV":"NORM"), ()=>{ wipeInv2=!wipeInv2; }, "Runs the wipe from the other side.");
-    if(which===3) mkToggle(tr, "wipeInvM", ()=>"WIPE: "+(wipeInvM?"INV":"NORM"), ()=>{ wipeInvM=!wipeInvM; }, "Runs the wipe from the other side.");
-    d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
     note.textContent =
-      which===1 ? "Bus 1 combines channels A and B. Run the fader like a T-bar; wipes use SOFT for edge feather, DETAIL for blind/bar count, CTR X/Y for the origin. Give channel B a source first."
-    : which===2 ? "Bus 2 combines channels C and D, exactly like bus 1. It only renders when the MASTER fader is above zero, so leaving it alone costs nothing."
-    : "The master crossfade between the two buses \u2014 the same twenty transitions again, one level up. Push it off zero and channels C and D come alive.";
+      which===1 ? "How bus 1's transition looks. The fader, the routing and the transition mode are on the mixer strip under the picture; SOFT feathers the wipe edge, DETAIL sets blind and bar counts, CTR X/Y moves the origin, and the KEY controls apply to the two key transitions."
+    : which===2 ? "The same for bus 2. It only renders while the master fader is above zero, so leaving it alone costs nothing."
+    : "The same again for the master crossfade between the two buses.";
     d.appendChild(note);
   }
   if(id==="morph"){

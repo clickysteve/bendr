@@ -146,6 +146,40 @@ input[type=range]::-webkit-slider-thumb{
 }
 input[type=range]::-moz-range-track{height:3px; background:#2a2a34; border-radius:2px;}
 input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; background:var(--amber); border:1px solid #000;}
+/* ---------- mixer strip ---------- */
+#mixstrip{
+  flex:0 0 auto; display:flex; align-items:stretch;
+  border-top:1px solid var(--line); background:var(--panel2);
+}
+#mixCollapse{
+  flex:0 0 auto; border:none; border-right:1px solid var(--line); border-radius:0;
+  padding:0 10px; font-size:8px; letter-spacing:2px; color:var(--dim);
+  display:flex; align-items:center; gap:4px; background:rgba(0,0,0,.2);
+}
+#mixCollapse i{font-style:normal; font-size:8px; transition:transform .12s;}
+body.nomix #mixCollapse i{transform:rotate(-90deg);}
+body.nomix #mixbuses{display:none;}
+#mixbuses{flex:1; display:flex; min-width:0;}
+.mixbus{
+  flex:1 1 0; min-width:0; padding:6px 12px 7px;
+  border-left:1px solid var(--line); display:flex; flex-direction:column; gap:4px;
+}
+.mixbus:first-child{border-left:none;}
+.mixbus h5{font-size:7.5px; letter-spacing:2px; color:var(--dim);}
+.mixbus.mixmaster h5{color:var(--amber);}
+.mixrow{display:flex; gap:4px; align-items:center;}
+.mixrow select{flex:1 1 0; min-width:0; padding:3px 4px; font-size:9px;}
+.mixrow .arrow{color:var(--dim); font-size:9px;}
+.mixrow button{padding:3px 6px; font-size:8px;}
+.mixfader{display:flex; align-items:center; gap:8px; position:relative;}
+.mixfader .sldwrap{flex:1; position:relative; display:flex; align-items:center;}
+.mixfader input[type=range]{height:22px;}
+.mixfader input[type=range]::-webkit-slider-runnable-track{height:5px; background:#26262f;}
+.mixfader input[type=range]::-webkit-slider-thumb{width:15px; height:19px; margin-top:-7px; border-radius:2px;}
+.mixfader input[type=range]::-moz-range-thumb{width:14px; height:18px; border-radius:2px;}
+.mixfader .mval{width:42px; text-align:right; color:var(--amber); font-size:11px;}
+.mixbus.mixmaster .mixfader input[type=range]::-webkit-slider-thumb{background:var(--cyan); box-shadow:0 0 5px rgba(46,230,214,.6);}
+.mixbus.mixmaster .mval{color:var(--cyan);}
 .modtick{
   position:absolute; top:1px; width:2px; height:14px; background:var(--cyan);
   box-shadow:0 0 4px var(--cyan); pointer-events:none; display:none; left:0;
@@ -365,8 +399,11 @@ body.multi #mvlabels{display:grid;}
   padding:8px; align-content:start; overflow-y:auto;
 }
 #textdock{padding:10px 12px; overflow-y:auto;}
-#bendsdock .bendbtns{grid-template-columns:repeat(6,1fr); max-width:900px;}
-#dockBody > #performdock.on{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;}
+#bendrow .bendbtns{grid-template-columns:repeat(6,1fr); max-width:900px;}
+#dockBody > #performdock.on{display:flex; flex-direction:column; gap:16px;}
+#pfmain{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;}
+#bendrow{border-top:1px solid var(--line); padding-top:10px;}
+#bendrow h4{padding-bottom:6px;}
 .pfcol{flex:0 0 auto; display:flex; flex-direction:column; gap:6px;}
 .pfcol .trow{width:100%;}
 .pfcol h4{font-size:8px; letter-spacing:2px; color:var(--dim); padding-bottom:3px;}
@@ -387,9 +424,8 @@ body.multi #mvlabels{display:grid;}
 .sec.secdrag{opacity:.4;}
 .sec.secover{box-shadow:inset 0 3px 0 var(--cyan);}
 .sec h3 .grab{color:#3a3a46; font-size:9px; cursor:grab; letter-spacing:-1px;}
-#bendsdock{padding:12px 14px;}
 #performdock{padding:12px 14px;}
-#bendsdock h4, #performdock h4, #matrix h4{font-size:8.5px; letter-spacing:2px; color:var(--dim); padding-bottom:2px;}
+#performdock h4, #matrix h4{font-size:8.5px; letter-spacing:2px; color:var(--dim); padding-bottom:2px;}
 .bendbtns{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
 .bend{
   padding:10px 6px; font-size:9.5px; font-weight:700; letter-spacing:1px; text-align:center;
@@ -444,7 +480,41 @@ audio,video{display:none;}
   button, select{padding:9px 12px; font-size:11px;}
   .prow{padding:5px 0;}
   .sldwrap{height:30px;}
-  .modtick{top:6px; height:18px;}
+  /* ---------- mixer strip ---------- */
+#mixstrip{
+  flex:0 0 auto; display:flex; align-items:stretch;
+  border-top:1px solid var(--line); background:var(--panel2);
+}
+#mixCollapse{
+  flex:0 0 auto; border:none; border-right:1px solid var(--line); border-radius:0;
+  padding:0 10px; font-size:8px; letter-spacing:2px; color:var(--dim);
+  display:flex; align-items:center; gap:4px; background:rgba(0,0,0,.2);
+}
+#mixCollapse i{font-style:normal; font-size:8px; transition:transform .12s;}
+body.nomix #mixCollapse i{transform:rotate(-90deg);}
+body.nomix #mixbuses{display:none;}
+#mixbuses{flex:1; display:flex; min-width:0;}
+.mixbus{
+  flex:1 1 0; min-width:0; padding:6px 12px 7px;
+  border-left:1px solid var(--line); display:flex; flex-direction:column; gap:4px;
+}
+.mixbus:first-child{border-left:none;}
+.mixbus h5{font-size:7.5px; letter-spacing:2px; color:var(--dim);}
+.mixbus.mixmaster h5{color:var(--amber);}
+.mixrow{display:flex; gap:4px; align-items:center;}
+.mixrow select{flex:1 1 0; min-width:0; padding:3px 4px; font-size:9px;}
+.mixrow .arrow{color:var(--dim); font-size:9px;}
+.mixrow button{padding:3px 6px; font-size:8px;}
+.mixfader{display:flex; align-items:center; gap:8px; position:relative;}
+.mixfader .sldwrap{flex:1; position:relative; display:flex; align-items:center;}
+.mixfader input[type=range]{height:22px;}
+.mixfader input[type=range]::-webkit-slider-runnable-track{height:5px; background:#26262f;}
+.mixfader input[type=range]::-webkit-slider-thumb{width:15px; height:19px; margin-top:-7px; border-radius:2px;}
+.mixfader input[type=range]::-moz-range-thumb{width:14px; height:18px; border-radius:2px;}
+.mixfader .mval{width:42px; text-align:right; color:var(--amber); font-size:11px;}
+.mixbus.mixmaster .mixfader input[type=range]::-webkit-slider-thumb{background:var(--cyan); box-shadow:0 0 5px rgba(46,230,214,.6);}
+.mixbus.mixmaster .mval{color:var(--cyan);}
+.modtick{top:6px; height:18px;}
   .stagepill{padding:9px 10px; font-size:10px;}
   .secreset{padding:5px 9px; font-size:9px;}
 }
@@ -480,12 +550,15 @@ audio,video{display:none;}
     order:2; width:100%; flex:1 1 auto; border-right:none; border-top:1px solid var(--line);
     padding-bottom:78px; max-height:none;
   }
+  #mixstrip{flex-direction:column;}
+  #mixbuses{flex-direction:column;}
+  .mixbus{border-left:none; border-top:1px solid var(--line);}
   #lower{
     order:3; flex:1 1 auto; max-height:none; flex-direction:column;
     border-top:1px solid var(--line); overflow-y:auto; padding-bottom:78px;
   }
-  #bendsdock .bendbtns{grid-template-columns:repeat(3,1fr); gap:8px; max-width:none;}
-  #dockBody > #performdock.on{flex-direction:column; gap:14px;}
+  #bendrow .bendbtns{grid-template-columns:repeat(3,1fr); gap:8px; max-width:none;}
+  #pfmain{flex-direction:column; gap:14px;}
   .bend{padding:16px 6px; font-size:11px;}
   #matrix{width:100%;}
   .mrow{flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #1e1e26;}
@@ -523,7 +596,7 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v19.0</span>
+  <span id="ver" title="Build version">v21.0</span>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -616,8 +689,6 @@ audio,video{display:none;}
 
   <button id="btnRnd" class="cy" data-tip="Rolls a whole new patch: every parameter, a handful of new mod routes, new LFO rates, sometimes a new chain order. Weighted so the results are usable rather than uniformly random. Z undoes it. Keyboard: space.">RANDOMIZE</button>
   <button id="btnMut" class="cy" data-tip="Nudges every control on this channel by a small random amount instead of replacing them. Press it repeatedly to drift somewhere new without losing what you have. Keyboard: M.">MUTATE</button>
-  <button id="btnBendPane" data-tip="Show or hide the bend pads. Hidden, the mod matrix and text editor get the full width of the dock.">BEND</button>
-  <button id="btnModPane" data-tip="Jump the dock to the modulation page: every source drawn live with what it is driving. Keyboard: D.">MOD</button>
 
   <div class="spacer"></div>
   <button id="btnMulti" data-tip="Multiview: all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors. The channel you are editing gets the hot border. Keyboard: V.">MULTI</button>
@@ -644,6 +715,10 @@ audio,video{display:none;}
       <div id="dropHint">DROP VIDEO / PRESET</div>
       <div id="mvlabels"><span>A</span><span>B</span><span>BUS 1</span><span>C</span><span>D</span><span>PROGRAMME</span></div>
     </div>
+    <div id="mixstrip">
+      <button id="mixCollapse" data-tip="Fold the mixer strip away when you need the height. It stays folded until you bring it back.">MIX<i>&#9662;</i></button>
+      <div id="mixbuses"></div>
+    </div>
     <div id="transport">
       <button id="btnPlay" data-tip="Play or pause this channel's file. Keyboard: P.">❚❚</button>
       <button id="btnLoop" class="on" data-tip="Loop the file on this channel when it reaches the end.">LOOP</button>
@@ -658,17 +733,19 @@ audio,video{display:none;}
     <div id="lower">
       <div id="dock">
         <div id="dockTabs">
-          <button data-dock="bends" data-tip="The six momentary bend pads. Hold one and it slams the rig somewhere for as long as you hold it, then lets go.">BEND</button>
           <button data-dock="matrix" class="on" data-tip="The mod matrix: patch any source into any parameter, on any channel.">MATRIX</button>
           <button data-dock="mod" data-tip="Every modulation source drawn live, with editable rates and shapes and a list of what each one is driving.">MOD</button>
           <button data-dock="text" data-tip="The text and shape generator for this channel. Typing here never triggers keyboard shortcuts.">TEXT</button>
-          <button data-dock="perform" data-tip="Eight whole-rig snapshots with a glide time, and the performance recorder.">PERFORM</button>
+          <button data-dock="perform" data-tip="Everything you play with while it is running: eight whole-rig snapshots with a glide time, the performance recorder, and the six bend pads.">PERFORM</button>
           <span style="flex:1;"></span>
           <span id="dockHint"></span>
         </div>
         <div id="dockBody">
-      <div id="bendsdock">
-        <div class="bendbtns">
+      <div id="performdock">
+        <div id="pfmain"></div>
+        <div id="bendrow">
+          <h4>BEND — HOLD THESE</h4>
+          <div class="bendbtns">
           <button class="bend" data-bend="sync" data-tip="Momentary: slams the sync circuit out of lock while held, then it recovers. Bend pads apply to the channel you are editing (all of them with LINK on).">SYNC<small>hold Q</small></button>
           <button class="bend" data-bend="roll" data-tip="Momentary: breaks vertical hold so the picture rolls, with the blanking bar travelling through it.">ROLL<small>hold W</small></button>
           <button class="bend" data-bend="rainbow" data-tip="Momentary: floods the picture with the enhancer's rainbow colour mapping.">RAINBOW<small>hold E</small></button>
@@ -676,8 +753,8 @@ audio,video{display:none;}
           <button class="bend" data-bend="melt" data-tip="Momentary: the picture melts and smears through the flow stage while held.">MELT<small>hold T</small></button>
           <button class="bend" data-bend="kill" data-tip="Momentary: total collapse - sync, tracking and vertical hold all at once.">V-HOLD<small>hold Y</small></button>
         </div>
+        </div>
       </div>
-      <div id="performdock"></div>
       <div id="matrix">
         <h4>MOD MATRIX — PATCH SOURCES INTO ANY PARAMETER <button id="btnAddRoute" style="margin-left:8px; padding:2px 8px;" data-tip="Add a modulation route: pick a source, a channel, a destination parameter and an amount. Right-clicking a parameter does the same thing faster.">+ ROUTE</button></h4>
         <div id="routes"></div>
@@ -773,13 +850,12 @@ audio,video{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v19.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v21.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
-  <p>The channels meet in three mixers, each with the same twenty transitions: <b>BUS 1</b> combines A and B, <b>BUS 2</b> combines C and D, and <b>MASTER MIX</b> crossfades bus 1 against bus 2. Everything downstream of that (CRT display, overlay, morph) is shared. Leave the master fader at zero and channels C and D never render, so the two-channel setup costs exactly what it always did — push it off zero and the second bus comes alive.</p>
-  <h3>ROUTING</h3>
-  <p>Each bus picks its own two inputs, so the pairings are not fixed: bus 1 can mix <b>A against C</b>, bus 2 can mix <b>D against B</b>, or the same channel can appear on both. The two selectors at the top of each mixer section set it. To get all four in at once, leave the buses on their pairs, set both bus faders part-way, and put the master on ADD, SCREEN or LIGHTEN rather than FADE \u2014 the buses then sum instead of crossfading.</p>
+  <p>The channels meet in three mixers, laid out as a strip directly under the picture: bus 1, bus 2, and a master crossfade between them. Each strip has its own two input selectors, so the pairings are not fixed \u2014 bus 1 can mix <b>A against C</b>, bus 2 can mix <b>D against B</b>. To get all four in at once, set both bus faders part-way and put the master on ADD, SCREEN or LIGHTEN rather than FADE, so the buses sum instead of crossfading. Fold the strip away with <b>MIX</b> on its left when you want the height back.</p>
+  <p>The faders live under the picture rather than in the sidebar because a crossfader wants to be horizontal and should never be hidden behind a tab \u2014 it is the one control you ride while looking at something else. The detail behind each transition (softness, wipe geometry, key threshold) stays in the sidebar, where it is setup rather than performance.</p>
   <h3>MULTIVIEW</h3>
   <p><b>MULTI</b> (or <kbd>V</kbd>) shows all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors. The channel you are editing carries the hot border; channels that are not currently rendering are dimmed. It forces everything to render, so it costs more than the normal view \u2014 it is for setting up, not for performing.</p>
   <h3>PATTERN SYNTH</h3>
@@ -815,7 +891,7 @@ audio,video{display:none;}
   <h3>MOVEMENT</h3>
   <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch four LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
   <h3>PERFORMANCE</h3>
-  <p>The dock under the picture has five tabs: <b>BEND</b>, <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b> and <b>PERFORM</b>. Each gets the full width, and the dock resizes by dragging the bar above it.</p>
+  <p>The dock under the picture has four tabs: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b> and <b>PERFORM</b>. PERFORM holds everything you play with while it is running \u2014 the snapshot bank, the recorder and the bend pads. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
   <h3>MIXER, MORPH, KEYER &amp; TIME BASE</h3>
   <p>Each of the three <b>MIXERS</b> gets the same twenty modes: a plain fade, twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and a movable origin, luma and chroma key transitions, and add / difference / multiply / screen / lighten blends. Run the fader like a T-bar. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor.</p>

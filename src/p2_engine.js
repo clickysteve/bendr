@@ -1040,9 +1040,9 @@ const FS_COPY = COMMON +
    never moves, because it is the desk. The CHANNEL zone follows the signal path
    and is the only part you can reorder. OUT and TOOLS are pinned at the bottom. */
 const SECTIONS = [
-  {id:"mixer",    name:"MIX BUS 1",         cls:"mag",  zone:"mix"},
-  {id:"mixer2",   name:"MIX BUS 2",         cls:"mag",  zone:"mix"},
-  {id:"mixerM",   name:"MASTER MIX",        cls:"mag",  zone:"mix"},
+  {id:"mixer",    name:"BUS 1 \u00b7 TRANSITION",  cls:"mag",  zone:"mix"},
+  {id:"mixer2",   name:"BUS 2 \u00b7 TRANSITION",  cls:"mag",  zone:"mix"},
+  {id:"mixerM",   name:"MASTER \u00b7 TRANSITION", cls:"mag",  zone:"mix"},
 
   {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan", zone:"chain"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag",  zone:"chain"},
@@ -1065,7 +1065,7 @@ const SECTIONS = [
   {id:"morph",    name:"PRESET MORPH",      cls:"mag",  zone:"tools"},
 ];
 const ZONES = [
-  {id:"mix",   label:"MIX",                 note:"How the four channels combine. Pinned here because it is the desk \u2014 these faders are the last thing in the signal path and the first thing you reach for."},
+  {id:"mix",   label:"MIX \u00b7 TRANSITION DETAIL", note:"How each bus\u2019s transition is shaped. The faders, routing and transition modes are on the strip under the picture; this is the detail behind them."},
   {id:"chain", label:"CHANNEL \u00b7 SIGNAL PATH", note:"Everything belonging to the channel selected above, in the order the signal actually travels: source, framing, frame store, feedback, then the reorderable stages, then the keyer. Drag by the handle to rearrange."},
   {id:"out",   label:"MASTER OUT",          note:"The shared display stage, after the mixer. Every channel ends up here."},
   {id:"tools", label:"TOOLS",               note:"Performance and modulation tools that do not belong to any one channel."},

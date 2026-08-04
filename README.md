@@ -18,7 +18,7 @@ Works on phones and tablets too: the picture stays pinned at the top, controls /
 
 BENDR is a four-channel mixer. **A**, **B**, **C** and **D** each have their own input *and* their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; LINK edits all four, COPY and SWAP move settings between a channel and its partner on the same bus.
 
-The channels meet in three mixers, each with the same twenty transitions. Each bus picks its own two inputs, so the pairings are not fixed: bus 1 can mix A against C, bus 2 can mix D against B. **MASTER MIX** then crossfades bus 1 against bus 2. To get all four in at once, set both bus faders part-way and put the master on ADD, SCREEN or LIGHTEN so the buses sum instead of crossfading. Everything downstream (display, overlay, morph) is shared. Leave the master fader at zero and channels C and D never render, so a two-channel setup costs exactly what it always did.
+The channels meet in three mixers, laid out as a strip directly under the picture: bus 1, bus 2, and a master crossfade between them, each with the same twenty transitions. Each bus picks its own two inputs, so the pairings are not fixed: bus 1 can mix A against C, bus 2 can mix D against B. The faders sit under the picture rather than in the sidebar because a crossfader wants to be horizontal and is the one control you ride while looking at something else; the detail behind each transition stays in the sidebar. To get all four in at once, set both bus faders part-way and put the master on ADD, SCREEN or LIGHTEN so the buses sum instead of crossfading. Everything downstream (display, overlay, morph) is shared. Leave the master fader at zero and channels C and D never render, so a two-channel setup costs exactly what it always did.
 
 **MULTI** shows all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors.
 
@@ -74,7 +74,7 @@ Any channel can be a generator rather than a player. It is built like a video sy
 
 ## Snapshots and the performance recorder
 
-The dock under the picture has five tabs — bend pads, mod matrix, modulation page, text editor and perform. Eight snapshot slots hold the whole rig — all four channels, every bus, every mode — with a **glide** time. At zero a recall is a hard cut; wound up it becomes a slow transformation of everything at once.
+The dock under the picture has four tabs — mod matrix, modulation page, text editor, and perform, which holds the snapshot bank, the recorder and the bend pads together. Eight snapshot slots hold the whole rig — all four channels, every bus, every mode — with a **glide** time. At zero a recall is a hard cut; wound up it becomes a slow transformation of everything at once.
 
 The **performance recorder** writes down every control you move, twenty-four times a second, storing only what changed. It records gestures rather than pixels, so a take built slowly over an hour can be played back in real time, against completely different footage. Takes are saved inside the patch file.
 

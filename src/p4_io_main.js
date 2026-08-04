@@ -692,7 +692,7 @@ function setDock(t){
     t = dockTab === "text" ? "matrix" : dockTab;
   }
   dockTab = t;
-  const map = {bends:"bendsdock", matrix:"matrix", mod:"modgrid", text:"textdock", perform:"performdock"};
+  const map = {matrix:"matrix", mod:"modgrid", text:"textdock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);
     if(el) el.classList.toggle("on", k===t);
@@ -701,8 +701,7 @@ function setDock(t){
   const hint = document.getElementById("dockHint");
   if(hint) hint.textContent = t==="mod" ? "right-click any parameter to patch it"
                             : t==="text" ? "typing here never triggers shortcuts"
-                            : t==="bends" ? "hold a pad \u2014 Q W E R T Y do the same"
-                            : t==="perform" ? "shift and a number recalls a snapshot"
+                            : t==="perform" ? "shift and a number recalls a snapshot \u00b7 Q W E R T Y hold the pads"
                             : "patch sources into any parameter";
   if(t==="text") syncTextEditor();
   refreshDockTabs();
@@ -1099,8 +1098,7 @@ btnPop.onclick = ()=>{
 /* big performance randomize/mutate pads */
 document.getElementById("btnRnd").onclick = randomizeAll;
 document.getElementById("btnMut").onclick = mutate;
-document.getElementById("btnBendPane").onclick = ()=>setDock(dockTab==="bends" ? "matrix" : "bends");
-document.getElementById("btnModPane").onclick = ()=>setDock(dockTab==="mod" ? "matrix" : "mod");
+
 
 /* bend buttons: mouse + touch */
 for(const b of document.querySelectorAll(".bend[data-bend]")){
@@ -2040,8 +2038,8 @@ if(OUTPUT_MODE){
   document.querySelectorAll("#mtabs button").forEach(b=>{
     b.onclick = ()=>{
       setMTab(b.dataset.mtab);
-      if(b.dataset.mtab === "bends") setDock("bends");
-      if(b.dataset.mtab === "matrix" && dockTab === "bends") setDock("matrix");
+      if(b.dataset.mtab === "bends") setDock("perform");
+      if(b.dataset.mtab === "matrix" && dockTab === "perform") setDock("matrix");
     };
   });
   let startTab = "controls";
@@ -2057,6 +2055,7 @@ if(OUTPUT_MODE){
   }
 
   buildPanel();
+  buildMixStrip();
   buildModPage();
   buildPerformDock();
   setInterval(drawModPage, 50);
@@ -2102,6 +2101,14 @@ if(OUTPUT_MODE){
   renderRoutes();
   wireMenus();
   wireDataTips();
+  {
+    const mb = document.getElementById("mixCollapse");
+    let open = true;
+    try{ open = (localStorage.getItem("bendr.mixstrip") || "1") === "1"; }catch(e){}
+    const apply = ()=>{ document.body.classList.toggle("nomix", !open); sizeCanvas(); };
+    mb.onclick = ()=>{ open = !open; apply(); try{ localStorage.setItem("bendr.mixstrip", open?"1":"0"); }catch(e){} };
+    apply();
+  }
   loadPreset(1);   /* RAINBOW RITE so it looks alive immediately */
   sizeCanvas();
   requestAnimationFrame(frame);

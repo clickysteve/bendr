@@ -16,7 +16,7 @@ Works on phones and tablets too: the picture stays pinned at the top, controls /
 
 ## Four channels, three buses
 
-BENDR is a four-channel mixer. **A**, **B**, **C** and **D** each have their own input *and* their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; LINK edits all four, COPY and SWAP move settings between a channel and its partner on the same bus.
+BENDR is a four-channel mixer. **A**, **B**, **C** and **D** each have their own input *and* their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; LINK edits all four; the selector beside it picks a target channel, and COPY writes this channel's effects onto it while SWAP exchanges the two outright, sources included. Any channel reaches any other, and shift-clicking COPY sends it to all three at once.
 
 The channels meet in three mixers, laid out as a strip directly under the picture: bus 1, bus 2, and a master crossfade between them, each with the same twenty transitions. Each bus picks its own two inputs, so the pairings are not fixed: bus 1 can mix A against C, bus 2 can mix D against B. The faders sit under the picture rather than in the sidebar because a crossfader wants to be horizontal and is the one control you ride while looking at something else; the detail behind each transition lives on the MIX tab of the dock. To get all four in at once, set both bus faders part-way and put the master on ADD, SCREEN or LIGHTEN so the buses sum instead of crossfading. Everything downstream (display, overlay, morph) is shared. Leave the master fader at zero and channels C and D never render, so a two-channel setup costs exactly what it always did.
 
@@ -33,6 +33,18 @@ The channels meet in three mixers, laid out as a strip directly under the pictur
 Any channel can take another channel, either bus, or the finished programme as its source. Process it and mix it back in and the feedback loop travels through the whole rig rather than round a single stage — the software equivalent of patching a mixer's output back into a spare input. Whatever it reads is one frame old, which is what keeps it stable.
 
 ![Re-entry feeding a keyed shape back into its background](docs/doc_reentry.png)
+
+## The melting edge
+
+A hard boundary between two pictures is the thing that gives a digital mixer away. Every bus has a fourth stage after the transition, the mix type and the key, and it exists only to destroy that boundary.
+
+It works by asking where the boundary actually is. The coverage matte is evaluated at four points a chosen distance from each pixel; where those four disagree, the pixel is standing on the edge, and the direction in which they disagree is the way the edge faces. That gives a band of controlled width with a normal running through it, and everything else follows: the incoming picture is dragged out along that normal so the seam smears, and the mixer's own previous frame is dissolved back in inside the same band. Because the band feeds itself, the smear does not wash out — it stays put, and creeps a little further out every frame until the band runs out of width.
+
+The controls are MELT (how hard), WIDTH (how far either side), HOLD (how much of the last frame survives, which is the persistence that turns a smear into a trail), SWIRL (turns the drag from across the boundary to along it, so the edge stirs rather than bleeds), CHROMA (lets colour run further than brightness, the way it does off a composite edge) and CREEP (which side of the seam the melt lives on). Wind CREEP up and the melt only happens on the outgoing side, so a keyed or wiped shape bleeds into the background while the background never eats into the shape.
+
+![The same circle wipe with the melt off, and with it on](docs/doc_melt.png)
+
+The amount rides next to each crossfader because it is a performance control; the rest sits on the MIX tab. At zero the stage is switched off and the history buffer is never touched, so it costs nothing when it is not in use. It works on all three buses independently, and on any transition or key that has an edge — a wipe, a luma or chroma key, a subscreen. A plain dissolve has no boundary, so nothing happens, which is correct.
 
 ## Signal chain
 

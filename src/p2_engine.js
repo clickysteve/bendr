@@ -190,6 +190,8 @@ const FS_MIX = COMMON + KEYFN +
 "uniform float u_wipeSoft,u_wipeDetail,u_wipeX,u_wipeY,u_wipeInv;\n" +
 "uniform float u_mixKeyThresh,u_mixKeySoft,u_mixKeyInv,u_mixKeyHue;\n" +
 "uniform float u_pipX,u_pipY,u_pipSize,u_pipBorder;\n" +
+"uniform sampler2D u_prev; uniform float u_hasPrev;\n" +
+"uniform float u_edgeAmt,u_edgeWidth,u_edgeHold,u_edgeSwirl,u_edgeChroma,u_edgeCreep;\n" +
 "float wipeField(vec2 uv, float mode, float outA){\n" +
 "  vec2 off = vec2(u_wipeX, u_wipeY)*0.5;\n" +
 "  vec2 c = uv - 0.5 - off;\n" +
@@ -225,6 +227,37 @@ const FS_MIX = COMMON + KEYFN +
 "  else { p.y = 1.0-(1.0-uv.y)/k; }\n" +
 "  inside = step(0.0,p.x)*step(p.x,1.0)*step(0.0,p.y)*step(p.y,1.0);\n" +
 "  return p;\n}\n" +
+"/* The same coverage calculation the mixer uses, evaluated anywhere on the\n" +
+"   frame. The melt stage needs it at neighbouring points to find the boundary\n" +
+"   and which way it faces, which is cheap here because the wipe is analytic. */\n" +
+"float matteAt(vec2 uv, float mm, float t, float outA){\n" +
+"  float m = t, ins = 1.0;\n" +
+"  vec2 buv = uv;\n" +
+"  if(mm > 0.5 && mm < 12.5){\n" +
+"    float d = wipeField(uv, mm, outA);\n" +
+"    if(u_wipeInv>0.5) d = 1.0-d;\n" +
+"    float sw = max(u_wipeSoft*0.5, 0.002);\n" +
+"    m = smoothstep(d-sw, d+sw, t*(1.0+2.0*sw)-sw);\n" +
+"  } else if(mm > 12.5 && mm < 16.5){\n" +
+"    buv = slideUV(uv, mm-13.0, t, ins); m = ins;\n" +
+"  } else if(mm > 16.5 && mm < 20.5){\n" +
+"    buv = stretchUV(uv, mm-17.0, t, ins); m = ins;\n" +
+"  }\n" +
+"  if(u_mixKey > 0.5){\n" +
+"    if(u_mixKey < 3.5){\n" +
+"      m *= keyOf(texture(u_texB, clamp(buv,0.0,1.0)).rgb,\n" +
+"                 u_mixKey > 2.5 ? 1.0 : 0.0,\n" +
+"                 u_mixKeyHue, u_mixKeyThresh, u_mixKeySoft,\n" +
+"                 (u_mixKey < 1.5) ? 1.0-u_mixKeyInv : u_mixKeyInv);\n" +
+"    } else {\n" +
+"      float sz = 0.08 + u_pipSize*0.62;\n" +
+"      vec2 ctr = vec2(0.5,0.5) + vec2(u_pipX, u_pipY)*0.42;\n" +
+"      vec2 hw = vec2(sz*0.5, sz*0.5*outA);\n" +
+"      vec2 q = (uv - ctr)/hw;\n" +
+"      m = step(max(abs(q.x),abs(q.y)), 1.0)*t;\n" +
+"    }\n" +
+"  }\n" +
+"  return clamp(m, 0.0, 1.0);\n}\n" +
 "vec3 combine(vec3 a, vec3 b, float m, float blend){\n" +
 "  if(blend<0.5) return mix(a, b, m);\n" +                 /* DISSOLVE */
 "  if(blend<1.5) return a + b*m;\n" +                      /* ADDITIVE  (FAM) */
@@ -278,8 +311,46 @@ const FS_MIX = COMMON + KEYFN +
 "      m = inBox*t;\n" +
 "    }\n" +
 "  }\n" +
-"  vec3 b = texture(u_texB, clamp(buv, 0.0, 1.0)).rgb;\n" +
+"  /* ---- 3. the melt: treat the boundary itself as a feedback region ----\n" +
+"     The matte is sampled at four points a chosen distance away. Where those\n" +
+"     four disagree we are standing on the edge, and the direction in which\n" +
+"     they disagree is the way the edge faces. That gives a band of controlled\n" +
+"     width with a normal, and everything else follows from it: the incoming\n" +
+"     picture is dragged along the normal so the seam smears, and the mixer's\n" +
+"     own last frame is dissolved back in inside the band, so the smear stays\n" +
+"     put and creeps a little further out every frame. That is what makes it\n" +
+"     melt instead of blur, and it only happens at the edge. */\n" +
+"  float band = 0.0; vec2 en = vec2(0.0);\n" +
+"  if(u_edgeAmt > 0.002){\n" +
+"    float r = 0.004 + u_edgeWidth*0.085;\n" +
+"    vec2 rx = vec2(r/outA, 0.0), ry = vec2(0.0, r);\n" +
+"    float mL = matteAt(uv-rx, mm, t, outA), mR = matteAt(uv+rx, mm, t, outA);\n" +
+"    float mD = matteAt(uv-ry, mm, t, outA), mU = matteAt(uv+ry, mm, t, outA);\n" +
+"    float mn = min(min(mL,mR),min(mD,mU)), mx = max(max(mL,mR),max(mD,mU));\n" +
+"    band = clamp((mx-mn)*1.25, 0.0, 1.0);\n" +
+"    vec2 g = vec2(mR-mL, mU-mD);\n" +
+"    float gl = length(g);\n" +
+"    en = (gl > 1e-5) ? g/gl : vec2(0.0);\n" +
+"    float sa = u_edgeSwirl*1.5708;\n" +
+"    en = vec2(cos(sa)*en.x - sin(sa)*en.y, sin(sa)*en.x + cos(sa)*en.y);\n" +
+"    /* CREEP pushes the melt onto the outgoing side, so the shape bleeds into\n" +
+"       the background rather than the background eating into the shape */\n" +
+"    band *= mix(1.0, 1.0 - clamp(m,0.0,1.0), u_edgeCreep);\n" +
+"  }\n" +
+"  vec2 bd = en * band * u_edgeAmt * 0.055;\n" +
+"  vec3 b = texture(u_texB, clamp(buv + bd, 0.0, 1.0)).rgb;\n" +
 "  vec3 src = combine(a, b, clamp(m,0.0,1.0), u_mixBlend);\n" +
+"  if(u_hasPrev > 0.5 && band > 0.001 && u_edgeHold > 0.002){\n" +
+"    vec2 pd = en * (0.0015 + u_edgeAmt*0.04);\n" +
+"    vec3 pv = texture(u_prev, clamp(uv + pd, 0.0, 1.0)).rgb;\n" +
+"    if(u_edgeChroma > 0.002){\n" +
+"      /* colour runs further than luma, the way it does off a composite edge */\n" +
+"      vec3 pc = texture(u_prev, clamp(uv + pd*(1.0+3.0*u_edgeChroma), 0.0, 1.0)).rgb;\n" +
+"      vec3 y1 = rgb2yiq(pv), y2 = rgb2yiq(pc);\n" +
+"      pv = yiq2rgb(vec3(y1.x, mix(y1.yz, y2.yz, u_edgeChroma)));\n" +
+"    }\n" +
+"    src = mix(src, pv, clamp(band*u_edgeHold, 0.0, 0.94));\n" +
+"  }\n" +
 "  if(border > 0.5) src = mix(src, vec3(1.0), t);\n" +
 "  O = vec4(clamp(src,0.0,1.6),1.0);\n}\n";
 
@@ -1223,6 +1294,12 @@ const PDEF = [
   ["pipY","PIP Y","mixer",-1,1,-0.45],
   ["pipSize","PIP SIZE","mixer",0,1,0.35],
   ["pipBorder","PIP BORDER","mixer",0,1,0.12],
+  ["edgeAmt","EDGE MELT","mixer",0,1,0],
+  ["edgeWidth","EDGE WIDTH","mixer",0,1,0.3],
+  ["edgeHold","EDGE HOLD","mixer",0,1,0.6],
+  ["edgeSwirl","EDGE SWIRL","mixer",-1,1,0],
+  ["edgeChroma","EDGE CHROMA","mixer",0,1,0.5],
+  ["edgeCreep","EDGE CREEP","mixer",0,1,0.35],
 
   ["cdMix","BUS 2 FADER","mixer2",0,1,0],
   ["wipeSoft2","WIPE SOFT","mixer2",0,1,0.03],
@@ -1237,6 +1314,12 @@ const PDEF = [
   ["pipY2","PIP Y","mixer2",-1,1,-0.45],
   ["pipSize2","PIP SIZE","mixer2",0,1,0.35],
   ["pipBorder2","PIP BORDER","mixer2",0,1,0.12],
+  ["edgeAmt2","EDGE MELT","mixer2",0,1,0],
+  ["edgeWidth2","EDGE WIDTH","mixer2",0,1,0.3],
+  ["edgeHold2","EDGE HOLD","mixer2",0,1,0.6],
+  ["edgeSwirl2","EDGE SWIRL","mixer2",-1,1,0],
+  ["edgeChroma2","EDGE CHROMA","mixer2",0,1,0.5],
+  ["edgeCreep2","EDGE CREEP","mixer2",0,1,0.35],
 
   ["busMix","MASTER FADER","mixerM",0,1,0],
   ["wipeSoftM","WIPE SOFT","mixerM",0,1,0.03],
@@ -1251,6 +1334,12 @@ const PDEF = [
   ["pipYM","PIP Y","mixerM",-1,1,-0.45],
   ["pipSizeM","PIP SIZE","mixerM",0,1,0.35],
   ["pipBorderM","PIP BORDER","mixerM",0,1,0.12],
+  ["edgeAmtM","EDGE MELT","mixerM",0,1,0],
+  ["edgeWidthM","EDGE WIDTH","mixerM",0,1,0.3],
+  ["edgeHoldM","EDGE HOLD","mixerM",0,1,0.6],
+  ["edgeSwirlM","EDGE SWIRL","mixerM",-1,1,0],
+  ["edgeChromaM","EDGE CHROMA","mixerM",0,1,0.5],
+  ["edgeCreepM","EDGE CREEP","mixerM",0,1,0.35],
 
   ["morph","MORPH A>B","morph",0,1,0],
 
@@ -1526,6 +1615,12 @@ const PHELP = {
   pipY:"Vertical position of the subscreen.",
   pipSize:"How large the subscreen is, from a small inset to most of the frame.",
   pipBorder:"Width of the border drawn around the subscreen. Zero for none.",
+  edgeAmt:"How hard the seam between the two pictures melts. The mixer works out where the boundary is and which way it faces, then drags the incoming picture along that direction and feeds its own last frame back into the same narrow band. The result is a soft trailing boundary that creeps outward, instead of a clean cut. Zero switches the whole stage off and costs nothing.",
+  edgeWidth:"How far either side of the boundary the melt reaches. Small values give a wet-looking rim; large values turn the whole transition into a smear.",
+  edgeHold:"How much of the last frame survives inside the band. This is the persistence that turns a smear into a trail. Above about 0.8 it stops settling and keeps building, which is where it starts to look properly bent.",
+  edgeSwirl:"Turns the drag direction. At zero the melt runs straight out across the boundary; wound fully either way it runs along it instead, so the edge stirs rather than bleeds.",
+  edgeChroma:"Lets colour run further than brightness, the way it does off a composite edge. This is what makes the melt read as analogue rather than as a blur.",
+  edgeCreep:"Which side of the boundary the melt lives on. At zero it sits evenly across the seam. Wound up, it only happens on the outgoing side, so the incoming shape bleeds into the background and the background never eats into the shape.",
   morph:"Blends every slider on the panel between the two snapshots stored with STORE A and STORE B. Put an LFO on this and the whole rig evolves on its own. Touching any individual slider takes that one control back out of the morph.",
 
   /* ---- frame / position ---- */
@@ -1795,7 +1890,8 @@ const PHELP = {
 };
 /* the bus 2 and master mixer controls reuse bus 1's descriptions */
 for(const [suffix, note] of [["2"," (bus 2: channels C and D)"], ["M"," (master: bus 1 against bus 2)"]]){
-  for(const id of ["wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue","pipX","pipY","pipSize","pipBorder"]){
+  for(const id of ["wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue","pipX","pipY","pipSize","pipBorder",
+                   "edgeAmt","edgeWidth","edgeHold","edgeSwirl","edgeChroma","edgeCreep"]){
     PHELP[id+suffix] = PHELP[id] + note;
   }
 }
@@ -1803,7 +1899,7 @@ for(const [suffix, note] of [["2"," (bus 2: channels C and D)"], ["M"," (master:
 
 /* ---------------- per-section help ---------------- */
 const SECHELP = {
-  mixer:"Bus 1 of three. Combines the two finished channels A and B with a fader and twenty transition modes.",
+  mixer:"Bus 1 of three. Combines the two finished channels A and B with a fader, twenty transition modes, a keyer and the melt stage that softens the seam between them.",
   mixer2:"Bus 2. Identical to bus 1 but for channels C and D. It only renders while the MASTER fader is above zero, so leaving it alone is free.",
   mixerM:"The master crossfade between the two buses, with the same twenty transitions one level up.",
   snap:"Eight whole-rig snapshots with a glide time, and a performance recorder that writes down every control you move so the take can be replayed against other footage.",
@@ -1832,6 +1928,9 @@ const SECHELP = {
 const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","overlay","morph"]);
 const CHANNELS = ["A","B","C","D"];
 const BUSPAIR = {A:"B", B:"A", C:"D", D:"C"};   // each channel's partner on its mixer bus
+/* COPY / SWAP are free routing: any channel to any other. The bus partner is
+   only the default the selector opens on. */
+let copyDest = "B";
 const P = {};           // id -> param descriptor
 const PLIST = [];       // all params
 const CLIST = [];       // per-channel params
@@ -1861,7 +1960,14 @@ function setBase(id, v, ch){
   else chanBase[activeChan][id]=v;
 }
 function getCur(id, ch){ const p=P[id]; return p.master ? mCur[id] : chanCur[ch||activeChan][id]; }
-function copyChannel(from, to){ for(const p of CLIST) chanBase[to][p.id] = chanBase[from][p.id]; }
+function copyChannel(from, to){
+  if(from === to) return;
+  for(const p of CLIST) chanBase[to][p.id] = chanBase[from][p.id];
+}
+function swapChannels(a, b){
+  if(a === b) return;
+  for(const p of CLIST){ const t = chanBase[a][p.id]; chanBase[a][p.id] = chanBase[b][p.id]; chanBase[b][p.id] = t; }
+}
 let fbTrailMode = false;   // false=MIX  true=TRAIL(lighten)
 let rescanMode = false;    // true = feedback taps the CRT-processed output (full rescan)
 let chainOrder = ["sig","col","glitch","lab","flow"];    // drag-to-reorder signal chain
@@ -1875,7 +1981,9 @@ let mixModeM = 0, wipeInvM = false;   // MASTER (bus 1 / bus 2)
 let mixBlend = 0, mixBlend2 = 0, mixBlendM = 0;
 let mixKey = 0,   mixKey2 = 0,   mixKeyM = 0;
 /* the mixer shader has one set of uniform names; each bus feeds it its own params */
-const MIXP = ["abMix","wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue","pipX","pipY","pipSize","pipBorder"];
+const MIXP = ["abMix","wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue","pipX","pipY","pipSize","pipBorder",
+              "edgeAmt","edgeWidth","edgeHold","edgeSwirl","edgeChroma","edgeCreep"];
+const MIXP_EDGE = 13;   /* index of edgeAmt inside a bus's parameter list */
 /* which channel feeds each side of each bus — any channel can meet any other */
 const busSrc = {b1:["A","B"], b2:["C","D"]};
 /* pattern synth mode selectors, one set per channel */
@@ -1886,8 +1994,10 @@ const genMode = {};
 let multiView = false;
 const MIXBUS = {
   b1: MIXP,
-  b2: ["cdMix","wipeSoft2","wipeDetail2","wipeX2","wipeY2","mixKeyThresh2","mixKeySoft2","mixKeyInv2","mixKeyHue2","pipX2","pipY2","pipSize2","pipBorder2"],
-  bM: ["busMix","wipeSoftM","wipeDetailM","wipeXM","wipeYM","mixKeyThreshM","mixKeySoftM","mixKeyInvM","mixKeyHueM","pipXM","pipYM","pipSizeM","pipBorderM"]
+  b2: ["cdMix","wipeSoft2","wipeDetail2","wipeX2","wipeY2","mixKeyThresh2","mixKeySoft2","mixKeyInv2","mixKeyHue2","pipX2","pipY2","pipSize2","pipBorder2",
+       "edgeAmt2","edgeWidth2","edgeHold2","edgeSwirl2","edgeChroma2","edgeCreep2"],
+  bM: ["busMix","wipeSoftM","wipeDetailM","wipeXM","wipeYM","mixKeyThreshM","mixKeySoftM","mixKeyInvM","mixKeyHueM","pipXM","pipYM","pipSizeM","pipBorderM",
+       "edgeAmtM","edgeWidthM","edgeHoldM","edgeSwirlM","edgeChromaM","edgeCreepM"]
 };
 let fbWrap = 0;        // 0 clamp 1 repeat 2 mirror
 let fbMirror = 0;      // 0 none 1 H 2 V 3 quad
@@ -1961,6 +2071,9 @@ function newChanRT(){
 const chanRT = {};
 for(const ch of CHANNELS){ chanRT[ch] = newChanRT(); genMode[ch] = {shape:0, wave:0, col:1}; }
 let scratch1, scratch2, mixOut, busOut1, busOut2, persistA, persistB;
+/* one frame of history per mixer stage, so the melt stage can read what the
+   same stage produced last time. Ping-ponged rather than copied. */
+let busHist1, busHist2, mixHist;
 let fieldSrc = 0;   // field-modulation source
 const autoGain = {};
 for(const ch of CHANNELS) autoGain[ch] = 1;
@@ -2007,6 +2120,7 @@ function flushBuffers(){
   }
   clearRT(scratch1); clearRT(scratch2); clearRT(mixOut);
   clearRT(busOut1); clearRT(busOut2); clearRT(persistA); clearRT(persistB);
+  clearRT(busHist1); clearRT(busHist2); clearRT(mixHist);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 function allocRTs(){
@@ -2017,9 +2131,11 @@ function allocRTs(){
   }
   freeRT(scratch1); freeRT(scratch2); freeRT(mixOut); freeRT(busOut1); freeRT(busOut2);
   freeRT(persistA); freeRT(persistB);
+  freeRT(busHist1); freeRT(busHist2); freeRT(mixHist);
   scratch1 = makeRT(procW,procH); scratch2 = makeRT(procW,procH); mixOut = makeRT(procW,procH);
   busOut1 = makeRT(procW,procH); busOut2 = makeRT(procW,procH);
   persistA = makeRT(procW,procH); persistB = makeRT(procW,procH);
+  busHist1 = makeRT(procW,procH); busHist2 = makeRT(procW,procH); mixHist = makeRT(procW,procH);
 }
 const MAX_TEX = gl.getParameter(gl.MAX_TEXTURE_SIZE);
 function setProcRes(h){

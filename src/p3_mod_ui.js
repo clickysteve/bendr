@@ -493,31 +493,63 @@ function buildChanBar(){
   lk.id = "btnLinkChans"; lk.textContent = "LINK";
   attachTip(lk, "LINK", "Edits all four channels at once, so every slider and every bend pad moves them together.");
   lk.onclick = ()=>{ linkChans = !linkChans; lk.classList.toggle("on", linkChans); };
+  /* COPY and SWAP used to be locked to the channel's partner on the same bus,
+     which meant A could only ever talk to B. They now take a destination, so
+     any channel can be copied onto or exchanged with any other. */
+  const dst = document.createElement("select");
+  dst.id = "chanDest"; dst.className = "chandest";
+  attachTip(dst, "TARGET CHANNEL", "The channel that COPY writes to and SWAP exchanges with. Any of the other three, not just the partner on the same bus.", "It opens on the bus partner and remembers your choice while that stays valid.");
+  fillChanDest(dst);
+  dst.onchange = ()=>{ copyDest = dst.value; };
   const cp = document.createElement("button");
-  cp.textContent = "COPY \u2192";
-  attachTip(cp, "COPY", "Copies this channel's effect settings onto its partner on the same bus: A to B, or C to D. Sources are left alone.");
-  cp.onclick = ()=>{
+  cp.textContent = "COPY";
+  attachTip(cp, "COPY", "Copies this channel's effect settings onto the channel in the selector. Sources are left alone, so you get the same treatment on different footage.", "Shift-click copies onto all three of the others at once.");
+  cp.onclick = (e)=>{
+    if(e.shiftKey){
+      pushHistory();
+      for(const ch of CHANNELS) if(ch !== activeChan) copyChannel(activeChan, ch);
+      toast("Copied channel "+activeChan+" onto all others");
+      return;
+    }
+    const other = copyDest;
+    if(other === activeChan) return;
     pushHistory();
-    const other = BUSPAIR[activeChan];
     copyChannel(activeChan, other);
     toast("Copied channel "+activeChan+" \u2192 "+other);
   };
   const sw = document.createElement("button");
   sw.textContent = "SWAP";
-  attachTip(sw, "SWAP", "Exchanges this channel with its partner on the same bus, sources as well as effects - so whatever was sitting on top swaps places.");
+  attachTip(sw, "SWAP", "Exchanges this channel with the one in the selector, sources as well as effects - so whatever was sitting on top swaps places.");
   sw.onclick = ()=>{
+    const other = copyDest;
+    if(other === activeChan) return;
     pushHistory();
-    const other = BUSPAIR[activeChan];
-    for(const p of CLIST){ const t = chanBase[activeChan][p.id]; chanBase[activeChan][p.id] = chanBase[other][p.id]; chanBase[other][p.id] = t; }
+    swapChannels(activeChan, other);
     if(window.__swapSources) window.__swapSources(activeChan, other);
     refreshUI(); toast("Swapped "+activeChan+" \u2194 "+other+" (effects and sources)");
   };
-  tools.appendChild(lk); tools.appendChild(cp); tools.appendChild(sw);
+  tools.appendChild(lk); tools.appendChild(dst); tools.appendChild(cp); tools.appendChild(sw);
   bar.appendChild(tools);
   panel.appendChild(bar);
 }
+/* the selector never offers the channel you are standing on */
+function fillChanDest(sel){
+  sel = sel || document.getElementById("chanDest");
+  if(!sel) return;
+  const want = (copyDest && copyDest !== activeChan) ? copyDest : BUSPAIR[activeChan];
+  sel.innerHTML = "";
+  for(const ch of CHANNELS){
+    if(ch === activeChan) continue;
+    const o = document.createElement("option");
+    o.value = ch; o.textContent = "\u2192 " + ch;
+    sel.appendChild(o);
+  }
+  sel.value = want;
+  copyDest = sel.value;
+}
 function setActiveChan(ch){
   activeChan = ch;
+  fillChanDest();
   document.querySelectorAll(".chanbtn").forEach(b=>b.classList.toggle("on", b.dataset.chan===ch));
   for(const c of CHANNELS) document.body.classList.toggle("chan-"+c.toLowerCase(), c===ch);
   refreshUI(); refreshToggles();
@@ -629,6 +661,32 @@ function buildMixStrip(){
     wrap.appendChild(sl); wrap.appendChild(tick);
     fr.appendChild(wrap); fr.appendChild(val);
     el.appendChild(fr);
+    /* the melt amount rides next to the fader because it is a performance
+       control, not a setup one. Its width, hold and direction stay on the
+       MIX tab with the rest of the transition detail. */
+    const ep = P[MIXBUS[bus.key][MIXP_EDGE]];
+    const er = document.createElement("div"); er.className = "mixfader mixmelt";
+    const elab = document.createElement("span"); elab.className = "mlab"; elab.textContent = "MELT";
+    attachTip(elab, "EDGE MELT", PHELP[ep.id] || "", "Width, hold, swirl, chroma and creep are on the MIX tab.");
+    const ewrap = document.createElement("div"); ewrap.className = "sldwrap";
+    const esl = document.createElement("input");
+    esl.type = "range"; esl.min = ep.min; esl.max = ep.max; esl.step = (ep.max-ep.min)/400;
+    esl.value = getBase(ep.id);
+    const eval_ = document.createElement("span"); eval_.className = "mval";
+    eval_.textContent = fmt(ep, getBase(ep.id));
+    esl.addEventListener("input", ()=>{
+      const v = parseFloat(esl.value);
+      setBase(ep.id, v); eval_.textContent = fmt(ep, v);
+      morphOverride.add("M:"+ep.id);
+      const r0 = uiRefs[ep.id]; if(r0 && r0.slider !== esl){ r0.slider.value = v; r0.val.textContent = fmt(ep, v); }
+    });
+    esl.addEventListener("dblclick", ()=>{ resetParam(ep); });
+    esl.addEventListener("contextmenu", e=>{ e.preventDefault(); openModMenu(e, ep); });
+    const etick = document.createElement("div"); etick.className = "modtick";
+    ewrap.appendChild(esl); ewrap.appendChild(etick);
+    er.appendChild(elab); er.appendChild(ewrap); er.appendChild(eval_);
+    el.appendChild(er);
+    stripMelt.push({p:ep, slider:esl, val:eval_, tick:etick});
     /* registering here means refreshUI and the modulation ticks drive it too */
     uiRefs[p.id] = {slider:sl, val, tick, row:el, label:h};
     host.appendChild(el);
@@ -636,6 +694,9 @@ function buildMixStrip(){
   refreshBusUI(); refreshToggles();
 }
 const stripInvBtns = {};
+/* the melt faders are a second view of parameters the MIX tab also draws,
+   so they are refreshed alongside rather than through uiRefs */
+const stripMelt = [];
 
 function buildPanel(){
   buildChanBar();
@@ -1667,6 +1728,7 @@ function refreshUI(){
     const v = getBase(p.id);
     r.slider.value = v; r.val.textContent = fmt(p,v);
   }
+  for(const m of stripMelt){ const v = getBase(m.p.id); m.slider.value = v; m.val.textContent = fmt(m.p, v); }
   const fm = document.getElementById("fbModeBtn");
   if(fm) fm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX");
   if(tapeBtnRefs[0] && window.__transportOf){
@@ -1685,6 +1747,13 @@ setInterval(()=>{
       r.tick.style.display = "block";
       r.tick.style.left = "calc("+(f*100).toFixed(1)+"% - 1px)";
     } else r.tick.style.display = "none";
+  }
+  for(const m of stripMelt){
+    if(routed.has(m.p.id)){
+      const f = (getCur(m.p.id)-m.p.min)/(m.p.max-m.p.min);
+      m.tick.style.display = "block";
+      m.tick.style.left = "calc("+(f*100).toFixed(1)+"% - 1px)";
+    } else m.tick.style.display = "none";
   }
   for(const k in meterEls){
     meterEls[k].style.width = (Math.min(1,audioBands[k])*100).toFixed(0)+"%";

@@ -188,6 +188,13 @@ body.nomix #mixbuses{display:none;}
 .mixfader input[type=range]::-moz-range-thumb{width:14px; height:18px; border-radius:2px;}
 .mixfader .mval{width:42px; text-align:right; color:var(--amber); font-size:11px;}
 .mixbus.mixmaster .mixfader input[type=range]::-webkit-slider-thumb{background:var(--cyan); box-shadow:0 0 5px rgba(46,230,214,.6);}
+.mixfader.mixmelt{margin-top:3px;}
+.mixfader.mixmelt .mlab{font-size:8.5px; letter-spacing:1.5px; color:var(--dim); width:30px; cursor:help;}
+.mixfader.mixmelt input[type=range]{height:16px;}
+.mixfader.mixmelt input[type=range]::-webkit-slider-runnable-track{height:3px;}
+.mixfader.mixmelt input[type=range]::-webkit-slider-thumb{width:11px; height:13px; margin-top:-5px;}
+.mixfader.mixmelt input[type=range]::-moz-range-thumb{width:10px; height:12px;}
+.mixfader.mixmelt .mval{font-size:9.5px; width:38px;}
 .mixbus.mixmaster .mval{color:var(--cyan);}
 .modtick{
   position:absolute; top:1px; width:2px; height:14px; background:var(--cyan);
@@ -331,8 +338,11 @@ body.nomix #mixbuses{display:none;}
 .chanbtn.chC.on b{color:var(--mag);} .chanbtn.chC.on small{color:var(--mag); opacity:.7;}
 .chanbtn.chD.on{background:rgba(180,255,90,.16); border-color:#b4ff5a;}
 .chanbtn.chD.on b{color:#b4ff5a;} .chanbtn.chD.on small{color:#b4ff5a; opacity:.7;}
-.chantools{display:flex; gap:6px; flex:1 1 100%;}
+.chantools{display:flex; gap:6px; flex:1 1 100%; align-items:stretch;}
 .chantools button{flex:1; padding:5px 4px; font-size:8.5px;}
+.chandest{flex:0 0 54px; padding:4px 2px; font-size:9px; text-align:center;
+  background:#0b0b0e; color:var(--fg); border:1px solid var(--line); border-radius:3px;
+  font-family:inherit; letter-spacing:1px;}
 .sectag{
   margin-left:6px; font-size:7px; letter-spacing:1.5px; padding:1px 4px; border-radius:2px;
   border:1px solid var(--line); color:var(--dim);
@@ -583,6 +593,13 @@ body.nomix #mixbuses{display:none;}
 .mixfader input[type=range]::-moz-range-thumb{width:14px; height:18px; border-radius:2px;}
 .mixfader .mval{width:42px; text-align:right; color:var(--amber); font-size:11px;}
 .mixbus.mixmaster .mixfader input[type=range]::-webkit-slider-thumb{background:var(--cyan); box-shadow:0 0 5px rgba(46,230,214,.6);}
+.mixfader.mixmelt{margin-top:3px;}
+.mixfader.mixmelt .mlab{font-size:8.5px; letter-spacing:1.5px; color:var(--dim); width:30px; cursor:help;}
+.mixfader.mixmelt input[type=range]{height:16px;}
+.mixfader.mixmelt input[type=range]::-webkit-slider-runnable-track{height:3px;}
+.mixfader.mixmelt input[type=range]::-webkit-slider-thumb{width:11px; height:13px; margin-top:-5px;}
+.mixfader.mixmelt input[type=range]::-moz-range-thumb{width:10px; height:12px;}
+.mixfader.mixmelt .mval{font-size:9.5px; width:38px;}
 .mixbus.mixmaster .mval{color:var(--cyan);}
 .modtick{top:6px; height:18px;}
   .stagepill{padding:9px 10px; font-size:10px;}
@@ -666,7 +683,7 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v28.0</span>
+  <span id="ver" title="Build version">v29.0</span>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -929,11 +946,12 @@ body.nomix #mixbuses{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v28.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v29.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
-  <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
+  <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once; the small selector next to it picks a target, and <b>COPY</b> writes this channel's effects onto it while <b>SWAP</b> exchanges the two outright, sources included. Any channel can reach any other, so D can be copied onto A as easily as A onto B, and shift-clicking COPY sends it to all three at once.</p>
   <p>Each mixer is three independent stages, the way a vision mixer actually works. <b>TRANSITION</b> decides how the fader reveals the second input \u2014 a dissolve, one of twelve wipes, a slide in from an edge, or a stretch. <b>MIX TYPE</b> decides how the two combine where both are visible: dissolve, additive, non-additive (whichever is brighter, so neither picture dims the other), difference, multiply or screen. <b>KEY</b> is a separate compositing stage on top: luma white, luma black, chroma, or picture-in-picture with position, size and border. Because they are separate, a circle wipe and a luma key can run at the same time.</p>
+  <p><b>MELT</b> is the fourth stage, and it is the one that stops a mix looking digital. The mixer works out where the boundary between the two pictures actually is and which way it faces, then does two things inside a narrow band along it: it drags the incoming picture out along that direction, and it dissolves the mixer's own last frame back in. Because the band feeds itself, the smear stays put and creeps a little further every frame, so the seam trails and bleeds instead of cutting. The amount sits next to each fader; <b>WIDTH</b>, <b>HOLD</b>, <b>SWIRL</b>, <b>CHROMA</b> and <b>CREEP</b> are on the MIX tab. Wind CREEP up and the melt only happens on the outgoing side, so a keyed or wiped shape bleeds into the background and the background never eats into the shape. At zero the whole stage is switched off and costs nothing.</p>
   <p>The channels meet in three mixers, laid out as a strip directly under the picture: bus 1, bus 2, and a master crossfade between them. Each strip has its own two input selectors, so the pairings are not fixed \u2014 bus 1 can mix <b>A against C</b>, bus 2 can mix <b>D against B</b>. To get all four in at once, set both bus faders part-way and put the master on ADD, SCREEN or LIGHTEN rather than FADE, so the buses sum instead of crossfading. The strip sits just under the transport bar, and folds away with <b>MIX</b> on its left when you want the height back.</p>
   <p>The faders live under the picture rather than in the sidebar because a crossfader wants to be horizontal and should never be hidden behind a tab \u2014 it is the one control you ride while looking at something else. The detail behind each transition (softness, wipe geometry, key threshold) lives on the MIX tab of the dock, where it is setup rather than performance. INV only greys in when the transition is a wipe, since a fade, a key and a blend have no direction to reverse.</p>
   <h3>MULTIVIEW</h3>

@@ -240,12 +240,17 @@ const FS_SIG = COMMON + KEYFN +
 "  vec2 iq = vec2(0.0);\n" +
 "  float spread = mix(0.6, 11.0, u_chromaBleed)*(1.0 + sp*1.7 + gEff*1.1 + hfl*2.2);\n" +
 "  float cdel = u_chromaDelay*10.0*px;\n" +
+"  /* taps that fall outside the frame contribute nothing rather than wrapping\n" +
+"     round to the opposite edge, so the bleed fades out at the sides */\n" +
+"  float iqw = 0.0;\n" +
 "  for(int i=0;i<9;i++){\n" +
 "    float fi = float(i)-2.5;\n" +
-"    vec2 sp = fract(suv + vec2(fi*spread*px - cdel, 0.0));\n" +
-"    iq += rgb2yiq(texture(u_tex, sp).rgb).yz;\n" +
+"    vec2 tp = suv + vec2(fi*spread*px - cdel, 0.0);\n" +
+"    float inb = step(0.0, tp.x)*step(tp.x, 1.0);\n" +
+"    iq += rgb2yiq(texture(u_tex, clamp(tp, 0.0, 1.0)).rgb).yz * inb;\n" +
+"    iqw += inb;\n" +
 "  }\n" +
-"  iq /= 9.0;\n" +
+"  iq /= max(iqw, 1.0);\n" +
 "  float edge = lum(suv+vec2(px,0.0)) - lum(suv-vec2(px,0.0));\n" +
 "  float ph = suv.x*u_res.x*1.85 + rowI*2.3 + t*10.0;\n" +
 "  iq += u_rainbow*edge*2.6*vec2(sin(ph), cos(ph*0.93));\n" +
@@ -272,8 +277,10 @@ const FS_SIG = COMMON + KEYFN +
 "    float fall = 0.22*(1.05-u_lumaBleed);\n" +
 "    float acc = y;\n" +
 "    for(int k=1;k<=6;k++){\n" +
-"      float tk = lum(suv - vec2(float(k)*bstep, 0.0)) - float(k)*fall;\n" +
-"      acc = max(acc, tk);\n" +
+"      float sx = suv.x - float(k)*bstep;\n" +
+"      /* nothing to bleed from beyond the edge of the frame */\n" +
+"      if(sx < 0.0 || sx > 1.0) continue;\n" +
+"      acc = max(acc, lum(vec2(sx, suv.y)) - float(k)*fall);\n" +
 "    }\n" +
 "    y = mix(y, acc, min(1.0, u_lumaBleed*1.4));\n" +
 "  }\n" +
@@ -284,10 +291,12 @@ const FS_SIG = COMMON + KEYFN +
 "    float wsum = 0.0;\n" +
 "    for(int k=1;k<=4;k++){\n" +
 "      float w = 1.0/float(k);\n" +
-"      iqv += w*rgb2yiq(texture(u_tex, fract(suv + vec2(0.0, float(k)*(1.0+u_vBleed*5.0)*pyx))).rgb).yz;\n" +
-"      wsum += w;\n" +
+"      vec2 tp = suv + vec2(0.0, float(k)*(1.0+u_vBleed*5.0)*pyx);\n" +
+"      float inb = step(0.0, tp.y)*step(tp.y, 1.0);\n" +
+"      iqv += w*inb*rgb2yiq(texture(u_tex, clamp(tp, 0.0, 1.0)).rgb).yz;\n" +
+"      wsum += w*inb;\n" +
 "    }\n" +
-"    iq = mix(iq, iqv/wsum, u_vBleed*0.75);\n" +
+"    iq = mix(iq, iqv/max(wsum, 0.0001), u_vBleed*0.75*step(0.0001, wsum));\n" +
 "  }\n" +
 "  /* ---- analogue noise: bandwidth-limited along the line, streaky by row ---- */\n" +
 "  float nx = suv.x*u_res.x/3.5;\n" +
@@ -1787,6 +1796,28 @@ function allocChan(ch){
 }
 function ensureChanRT(ch){
   if(!chanRT[ch].allocated) allocChan(ch);
+}
+function clearRT(rt){
+  if(!rt) return;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, rt.fbo);
+  gl.clearColor(0,0,0,1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+}
+/* Empty every buffer that feeds itself: the feedback store, the flow stage's
+   frame store, the phosphor persistence and the frame ring. A bad frame in any
+   of those circulates indefinitely, so this is the way out without touching a
+   single parameter. */
+function flushBuffers(){
+  for(const ch of CHANNELS){
+    const c = chanRT[ch];
+    if(!c.allocated) continue;
+    for(const k of CH_RTS) clearRT(c[k]);
+    if(c.ring){ for(const r of c.ring) clearRT(r); c.ringW = 0; c.ringFilled = 0; }
+    c.flowLast = -99;
+  }
+  clearRT(scratch1); clearRT(scratch2); clearRT(mixOut);
+  clearRT(busOut1); clearRT(busOut2); clearRT(persistA); clearRT(persistB);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 function allocRTs(){
   for(const ch of CHANNELS){

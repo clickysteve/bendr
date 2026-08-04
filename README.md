@@ -104,6 +104,7 @@ Six momentary bend pads (mouse, `Q W E R T Y`, or MIDI notes C1–F1), MIDI CC l
 ## Output
 
 - Processing resolution from 360p to **4K**, independent of window size
+- **FLUSH BUFFERS** empties every self-feeding buffer (feedback, flow, persistence, frame ring) without disturbing the patch
 - Live **recording** with source audio, MP4 where the browser supports it and WebM otherwise
 - Frame-accurate **offline MP4 render** via WebCodecs — every frame processed at full quality regardless of realtime performance (video only)
 - PNG stills, fullscreen, and a clean **pop-out output window** for OBS capture or a second display

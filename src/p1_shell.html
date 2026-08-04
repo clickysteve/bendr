@@ -55,6 +55,7 @@ body{
 .mrow2 > button{flex:1 1 0; min-width:0;}
 .mlabel{font-size:7.5px; letter-spacing:1.5px; color:var(--dim); padding:3px 0 0;}
 .mlabel .mchan{color:var(--amber);}
+.mlabel .msrc{color:var(--cyan);}
 /* ---------- hover tooltip ---------- */
 #tip{
   position:fixed; z-index:200; display:none; max-width:330px; pointer-events:none;
@@ -316,8 +317,12 @@ body.nomix #mixbuses{display:none;}
   background:var(--panel); border:1px solid var(--line); cursor:pointer; line-height:1.15;
 }
 .chanbtn b{font-size:17px; letter-spacing:2px; display:block; color:var(--dim);}
-.chanbtn small{font-size:7.5px; letter-spacing:2px; color:#4a4a56; display:block;}
-.chanbtn{flex:1 1 22%;}
+.chanbtn small{
+  font-size:7px; letter-spacing:1px; color:#5a5a68; display:block;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-top:1px;
+}
+.menubtn b{color:var(--cyan); font-weight:400;}
+.chanbtn{flex:1 1 0; min-width:0;}
 .chanbtn.chA.on{background:rgba(255,122,24,.16); border-color:var(--amber);}
 .chanbtn.chA.on b{color:var(--amber);} .chanbtn.chA.on small{color:var(--amber); opacity:.7;}
 .chanbtn.chB.on{background:rgba(46,230,214,.16); border-color:var(--cyan);}
@@ -410,6 +415,10 @@ body.multi #mvlabels{display:grid;}
 }
 #canvasWrap:fullscreen{background:#000;}
 #canvasWrap:fullscreen #glcanvas{width:100vw; height:100vh;}
+#osdsrc{
+  position:absolute; left:8px; bottom:20px; font-size:8px; letter-spacing:1.5px;
+  color:var(--dim); text-shadow:0 1px 3px #000; pointer-events:none;
+}
 #dropHint{
   position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   pointer-events:none; opacity:0; transition:opacity .15s; background:rgba(10,10,14,.75);
@@ -657,7 +666,7 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v26.0</span>
+  <span id="ver" title="Build version">v27.0</span>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -681,7 +690,7 @@ body.nomix #mixbuses{display:none;}
   <div class="menu" id="mnuSource">
     <button class="menubtn" data-tip="Choose what this channel is looking at. Each channel has its own source.">SOURCE <i>&#9662;</i></button>
     <div class="menupanel">
-      <div class="mlabel">INPUT FOR CHANNEL <span class="mchan">A</span></div>
+      <div class="mlabel">INPUT FOR CHANNEL <span class="mchan">A</span> — <span class="msrc">PATTERN</span></div>
       <div class="mrow2">
         <button id="btnFile" data-tip="Load a video file into this channel. Files stream from disk, so a 4GB movie is no heavier than a small one. Drag and drop onto the picture works too.">FILE</button>
         <button id="btnCam" data-tip="Use a webcam or capture device as this channel's source.">CAM</button>
@@ -689,14 +698,6 @@ body.nomix #mixbuses{display:none;}
       <div class="mrow2">
         <button id="btnPat" data-tip="Use a built-in generated test signal as this channel's source. No file needed.">PATTERN</button>
         <button id="btnText" data-tip="Turn this channel into a text and shape generator. Opens the editor in the dock below the picture.">TEXT</button>
-      </div>
-      <div class="mrow2">
-        <button id="btnFeed" data-tip="Re-entry: take another channel, a bus, or the finished programme as this channel's source. Process it however you like and mix it back in, and you have a feedback loop that runs through the whole rig rather than inside one stage. Exactly like patching a mixer's output back into a spare input.">FEED</button>
-      </div>
-      <div class="mlabel">RE-ENTRY SOURCE</div>
-      <select id="selFeed" data-tip="What this channel re-enters. Whatever it reads is one frame old, which is what makes the loop stable rather than an infinite regress."></select>
-      <div class="mrow2">
-        <button id="btnSynth" data-tip="Turn this channel into a pattern synthesiser: oscillators, cross-modulation, a wavefolder, a comparator and a colouriser, all computed on the GPU and all modulatable. Shape it in the PATTERN SYNTH section of the panel.">SYNTH</button>
       </div>
       <div class="mlabel">PATTERN</div>
       <select id="selPat" data-tip="Which generated pattern this channel produces. OSCILLATOR, PLASMA and LISSAJOUS are video-synth style sources with no camera involved.">
@@ -714,6 +715,14 @@ body.nomix #mixbuses{display:none;}
         <option value="lissa">LISSAJOUS</option>
         <option value="checker">CHECKER</option>
       </select>
+      <div class="mrow2">
+        <button id="btnSynth" data-tip="Turn this channel into a pattern synthesiser: oscillators, cross-modulation, a wavefolder, a comparator and a colouriser, all computed on the GPU and all modulatable. Shape it in the PATTERN SYNTH section of the panel.">SYNTH</button>
+      </div>
+      <div class="mrow2">
+        <button id="btnFeed" data-tip="Re-entry: take another channel, a bus, or the finished programme as this channel's source. Process it however you like and mix it back in, and you have a feedback loop that runs through the whole rig rather than inside one stage. Exactly like patching a mixer's output back into a spare input.">FEED</button>
+      </div>
+      <div class="mlabel">RE-ENTRY SOURCE</div>
+      <select id="selFeed" data-tip="What this channel re-enters. Whatever it reads is one frame old, which is what makes the loop stable rather than an infinite regress."></select>
     </div>
   </div>
 
@@ -779,6 +788,7 @@ body.nomix #mixbuses{display:none;}
     <div id="canvasWrap">
       <canvas id="glcanvas"></canvas>
       <div id="osd"></div>
+      <div id="osdsrc"></div>
       <div id="dropHint">DROP VIDEO / PRESET</div>
       <div id="mvlabels"><span>A</span><span>B</span><span>BUS 1</span><span>C</span><span>D</span><span>PROGRAMME</span></div>
     </div>
@@ -919,10 +929,11 @@ body.nomix #mixbuses{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v26.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v27.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
+  <p>Each mixer is three independent stages, the way a vision mixer actually works. <b>TRANSITION</b> decides how the fader reveals the second input \u2014 a dissolve, one of twelve wipes, a slide in from an edge, or a stretch. <b>MIX TYPE</b> decides how the two combine where both are visible: dissolve, additive, non-additive (whichever is brighter, so neither picture dims the other), difference, multiply or screen. <b>KEY</b> is a separate compositing stage on top: luma white, luma black, chroma, or picture-in-picture with position, size and border. Because they are separate, a circle wipe and a luma key can run at the same time.</p>
   <p>The channels meet in three mixers, laid out as a strip directly under the picture: bus 1, bus 2, and a master crossfade between them. Each strip has its own two input selectors, so the pairings are not fixed \u2014 bus 1 can mix <b>A against C</b>, bus 2 can mix <b>D against B</b>. To get all four in at once, set both bus faders part-way and put the master on ADD, SCREEN or LIGHTEN rather than FADE, so the buses sum instead of crossfading. The strip sits just under the transport bar, and folds away with <b>MIX</b> on its left when you want the height back.</p>
   <p>The faders live under the picture rather than in the sidebar because a crossfader wants to be horizontal and should never be hidden behind a tab \u2014 it is the one control you ride while looking at something else. The detail behind each transition (softness, wipe geometry, key threshold) lives on the MIX tab of the dock, where it is setup rather than performance. INV only greys in when the transition is a wipe, since a fade, a key and a blend have no direction to reverse.</p>
   <h3>MULTIVIEW</h3>

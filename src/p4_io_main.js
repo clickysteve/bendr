@@ -168,6 +168,8 @@ function loadPreset(i){
     fbWrap = tg.wrap||0; fbMirror = tg.mir||0; fbBlend = tg.blend||0;
     fbNL = tg.nl||0; fbInvert = !!tg.inv;
     if(tg.model!==undefined) outModel = tg.model;
+    if(tg.blend!==undefined) mixBlend = tg.blend;
+    if(tg.key!==undefined) mixKey = tg.key;
     if(tg.gm){
       const tgt = linkChans ? CHANNELS : [activeChan];
       for(const ch of tgt) genMode[ch] = {...tg.gm};
@@ -315,6 +317,7 @@ function captureState(){
     audioCfg: JSON.parse(JSON.stringify(audioCfg)),
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
     mixMode2, wipeInv2, mixModeM, wipeInvM,
+    mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
     fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
@@ -327,7 +330,24 @@ function captureState(){
   st.mods = JSON.parse(JSON.stringify(mods));
   return st;
 }
+/* patches from before the mixer was split carry one combined value, where 13
+   and 14 were keys and 15-19 were blends. Unpack them into the three stages. */
+function migrateMixMode(st){
+  if(st.mixBlend !== undefined) return;
+  const un = v=>{
+    v = v || 0;
+    if(v <= 12) return {mode:v, blend:0, key:0};
+    if(v === 13) return {mode:0, blend:0, key:1};
+    if(v === 14) return {mode:0, blend:0, key:3};
+    return {mode:0, blend:[1,3,4,5,2][v-15] || 0, key:0};
+  };
+  const a = un(st.mixMode), b = un(st.mixMode2), c = un(st.mixModeM);
+  st.mixMode = a.mode;  st.mixBlend = a.blend;  st.mixKey = a.key;
+  st.mixMode2 = b.mode; st.mixBlend2 = b.blend; st.mixKey2 = b.key;
+  st.mixModeM = c.mode; st.mixBlendM = c.blend; st.mixKeyM = c.key;
+}
 function restoreState(st){
+  migrateMixMode(st);
   if(typeof cancelGlide === "function") cancelGlide();
   if(st.rescanMode !== undefined) rescanMode = st.rescanMode;
   if(st.chainOrder && st.chainOrder.length>=4) chainOrder = st.chainOrder.slice();
@@ -335,7 +355,7 @@ function restoreState(st){
   if(st.wipeInv !== undefined) wipeInv = st.wipeInv;
   if(st.wipeInv2 !== undefined) wipeInv2 = st.wipeInv2;
   if(st.wipeInvM !== undefined) wipeInvM = st.wipeInvM;
-  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","fieldSrc","flowField","flowEdge","mixMode2","mixModeM"]){
+  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","fieldSrc","flowField","flowEdge","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM","mixKey","mixKey2","mixKeyM"]){
     if(st[k] !== undefined) eval(k+" = st."+k);
   }
   if(st.fbInvert !== undefined) fbInvert = st.fbInvert;
@@ -412,6 +432,7 @@ function initPatch(){
   mixMode=0; edgeMode=0; showKeyMatte=false; wipeInv=false; linkChans=false;
   fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbTap=0; outModel=0; fieldSrc=0; flowField=0; flowEdge=0;
   mixMode2=0; wipeInv2=false; mixModeM=0; wipeInvM=false;
+  mixBlend=mixBlend2=mixBlendM=0; mixKey=mixKey2=mixKeyM=0;
   { const lb=document.getElementById("btnLinkChans"); if(lb) lb.classList.remove("on"); }
   for(const ch of CHANNELS) for(const p of CLIST) chanBase[ch][p.id] = p.def;
   for(const p of MLIST) mBase[p.id] = p.def;
@@ -442,6 +463,7 @@ document.getElementById("btnSave").onclick = ()=>{
   const state = {app:"bendr", v:5, chan:snap.chan, master:snap.master, routes, audioCfg,
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
     mixMode2, wipeInv2, mixModeM, wipeInvM,
+    mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
     fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
@@ -589,6 +611,27 @@ function syncChanInputUI(){
     el.title = off ? "Not available on a generated source — load a file into this channel" : "";
   }
   for(const q of document.querySelectorAll(".mchan")) q.textContent = activeChan;
+  /* say what every channel is looking at, in three places, because "which
+     source is this channel on" was invisible until you opened the menu */
+  const label = ch2=>{
+    const T = SRC[ch2];
+    if(T.mode === "file")    return T.name ? T.name.slice(0,14).toUpperCase() : "FILE";
+    if(T.mode === "cam")     return "CAM";
+    if(T.mode === "pattern") return (T.pattern||"pattern").toUpperCase();
+    if(T.mode === "text")    return "TEXT";
+    if(T.mode === "synth")   return "SYNTH "+GEN_SHAPES[genMode[ch2].shape];
+    if(T.mode === "feed")    return "FEED \u2190 "+(T.feed||"PGM");
+    return T.mode.toUpperCase();
+  };
+  for(const q of document.querySelectorAll(".msrc")) q.textContent = label(activeChan);
+  { const mb = document.querySelector("#mnuSource .menubtn");
+    if(mb) mb.innerHTML = "SRC <b>"+label(activeChan).slice(0,13)+"</b> <i>&#9662;</i>"; }
+  for(const ch2 of CHANNELS){
+    const btn = document.querySelector(".chanbtn.ch"+ch2+" small");
+    if(btn) btn.textContent = label(ch2);
+  }
+  { const os = document.getElementById("osdsrc");
+    if(os) os.textContent = CHANNELS.filter(c=>SRC[c].has).map(c=>c+" "+label(c)).join("   ·   "); }
   if(typeof refreshDockTabs === "function") refreshDockTabs();
   if(S.mode !== "text" && dockTab === "text") setDock("matrix");
   document.getElementById("btnFile").classList.toggle("on", S.mode==="file");
@@ -608,6 +651,7 @@ function syncChanInputUI(){
   if(dockTab === "text") syncTextEditor();
 }
 window.__syncChanInputUI = syncChanInputUI;
+setInterval(()=>{ if(!offline) syncChanInputUI(); }, 900);
 /* swap two channels' *sources* (what sits on top), not just their effects */
 window.__swapSources = function(a, b){
   const A = SRC[a], B = SRC[b];
@@ -1862,7 +1906,7 @@ function renderFrame(now, dt){
 
   /* mixer tree: BUS 1 and BUS 2 each take any two channels, then MASTER
      crossfades the two buses. So A can meet C, or D can meet B. */
-  function mixPass(dstRT, texA, texB, hasB, ids, mode, inv){
+  function mixPass(dstRT, texA, texB, hasB, ids, mode, inv, blend, key){
     gl.bindFramebuffer(gl.FRAMEBUFFER, dstRT.fbo);
     gl.viewport(0,0,procW,procH);
     gl.useProgram(progMIX.prog);
@@ -1874,17 +1918,19 @@ function renderFrame(now, dt){
     gl.uniform1f(U(progMIX,"u_hasB"), hasB?1:0);
     gl.uniform1f(U(progMIX,"u_mixMode"), mode);
     gl.uniform1f(U(progMIX,"u_wipeInv"), inv?1:0);
+    gl.uniform1f(U(progMIX,"u_mixBlend"), blend||0);
+    gl.uniform1f(U(progMIX,"u_mixKey"), key||0);
     setParamUniforms(progMIX, "A");
     for(let i=0;i<MIXP.length;i++) gl.uniform1f(U(progMIX,"u_"+MIXP[i]), mCur[ids[i]]);
     draw();
   }
   if(masterLive){
-    mixPass(busOut1, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv);
-    mixPass(busOut2, chanOutTex(b2[0]), chanOutTex(b2[1]), live[b2[1]], MIXBUS.b2, mixMode2, wipeInv2);
-    mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mixModeM, wipeInvM);
+    mixPass(busOut1, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv, mixBlend, mixKey);
+    mixPass(busOut2, chanOutTex(b2[0]), chanOutTex(b2[1]), live[b2[1]], MIXBUS.b2, mixMode2, wipeInv2, mixBlend2, mixKey2);
+    mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mixModeM, wipeInvM, mixBlendM, mixKeyM);
   } else {
     /* nothing on bus 2, so bus 1 goes straight to master and costs one pass, as before */
-    mixPass(mixOut, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv);
+    mixPass(mixOut, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv, mixBlend, mixKey);
   }
 
   if(multiView){

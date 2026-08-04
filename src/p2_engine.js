@@ -153,17 +153,24 @@ const FS_FB = COMMON + KEYFN +
 "  O = vec4(clamp(col, -0.5, 2.0),1.0);\n}\n";
 
 /* mixer: combines the two fully-processed channels — fader, wipes, keys, blends */
+/* pass: MIXER — three independent stages, the way a vision mixer actually works.
+   TRANSITION decides how the fader reveals B over A (dissolve, wipe, slide,
+   stretch). MIX TYPE decides how the two combine where both are visible
+   (dissolve, additive, non-additive, difference, multiply, screen). KEY is a
+   separate compositing stage on top — luminance, chroma or picture-in-picture.
+   Splitting them means you can run a circle wipe AND a key at the same time,
+   which one combined dropdown could never express. */
 const FS_MIX = COMMON + KEYFN +
 "uniform sampler2D u_texA; uniform sampler2D u_texB;\n" +
-"uniform float u_mixMode,u_hasB,u_abMix;\n" +
+"uniform float u_mixMode,u_mixBlend,u_mixKey,u_hasB,u_abMix;\n" +
 "uniform float u_wipeSoft,u_wipeDetail,u_wipeX,u_wipeY,u_wipeInv;\n" +
 "uniform float u_mixKeyThresh,u_mixKeySoft,u_mixKeyInv,u_mixKeyHue;\n" +
+"uniform float u_pipX,u_pipY,u_pipSize,u_pipBorder;\n" +
 "float wipeField(vec2 uv, float mode, float outA){\n" +
 "  vec2 off = vec2(u_wipeX, u_wipeY)*0.5;\n" +
 "  vec2 c = uv - 0.5 - off;\n" +
-"  /* how far the farthest corner is from wherever the origin has been moved to.\n" +
-"     Normalising by it means the fader travels evenly from nothing to full\n" +
-"     coverage instead of saturating early and flipping the rest in one go. */\n" +
+"  /* normalised against the distance to the farthest corner from wherever the\n" +
+"     origin has been moved to, so the fader travels evenly to full coverage */\n" +
 "  vec2 far = abs(off) + 0.5;\n" +
 "  float n = 2.0 + floor(u_wipeDetail*14.0);\n" +
 "  if(mode<1.5) return uv.x;\n" +
@@ -177,31 +184,79 @@ const FS_MIX = COMMON + KEYFN +
 "  if(mode<9.5) return fract(uv.y*n);\n" +
 "  if(mode<10.5){ float a = atan(c.y, c.x)/6.2832 + 0.5; return fract(a); }\n" +
 "  if(mode<11.5) return fract((uv.x + uv.y)*n*0.5);\n" +
-"  if(mode<12.5) return h21(floor(uv*vec2(n*2.0, n)));\n" +
-"  return 0.0;\n}\n" +
+"  return h21(floor(uv*vec2(n*2.0, n)));\n}\n" +
+"/* SLIDE moves the incoming picture in from an edge; STRETCH squashes it in.\n" +
+"   Both are transitions where B is repositioned rather than revealed. */\n" +
+"vec2 slideUV(vec2 uv, float dir, float t, out float inside){\n" +
+"  vec2 d = dir<0.5 ? vec2(1.0,0.0) : dir<1.5 ? vec2(-1.0,0.0) : dir<2.5 ? vec2(0.0,1.0) : vec2(0.0,-1.0);\n" +
+"  vec2 p = uv + d*(1.0-t);\n" +
+"  inside = step(0.0,p.x)*step(p.x,1.0)*step(0.0,p.y)*step(p.y,1.0);\n" +
+"  return p;\n}\n" +
+"vec2 stretchUV(vec2 uv, float dir, float t, out float inside){\n" +
+"  float k = max(t, 0.0001);\n" +
+"  vec2 p = uv;\n" +
+"  if(dir<0.5){ p.x = uv.x/k; }\n" +
+"  else if(dir<1.5){ p.x = 1.0-(1.0-uv.x)/k; }\n" +
+"  else if(dir<2.5){ p.y = uv.y/k; }\n" +
+"  else { p.y = 1.0-(1.0-uv.y)/k; }\n" +
+"  inside = step(0.0,p.x)*step(p.x,1.0)*step(0.0,p.y)*step(p.y,1.0);\n" +
+"  return p;\n}\n" +
+"vec3 combine(vec3 a, vec3 b, float m, float blend){\n" +
+"  if(blend<0.5) return mix(a, b, m);\n" +                 /* DISSOLVE */
+"  if(blend<1.5) return a + b*m;\n" +                      /* ADDITIVE  (FAM) */
+"  if(blend<2.5) return mix(a, max(a,b), m);\n" +          /* NON-ADD   (NAM) */
+"  if(blend<3.5) return mix(a, abs(a-b), m);\n" +          /* DIFFERENCE */
+"  if(blend<4.5) return mix(a, a*b*1.6, m);\n" +           /* MULTIPLY */
+"  return mix(a, 1.0-(1.0-a)*(1.0-b), m);\n}\n" +          /* SCREEN */
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  float outA = u_res.x/u_res.y;\n" +
 "  vec3 a = texture(u_texA, uv).rgb;\n" +
 "  if(u_hasB<0.5 || u_abMix<0.0005){ O = vec4(a,1.0); return; }\n" +
-"  vec3 b = texture(u_texB, uv).rgb;\n" +
-"  vec3 src;\n" +
+"  float t = u_abMix;\n" +
 "  float mm = u_mixMode;\n" +
-"  if(mm < 0.5){ src = mix(a, b, u_abMix); }\n" +
-"  else if(mm < 12.5){\n" +
+"  /* ---- 1. where does B come from, and how much of it shows ---- */\n" +
+"  vec2 buv = uv;\n" +
+"  float m = t, inside = 1.0;\n" +
+"  if(mm > 0.5 && mm < 12.5){\n" +
 "    float d = wipeField(uv, mm, outA);\n" +
 "    if(u_wipeInv>0.5) d = 1.0-d;\n" +
 "    float sw = max(u_wipeSoft*0.5, 0.002);\n" +
-"    float m = smoothstep(d-sw, d+sw, u_abMix*(1.0+2.0*sw)-sw);\n" +
-"    src = mix(a, b, m);\n" +
+"    m = smoothstep(d-sw, d+sw, t*(1.0+2.0*sw)-sw);\n" +
+"  } else if(mm > 12.5 && mm < 16.5){\n" +
+"    buv = slideUV(uv, mm-13.0, t, inside);\n" +
+"    m = inside;\n" +
+"  } else if(mm > 16.5 && mm < 20.5){\n" +
+"    buv = stretchUV(uv, mm-17.0, t, inside);\n" +
+"    m = inside;\n" +
 "  }\n" +
-"  else if(mm < 13.5){ src = mix(a, b, u_abMix*keyOf(a,0.0,u_mixKeyHue,u_mixKeyThresh,u_mixKeySoft,u_mixKeyInv)); }\n" +
-"  else if(mm < 14.5){ src = mix(a, b, u_abMix*keyOf(a,1.0,u_mixKeyHue,u_mixKeyThresh,u_mixKeySoft,u_mixKeyInv)); }\n" +
-"  else if(mm < 15.5){ src = a + b*u_abMix; }\n" +
-"  else if(mm < 16.5){ src = mix(a, abs(a-b), u_abMix); }\n" +
-"  else if(mm < 17.5){ src = mix(a, a*b*1.6, u_abMix); }\n" +
-"  else if(mm < 18.5){ src = mix(a, 1.0-(1.0-a)*(1.0-b), u_abMix); }\n" +
-"  else { src = mix(a, max(a,b), u_abMix); }\n" +
+"  /* ---- 2. the key stage, independent of the transition ---- */\n" +
+"  float border = 0.0;\n" +
+"  if(u_mixKey > 0.5){\n" +
+"    if(u_mixKey < 3.5){\n" +
+"      /* 1 = white luma, 2 = black luma, 3 = chroma. The key is taken from the\n" +
+"         incoming picture, so its bright, dark or coloured parts drop out. */\n" +
+"      float km = keyOf(texture(u_texB, clamp(buv,0.0,1.0)).rgb,\n" +
+"                       u_mixKey > 2.5 ? 1.0 : 0.0,\n" +
+"                       u_mixKeyHue, u_mixKeyThresh, u_mixKeySoft,\n" +
+"                       (u_mixKey < 1.5) ? 1.0-u_mixKeyInv : u_mixKeyInv);\n" +
+"      m *= km;\n" +
+"    } else {\n" +
+"      /* picture in picture: B is scaled into a subscreen with a border */\n" +
+"      float sz = 0.08 + u_pipSize*0.62;\n" +
+"      vec2 ctr = vec2(0.5,0.5) + vec2(u_pipX, u_pipY)*0.42;\n" +
+"      vec2 hw = vec2(sz*0.5, sz*0.5*outA);\n" +
+"      vec2 q = (uv - ctr)/hw;\n" +
+"      buv = q*0.5 + 0.5;\n" +
+"      float bw = u_pipBorder*0.16;\n" +
+"      float inBox = step(max(abs(q.x),abs(q.y)), 1.0);\n" +
+"      border = step(max(abs(q.x),abs(q.y)), 1.0+bw) - inBox;\n" +
+"      m = inBox*t;\n" +
+"    }\n" +
+"  }\n" +
+"  vec3 b = texture(u_texB, clamp(buv, 0.0, 1.0)).rgb;\n" +
+"  vec3 src = combine(a, b, clamp(m,0.0,1.0), u_mixBlend);\n" +
+"  if(border > 0.5) src = mix(src, vec3(1.0), t);\n" +
 "  O = vec4(clamp(src,0.0,1.6),1.0);\n}\n";
 
 /* pass 2: the bent signal path — physical sync model + NTSC + tape */
@@ -1093,6 +1148,10 @@ const PDEF = [
   ["mixKeySoft","KEY SOFT","mixer",0.01,1,0.2],
   ["mixKeyInv","KEY INVERT","mixer",0,1,0],
   ["mixKeyHue","KEY HUE","mixer",0,1,0.33],
+  ["pipX","PIP X","mixer",-1,1,0.45],
+  ["pipY","PIP Y","mixer",-1,1,-0.45],
+  ["pipSize","PIP SIZE","mixer",0,1,0.35],
+  ["pipBorder","PIP BORDER","mixer",0,1,0.12],
 
   ["cdMix","BUS 2 FADER","mixer2",0,1,0],
   ["wipeSoft2","WIPE SOFT","mixer2",0,1,0.03],
@@ -1103,6 +1162,10 @@ const PDEF = [
   ["mixKeySoft2","KEY SOFT","mixer2",0.01,1,0.2],
   ["mixKeyInv2","KEY INVERT","mixer2",0,1,0],
   ["mixKeyHue2","KEY HUE","mixer2",0,1,0.33],
+  ["pipX2","PIP X","mixer2",-1,1,0.45],
+  ["pipY2","PIP Y","mixer2",-1,1,-0.45],
+  ["pipSize2","PIP SIZE","mixer2",0,1,0.35],
+  ["pipBorder2","PIP BORDER","mixer2",0,1,0.12],
 
   ["busMix","MASTER FADER","mixerM",0,1,0],
   ["wipeSoftM","WIPE SOFT","mixerM",0,1,0.03],
@@ -1113,6 +1176,10 @@ const PDEF = [
   ["mixKeySoftM","KEY SOFT","mixerM",0.01,1,0.2],
   ["mixKeyInvM","KEY INVERT","mixerM",0,1,0],
   ["mixKeyHueM","KEY HUE","mixerM",0,1,0.33],
+  ["pipXM","PIP X","mixerM",-1,1,0.45],
+  ["pipYM","PIP Y","mixerM",-1,1,-0.45],
+  ["pipSizeM","PIP SIZE","mixerM",0,1,0.35],
+  ["pipBorderM","PIP BORDER","mixerM",0,1,0.12],
 
   ["morph","MORPH A>B","morph",0,1,0],
 
@@ -1364,6 +1431,10 @@ const PHELP = {
   mixKeySoft:"How gradual the key edge is. Small values give a hard cut-out; large values let the incoming picture bleed through the midtones.",
   mixKeyInv:"Flips the key so the incoming channel appears where it was previously hidden.",
   mixKeyHue:"For CHROMA KEY: which hue is treated as the key colour. 0.33 is green, 0.66 blue, 0 red.",
+  pipX:"Horizontal position of the picture-in-picture subscreen, when KEY is set to PIP.",
+  pipY:"Vertical position of the subscreen.",
+  pipSize:"How large the subscreen is, from a small inset to most of the frame.",
+  pipBorder:"Width of the border drawn around the subscreen. Zero for none.",
   morph:"Blends every slider on the panel between the two snapshots stored with STORE A and STORE B. Put an LFO on this and the whole rig evolves on its own. Touching any individual slider takes that one control back out of the morph.",
 
   /* ---- frame / position ---- */
@@ -1613,7 +1684,7 @@ const PHELP = {
 };
 /* the bus 2 and master mixer controls reuse bus 1's descriptions */
 for(const [suffix, note] of [["2"," (bus 2: channels C and D)"], ["M"," (master: bus 1 against bus 2)"]]){
-  for(const id of ["wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue"]){
+  for(const id of ["wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue","pipX","pipY","pipSize","pipBorder"]){
     PHELP[id+suffix] = PHELP[id] + note;
   }
 }
@@ -1689,8 +1760,11 @@ let mixMode = 0;           // BUS 1 (A/B) transition/blend mode (see MIXMODES)
 let wipeInv = false;
 let mixMode2 = 0, wipeInv2 = false;   // BUS 2 (C/D)
 let mixModeM = 0, wipeInvM = false;   // MASTER (bus 1 / bus 2)
+/* transition, mix type and key are three independent choices per bus */
+let mixBlend = 0, mixBlend2 = 0, mixBlendM = 0;
+let mixKey = 0,   mixKey2 = 0,   mixKeyM = 0;
 /* the mixer shader has one set of uniform names; each bus feeds it its own params */
-const MIXP = ["abMix","wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue"];
+const MIXP = ["abMix","wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue","pipX","pipY","pipSize","pipBorder"];
 /* which channel feeds each side of each bus — any channel can meet any other */
 const busSrc = {b1:["A","B"], b2:["C","D"]};
 /* pattern synth mode selectors, one set per channel */
@@ -1701,8 +1775,8 @@ const genMode = {};
 let multiView = false;
 const MIXBUS = {
   b1: MIXP,
-  b2: ["cdMix","wipeSoft2","wipeDetail2","wipeX2","wipeY2","mixKeyThresh2","mixKeySoft2","mixKeyInv2","mixKeyHue2"],
-  bM: ["busMix","wipeSoftM","wipeDetailM","wipeXM","wipeYM","mixKeyThreshM","mixKeySoftM","mixKeyInvM","mixKeyHueM"]
+  b2: ["cdMix","wipeSoft2","wipeDetail2","wipeX2","wipeY2","mixKeyThresh2","mixKeySoft2","mixKeyInv2","mixKeyHue2","pipX2","pipY2","pipSize2","pipBorder2"],
+  bM: ["busMix","wipeSoftM","wipeDetailM","wipeXM","wipeYM","mixKeyThreshM","mixKeySoftM","mixKeyInvM","mixKeyHueM","pipXM","pipYM","pipSizeM","pipBorderM"]
 };
 let fbWrap = 0;        // 0 clamp 1 repeat 2 mirror
 let fbMirror = 0;      // 0 none 1 H 2 V 3 quad

@@ -481,7 +481,7 @@ function buildChanBar(){
     const b = document.createElement("button");
     b.className = "chanbtn ch"+ch;
     b.dataset.chan = ch;
-    b.innerHTML = "<b>"+ch+"</b><small>CHANNEL</small>";
+    b.innerHTML = "<b>"+ch+"</b><small>\u2014</small>";
     attachTip(b, "CHANNEL "+ch, "Everything below this bar - the source, the framing, the whole effect chain and the bend pads - belongs to the channel selected here. Channels A and B feed mixer bus 1; C and D feed bus 2.", "Sections tagged MASTER are shared across all four.");
     b.onclick = ()=>{ setActiveChan(ch); };
     return b;
@@ -536,11 +536,14 @@ function buildMixStrip(){
   host.innerHTML = "";
   const buses = [
     {key:"b1", pid:"abMix", label:"BUS 1", routed:true,
-     get:()=>mixMode, set:v=>{mixMode=v;}, inv:()=>wipeInv, tinv:()=>{wipeInv=!wipeInv;}},
+     get:()=>mixMode, set:v=>{mixMode=v;}, inv:()=>wipeInv, tinv:()=>{wipeInv=!wipeInv;},
+     getBlend:()=>mixBlend, setBlend:v=>{mixBlend=v;}, getKey:()=>mixKey, setKey:v=>{mixKey=v;}},
     {key:"b2", pid:"cdMix", label:"BUS 2", routed:true,
-     get:()=>mixMode2, set:v=>{mixMode2=v;}, inv:()=>wipeInv2, tinv:()=>{wipeInv2=!wipeInv2;}},
+     get:()=>mixMode2, set:v=>{mixMode2=v;}, inv:()=>wipeInv2, tinv:()=>{wipeInv2=!wipeInv2;},
+     getBlend:()=>mixBlend2, setBlend:v=>{mixBlend2=v;}, getKey:()=>mixKey2, setKey:v=>{mixKey2=v;}},
     {key:"bM", pid:"busMix", label:"MASTER · BUS 1 ↔ BUS 2", routed:false,
-     get:()=>mixModeM, set:v=>{mixModeM=v;}, inv:()=>wipeInvM, tinv:()=>{wipeInvM=!wipeInvM;}},
+     get:()=>mixModeM, set:v=>{mixModeM=v;}, inv:()=>wipeInvM, tinv:()=>{wipeInvM=!wipeInvM;},
+     getBlend:()=>mixBlendM, setBlend:v=>{mixBlendM=v;}, getKey:()=>mixKeyM, setKey:v=>{mixKeyM=v;}},
   ];
   for(const bus of buses){
     const p = P[bus.pid];
@@ -573,21 +576,40 @@ function buildMixStrip(){
     const mode = document.createElement("select");
     mode.id = bus.key==="b1" ? "selMixMode" : (bus.key==="b2" ? "selMixMode2" : "selMixModeM");
     attachTip(mode, "TRANSITION",
-      "How the two sides meet: a plain dissolve, one of twelve wipe shapes, a luma or chroma key, or a blend. The softness, wipe geometry and key settings live in the sidebar.");
+      "How the fader reveals the second input: a plain dissolve, one of twelve wipe shapes, a slide in from an edge, or a stretch. This is independent of the key, so a wipe and a key can run at the same time.");
     MIXMODES.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=m; mode.appendChild(o); });
     mode.value = bus.get();
     mode.onchange = ()=>{ bus.set(parseInt(mode.value)); refreshToggles(); };
     row.appendChild(mode);
     const iv = document.createElement("button");
     iv.textContent = "INV";
-    attachTip(iv, "INVERT WIPE",
-      "Runs the wipe from the other side.",
-      "Only wipes have a direction to reverse, so this greys out on FADE, on the keys and on the blend modes. Keys have their own KEY INVERT in the MIX tab.");
+    attachTip(iv, "INVERT WIPE", "Runs the wipe from the other side.",
+      "Only wipes have a direction to reverse, so this greys out on a dissolve, a slide or a stretch.");
     iv.classList.toggle("on", bus.inv());
     iv.onclick = ()=>{ if(iv.disabled) return; bus.tinv(); iv.classList.toggle("on", bus.inv()); };
     stripInvBtns[bus.key] = {btn:iv, get:bus.inv, mode:bus.get};
     row.appendChild(iv);
     el.appendChild(row);
+
+    /* mix type and key are their own choices, not alternatives to the wipe */
+    const row2 = document.createElement("div"); row2.className = "mixrow";
+    const bl = document.createElement("select");
+    bl.id = "selMixBlend"+bus.key;
+    attachTip(bl, "MIX TYPE",
+      "How the two pictures combine where both are visible. DISSOLVE crossfades; ADDITIVE sums them, which is the classic full-additive mix; NON-ADD keeps whichever is brighter, so neither picture dims the other; then difference, multiply and screen.");
+    MIXBLENDS.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=m; bl.appendChild(o); });
+    bl.value = bus.getBlend();
+    bl.onchange = ()=>{ bus.setBlend(parseInt(bl.value)); };
+    const ky = document.createElement("select");
+    ky.id = "selMixKey"+bus.key;
+    attachTip(ky, "KEY / COMPOSITE",
+      "A compositing stage on top of the transition. LUMA WHITE drops the bright parts of the incoming picture out, LUMA BLACK drops the dark parts, CHROMA drops a colour, and PICTURE IN PICTURE insets it as a subscreen.",
+      "Because this is separate from the transition, you can run a circle wipe and a luma key together. The threshold, softness and subscreen controls are on the MIX tab.");
+    MIXKEYS.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=m; ky.appendChild(o); });
+    ky.value = bus.getKey();
+    ky.onchange = ()=>{ bus.setKey(parseInt(ky.value)); };
+    row2.appendChild(bl); row2.appendChild(ky);
+    el.appendChild(row2);
 
     const fr = document.createElement("div"); fr.className = "mixfader";
     const wrap = document.createElement("div"); wrap.className = "sldwrap";
@@ -1285,9 +1307,13 @@ function refreshToggles(){
   }
 }
 const tapeBtnRefs = [];
-const MIXMODES = ["FADE","WIPE H","WIPE V","DIAGONAL","BOX","CIRCLE","SPLIT H","SPLIT V",
-  "BLINDS V","BLINDS H","CLOCK","DIAG BARS","BLOCKS","LUMA KEY","CHROMA KEY",
-  "ADD","DIFFERENCE","MULTIPLY","SCREEN","LIGHTEN"];
+/* three independent choices, as on a real mixer */
+const MIXMODES = ["MIX / DISSOLVE","WIPE H","WIPE V","DIAGONAL","BOX","CIRCLE","SPLIT H","SPLIT V",
+  "BLINDS V","BLINDS H","CLOCK","DIAG BARS","BLOCKS",
+  "SLIDE \u2192","SLIDE \u2190","SLIDE \u2191","SLIDE \u2193",
+  "STRETCH \u2192","STRETCH \u2190","STRETCH \u2191","STRETCH \u2193"];
+const MIXBLENDS = ["DISSOLVE","ADDITIVE","NON-ADD","DIFFERENCE","MULTIPLY","SCREEN"];
+const MIXKEYS = ["KEY OFF","LUMA WHITE","LUMA BLACK","CHROMA","PICTURE IN PICTURE"];
 
 /* ---- PERFORM dock: snapshot bank + performance recorder ---- */
 function buildPerformDock(){
@@ -1369,7 +1395,7 @@ function sectionExtras(id, d){
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
     note.textContent =
-      which===1 ? "How bus 1's transition looks. The fader, the routing and the transition mode are on the mixer strip under the picture; SOFT feathers the wipe edge, DETAIL sets blind and bar counts, CTR X/Y moves the origin, and the KEY controls apply to the two key transitions."
+      which===1 ? "The detail behind bus 1's three mixer stages. SOFT feathers the wipe edge, DETAIL sets blind and bar counts, CTR X/Y moves the wipe origin. KEY THRESH, SOFT, INVERT and HUE shape whichever key is selected, and the PIP controls place the subscreen. The transition, mix type and key selectors are on the strip under the picture."
     : which===2 ? "The same for bus 2. It only renders while the master fader is above zero, so leaving it alone costs nothing."
     : "The same again for the master crossfade between the two buses.";
     d.appendChild(note);

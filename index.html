@@ -347,6 +347,23 @@ body.chan-b #panel{border-left-color:var(--cyan);}
 body.chan-c #panel{border-left-color:var(--mag);}
 body.chan-d #panel{border-left-color:#b4ff5a;}
 .mrow .rch{width:46px;}
+.mrow .rgo{flex:0 0 auto; padding:3px 6px; font-size:10px; line-height:1; color:var(--dim);}
+.mrow .rgo:hover{color:var(--cyan); border-color:var(--cyan);}
+.mrow .rinv{flex:0 0 auto; padding:3px 6px; font-size:8px;}
+.mrow .rcurve{flex:0 0 auto; width:58px; padding:3px 2px; font-size:8.5px;}
+.destlink{
+  display:inline-block; margin:0 8px 3px 0; cursor:pointer; color:var(--dim);
+  border-bottom:1px dotted #33333f;
+}
+.destlink:hover{color:var(--cyan); border-bottom-color:var(--cyan);}
+.destlink b{color:var(--cyan);}
+.destlink:hover b{color:#fff;}
+.patchpick{width:100%; margin-top:6px; font-size:8.5px; padding:3px 4px;}
+.flash{animation:flashhi 1.5s ease-out;}
+@keyframes flashhi{
+  0%,18%{background:rgba(46,230,214,.28); box-shadow:0 0 0 1px var(--cyan);}
+  100%{background:transparent; box-shadow:none;}
+}
 /* ---------- mobile tab bar (hidden on desktop) ---------- */
 #mtabs{display:none;}
 /* ---------- stage ---------- */
@@ -612,7 +629,7 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v23.0</span>
+  <span id="ver" title="Build version">v24.0</span>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -645,6 +662,11 @@ body.nomix #mixbuses{display:none;}
         <button id="btnPat" data-tip="Use a built-in generated test signal as this channel's source. No file needed.">PATTERN</button>
         <button id="btnText" data-tip="Turn this channel into a text and shape generator. Opens the editor in the dock below the picture.">TEXT</button>
       </div>
+      <div class="mrow2">
+        <button id="btnFeed" data-tip="Re-entry: take another channel, a bus, or the finished programme as this channel's source. Process it however you like and mix it back in, and you have a feedback loop that runs through the whole rig rather than inside one stage. Exactly like patching a mixer's output back into a spare input.">FEED</button>
+      </div>
+      <div class="mlabel">RE-ENTRY SOURCE</div>
+      <select id="selFeed" data-tip="What this channel re-enters. Whatever it reads is one frame old, which is what makes the loop stable rather than an infinite regress."></select>
       <div class="mrow2">
         <button id="btnSynth" data-tip="Turn this channel into a pattern synthesiser: oscillators, cross-modulation, a wavefolder, a comparator and a colouriser, all computed on the GPU and all modulatable. Shape it in the PATTERN SYNTH section of the panel.">SYNTH</button>
       </div>
@@ -869,7 +891,7 @@ body.nomix #mixbuses{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v23.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v24.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
@@ -907,8 +929,11 @@ body.nomix #mixbuses{display:none;}
   <p><b>FLOW / MOSH</b> is the temporal-smear stage, and it holds its own frame store. <b>FIELD</b> picks the vector field everything is advected along: MOTION estimates real optical flow from the picture (frame to frame, per pixel), CONTOUR runs along brightness edges, CURL NOISE churns, RADIAL and SPIRAL push out and around, CHROMA steers by colour, WEAVE crosshatches. <b>P-FRAME PUSH</b> drags the held frame along that field, which on MOTION is what proper datamosh actually is: the picture stops updating while the movement keeps pulling it apart. <b>MOSH HOLD</b> sets how much of the held frame survives each pass and <b>MOSH GATE</b> restricts the holding to the moving parts of the frame (positive) or the still parts (negative). <b>CURL / ROTATE</b> turns the whole field sideways, so drift becomes orbit. Then MELT with its own direction and brightness gate, SWIRL with scale and speed, VECTOR TRASH with block size and rate, STRETCH, EDGE REPEL, FLOW NOISE, per-pass HUE and DECAY, RE-SHARP to claw back the detail resampling eats, TIME SHEAR on either axis, and an EDGE mode (clamp / repeat / mirror) for what happens off the edge of the frame.</p>
   <h3>TAPE TRANSPORT</h3>
   <p>A whole deck, per channel. The transport row drives that channel's source: <b>STILL</b> parks the noise bar a paused deck lays across the field, the shuttle and jog buttons scrub with head-crossing bands marching through the picture. <b>TAPE SPEED</b> runs SP to EP — the slower the tape, the less bandwidth survives, so chroma widens and detail goes. <b>GENERATIONS</b> compounds GEN LOSS as if the tape had been dubbed that many times. <b>TRACK PHASE</b> places the mistracking band and <b>SERVO HUNT</b> sets the auto-tracking circuit searching for it. On top: tape crease, head clog, azimuth error, scrape flutter, wow with its own rate, tape stretch, edge damage, print-through, chroma loss, tape hiss, and dropout with adjustable streak length.</p>
+  <h3>RE-ENTRY</h3>
+  <p><b>FEED</b> under SOURCE takes another channel, either bus, or the finished programme as this channel's source. Process it and mix it back in and you have a feedback loop that travels through the entire rig rather than round one stage \u2014 which is what patching a mixer's output back into a spare input does. Whatever it reads is one frame old, and that single frame of delay is what keeps it stable instead of an infinite regress.</p>
+  <p>This is the answer to making two mixed pictures interact. Key or wipe one over another on bus 1, set channel C to re-enter PROGRAMME with feedback zoom, and bring it in on the master with ADD or LIGHTEN: the shape on top now bleeds out into what is behind it, and keeps bleeding, because its own output is going back round. Chain a channel to another channel instead of the programme and you can put a whole different effect chain in the return path.</p>
   <h3>MOVEMENT</h3>
-  <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch four LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
+  <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch eight LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
   <h3>PERFORMANCE</h3>
   <p>The dock under the picture has five tabs: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b>, <b>MIX</b> and <b>PERFORM</b>. MIX holds the detail behind each transition \u2014 wipe softness and geometry, key threshold and hue \u2014 while the faders themselves stay on the strip. PERFORM holds everything you play with while it is running \u2014 the snapshot bank, the recorder and the bend pads. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
@@ -2825,6 +2850,21 @@ for(const ch of CHANNELS) srcTex[ch] = makeSrcTex();
 /* stand-in for a channel that has not been allocated yet */
 const blackTex = makeSrcTex();
 function chanOutTex(ch){ const c = chanRT[ch]; return (c.allocated && c.out) ? c.out.tex : blackTex; }
+/* re-entry: a channel can take another channel, a bus, or the programme as its
+   source. Whatever it reads is last frame's, exactly like patching a mixer's
+   output back into a spare input with a cable. */
+const FEED_SRCS = [
+  {id:"A", name:"CH A OUT"}, {id:"B", name:"CH B OUT"},
+  {id:"C", name:"CH C OUT"}, {id:"D", name:"CH D OUT"},
+  {id:"BUS1", name:"BUS 1 OUT"}, {id:"BUS2", name:"BUS 2 OUT"},
+  {id:"PGM", name:"PROGRAMME OUT"},
+];
+function feedTex(id){
+  if(id === "BUS1") return busOut1 ? busOut1.tex : blackTex;
+  if(id === "BUS2") return busOut2 ? busOut2.tex : blackTex;
+  if(id === "PGM")  return mixOut  ? mixOut.tex  : blackTex;
+  return chanOutTex(id);
+}
 
 /* per-scanline sync model texture (written by CPU each frame) */
 const SROWS = 576;
@@ -2938,21 +2978,26 @@ function toast(msg, err){
 window.addEventListener("error", e=>{ toast("Error: "+e.message, true); });
 
 /* ---------------- modulation engine ---------------- */
+const LFOKEYS = ["lfo1","lfo2","lfo3","lfo4","lfo5","lfo6","lfo7","lfo8"];
+/* eight of them: with 243 destinations, four was the bottleneck */
+const LFO_DEFAULTS = [
+  {rate:0.3,   shape:"sine"}, {rate:1.7,  shape:"snh"},
+  {rate:0.07,  shape:"tri"},  {rate:5.5,  shape:"sine"},
+  {rate:0.017, shape:"tri"},  {rate:0.9,  shape:"saw"},
+  {rate:3.1,   shape:"sqr"},  {rate:0.13, shape:"drift"},
+];
 const MODSRC = [
-  {id:"lfo1", name:"LFO 1"}, {id:"lfo2", name:"LFO 2"},
-  {id:"lfo3", name:"LFO 3"}, {id:"lfo4", name:"LFO 4"},
+  ...LFOKEYS.map((k,i)=>({id:k, name:"LFO "+(i+1)})),
   {id:"chaos", name:"CHAOS"}, {id:"drift", name:"DRIFT"}, {id:"spike", name:"SPIKE"},
   {id:"bass", name:"AUD BASS"}, {id:"mid", name:"AUD MID"}, {id:"high", name:"AUD HIGH"},
   {id:"motion", name:"VID MOTION"}, {id:"bright", name:"VID BRIGHT"}, {id:"cut", name:"VID CUT"},
 ];
-const LFOKEYS = ["lfo1","lfo2","lfo3","lfo4"];
-const lfoState = {
-  lfo1:{rate:0.3,  shape:"sine", phase:Math.random(), sync:0},
-  lfo2:{rate:1.7,  shape:"snh",  phase:Math.random(), snh:0, sync:0},
-  lfo3:{rate:0.07, shape:"tri",  phase:Math.random(), sync:0},
-  lfo4:{rate:5.5,  shape:"sine", phase:Math.random(), sync:0},
-};
-const modVal = {lfo1:0, lfo2:0, lfo3:0, lfo4:0, chaos:0, drift:0, spike:0, bass:0, mid:0, high:0, motion:0, bright:0, cut:0};
+const lfoState = {};
+LFOKEYS.forEach((k,i)=>{
+  lfoState[k] = {rate:LFO_DEFAULTS[i].rate, shape:LFO_DEFAULTS[i].shape, phase:Math.random(), snh:0, sync:0};
+});
+const modVal = {};
+for(const m of MODSRC) modVal[m.id] = 0;
 
 /* tempo: tap or MIDI clock; synced LFOs derive their rate from it */
 let bpm = 120, extClockAt = 0, clockEma = 0;
@@ -3002,6 +3047,24 @@ function lfoOut(st, dt){
   return 0;
 }
 const LFO_SHAPES = ["sine","tri","saw","ramp","sqr","pulse","snh","exp","sine2","drift"];
+/* value = beats per cycle, so smaller is faster */
+const SYNC_DIVS = [
+  ["0","FREE"], ["32","8 BAR"], ["16","4 BAR"], ["12","3 BAR"], ["8","2 BAR"],
+  ["6","1.5 BAR"], ["4","1 BAR"], ["3","1/2 DOT"], ["2.6667","1 BAR TRIP"], ["2","1/2"],
+  ["1.5","1/4 DOT"], ["1.3333","1/2 TRIP"], ["1","1/4"], ["0.75","1/8 DOT"],
+  ["0.6667","1/4 TRIP"], ["0.5","1/8"], ["0.3333","1/8 TRIP"], ["0.25","1/16"],
+  ["0.1667","1/16 TRIP"], ["0.125","1/32"],
+];
+/* per-route shaping: the same source can drive two destinations differently */
+const ROUTE_CURVES = ["LIN","EXP","LOG","S","STEP"];
+function shapeMod(v, curve){
+  if(!curve) return v;
+  const sg = v < 0 ? -1 : 1, u = Math.min(1, Math.abs(v));
+  if(curve === 1) return sg*u*u;
+  if(curve === 2) return sg*Math.sqrt(u);
+  if(curve === 3) return sg*u*u*(3-2*u);
+  return sg*Math.round(u*4)/4;
+}
 function updateMod(dt, t){
   for(const k of LFOKEYS){
     if(lfoState[k].sync > 0) lfoState[k].rate = (bpm/60)/lfoState[k].sync;
@@ -3072,7 +3135,10 @@ function applyParams(dt){
   /* mod routes */
   for(const r of routes){
     const p = P[r.dst]; if(!p) continue;
-    const d = r.amt * (p.max-p.min) * modVal[r.src];
+    let mv = modVal[r.src] || 0;
+    if(r.inv) mv = -mv;
+    mv = shapeMod(mv, r.curve || 0);
+    const d = (p.max-p.min) * (r.amt*mv + (r.off || 0));
     if(p.master){ mCur[p.id] += d; }
     else {
       const rc = r.ch || "A";
@@ -3470,9 +3536,7 @@ function buildPanel(){
 /* ---- MOD page: every source, live ---- */
 const modHist = {};   // id -> Float32Array ring
 const MODHIST_N = 140;
-for(const m of ["lfo1","lfo2","lfo3","lfo4","chaos","drift","spike","bass","mid","high","motion","bright","cut"]){
-  modHist[m] = {buf:new Float32Array(MODHIST_N), w:0};
-}
+for(const m of MODSRC) modHist[m.id] = {buf:new Float32Array(MODHIST_N), w:0};
 function pushModHistory(){
   for(const id in modHist){
     const h = modHist[id];
@@ -3524,7 +3588,7 @@ function buildModPage(){
       sh.value = st.shape;
       sh.onchange = ()=>{ st.shape = sh.value; refreshLfoUI(); };
       const sy = document.createElement("select");
-      for(const [v,n] of [["0","FREE"],["16","4BAR"],["8","2BAR"],["4","1BAR"],["2","1/2"],["1","1/4"],["0.5","1/8"],["0.25","1/16"]]){
+      for(const [v,n] of SYNC_DIVS){
         const op=document.createElement("option"); op.value=v; op.textContent=n; sy.appendChild(op);
       }
       sy.value = String(st.sync||0);
@@ -3537,7 +3601,7 @@ function buildModPage(){
     dests.className = "dests";
     card.appendChild(dests);
     grid.appendChild(card);
-    modCards[id] = {cv, ctx:cv.getContext("2d"), val, dests};
+    modCards[id] = {cv, ctx:cv.getContext("2d"), val, dests, card};
   }
 }
 function drawModPage(){
@@ -4284,6 +4348,36 @@ setInterval(()=>{
 
 /* ---------------- mod matrix UI ---------------- */
 const routesDiv = document.getElementById("routes");
+/* ---- moving between the matrix, the mod page and the panel ---- */
+function flashEl(el){
+  if(!el) return;
+  el.classList.remove("flash");
+  void el.offsetWidth;
+  el.classList.add("flash");
+  setTimeout(()=>el.classList.remove("flash"), 1600);
+}
+function focusModSource(id){
+  setDock("mod");
+  const c = modCards[id];
+  if(c && c.card){ c.card.scrollIntoView({block:"nearest", behavior:"smooth"}); flashEl(c.card); }
+}
+function focusParam(pid){
+  const r = uiRefs[pid], p = P[pid];
+  if(!r || !p) return;
+  /* the mixer faders live on the strip and the transition detail on the MIX tab */
+  if(STRIP_PARAMS.has(pid)) document.body.classList.remove("nomix");
+  else if(p.sec === "mixer" || p.sec === "mixer2" || p.sec === "mixerM") setDock("mix");
+  const sec = secEls[p.sec];
+  if(sec) sec.classList.remove("collapsed");
+  r.row.scrollIntoView({block:"center", behavior:"smooth"});
+  flashEl(r.row);
+}
+function addRoute(srcId, dstId){
+  routes.push({src:srcId, dst:dstId, amt:0.3,
+    ch:(P[dstId] && P[dstId].master) ? "A" : activeChan, inv:false, curve:0});
+  renderRoutes();
+  return routes.length-1;
+}
 function renderRoutes(){
   routesDiv.innerHTML = "";
   routes.forEach((r, i)=>{
@@ -4291,6 +4385,9 @@ function renderRoutes(){
     const src = document.createElement("select"); src.className="src";
     for(const m of MODSRC){ const o=document.createElement("option"); o.value=m.id; o.textContent=m.name; src.appendChild(o); }
     src.value = r.src; src.onchange = ()=>{ r.src = src.value; };
+    const go = document.createElement("button"); go.className="rgo"; go.textContent="\u25ce";
+    attachTip(go, "SHOW THIS SOURCE", "Jumps to the MOD page and flashes this modulator's card, so you can see what it is doing and what else it is driving.");
+    go.onclick = ()=>focusModSource(r.src);
     const dst = document.createElement("select"); dst.className="dst";
     for(const p of PLIST){ const o=document.createElement("option"); o.value=p.id; o.textContent=p.name+" ("+p.sec+")"; dst.appendChild(o); }
     dst.value = r.dst; dst.onchange = ()=>{ r.dst = dst.value; syncChanSel(); };
@@ -4305,15 +4402,25 @@ function renderRoutes(){
     amt.type="range"; amt.min=-1; amt.max=1; amt.step=0.01; amt.value=r.amt;
     const av = document.createElement("span"); av.className="mamt"; av.textContent = (+r.amt).toFixed(2);
     amt.addEventListener("input", ()=>{ r.amt = parseFloat(amt.value); av.textContent = r.amt.toFixed(2); });
+    const inv = document.createElement("button"); inv.className="rinv"; inv.textContent="INV";
+    inv.classList.toggle("on", !!r.inv);
+    attachTip(inv, "INVERT", "Flips this route only. The same source can push one parameter up while pulling another down.");
+    inv.onclick = ()=>{ r.inv = !r.inv; inv.classList.toggle("on", !!r.inv); };
+    const cv = document.createElement("select"); cv.className="rcurve";
+    ROUTE_CURVES.forEach((n,ci)=>{ const o=document.createElement("option"); o.value=ci; o.textContent=n; cv.appendChild(o); });
+    cv.value = r.curve || 0;
+    attachTip(cv, "RESPONSE CURVE", "How the source's travel maps onto this destination. LIN is straight through, EXP holds back until the source is near its extremes, LOG does the opposite, S eases both ends, STEP quantises into four levels.");
+    cv.onchange = ()=>{ r.curve = parseInt(cv.value); };
     const rm = document.createElement("button"); rm.className="rm"; rm.textContent="✕";
     rm.onclick = ()=>{ routes.splice(i,1); renderRoutes(); };
-    row.appendChild(src); row.appendChild(chSel); row.appendChild(dst); row.appendChild(amt); row.appendChild(av); row.appendChild(rm);
+    row.appendChild(go); row.appendChild(src); row.appendChild(chSel); row.appendChild(dst);
+    row.appendChild(inv); row.appendChild(cv);
+    row.appendChild(amt); row.appendChild(av); row.appendChild(rm);
     routesDiv.appendChild(row);
   });
 }
 document.getElementById("btnAddRoute").onclick = ()=>{
-  routes.push({src:"lfo1", dst:"hWobble", amt:0.3, ch:activeChan});
-  renderRoutes();
+  addRoute("lfo1", "hWobble");
 };
 
 /* ---------------- MIDI ---------------- */
@@ -4695,6 +4802,10 @@ function captureState(){
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
+    srcMode: (()=>{ const o={}; for(const ch of CHANNELS){
+      const m = SRC[ch].mode;
+      if(m==="pattern"||m==="synth"||m==="text"||m==="feed") o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed};
+    } return o; })(),
     srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   for(const k of LFOKEYS) st[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   return st;
@@ -4731,6 +4842,15 @@ function restoreState(st){
   if(st.srcText){ for(const ch of CHANNELS) if(st.srcText[ch]) Object.assign(SRC[ch].text, st.srcText[ch]); }
   if(st.busSrc){ if(st.busSrc.b1) busSrc.b1 = st.busSrc.b1.slice(); if(st.busSrc.b2) busSrc.b2 = st.busSrc.b2.slice(); refreshBusUI(); }
   if(st.genMode) for(const ch of CHANNELS) if(st.genMode[ch]) genMode[ch] = {...st.genMode[ch]};
+  if(st.srcMode) for(const ch of CHANNELS){
+    const m = st.srcMode[ch];
+    /* only generated sources restore — a file or a camera cannot be reopened for you */
+    if(!m || SRC[ch].mode === "file" || SRC[ch].mode === "cam") continue;
+    SRC[ch].mode = m.mode; SRC[ch].name = m.mode;
+    if(m.pattern) SRC[ch].pattern = m.pattern;
+    if(m.feed) SRC[ch].feed = m.feed;
+  }
+  if(typeof syncChanInputUI === "function") syncChanInputUI();
   if(st.snapSlots) for(let i=0;i<SNAP_N;i++) snapSlots[i] = st.snapSlots[i] || null;
   if(st.snapGlide !== undefined) snapGlide = st.snapGlide;
   if(st.perfTake){ perfRec.data = st.perfTake; perfRec.len = st.perfLen || 0; }
@@ -4801,6 +4921,10 @@ document.getElementById("btnSave").onclick = ()=>{
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
     snapSlots, snapGlide, perfTake: perfRec.data, perfLen: perfRec.len,
+    srcMode: (()=>{ const o={}; for(const ch of CHANNELS){
+      const m = SRC[ch].mode;
+      if(m==="pattern"||m==="synth"||m==="text"||m==="feed") o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed};
+    } return o; })(),
     srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   for(const k of LFOKEYS) state[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   const blob = new Blob([JSON.stringify(state,null,1)], {type:"application/json"});
@@ -4837,7 +4961,7 @@ function newSource(ch){
   pc.width = 960; pc.height = 540;
   return {ch, video:v, mode:"pattern", pattern:"bars", cam:null,
           patCanvas:pc, pat:pc.getContext("2d"), patClock:0,
-          aspect:16/9, has:0, speed:1, tpRate:1, name:"", audioHooked:false,
+          aspect:16/9, has:0, speed:1, tpRate:1, feed:"PGM", name:"", audioHooked:false,
           text:{body:"BENDR", font:"mono", size:0.2, track:0, x:0.5, y:0.5, rot:0,
                 scrollX:0, scrollY:0, repeat:1, ink:"#ffffff", bg:"#000000", outline:0,
                 shape:"none", shpCount:1, shpSize:0.3, shpX:0.5, shpY:0.5,
@@ -4894,6 +5018,18 @@ document.getElementById("btnPat").onclick = ()=>{
   SRC[ch].mode = "pattern"; SRC[ch].name = "pattern";
   syncChanInputUI();
 };
+document.getElementById("btnFeed").onclick = ()=>{
+  const ch = activeChan;
+  stopCam(ch);
+  SRC[ch].mode = "feed"; SRC[ch].name = "feed";
+  syncChanInputUI();
+  toast("Channel "+ch+" now re-enters "+(SRC[ch].feed||"PGM")+" \u2014 process it and mix it back in");
+};
+{
+  const f = document.getElementById("selFeed");
+  for(const o of FEED_SRCS){ const op=document.createElement("option"); op.value=o.id; op.textContent=o.name; f.appendChild(op); }
+  f.onchange = ()=>{ const S = cur(); S.feed = f.value; S.mode = "feed"; S.name = "feed"; syncChanInputUI(); };
+}
 document.getElementById("btnSynth").onclick = ()=>{
   const ch = activeChan;
   stopCam(ch);
@@ -4933,6 +5069,8 @@ function syncChanInputUI(){
   document.getElementById("btnCam").classList.toggle("on", S.mode==="cam");
   document.getElementById("btnPat").classList.toggle("on", S.mode==="pattern");
   { const b=document.getElementById("btnSynth"); if(b) b.classList.toggle("on", S.mode==="synth"); }
+  { const b=document.getElementById("btnFeed"); if(b) b.classList.toggle("on", S.mode==="feed");
+    const f=document.getElementById("selFeed"); if(f) f.value = S.feed || "PGM"; }
   document.getElementById("btnText").classList.toggle("on", S.mode==="text");
   document.getElementById("btnFile").textContent = "FILE";
   selPat.value = S.pattern;
@@ -4947,7 +5085,7 @@ window.__syncChanInputUI = syncChanInputUI;
 /* swap two channels' *sources* (what sits on top), not just their effects */
 window.__swapSources = function(a, b){
   const A = SRC[a], B = SRC[b];
-  const keys = ["mode","pattern","cam","patClock","aspect","has","speed","tpRate","name","text"];
+  const keys = ["mode","pattern","cam","patClock","aspect","has","speed","tpRate","feed","name","text"];
   for(const k of keys){ const t = A[k]; A[k] = B[k]; B[k] = t; }
   /* video elements carry their own media, so swap what each channel points at */
   const tv = A.video, tp = A.patCanvas, tc = A.pat;
@@ -6014,7 +6152,7 @@ function runStage(id, inTex, dstRT, now, ch){
 
 function srcReady(ch){
   const S = SRC[ch];
-  if(S.mode === "pattern" || S.mode === "text" || S.mode === "synth") return true;
+  if(S.mode === "pattern" || S.mode === "text" || S.mode === "synth" || S.mode === "feed") return true;
   return S.video.readyState >= 2 && S.video.videoWidth > 0;
 }
 window.__chanHasSource = srcReady;
@@ -6022,7 +6160,7 @@ window.__chanHasSource = srcReady;
 /* upload a channel's source frame into its texture */
 function uploadSource(ch, dt){
   const S = SRC[ch];
-  if(S.mode === "synth"){ S.aspect = procW/procH; S.has = 1; S.patClock += dt*S.speed; return; }
+  if(S.mode === "synth" || S.mode === "feed"){ S.aspect = procW/procH; S.has = 1; S.patClock += dt*S.speed; return; }
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
   if(S.mode === "pattern" || S.mode === "text"){
@@ -6059,7 +6197,9 @@ function renderGen(ch, now){
 function renderChannel(ch, now, dt){
   ensureChanRT(ch);
   const C = chanRT[ch], S = SRC[ch];
-  const chanSrcTex = (S.mode === "synth") ? renderGen(ch, now) : srcTex[ch];
+  const chanSrcTex = (S.mode === "synth") ? renderGen(ch, now)
+                   : (S.mode === "feed") ? feedTex(S.feed || "PGM")
+                   : srcTex[ch];
 
   /* time base: bent frame store */
   const delayN = Math.max(1, Math.min(RING_N-1, Math.round(getCur("delayF",ch))));
@@ -6169,6 +6309,17 @@ function renderFrame(now, dt){
   if(masterLive){
     if(srcReady(b2[0])) live[b2[0]] = true;
     if(srcReady(b2[1]) && (mCur.cdMix > 0.0005 || multiView)) live[b2[1]] = true;
+  }
+  /* a re-entry source only works if the channel it is reading is still rendering */
+  for(let pass=0; pass<3; pass++){
+    for(const ch of CHANNELS){
+      if(!live[ch]) continue;
+      const S = SRC[ch];
+      if(S.mode !== "feed") continue;
+      const f = S.feed || "PGM";
+      if(f === "BUS1" || f === "BUS2" || f === "PGM") continue;
+      if(f !== ch && !live[f] && srcReady(f)) live[f] = true;
+    }
   }
   liveList = CHANNELS.filter(c=>live[c]).join("+");
   for(const ch of CHANNELS){

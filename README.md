@@ -28,6 +28,12 @@ The channels meet in three mixers, laid out as a strip directly under the pictur
 
 ![Two channels mixed through a circle wipe](docs/doc_mixer.png)
 
+## Re-entry
+
+Any channel can take another channel, either bus, or the finished programme as its source. Process it and mix it back in and the feedback loop travels through the whole rig rather than round a single stage — the software equivalent of patching a mixer's output back into a spare input. Whatever it reads is one frame old, which is what keeps it stable.
+
+![Re-entry feeding a keyed shape back into its background](docs/doc_reentry.png)
+
 ## Signal chain
 
 The rail above the picture is the live signal path. **Drag the pills to reorder the stages, click one to bypass it.** Order changes everything: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.
@@ -88,12 +94,12 @@ Any channel can be a text/shape generator instead of a video source: type anythi
 
 Nothing sits still. The mod matrix patches any source into any parameter:
 
-- Four LFOs, ten shapes, free-running or tempo-synced via tap tempo or MIDI clock
+- Eight LFOs, ten shapes, free-running or tempo-synced to twenty divisions including dotted and triplet
 - Chaos, drift and spike generators
 - Audio bands with adjustable frequency ranges, gain, response, input device and channel selection for audio interfaces
 - Video-reactive sources computed from the picture itself: motion, brightness, and scene-cut detection — patch CUT into TEAR and every edit knocks the sync loose
 
-**Right-click any parameter** to patch a modulator onto it directly. The **MOD** page (`D`) draws every source live — four LFOs with editable rate, ten shapes and tempo sync, chaos/drift/spike generators, audio bands and video-reactive sources — and shows what each one is driving.
+Every route has its own invert and response curve, so one source can push one parameter up while easing another down. The matrix links both ways: a route jumps to its modulator, and a modulator lists what it drives and jumps back. **Right-click any parameter** to patch a modulator onto it directly. The **MOD** page (`D`) draws every source live — four LFOs with editable rate, ten shapes and tempo sync, chaos/drift/spike generators, audio bands and video-reactive sources — and shows what each one is driving.
 
 ![Modulation page](docs/doc_modpage.png)
 

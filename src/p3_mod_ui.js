@@ -86,21 +86,26 @@ function toast(msg, err){
 window.addEventListener("error", e=>{ toast("Error: "+e.message, true); });
 
 /* ---------------- modulation engine ---------------- */
+const LFOKEYS = ["lfo1","lfo2","lfo3","lfo4","lfo5","lfo6","lfo7","lfo8"];
+/* eight of them: with 243 destinations, four was the bottleneck */
+const LFO_DEFAULTS = [
+  {rate:0.3,   shape:"sine"}, {rate:1.7,  shape:"snh"},
+  {rate:0.07,  shape:"tri"},  {rate:5.5,  shape:"sine"},
+  {rate:0.017, shape:"tri"},  {rate:0.9,  shape:"saw"},
+  {rate:3.1,   shape:"sqr"},  {rate:0.13, shape:"drift"},
+];
 const MODSRC = [
-  {id:"lfo1", name:"LFO 1"}, {id:"lfo2", name:"LFO 2"},
-  {id:"lfo3", name:"LFO 3"}, {id:"lfo4", name:"LFO 4"},
+  ...LFOKEYS.map((k,i)=>({id:k, name:"LFO "+(i+1)})),
   {id:"chaos", name:"CHAOS"}, {id:"drift", name:"DRIFT"}, {id:"spike", name:"SPIKE"},
   {id:"bass", name:"AUD BASS"}, {id:"mid", name:"AUD MID"}, {id:"high", name:"AUD HIGH"},
   {id:"motion", name:"VID MOTION"}, {id:"bright", name:"VID BRIGHT"}, {id:"cut", name:"VID CUT"},
 ];
-const LFOKEYS = ["lfo1","lfo2","lfo3","lfo4"];
-const lfoState = {
-  lfo1:{rate:0.3,  shape:"sine", phase:Math.random(), sync:0},
-  lfo2:{rate:1.7,  shape:"snh",  phase:Math.random(), snh:0, sync:0},
-  lfo3:{rate:0.07, shape:"tri",  phase:Math.random(), sync:0},
-  lfo4:{rate:5.5,  shape:"sine", phase:Math.random(), sync:0},
-};
-const modVal = {lfo1:0, lfo2:0, lfo3:0, lfo4:0, chaos:0, drift:0, spike:0, bass:0, mid:0, high:0, motion:0, bright:0, cut:0};
+const lfoState = {};
+LFOKEYS.forEach((k,i)=>{
+  lfoState[k] = {rate:LFO_DEFAULTS[i].rate, shape:LFO_DEFAULTS[i].shape, phase:Math.random(), snh:0, sync:0};
+});
+const modVal = {};
+for(const m of MODSRC) modVal[m.id] = 0;
 
 /* tempo: tap or MIDI clock; synced LFOs derive their rate from it */
 let bpm = 120, extClockAt = 0, clockEma = 0;
@@ -150,6 +155,24 @@ function lfoOut(st, dt){
   return 0;
 }
 const LFO_SHAPES = ["sine","tri","saw","ramp","sqr","pulse","snh","exp","sine2","drift"];
+/* value = beats per cycle, so smaller is faster */
+const SYNC_DIVS = [
+  ["0","FREE"], ["32","8 BAR"], ["16","4 BAR"], ["12","3 BAR"], ["8","2 BAR"],
+  ["6","1.5 BAR"], ["4","1 BAR"], ["3","1/2 DOT"], ["2.6667","1 BAR TRIP"], ["2","1/2"],
+  ["1.5","1/4 DOT"], ["1.3333","1/2 TRIP"], ["1","1/4"], ["0.75","1/8 DOT"],
+  ["0.6667","1/4 TRIP"], ["0.5","1/8"], ["0.3333","1/8 TRIP"], ["0.25","1/16"],
+  ["0.1667","1/16 TRIP"], ["0.125","1/32"],
+];
+/* per-route shaping: the same source can drive two destinations differently */
+const ROUTE_CURVES = ["LIN","EXP","LOG","S","STEP"];
+function shapeMod(v, curve){
+  if(!curve) return v;
+  const sg = v < 0 ? -1 : 1, u = Math.min(1, Math.abs(v));
+  if(curve === 1) return sg*u*u;
+  if(curve === 2) return sg*Math.sqrt(u);
+  if(curve === 3) return sg*u*u*(3-2*u);
+  return sg*Math.round(u*4)/4;
+}
 function updateMod(dt, t){
   for(const k of LFOKEYS){
     if(lfoState[k].sync > 0) lfoState[k].rate = (bpm/60)/lfoState[k].sync;
@@ -220,7 +243,10 @@ function applyParams(dt){
   /* mod routes */
   for(const r of routes){
     const p = P[r.dst]; if(!p) continue;
-    const d = r.amt * (p.max-p.min) * modVal[r.src];
+    let mv = modVal[r.src] || 0;
+    if(r.inv) mv = -mv;
+    mv = shapeMod(mv, r.curve || 0);
+    const d = (p.max-p.min) * (r.amt*mv + (r.off || 0));
     if(p.master){ mCur[p.id] += d; }
     else {
       const rc = r.ch || "A";
@@ -618,9 +644,7 @@ function buildPanel(){
 /* ---- MOD page: every source, live ---- */
 const modHist = {};   // id -> Float32Array ring
 const MODHIST_N = 140;
-for(const m of ["lfo1","lfo2","lfo3","lfo4","chaos","drift","spike","bass","mid","high","motion","bright","cut"]){
-  modHist[m] = {buf:new Float32Array(MODHIST_N), w:0};
-}
+for(const m of MODSRC) modHist[m.id] = {buf:new Float32Array(MODHIST_N), w:0};
 function pushModHistory(){
   for(const id in modHist){
     const h = modHist[id];
@@ -672,7 +696,7 @@ function buildModPage(){
       sh.value = st.shape;
       sh.onchange = ()=>{ st.shape = sh.value; refreshLfoUI(); };
       const sy = document.createElement("select");
-      for(const [v,n] of [["0","FREE"],["16","4BAR"],["8","2BAR"],["4","1BAR"],["2","1/2"],["1","1/4"],["0.5","1/8"],["0.25","1/16"]]){
+      for(const [v,n] of SYNC_DIVS){
         const op=document.createElement("option"); op.value=v; op.textContent=n; sy.appendChild(op);
       }
       sy.value = String(st.sync||0);
@@ -685,7 +709,7 @@ function buildModPage(){
     dests.className = "dests";
     card.appendChild(dests);
     grid.appendChild(card);
-    modCards[id] = {cv, ctx:cv.getContext("2d"), val, dests};
+    modCards[id] = {cv, ctx:cv.getContext("2d"), val, dests, card};
   }
 }
 function drawModPage(){
@@ -1432,6 +1456,36 @@ setInterval(()=>{
 
 /* ---------------- mod matrix UI ---------------- */
 const routesDiv = document.getElementById("routes");
+/* ---- moving between the matrix, the mod page and the panel ---- */
+function flashEl(el){
+  if(!el) return;
+  el.classList.remove("flash");
+  void el.offsetWidth;
+  el.classList.add("flash");
+  setTimeout(()=>el.classList.remove("flash"), 1600);
+}
+function focusModSource(id){
+  setDock("mod");
+  const c = modCards[id];
+  if(c && c.card){ c.card.scrollIntoView({block:"nearest", behavior:"smooth"}); flashEl(c.card); }
+}
+function focusParam(pid){
+  const r = uiRefs[pid], p = P[pid];
+  if(!r || !p) return;
+  /* the mixer faders live on the strip and the transition detail on the MIX tab */
+  if(STRIP_PARAMS.has(pid)) document.body.classList.remove("nomix");
+  else if(p.sec === "mixer" || p.sec === "mixer2" || p.sec === "mixerM") setDock("mix");
+  const sec = secEls[p.sec];
+  if(sec) sec.classList.remove("collapsed");
+  r.row.scrollIntoView({block:"center", behavior:"smooth"});
+  flashEl(r.row);
+}
+function addRoute(srcId, dstId){
+  routes.push({src:srcId, dst:dstId, amt:0.3,
+    ch:(P[dstId] && P[dstId].master) ? "A" : activeChan, inv:false, curve:0});
+  renderRoutes();
+  return routes.length-1;
+}
 function renderRoutes(){
   routesDiv.innerHTML = "";
   routes.forEach((r, i)=>{
@@ -1439,6 +1493,9 @@ function renderRoutes(){
     const src = document.createElement("select"); src.className="src";
     for(const m of MODSRC){ const o=document.createElement("option"); o.value=m.id; o.textContent=m.name; src.appendChild(o); }
     src.value = r.src; src.onchange = ()=>{ r.src = src.value; };
+    const go = document.createElement("button"); go.className="rgo"; go.textContent="\u25ce";
+    attachTip(go, "SHOW THIS SOURCE", "Jumps to the MOD page and flashes this modulator's card, so you can see what it is doing and what else it is driving.");
+    go.onclick = ()=>focusModSource(r.src);
     const dst = document.createElement("select"); dst.className="dst";
     for(const p of PLIST){ const o=document.createElement("option"); o.value=p.id; o.textContent=p.name+" ("+p.sec+")"; dst.appendChild(o); }
     dst.value = r.dst; dst.onchange = ()=>{ r.dst = dst.value; syncChanSel(); };
@@ -1453,15 +1510,25 @@ function renderRoutes(){
     amt.type="range"; amt.min=-1; amt.max=1; amt.step=0.01; amt.value=r.amt;
     const av = document.createElement("span"); av.className="mamt"; av.textContent = (+r.amt).toFixed(2);
     amt.addEventListener("input", ()=>{ r.amt = parseFloat(amt.value); av.textContent = r.amt.toFixed(2); });
+    const inv = document.createElement("button"); inv.className="rinv"; inv.textContent="INV";
+    inv.classList.toggle("on", !!r.inv);
+    attachTip(inv, "INVERT", "Flips this route only. The same source can push one parameter up while pulling another down.");
+    inv.onclick = ()=>{ r.inv = !r.inv; inv.classList.toggle("on", !!r.inv); };
+    const cv = document.createElement("select"); cv.className="rcurve";
+    ROUTE_CURVES.forEach((n,ci)=>{ const o=document.createElement("option"); o.value=ci; o.textContent=n; cv.appendChild(o); });
+    cv.value = r.curve || 0;
+    attachTip(cv, "RESPONSE CURVE", "How the source's travel maps onto this destination. LIN is straight through, EXP holds back until the source is near its extremes, LOG does the opposite, S eases both ends, STEP quantises into four levels.");
+    cv.onchange = ()=>{ r.curve = parseInt(cv.value); };
     const rm = document.createElement("button"); rm.className="rm"; rm.textContent="✕";
     rm.onclick = ()=>{ routes.splice(i,1); renderRoutes(); };
-    row.appendChild(src); row.appendChild(chSel); row.appendChild(dst); row.appendChild(amt); row.appendChild(av); row.appendChild(rm);
+    row.appendChild(go); row.appendChild(src); row.appendChild(chSel); row.appendChild(dst);
+    row.appendChild(inv); row.appendChild(cv);
+    row.appendChild(amt); row.appendChild(av); row.appendChild(rm);
     routesDiv.appendChild(row);
   });
 }
 document.getElementById("btnAddRoute").onclick = ()=>{
-  routes.push({src:"lfo1", dst:"hWobble", amt:0.3, ch:activeChan});
-  renderRoutes();
+  addRoute("lfo1", "hWobble");
 };
 
 /* ---------------- MIDI ---------------- */

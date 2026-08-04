@@ -347,6 +347,23 @@ body.chan-b #panel{border-left-color:var(--cyan);}
 body.chan-c #panel{border-left-color:var(--mag);}
 body.chan-d #panel{border-left-color:#b4ff5a;}
 .mrow .rch{width:46px;}
+.mrow .rgo{flex:0 0 auto; padding:3px 6px; font-size:10px; line-height:1; color:var(--dim);}
+.mrow .rgo:hover{color:var(--cyan); border-color:var(--cyan);}
+.mrow .rinv{flex:0 0 auto; padding:3px 6px; font-size:8px;}
+.mrow .rcurve{flex:0 0 auto; width:58px; padding:3px 2px; font-size:8.5px;}
+.destlink{
+  display:inline-block; margin:0 8px 3px 0; cursor:pointer; color:var(--dim);
+  border-bottom:1px dotted #33333f;
+}
+.destlink:hover{color:var(--cyan); border-bottom-color:var(--cyan);}
+.destlink b{color:var(--cyan);}
+.destlink:hover b{color:#fff;}
+.patchpick{width:100%; margin-top:6px; font-size:8.5px; padding:3px 4px;}
+.flash{animation:flashhi 1.5s ease-out;}
+@keyframes flashhi{
+  0%,18%{background:rgba(46,230,214,.28); box-shadow:0 0 0 1px var(--cyan);}
+  100%{background:transparent; box-shadow:none;}
+}
 /* ---------- mobile tab bar (hidden on desktop) ---------- */
 #mtabs{display:none;}
 /* ---------- stage ---------- */
@@ -612,7 +629,7 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v23.0</span>
+  <span id="ver" title="Build version">v24.0</span>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -645,6 +662,11 @@ body.nomix #mixbuses{display:none;}
         <button id="btnPat" data-tip="Use a built-in generated test signal as this channel's source. No file needed.">PATTERN</button>
         <button id="btnText" data-tip="Turn this channel into a text and shape generator. Opens the editor in the dock below the picture.">TEXT</button>
       </div>
+      <div class="mrow2">
+        <button id="btnFeed" data-tip="Re-entry: take another channel, a bus, or the finished programme as this channel's source. Process it however you like and mix it back in, and you have a feedback loop that runs through the whole rig rather than inside one stage. Exactly like patching a mixer's output back into a spare input.">FEED</button>
+      </div>
+      <div class="mlabel">RE-ENTRY SOURCE</div>
+      <select id="selFeed" data-tip="What this channel re-enters. Whatever it reads is one frame old, which is what makes the loop stable rather than an infinite regress."></select>
       <div class="mrow2">
         <button id="btnSynth" data-tip="Turn this channel into a pattern synthesiser: oscillators, cross-modulation, a wavefolder, a comparator and a colouriser, all computed on the GPU and all modulatable. Shape it in the PATTERN SYNTH section of the panel.">SYNTH</button>
       </div>
@@ -869,7 +891,7 @@ body.nomix #mixbuses{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v23.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v24.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
@@ -907,8 +929,11 @@ body.nomix #mixbuses{display:none;}
   <p><b>FLOW / MOSH</b> is the temporal-smear stage, and it holds its own frame store. <b>FIELD</b> picks the vector field everything is advected along: MOTION estimates real optical flow from the picture (frame to frame, per pixel), CONTOUR runs along brightness edges, CURL NOISE churns, RADIAL and SPIRAL push out and around, CHROMA steers by colour, WEAVE crosshatches. <b>P-FRAME PUSH</b> drags the held frame along that field, which on MOTION is what proper datamosh actually is: the picture stops updating while the movement keeps pulling it apart. <b>MOSH HOLD</b> sets how much of the held frame survives each pass and <b>MOSH GATE</b> restricts the holding to the moving parts of the frame (positive) or the still parts (negative). <b>CURL / ROTATE</b> turns the whole field sideways, so drift becomes orbit. Then MELT with its own direction and brightness gate, SWIRL with scale and speed, VECTOR TRASH with block size and rate, STRETCH, EDGE REPEL, FLOW NOISE, per-pass HUE and DECAY, RE-SHARP to claw back the detail resampling eats, TIME SHEAR on either axis, and an EDGE mode (clamp / repeat / mirror) for what happens off the edge of the frame.</p>
   <h3>TAPE TRANSPORT</h3>
   <p>A whole deck, per channel. The transport row drives that channel's source: <b>STILL</b> parks the noise bar a paused deck lays across the field, the shuttle and jog buttons scrub with head-crossing bands marching through the picture. <b>TAPE SPEED</b> runs SP to EP — the slower the tape, the less bandwidth survives, so chroma widens and detail goes. <b>GENERATIONS</b> compounds GEN LOSS as if the tape had been dubbed that many times. <b>TRACK PHASE</b> places the mistracking band and <b>SERVO HUNT</b> sets the auto-tracking circuit searching for it. On top: tape crease, head clog, azimuth error, scrape flutter, wow with its own rate, tape stretch, edge damage, print-through, chroma loss, tape hiss, and dropout with adjustable streak length.</p>
+  <h3>RE-ENTRY</h3>
+  <p><b>FEED</b> under SOURCE takes another channel, either bus, or the finished programme as this channel's source. Process it and mix it back in and you have a feedback loop that travels through the entire rig rather than round one stage \u2014 which is what patching a mixer's output back into a spare input does. Whatever it reads is one frame old, and that single frame of delay is what keeps it stable instead of an infinite regress.</p>
+  <p>This is the answer to making two mixed pictures interact. Key or wipe one over another on bus 1, set channel C to re-enter PROGRAMME with feedback zoom, and bring it in on the master with ADD or LIGHTEN: the shape on top now bleeds out into what is behind it, and keeps bleeding, because its own output is going back round. Chain a channel to another channel instead of the programme and you can put a whole different effect chain in the return path.</p>
   <h3>MOVEMENT</h3>
-  <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch four LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
+  <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch eight LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
   <h3>PERFORMANCE</h3>
   <p>The dock under the picture has five tabs: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b>, <b>MIX</b> and <b>PERFORM</b>. MIX holds the detail behind each transition \u2014 wipe softness and geometry, key threshold and hue \u2014 while the faders themselves stay on the strip. PERFORM holds everything you play with while it is running \u2014 the snapshot bank, the recorder and the bend pads. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>

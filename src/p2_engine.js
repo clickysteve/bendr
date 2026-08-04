@@ -1862,6 +1862,21 @@ for(const ch of CHANNELS) srcTex[ch] = makeSrcTex();
 /* stand-in for a channel that has not been allocated yet */
 const blackTex = makeSrcTex();
 function chanOutTex(ch){ const c = chanRT[ch]; return (c.allocated && c.out) ? c.out.tex : blackTex; }
+/* re-entry: a channel can take another channel, a bus, or the programme as its
+   source. Whatever it reads is last frame's, exactly like patching a mixer's
+   output back into a spare input with a cable. */
+const FEED_SRCS = [
+  {id:"A", name:"CH A OUT"}, {id:"B", name:"CH B OUT"},
+  {id:"C", name:"CH C OUT"}, {id:"D", name:"CH D OUT"},
+  {id:"BUS1", name:"BUS 1 OUT"}, {id:"BUS2", name:"BUS 2 OUT"},
+  {id:"PGM", name:"PROGRAMME OUT"},
+];
+function feedTex(id){
+  if(id === "BUS1") return busOut1 ? busOut1.tex : blackTex;
+  if(id === "BUS2") return busOut2 ? busOut2.tex : blackTex;
+  if(id === "PGM")  return mixOut  ? mixOut.tex  : blackTex;
+  return chanOutTex(id);
+}
 
 /* per-scanline sync model texture (written by CPU each frame) */
 const SROWS = 576;

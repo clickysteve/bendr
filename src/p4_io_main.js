@@ -309,6 +309,10 @@ function captureState(){
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
+    srcMode: (()=>{ const o={}; for(const ch of CHANNELS){
+      const m = SRC[ch].mode;
+      if(m==="pattern"||m==="synth"||m==="text"||m==="feed") o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed};
+    } return o; })(),
     srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   for(const k of LFOKEYS) st[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   return st;
@@ -345,6 +349,15 @@ function restoreState(st){
   if(st.srcText){ for(const ch of CHANNELS) if(st.srcText[ch]) Object.assign(SRC[ch].text, st.srcText[ch]); }
   if(st.busSrc){ if(st.busSrc.b1) busSrc.b1 = st.busSrc.b1.slice(); if(st.busSrc.b2) busSrc.b2 = st.busSrc.b2.slice(); refreshBusUI(); }
   if(st.genMode) for(const ch of CHANNELS) if(st.genMode[ch]) genMode[ch] = {...st.genMode[ch]};
+  if(st.srcMode) for(const ch of CHANNELS){
+    const m = st.srcMode[ch];
+    /* only generated sources restore — a file or a camera cannot be reopened for you */
+    if(!m || SRC[ch].mode === "file" || SRC[ch].mode === "cam") continue;
+    SRC[ch].mode = m.mode; SRC[ch].name = m.mode;
+    if(m.pattern) SRC[ch].pattern = m.pattern;
+    if(m.feed) SRC[ch].feed = m.feed;
+  }
+  if(typeof syncChanInputUI === "function") syncChanInputUI();
   if(st.snapSlots) for(let i=0;i<SNAP_N;i++) snapSlots[i] = st.snapSlots[i] || null;
   if(st.snapGlide !== undefined) snapGlide = st.snapGlide;
   if(st.perfTake){ perfRec.data = st.perfTake; perfRec.len = st.perfLen || 0; }
@@ -415,6 +428,10 @@ document.getElementById("btnSave").onclick = ()=>{
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
     snapSlots, snapGlide, perfTake: perfRec.data, perfLen: perfRec.len,
+    srcMode: (()=>{ const o={}; for(const ch of CHANNELS){
+      const m = SRC[ch].mode;
+      if(m==="pattern"||m==="synth"||m==="text"||m==="feed") o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed};
+    } return o; })(),
     srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   for(const k of LFOKEYS) state[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
   const blob = new Blob([JSON.stringify(state,null,1)], {type:"application/json"});
@@ -451,7 +468,7 @@ function newSource(ch){
   pc.width = 960; pc.height = 540;
   return {ch, video:v, mode:"pattern", pattern:"bars", cam:null,
           patCanvas:pc, pat:pc.getContext("2d"), patClock:0,
-          aspect:16/9, has:0, speed:1, tpRate:1, name:"", audioHooked:false,
+          aspect:16/9, has:0, speed:1, tpRate:1, feed:"PGM", name:"", audioHooked:false,
           text:{body:"BENDR", font:"mono", size:0.2, track:0, x:0.5, y:0.5, rot:0,
                 scrollX:0, scrollY:0, repeat:1, ink:"#ffffff", bg:"#000000", outline:0,
                 shape:"none", shpCount:1, shpSize:0.3, shpX:0.5, shpY:0.5,
@@ -508,6 +525,18 @@ document.getElementById("btnPat").onclick = ()=>{
   SRC[ch].mode = "pattern"; SRC[ch].name = "pattern";
   syncChanInputUI();
 };
+document.getElementById("btnFeed").onclick = ()=>{
+  const ch = activeChan;
+  stopCam(ch);
+  SRC[ch].mode = "feed"; SRC[ch].name = "feed";
+  syncChanInputUI();
+  toast("Channel "+ch+" now re-enters "+(SRC[ch].feed||"PGM")+" \u2014 process it and mix it back in");
+};
+{
+  const f = document.getElementById("selFeed");
+  for(const o of FEED_SRCS){ const op=document.createElement("option"); op.value=o.id; op.textContent=o.name; f.appendChild(op); }
+  f.onchange = ()=>{ const S = cur(); S.feed = f.value; S.mode = "feed"; S.name = "feed"; syncChanInputUI(); };
+}
 document.getElementById("btnSynth").onclick = ()=>{
   const ch = activeChan;
   stopCam(ch);
@@ -547,6 +576,8 @@ function syncChanInputUI(){
   document.getElementById("btnCam").classList.toggle("on", S.mode==="cam");
   document.getElementById("btnPat").classList.toggle("on", S.mode==="pattern");
   { const b=document.getElementById("btnSynth"); if(b) b.classList.toggle("on", S.mode==="synth"); }
+  { const b=document.getElementById("btnFeed"); if(b) b.classList.toggle("on", S.mode==="feed");
+    const f=document.getElementById("selFeed"); if(f) f.value = S.feed || "PGM"; }
   document.getElementById("btnText").classList.toggle("on", S.mode==="text");
   document.getElementById("btnFile").textContent = "FILE";
   selPat.value = S.pattern;
@@ -561,7 +592,7 @@ window.__syncChanInputUI = syncChanInputUI;
 /* swap two channels' *sources* (what sits on top), not just their effects */
 window.__swapSources = function(a, b){
   const A = SRC[a], B = SRC[b];
-  const keys = ["mode","pattern","cam","patClock","aspect","has","speed","tpRate","name","text"];
+  const keys = ["mode","pattern","cam","patClock","aspect","has","speed","tpRate","feed","name","text"];
   for(const k of keys){ const t = A[k]; A[k] = B[k]; B[k] = t; }
   /* video elements carry their own media, so swap what each channel points at */
   const tv = A.video, tp = A.patCanvas, tc = A.pat;
@@ -1628,7 +1659,7 @@ function runStage(id, inTex, dstRT, now, ch){
 
 function srcReady(ch){
   const S = SRC[ch];
-  if(S.mode === "pattern" || S.mode === "text" || S.mode === "synth") return true;
+  if(S.mode === "pattern" || S.mode === "text" || S.mode === "synth" || S.mode === "feed") return true;
   return S.video.readyState >= 2 && S.video.videoWidth > 0;
 }
 window.__chanHasSource = srcReady;
@@ -1636,7 +1667,7 @@ window.__chanHasSource = srcReady;
 /* upload a channel's source frame into its texture */
 function uploadSource(ch, dt){
   const S = SRC[ch];
-  if(S.mode === "synth"){ S.aspect = procW/procH; S.has = 1; S.patClock += dt*S.speed; return; }
+  if(S.mode === "synth" || S.mode === "feed"){ S.aspect = procW/procH; S.has = 1; S.patClock += dt*S.speed; return; }
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
   if(S.mode === "pattern" || S.mode === "text"){
@@ -1673,7 +1704,9 @@ function renderGen(ch, now){
 function renderChannel(ch, now, dt){
   ensureChanRT(ch);
   const C = chanRT[ch], S = SRC[ch];
-  const chanSrcTex = (S.mode === "synth") ? renderGen(ch, now) : srcTex[ch];
+  const chanSrcTex = (S.mode === "synth") ? renderGen(ch, now)
+                   : (S.mode === "feed") ? feedTex(S.feed || "PGM")
+                   : srcTex[ch];
 
   /* time base: bent frame store */
   const delayN = Math.max(1, Math.min(RING_N-1, Math.round(getCur("delayF",ch))));
@@ -1783,6 +1816,17 @@ function renderFrame(now, dt){
   if(masterLive){
     if(srcReady(b2[0])) live[b2[0]] = true;
     if(srcReady(b2[1]) && (mCur.cdMix > 0.0005 || multiView)) live[b2[1]] = true;
+  }
+  /* a re-entry source only works if the channel it is reading is still rendering */
+  for(let pass=0; pass<3; pass++){
+    for(const ch of CHANNELS){
+      if(!live[ch]) continue;
+      const S = SRC[ch];
+      if(S.mode !== "feed") continue;
+      const f = S.feed || "PGM";
+      if(f === "BUS1" || f === "BUS2" || f === "PGM") continue;
+      if(f !== ch && !live[f] && srcReady(f)) live[f] = true;
+    }
   }
   liveList = CHANNELS.filter(c=>live[c]).join("+");
   for(const ch of CHANNELS){

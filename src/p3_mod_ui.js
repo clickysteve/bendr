@@ -1530,6 +1530,19 @@ function sectionExtras(id, d){
     note.textContent = "Set this channel to SYNTH under SOURCE and the picture is computed rather than filmed. Signal flow: coordinates \u2192 shape \u2192 oscillator \u2192 cross modulation \u2192 wavefolder \u2192 comparator \u2192 colouriser. Every control here is a modulation destination, so patch an LFO into FREQ X or CROSS MOD and it becomes a moving source.";
     d.appendChild(note);
   }
+  if(id==="time"){
+    const tr = document.createElement("div"); tr.className="trow";
+    const st = document.createElement("button"); st.id="btnStill"; st.textContent="STILL";
+    attachTip(st, "STILL", "Freezes this channel's source outright. The effects keep running on the held frame, so you can wreck a still.",
+      "STROBE below does the same thing rhythmically \u2014 it holds each frame for a while and then lets the next one through.");
+    st.onclick = ()=>{ window.__toggleStill(); st.classList.toggle("on", window.__stillOf()); };
+    tr.appendChild(st);
+    d.appendChild(tr);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "A bent frame store. ECHO blends in a frame from the past and DELAY FRM says how far back; STUTTER freezes at random; STROBE freezes on a regular beat; SHAKE knocks the picture off its position.";
+    d.appendChild(note);
+  }
   if(id==="glitch"){
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";

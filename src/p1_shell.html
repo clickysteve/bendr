@@ -666,7 +666,7 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v27.0</span>
+  <span id="ver" title="Build version">v28.0</span>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -929,7 +929,7 @@ body.nomix #mixbuses{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v27.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v28.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
@@ -959,6 +959,10 @@ body.nomix #mixbuses{display:none;}
   <p>Feedback → composite/NTSC encode-decode → sync &amp; tape damage → bent enhancer → colour stage → CRT. The <b>BENT ENHANCER</b> section is the circuit-bent video enhancer core: RAINBOW MAP replaces luma with hot posterized rainbows, EDGE RING is the sharpness circuit driven into oscillation (repeating ghost edges), RGB SPLIT tears the channels apart, LUMA HUE makes colour chase brightness, INV FLICKER strobes inversions.</p>
   <h3>CONTOUR / PALETTE</h3>
   <p>The bent-enhancer signature: <b>CONTOUR</b> draws the isolines between brightness bands, giving those repeated outlines that trace the shape of a face or a body. BANDS sets how many, LINE WIDTH how heavy, LINE HUE colours them by band, KEEP FILL decides how much of the picture survives between the lines (drop it to zero for lines on black). <b>FLATTEN</b> quantises brightness into hard LEVELS for solid poster-like colour fields, and <b>DITHER</b> breaks the steps into speckle.</p>
+  <h3>THE MIXER EFFECT FAMILY</h3>
+  <p>In the colour stage: <b>NEGATIVE</b> with three modes (invert brightness, colour, or both), <b>MONOCOLOR</b> to put the whole picture through one colour, <b>COLORPASS</b> to keep a single hue and drop everything else to monochrome, <b>SILHOUETTE</b> to threshold the picture into a flat shape, <b>FIND EDGE</b> for coloured outlines on a dark ground, and <b>EMBOSS</b> to light it from one side as relief.</p>
+  <p>In frame and position: <b>FLIP</b> turns the picture over, <b>MIRROR</b> reflects one half onto the other, and <b>MULTI</b> tiles it into a grid with alternate cells mirrored so the tiles meet. All three act on the picture before the framing, and all three are modulation destinations \u2014 an LFO into FLIP is a switch, an LFO into MULTI is a grid that grows.</p>
+  <p>In the time base: <b>STILL</b> freezes the source outright while the effects carry on running over the held frame, <b>STROBE</b> does the same on a regular beat, and <b>SHAKE</b> knocks the picture off its position.</p>
   <h3>KALEIDO</h3>
   <p>In FRAME / POSITION, <b>KALEIDO</b> folds the picture into radial symmetry. FOLD N = 3 gives triangles; modulate FOLD SPIN with a slow LFO and the whole composition rotates.</p>
   <h3>CRT REPHOTO</h3>

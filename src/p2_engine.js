@@ -30,6 +30,7 @@ const FS_FB = COMMON + KEYFN +
 "uniform float u_fbAmount,u_fbZoom,u_fbRotate,u_fbHue,u_fbShiftX,u_fbShiftY,u_fbMode;\n" +
 "uniform float u_echo,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFb;\n" +
 "uniform float u_srcZoom,u_srcX,u_srcY,u_srcRot,u_edgeMode;\n" +
+"uniform float u_flipMode,u_mirrorMode,u_multiN,u_shakeX,u_shakeY;\n" +
 "uniform float u_kaleido,u_kaleidoN,u_kaleidoRot,u_kaleidoX,u_kaleidoY;\n" +
 "uniform float u_fbShearX,u_fbShearY,u_fbGainR,u_fbGainG,u_fbGainB,u_fbSat,u_fbVal,u_fbPost,u_fbChromOff;\n" +
 "uniform float u_fbBlur,u_fbBlur2,u_fbSharp,u_fbDrive,u_fbPivot,u_fbThresh,u_fbThreshSoft;\n" +
@@ -64,6 +65,29 @@ const FS_FB = COMMON + KEYFN +
 "  return q + 0.5 - vec2(px,py)*1.5;\n}\n" +
 "vec3 fitSample(sampler2D tx, vec2 uv, float srcA, float outA){\n" +
 "  vec2 p = uv-0.5;\n" +
+"  /* FLIP turns the picture over; MIRROR reflects one half onto the other;\n" +
+"     MULTI tiles it into a grid. All before the aspect fit, so they act on the\n" +
+"     picture rather than on the raster. */\n" +
+"  if(u_flipMode>0.5){\n" +
+"    if(u_flipMode<1.5) p.x = -p.x;\n" +
+"    else if(u_flipMode<2.5) p.y = -p.y;\n" +
+"    else p = -p;\n" +
+"  }\n" +
+"  if(u_multiN>1.5){\n" +
+"    float n = floor(u_multiN);\n" +
+"    vec2 g = fract((p+0.5)*n);\n" +
+"    /* odd cells mirror, so the tiles meet instead of butting hard */\n" +
+"    vec2 cell = floor((p+0.5)*n);\n" +
+"    if(mod(cell.x,2.0)>0.5) g.x = 1.0-g.x;\n" +
+"    if(mod(cell.y,2.0)>0.5) g.y = 1.0-g.y;\n" +
+"    p = g-0.5;\n" +
+"  }\n" +
+"  if(u_mirrorMode>0.5){\n" +
+"    if(u_mirrorMode<1.5) p.x = abs(p.x)-0.25;\n" +
+"    else if(u_mirrorMode<2.5) p.y = abs(p.y)-0.25;\n" +
+"    else p = abs(p)-0.25;\n" +
+"  }\n" +
+"  p += vec2(u_shakeX, u_shakeY);\n" +
 "  if(srcA>outA){ p.y *= srcA/outA; } else { p.x *= outA/srcA; }\n" +
 "  p += 0.5;\n" +
 "  if(u_edgeMode>1.5){ vec2 t = fract(p*0.5)*2.0; p = 1.0-abs(t-1.0); }\n" +
@@ -430,7 +454,12 @@ const FS_COL = COMMON + KEYFN +
 "uniform float u_contour,u_contourBands,u_contourWidth,u_contourHue,u_contourFill;\n" +
 "uniform float u_lumaSteps,u_stepCount,u_dither;\n" +
 "uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx,u_showKey;\n" +
+"uniform float u_negative,u_negMode,u_monoCol,u_monoHue,u_colorPass,u_passHue,u_passWidth;\n" +
+"uniform float u_silhouette,u_silThresh,u_silHue,u_findEdge,u_edgeHue,u_emboss,u_embossDir;\n" +
 "float lum(vec2 p){ return dot(texture(u_tex, clamp(p,0.0,1.0)).rgb, vec3(0.299,0.587,0.114)); }\n" +
+"vec3 hsv2(float h, float sa, float v){\n" +
+"  vec3 k = fract(vec3(h) + vec3(0.0, 2.0/3.0, 1.0/3.0));\n" +
+"  return v * mix(vec3(1.0), clamp(abs(k*6.0-3.0)-1.0, 0.0, 1.0), sa);\n}\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  if(u_showKey>0.5){ float km = keyOf(texture(u_tex,uv).rgb, u_keyMode, u_keyHue, u_keyThresh, u_keySoft, u_keyInv); O = vec4(vec3(km),1.0); return; }\n" +
@@ -509,6 +538,48 @@ const FS_COL = COMMON + KEYFN +
 "    lc = mix(vec3(1.0), lc, smoothstep(0.0,0.15,u_contourHue));\n" +
 "    vec3 bg = c*u_contourFill;\n" +
 "    c = mix(c, mix(bg, lc, line), u_contour);\n" +
+"  }\n" +
+"  /* ---- the video-mixer effect family ---- */\n" +
+"  float lm2 = dot(c, vec3(0.299,0.587,0.114));\n" +
+"  /* NEGATIVE: invert brightness, colour, or both */\n" +
+"  if(u_negative>0.003){\n" +
+"    vec3 nb = vec3(1.0) - c;\n" +
+"    vec3 nv;\n" +
+"    if(u_negMode < 0.5) nv = nb;\n" +
+"    else if(u_negMode < 1.5) nv = clamp(vec3(lm2) + (vec3(lm2) - (c - vec3(lm2))) - vec3(lm2), 0.0, 1.0);\n" +
+"    else nv = clamp(c + vec3(1.0 - 2.0*lm2), 0.0, 1.0);\n" +
+"    c = mix(c, nv, u_negative);\n" +
+"  }\n" +
+"  /* COLORPASS: one hue survives, everything else goes monochrome */\n" +
+"  if(u_colorPass>0.003){\n" +
+"    vec3 q = rgb2yiq(c);\n" +
+"    float ang = atan(q.z, q.y)/6.2832 + 0.5;\n" +
+"    float d = abs(fract(ang - u_passHue + 0.5) - 0.5)*2.0;\n" +
+"    float keep = 1.0 - smoothstep(u_passWidth*0.5, u_passWidth*0.5 + 0.12, d);\n" +
+"    keep *= smoothstep(0.02, 0.16, length(q.yz));\n" +
+"    c = mix(mix(vec3(lm2), c, keep), c, 1.0 - u_colorPass);\n" +
+"  }\n" +
+"  /* MONOCOLOR: the whole picture through one colour */\n" +
+"  if(u_monoCol>0.003) c = mix(c, hsv2(u_monoHue, 1.0, 1.0)*(0.15 + lm2*1.15), u_monoCol);\n" +
+"  /* SILHOUETTE: threshold to a flat colour on black */\n" +
+"  if(u_silhouette>0.003){\n" +
+"    float sm = smoothstep(u_silThresh-0.06, u_silThresh+0.06, lm2);\n" +
+"    c = mix(c, hsv2(u_silHue, 1.0, 1.0)*sm, u_silhouette);\n" +
+"  }\n" +
+"  /* FINDEDGE: a Sobel outline, coloured, on a dark ground */\n" +
+"  if(u_findEdge>0.003){\n" +
+"    vec2 e = 1.0/u_res;\n" +
+"    float gx = lum(uv+vec2(e.x,0.0)) - lum(uv-vec2(e.x,0.0));\n" +
+"    float gy = lum(uv+vec2(0.0,e.y)) - lum(uv-vec2(0.0,e.y));\n" +
+"    float g = clamp(length(vec2(gx,gy))*4.5, 0.0, 1.0);\n" +
+"    c = mix(c, hsv2(u_edgeHue + g*0.25, 0.9, 1.0)*g, u_findEdge);\n" +
+"  }\n" +
+"  /* EMBOSS: a directional difference lit from one side */\n" +
+"  if(u_emboss>0.003){\n" +
+"    float a2 = u_embossDir*6.2832;\n" +
+"    vec2 d2 = vec2(cos(a2), sin(a2))*1.6/u_res;\n" +
+"    float em = (lum(uv+d2) - lum(uv-d2))*3.0 + 0.5;\n" +
+"    c = mix(c, vec3(em)*mix(vec3(1.0), c*1.6, 0.35), u_emboss);\n" +
 "  }\n" +
 "  c += c*c*u_glow*0.8;\n" +
 "  if(u_keyFx>0.001){\n" +
@@ -1206,6 +1277,9 @@ const PDEF = [
   ["genBright","BRIGHTNESS","gen",0,1.5,1],
   ["genBands","COLOUR BANDS","gen",2,16,6],
 
+  ["flipMode","FLIP","frame",0,3,0],
+  ["mirrorMode","MIRROR","frame",0,3,0],
+  ["multiN","MULTI GRID","frame",1,8,1],
   ["srcZoom","ZOOM","frame",-1,1,0],
   ["srcX","POS X","frame",-1,1,0],
   ["srcY","POS Y","frame",-1,1,0],
@@ -1219,6 +1293,9 @@ const PDEF = [
   ["echo","ECHO","time",0,1,0],
   ["delayF","DELAY FRM","time",1,29,3],
   ["stutter","STUTTER","time",0,1,0],
+  ["strobe","STROBE","time",0,1,0],
+  ["shake","SHAKE","time",0,1,0],
+  ["shakeRate","SHAKE RATE","time",0,1,0.5],
 
   ["contour","CONTOUR","contour",0,1,0],
   ["contourBands","BANDS","contour",2,40,10],
@@ -1380,6 +1457,20 @@ const PDEF = [
   ["posterize","POSTERIZE","color",0,1,0],
   ["solarize","SOLARIZE","color",0,1,0],
   ["glow","GLOW","color",0,1,0.15],
+  ["negative","NEGATIVE","color",0,1,0],
+  ["negMode","NEG MODE","color",0,2,0],
+  ["monoCol","MONOCOLOR","color",0,1,0],
+  ["monoHue","MONO HUE","color",0,1,0.55],
+  ["colorPass","COLORPASS","color",0,1,0],
+  ["passHue","PASS HUE","color",0,1,0],
+  ["passWidth","PASS WIDTH","color",0,1,0.25],
+  ["silhouette","SILHOUETTE","color",0,1,0],
+  ["silThresh","SIL THRESH","color",0,1,0.45],
+  ["silHue","SIL HUE","color",0,1,0.08],
+  ["findEdge","FIND EDGE","color",0,1,0],
+  ["edgeHue","EDGE HUE","color",0,1,0.45],
+  ["emboss","EMBOSS","color",0,1,0],
+  ["embossDir","EMBOSS DIR","color",0,1,0.12],
 
   ["scanlines","SCANLINES","crt",0,1,0.18],
   ["beamWidth","BEAM WIDTH","crt",0.1,3,1],
@@ -1636,6 +1727,26 @@ const PHELP = {
   genCount:"How many times the tape has been dubbed. GEN LOSS compounds across this many generations, so a small loss and a high count gives something far worse than either alone.",
 
   /* ---- colour stage ---- */
+  flipMode:"Turns the picture over: off, left-right, top-bottom, or both. It happens before the framing, so it flips the picture rather than the raster.",
+  mirrorMode:"Reflects one half of the picture onto the other: off, horizontal, vertical, or both. Unlike the feedback mirror this works on the source, so it is symmetry you can see before anything else happens.",
+  multiN:"Tiles the picture into a grid of repeats, alternate cells mirrored so the tiles meet rather than butting hard against each other. Two gives a quad, eight gives a wall of them.",
+  strobe:"Holds each frame for a while before letting the next one through, so motion becomes a series of stills. Wound up it goes from a slight judder to a hard stutter several frames long.",
+  shake:"Knocks the picture off its position at random, the way a camera mount does when something hits it.",
+  shakeRate:"How often the shake picks a new position. Low is a slow lurch, high is a fast rattle.",
+  negative:"Turns the picture into a negative. NEG MODE decides whether brightness, colour, or both are inverted.",
+  negMode:"What NEGATIVE inverts: both brightness and colour, colour only (so the picture stays the right way up but the hues flip), or brightness only.",
+  monoCol:"Puts the whole picture through a single colour, keeping its brightness. A colour filter over the lens rather than a tint applied to the pixels.",
+  monoHue:"Which colour MONOCOLOR uses.",
+  colorPass:"Keeps one hue and drops everything else to monochrome. The classic single-red-coat-in-a-black-and-white-street effect, and a good way to pull one element out of a busy picture.",
+  passHue:"Which hue survives.",
+  passWidth:"How wide a band of hues counts as surviving. Narrow picks one shade, wide keeps a whole family.",
+  silhouette:"Thresholds the picture into a flat silhouette of one colour, throwing away everything except the shape.",
+  silThresh:"Where the silhouette cuts between shape and ground.",
+  silHue:"The colour the silhouette is filled with.",
+  findEdge:"Edge detection: outlines on a dark ground, brighter where the picture changes fastest. Related to CONTOUR but this finds gradients rather than brightness bands, so it traces detail rather than bands of tone.",
+  edgeHue:"The colour of the outlines, shifting a little with edge strength.",
+  emboss:"Lights the picture from one side so it reads as relief cut into a surface.",
+  embossDir:"Which direction the emboss is lit from.",
   rGain:"Red channel gain. Unbalancing the three is the quickest way to a strong colour cast.",
   gGain:"Green channel gain.",
   bGain:"Blue channel gain.",

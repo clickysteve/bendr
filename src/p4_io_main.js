@@ -630,6 +630,7 @@ function syncChanInputUI(){
     const btn = document.querySelector(".chanbtn.ch"+ch2+" small");
     if(btn) btn.textContent = label(ch2);
   }
+  { const sb = document.getElementById("btnStill"); if(sb) sb.classList.toggle("on", !!stillHeld[activeChan]); }
   { const os = document.getElementById("osdsrc");
     if(os) os.textContent = CHANNELS.filter(c=>SRC[c].has).map(c=>c+" "+label(c)).join("   ·   "); }
   if(typeof refreshDockTabs === "function") refreshDockTabs();
@@ -1594,6 +1595,26 @@ const osd = document.getElementById("osd");
 let lastT = performance.now()/1000, fpsAcc=0, fpsN=0, fpsShow=0;
 const stutterHeld = {}, stutterT = {};
 for(const ch of CHANNELS){ stutterHeld[ch]=false; stutterT[ch]=0; }
+/* STILL freezes a channel's source outright; STROBE holds each frame for a
+   while before letting the next through; SHAKE knocks it off position. */
+const stillHeld = {}, shakeOff = {}, shakeT = {};
+for(const ch of CHANNELS){ stillHeld[ch]=false; shakeOff[ch]={x:0,y:0}; shakeT[ch]=0; }
+function sourceFrozen(ch){
+  if(stillHeld[ch]) return true;
+  const st = getCur("strobe", ch);
+  if(st > 0.003){
+    const hold = 1 + Math.floor(st*st*22);
+    if(frameNo % hold !== 0) return true;
+  }
+  return false;
+}
+window.__toggleStill = ch=>{
+  ch = ch || activeChan;
+  stillHeld[ch] = !stillHeld[ch];
+  toast("Channel "+ch+(stillHeld[ch] ? ": frozen" : ": running"));
+  return stillHeld[ch];
+};
+window.__stillOf = ch=>!!stillHeld[ch||activeChan];
 let offline = false, liveList = "A";
 
 /* video content analysis — the picture itself as a mod source (reads channel A) */
@@ -1676,11 +1697,12 @@ function sigExtras(pr, now, ch){
   gl.uniform1f(U(pr,"u_tpStill"), tp==="still" ? 0.75 : 0);
   gl.uniform1f(U(pr,"u_tpShuttle"), tp==="ff" ? 0.55 : (tp==="rew" ? -0.55 : 0));
 }
-function colExtras(pr, now){
+function colExtras(pr, now, ch){
   gl.uniform1f(U(pr,"u_time"), now);
   gl.uniform1f(U(pr,"u_bypass"), bypass);
   gl.uniform1f(U(pr,"u_keyMode"), keyChroma?1:0);
   gl.uniform1f(U(pr,"u_showKey"), showKeyMatte?1:0);
+  gl.uniform1f(U(pr,"u_negMode"), Math.round(getCur("negMode", ch||"A")));
 }
 const FLOW_IDS = ["mosh","moshVec","melt","swirl","moshBlock","timeGrad","flowStretch","flowRepel","flowNoise","flowHue","flowFade"];
 const LAB_IDS = ["sparseJit","ntscArt","ntscFringe","snow","fmAmt","slitscan","bitCrush","bandKey","rowSmear","moire","fieldMod"];
@@ -1693,7 +1715,7 @@ function stageNeeded(id, ch){
 function runStage(id, inTex, dstRT, now, ch){
   const C = chanRT[ch];
   if(id === "sig")    return runPass(progSIG, inTex, dstRT.fbo, procW, procH, pr=>sigExtras(pr,now,ch), ch);
-  if(id === "col")    return runPass(progCOL, inTex, dstRT.fbo, procW, procH, pr=>colExtras(pr,now), ch);
+  if(id === "col")    return runPass(progCOL, inTex, dstRT.fbo, procW, procH, pr=>colExtras(pr,now,ch), ch);
   if(id === "glitch") return runPass(progGLITCH, inTex, dstRT.fbo, procW, procH, pr=>{ gl.uniform1f(U(pr,"u_time"), now); }, ch);
   if(id === "lab")    return runPass(progLAB, inTex, dstRT.fbo, procW, procH, pr=>{
     gl.uniform1f(U(pr,"u_time"), now); gl.uniform1f(U(pr,"u_frame"), frameNo);
@@ -1736,6 +1758,7 @@ window.__chanHasSource = srcReady;
 /* upload a channel's source frame into its texture */
 function uploadSource(ch, dt){
   const S = SRC[ch];
+  if(sourceFrozen(ch)) return;   /* leave the texture holding its last frame */
   if(S.mode === "synth" || S.mode === "feed"){ S.aspect = procW/procH; S.has = 1; S.patClock += dt*S.speed; return; }
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
@@ -1773,7 +1796,7 @@ function renderGen(ch, now){
 function renderChannel(ch, now, dt){
   ensureChanRT(ch);
   const C = chanRT[ch], S = SRC[ch];
-  const chanSrcTex = (S.mode === "synth") ? renderGen(ch, now)
+  const chanSrcTex = (S.mode === "synth") ? (sourceFrozen(ch) ? C.gen.tex : renderGen(ch, now))
                    : (S.mode === "feed") ? feedTex(S.feed || "PGM")
                    : srcTex[ch];
 
@@ -1814,6 +1837,11 @@ function renderChannel(ch, now, dt){
   gl.uniform1f(U(progFB,"u_fbNL"), fbNL);
   gl.uniform1f(U(progFB,"u_fbInvert"), fbInvert?1:0);
   gl.uniform1f(U(progFB,"u_autoGain"), autoGain[ch]);
+  gl.uniform1f(U(progFB,"u_flipMode"), Math.round(getCur("flipMode",ch)));
+  gl.uniform1f(U(progFB,"u_mirrorMode"), Math.round(getCur("mirrorMode",ch)));
+  gl.uniform1f(U(progFB,"u_multiN"), Math.round(getCur("multiN",ch)));
+  gl.uniform1f(U(progFB,"u_shakeX"), shakeOff[ch].x);
+  gl.uniform1f(U(progFB,"u_shakeY"), shakeOff[ch].y);
   setParamUniforms(progFB, ch);
   draw();
 
@@ -1871,6 +1899,15 @@ function renderFrame(now, dt){
   }
 
   for(const ch of CHANNELS){
+    const sk = getCur("shake", ch);
+    if(sk > 0.003){
+      shakeT[ch] -= dt;
+      if(shakeT[ch] <= 0){
+        shakeT[ch] = 0.02 + (1-getCur("shakeRate",ch))*0.35;
+        shakeOff[ch].x = (Math.random()*2-1)*sk*0.09;
+        shakeOff[ch].y = (Math.random()*2-1)*sk*0.09;
+      }
+    } else { shakeOff[ch].x = 0; shakeOff[ch].y = 0; }
     const vr = getCur("vRoll",ch);
     vrollpos[ch] = (vrollpos[ch] + Math.sign(vr)*Math.pow(Math.abs(vr),2.2)*dt*3.0) % 1;
     humpos[ch] = (humpos[ch] + dt*(0.05 + getCur("humBar",ch)*0.1)) % 1;

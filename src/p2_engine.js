@@ -159,15 +159,20 @@ const FS_MIX = COMMON + KEYFN +
 "uniform float u_wipeSoft,u_wipeDetail,u_wipeX,u_wipeY,u_wipeInv;\n" +
 "uniform float u_mixKeyThresh,u_mixKeySoft,u_mixKeyInv,u_mixKeyHue;\n" +
 "float wipeField(vec2 uv, float mode, float outA){\n" +
-"  vec2 c = uv - 0.5 - vec2(u_wipeX, u_wipeY)*0.5;\n" +
+"  vec2 off = vec2(u_wipeX, u_wipeY)*0.5;\n" +
+"  vec2 c = uv - 0.5 - off;\n" +
+"  /* how far the farthest corner is from wherever the origin has been moved to.\n" +
+"     Normalising by it means the fader travels evenly from nothing to full\n" +
+"     coverage instead of saturating early and flipping the rest in one go. */\n" +
+"  vec2 far = abs(off) + 0.5;\n" +
 "  float n = 2.0 + floor(u_wipeDetail*14.0);\n" +
 "  if(mode<1.5) return uv.x;\n" +
 "  if(mode<2.5) return 1.0-uv.y;\n" +
 "  if(mode<3.5) return (uv.x + (1.0-uv.y))*0.5;\n" +
-"  if(mode<4.5) return max(abs(c.x)*2.0, abs(c.y)*2.0);\n" +
-"  if(mode<5.5) return clamp(length(c*vec2(outA,1.0))*1.9, 0.0, 1.0);\n" +
-"  if(mode<6.5) return abs(c.x)*2.0;\n" +
-"  if(mode<7.5) return abs(c.y)*2.0;\n" +
+"  if(mode<4.5) return max(abs(c.x)/far.x, abs(c.y)/far.y);\n" +
+"  if(mode<5.5) return length(c*vec2(outA,1.0))/max(length(far*vec2(outA,1.0)), 0.0001);\n" +
+"  if(mode<6.5) return abs(c.x)/far.x;\n" +
+"  if(mode<7.5) return abs(c.y)/far.y;\n" +
 "  if(mode<8.5) return fract(uv.x*n);\n" +
 "  if(mode<9.5) return fract(uv.y*n);\n" +
 "  if(mode<10.5){ float a = atan(c.y, c.x)/6.2832 + 0.5; return fract(a); }\n" +

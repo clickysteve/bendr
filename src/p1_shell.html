@@ -359,6 +359,34 @@ body.chan-d #panel{border-left-color:#b4ff5a;}
 .destlink b{color:var(--cyan);}
 .destlink:hover b{color:#fff;}
 .patchpick{width:100%; margin-top:6px; font-size:8.5px; padding:3px 4px;}
+.modcard.addcard{border-style:dashed; display:flex; flex-direction:column; gap:5px;}
+.modcard.addcard h4{color:var(--dim);}
+.modcard .modname{cursor:text;}
+.modcard .modname:hover{color:#fff; text-decoration:underline dotted;}
+.modcard .mtype{
+  font-style:normal; font-size:7px; letter-spacing:1.5px; padding:1px 4px; margin-left:6px;
+  border:1px solid var(--line); border-radius:2px; color:var(--dim);
+}
+.modcard .moddel{margin-left:6px; padding:1px 5px; font-size:9px; line-height:1; border:none; background:none; color:#3a3a46;}
+.modcard .moddel:hover{color:var(--red); border:none;}
+.modcard .mcrow select{flex:1 1 0; min-width:0;}
+.modcard .mcrow button{flex:0 0 auto; padding:2px 7px; font-size:8px;}
+.mmrow.anim{color:var(--cyan);}
+.modcard.addcard{border-style:dashed; display:flex; flex-direction:column; gap:5px;}
+.modcard.addcard h4{color:var(--dim);}
+.modcard .modname{cursor:text;}
+.modcard .modname:hover{color:#fff; text-decoration:underline dotted;}
+.modcard .mtype{
+  font-style:normal; font-size:7px; letter-spacing:1.5px; padding:1px 4px; margin-left:6px;
+  border:1px solid var(--line); border-radius:2px; color:var(--dim);
+}
+.modcard .moddel{
+  margin-left:6px; padding:1px 5px; font-size:9px; line-height:1;
+  border:none; background:none; color:#3a3a46;
+}
+.modcard .moddel:hover{color:var(--red); border:none;}
+.modcard .mcrow select{flex:1 1 0; min-width:0;}
+.modcard .mcrow button{flex:0 0 auto; padding:2px 7px; font-size:8px;}
 .flash{animation:flashhi 1.5s ease-out;}
 @keyframes flashhi{
   0%,18%{background:rgba(46,230,214,.28); box-shadow:0 0 0 1px var(--cyan);}
@@ -629,7 +657,7 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v25.0</span>
+  <span id="ver" title="Build version">v26.0</span>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -891,7 +919,7 @@ body.nomix #mixbuses{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v25.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v26.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
@@ -933,7 +961,11 @@ body.nomix #mixbuses{display:none;}
   <p><b>FEED</b> under SOURCE takes another channel, either bus, or the finished programme as this channel's source. Process it and mix it back in and you have a feedback loop that travels through the entire rig rather than round one stage \u2014 which is what patching a mixer's output back into a spare input does. Whatever it reads is one frame old, and that single frame of delay is what keeps it stable instead of an infinite regress.</p>
   <p>This is the answer to making two mixed pictures interact. Key or wipe one over another on bus 1, set channel C to re-enter PROGRAMME with feedback zoom, and bring it in on the master with ADD or LIGHTEN: the shape on top now bleeds out into what is behind it, and keeps bleeding, because its own output is going back round. Chain a channel to another channel instead of the programme and you can put a whole different effect chain in the return path.</p>
   <h3>MOVEMENT</h3>
-  <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch eight LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
+  <p>Nothing sits still. The <b>MOD</b> tab holds every modulator, and you can add as many as you want \u2014 there is no fixed number of them. Three kinds:</p>
+  <p><b>LFOs</b> run continuously: ten shapes, free-running or locked to tempo across twenty divisions from eight bars down to a thirty-second, including dotted and triplet. <b>ENVELOPES</b> do the opposite \u2014 they fire once and decay, triggered by a bend pad, an audio hit (onset, so it fires on the attack rather than while the sound stays loud), a scene cut, the tempo, or by hand. That is how you get punctuation rather than constant motion. <b>MACROS</b> are one knob driving as many parameters as you point it at, each with its own depth and direction, so you can build a single control that means something specific to the patch you are playing.</p>
+  <p>On top of those: chaos, drift and random spikes; three audio bands with adjustable frequency ranges; and video-reactive sources computed from the picture itself \u2014 motion, brightness and scene-cut detection. Patch CUT into TEAR and every edit knocks the sync loose.</p>
+  <p>Each route has its own <b>invert</b> and <b>response curve</b>, so one modulator can drive several parameters quite differently \u2014 one hard, one gently, one inverted, one in four steps. That is often worth more than adding another modulator.</p>
+  <p><b>Right-click any parameter</b> to patch something onto it, or choose <b>ANIMATE</b> there to give it a new LFO of its own in one click. Each route in the matrix has a \u25ce that jumps to its modulator, and each modulator lists what it drives as links that jump back.</p>
   <h3>PERFORMANCE</h3>
   <p>The dock under the picture has five tabs: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b>, <b>MIX</b> and <b>PERFORM</b>. MIX holds the detail behind each transition \u2014 wipe softness and geometry, key threshold and hue \u2014 while the faders themselves stay on the strip. PERFORM holds everything you play with while it is running \u2014 the snapshot bank, the recorder and the bend pads. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>

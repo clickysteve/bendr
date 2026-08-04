@@ -94,7 +94,7 @@ Any channel can be a text/shape generator instead of a video source: type anythi
 
 Nothing sits still. The mod matrix patches any source into any parameter:
 
-- Eight LFOs, ten shapes, free-running or tempo-synced to twenty divisions including dotted and triplet
+- As many modulators as you want, of three kinds: **LFOs** (ten shapes, free or synced to twenty divisions including dotted and triplet), **envelopes** (fire and decay on a bend pad, an audio onset, a scene cut or the tempo) and **macros** (one knob driving as many parameters as you point it at)
 - Chaos, drift and spike generators
 - Audio bands with adjustable frequency ranges, gain, response, input device and channel selection for audio interfaces
 - Video-reactive sources computed from the picture itself: motion, brightness, and scene-cut detection — patch CUT into TEAR and every edit knocks the sync loose

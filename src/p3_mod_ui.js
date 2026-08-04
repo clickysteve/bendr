@@ -87,25 +87,66 @@ window.addEventListener("error", e=>{ toast("Error: "+e.message, true); });
 
 /* ---------------- modulation engine ---------------- */
 const LFOKEYS = ["lfo1","lfo2","lfo3","lfo4","lfo5","lfo6","lfo7","lfo8"];
-/* eight of them: with 243 destinations, four was the bottleneck */
+/* Modulators are a list, not a fixed set: as many LFOs as you like, plus
+   envelopes, which fire and decay when something happens rather than running
+   free, and macros, which are one knob driving as many parameters as you point
+   it at. The first eight keep the ids lfo1..lfo8 so old patches still load. */
 const LFO_DEFAULTS = [
   {rate:0.3,   shape:"sine"}, {rate:1.7,  shape:"snh"},
   {rate:0.07,  shape:"tri"},  {rate:5.5,  shape:"sine"},
   {rate:0.017, shape:"tri"},  {rate:0.9,  shape:"saw"},
   {rate:3.1,   shape:"sqr"},  {rate:0.13, shape:"drift"},
 ];
-const MODSRC = [
-  ...LFOKEYS.map((k,i)=>({id:k, name:"LFO "+(i+1)})),
+const FIXED_SRC = [
   {id:"chaos", name:"CHAOS"}, {id:"drift", name:"DRIFT"}, {id:"spike", name:"SPIKE"},
   {id:"bass", name:"AUD BASS"}, {id:"mid", name:"AUD MID"}, {id:"high", name:"AUD HIGH"},
   {id:"motion", name:"VID MOTION"}, {id:"bright", name:"VID BRIGHT"}, {id:"cut", name:"VID CUT"},
 ];
-const lfoState = {};
-LFOKEYS.forEach((k,i)=>{
-  lfoState[k] = {rate:LFO_DEFAULTS[i].rate, shape:LFO_DEFAULTS[i].shape, phase:Math.random(), snh:0, sync:0};
+const ENV_TRIGS = [
+  ["manual","MANUAL"], ["pad:sync","PAD SYNC"], ["pad:roll","PAD ROLL"],
+  ["pad:rainbow","PAD RAINBOW"], ["pad:drop","PAD DROPOUT"], ["pad:melt","PAD MELT"],
+  ["pad:kill","PAD V-HOLD"], ["aud:bass","AUDIO BASS HIT"], ["aud:mid","AUDIO MID HIT"],
+  ["aud:high","AUDIO HIGH HIT"], ["cut","SCENE CUT"], ["tempo","EVERY BEAT"],
+  ["tempo2","EVERY 2 BEATS"], ["tempo4","EVERY BAR"],
+];
+const ENV_MODES = [["once","ONE SHOT"],["gate","GATE"],["loop","LOOP"]];
+let mods = [];
+let modSeq = 0;
+function mkLfo(o){
+  return Object.assign({id:"lfo"+(++modSeq)+"x", type:"lfo", name:"LFO "+modSeq,
+    rate:0.4, shape:"sine", phase:Math.random(), snh:0, sync:0}, o||{});
+}
+function mkEnv(o){
+  return Object.assign({id:"env"+(++modSeq), type:"env", name:"ENV "+modSeq,
+    a:0.02, d:0.5, trig:"pad:sync", mode:"once",
+    level:0, stage:"d", gate:false, prevGate:false, avg:0, beat:0, manual:false}, o||{});
+}
+function mkMacro(o){
+  return Object.assign({id:"mac"+(++modSeq), type:"macro", name:"MACRO "+modSeq, val:0}, o||{});
+}
+function defaultMods(){
+  modSeq = 8;
+  return LFOKEYS.map((k,i)=>({id:k, type:"lfo", name:"LFO "+(i+1),
+    rate:LFO_DEFAULTS[i].rate, shape:LFO_DEFAULTS[i].shape,
+    phase:Math.random(), snh:0, sync:0}));
+}
+function modById(id){ return mods.find(m=>m.id===id); }
+const MODSRC = [];
+function rebuildMODSRC(){
+  MODSRC.length = 0;
+  for(const m of mods) MODSRC.push({id:m.id, name:m.name, type:m.type});
+  for(const f of FIXED_SRC) MODSRC.push({id:f.id, name:f.name, type:"fixed"});
+  for(const m of MODSRC){
+    if(modVal[m.id] === undefined) modVal[m.id] = 0;
+    if(!modHist[m.id]) modHist[m.id] = {buf:new Float32Array(MODHIST_N), w:0};
+  }
+}
+/* anything still reaching for the old fixed table gets a live view of the list */
+const lfoState = new Proxy({}, {
+  get(_, k){ return modById(k) || {rate:0, shape:"sine", phase:0, sync:0}; },
+  has(_, k){ return !!modById(k); },
 });
 const modVal = {};
-for(const m of MODSRC) modVal[m.id] = 0;
 
 /* tempo: tap or MIDI clock; synced LFOs derive their rate from it */
 let bpm = 120, extClockAt = 0, clockEma = 0;
@@ -173,10 +214,60 @@ function shapeMod(v, curve){
   if(curve === 3) return sg*u*u*(3-2*u);
   return sg*Math.round(u*4)/4;
 }
+/* did this envelope's trigger just fire? */
+function envFired(m, dt){
+  if(m.trig === "manual"){
+    if(m.manual){ m.manual = false; m.gate = true; return true; }
+    m.gate = false; return false;
+  }
+  if(m.trig.indexOf("pad:") === 0){
+    const on = !!bendHeld[m.trig.slice(4)];
+    const fired = on && !m.prevGate;
+    m.prevGate = on; m.gate = on;
+    return fired;
+  }
+  if(m.trig === "cut"){
+    const on = (modVal.cut || 0) > 0.45;
+    const fired = on && !m.prevGate;
+    m.prevGate = on; m.gate = on;
+    return fired;
+  }
+  if(m.trig.indexOf("aud:") === 0){
+    /* onset, not level: it fires on the attack rather than while it stays loud */
+    const v = modVal[m.trig.slice(4)] || 0;
+    m.avg = m.avg*0.92 + v*0.08;
+    const on = v > m.avg*1.45 + 0.05;
+    const fired = on && !m.prevGate;
+    m.prevGate = on; m.gate = on;
+    return fired;
+  }
+  if(m.trig.indexOf("tempo") === 0){
+    const every = m.trig === "tempo4" ? 4 : m.trig === "tempo2" ? 2 : 1;
+    m.beat = (m.beat || 0) + dt*(bpm/60);
+    if(m.beat >= every){ m.beat -= every; m.gate = true; return true; }
+    m.gate = false;
+    return false;
+  }
+  return false;
+}
 function updateMod(dt, t){
-  for(const k of LFOKEYS){
-    if(lfoState[k].sync > 0) lfoState[k].rate = (bpm/60)/lfoState[k].sync;
-    modVal[k] = lfoOut(lfoState[k], dt);
+  for(const m of mods){
+    if(m.type === "lfo"){
+      if(m.sync > 0) m.rate = (bpm/60)/m.sync;
+      modVal[m.id] = lfoOut(m, dt);
+    } else if(m.type === "env"){
+      if(envFired(m, dt)) m.stage = "a";
+      if(m.stage === "a"){
+        m.level = Math.min(1, m.level + dt/Math.max(0.005, m.a));
+        if(m.level >= 1) m.stage = "d";
+      } else if(!(m.mode === "gate" && m.gate)){
+        m.level *= Math.exp(-dt/Math.max(0.02, m.d));
+        if(m.mode === "loop" && m.level < 0.02) m.stage = "a";
+      }
+      modVal[m.id] = m.level;
+    } else {
+      modVal[m.id] = m.val;
+    }
   }
   chaosState.timer -= dt;
   if(chaosState.timer <= 0){ chaosState.target = Math.random()*2-1; chaosState.timer = 0.12+Math.random()*0.5; }
@@ -593,7 +684,7 @@ function buildPanel(){
     host.appendChild(d);
   }
   /* LFO config section */
-  const d = mkSection("lfo", "mag", "LFO SETTINGS");
+  const d = mkSection("lfo", "mag", "TEMPO / CLOCK");
   /* tempo row */
   {
     const row = document.createElement("div"); row.className="prow";
@@ -609,42 +700,18 @@ function buildPanel(){
     row.appendChild(lab); row.appendChild(tap); row.appendChild(bv); row.appendChild(note);
     d.appendChild(row);
   }
-  for(const key of LFOKEYS){
-    const row = document.createElement("div"); row.className="prow";
-    const lab = document.createElement("label"); lab.textContent = key.toUpperCase()+" RATE";
-    const wrap = document.createElement("div"); wrap.className="sldwrap";
-    const s = document.createElement("input");
-    s.type="range"; s.min=-2; s.max=1.2; s.step=0.01;
-    s.value = Math.log10(lfoState[key].rate);
-    const val = document.createElement("span"); val.className="val";
-    const upd = ()=>{ lfoState[key].rate = Math.pow(10, parseFloat(s.value)); val.textContent = lfoState[key].rate.toFixed(2); };
-    s.addEventListener("input", upd); upd();
-    wrap.appendChild(s);
-    const shp = document.createElement("select");
-    for(const o of ["sine","tri","saw","sqr","snh"]){
-      const op = document.createElement("option"); op.value=o; op.textContent=o.toUpperCase(); shp.appendChild(op);
-    }
-    shp.value = lfoState[key].shape;
-    shp.onchange = ()=>{ lfoState[key].shape = shp.value; };
-    shp.style.width = "56px";
-    const sync = document.createElement("select");
-    const DIVS = [["0","FREE"],["16","4 BAR"],["8","2 BAR"],["4","1 BAR"],["2","1/2"],["1","1/4"],["0.5","1/8"],["0.25","1/16"]];
-    for(const [v,n] of DIVS){ const op=document.createElement("option"); op.value=v; op.textContent=n; sync.appendChild(op); }
-    sync.title = "Tempo sync division (beats per cycle)";
-    sync.value = String(lfoState[key].sync||0);
-    sync.onchange = ()=>{ lfoState[key].sync = parseFloat(sync.value); s.disabled = lfoState[key].sync>0; };
-    sync.style.width = "58px";
-    row.appendChild(lab); row.appendChild(wrap); row.appendChild(val); row.appendChild(shp); row.appendChild(sync);
-    d.appendChild(row);
-    lfoUIRefs[key] = {slider:s, val, shp, sync, upd};
-  }
+  const lfnote = document.createElement("div");
+  lfnote.style.cssText = "color:var(--dim); font-size:8.5px; padding:4px 0 2px;";
+  lfnote.textContent = "Tap to set the tempo; any modulator with a sync division follows it, and MIDI clock overrides it automatically. Rates, shapes, envelopes and macros live on the MOD tab of the dock, where you can also add as many more as you want.";
+  d.appendChild(lfnote);
   buildAudioSection();
 }
 
 /* ---- MOD page: every source, live ---- */
 const modHist = {};   // id -> Float32Array ring
 const MODHIST_N = 140;
-for(const m of MODSRC) modHist[m.id] = {buf:new Float32Array(MODHIST_N), w:0};
+mods = defaultMods();
+rebuildMODSRC();
 function pushModHistory(){
   for(const id in modHist){
     const h = modHist[id];
@@ -656,62 +723,187 @@ const modCards = {};
 function buildModPage(){
   const grid = document.getElementById("modgrid");
   if(!grid) return;
+  for(const k in modCards) delete modCards[k];
+  for(const k in modMacroRefs) delete modMacroRefs[k];
   grid.innerHTML = "";
+
+  const addCard = document.createElement("div");
+  addCard.className = "modcard addcard";
+  const ah = document.createElement("h4"); ah.textContent = "ADD MODULATOR";
+  addCard.appendChild(ah);
+  for(const [label, make, tip] of [
+    ["+ LFO", mkLfo, "A free-running or tempo-synced oscillator. Ten shapes, twenty sync divisions. Add as many as you want."],
+    ["+ ENVELOPE", mkEnv, "Fires and decays when something happens rather than running continuously: a bend pad, an audio hit, a scene cut, or the tempo. This is how you get punctuation instead of constant motion."],
+    ["+ MACRO", mkMacro, "One knob driving as many parameters as you point it at, each with its own depth, curve and direction. Build a 'more broken' control that means something specific to this patch."],
+  ]){
+    const btn = document.createElement("button");
+    btn.textContent = label; btn.style.width = "100%";
+    attachTip(btn, label.replace("+ ", ""), tip);
+    btn.onclick = ()=>{
+      const m = make();
+      mods.push(m); rebuildMODSRC(); buildModPage(); renderRoutes();
+      setTimeout(()=>focusModSource(m.id), 30);
+      toast(m.name + " added");
+    };
+    addCard.appendChild(btn);
+  }
+  grid.appendChild(addCard);
+
   const groups = [
-    {cls:"", title:"LFO", ids:LFOKEYS},
-    {cls:"", title:"GENERATORS", ids:["chaos","drift","spike"]},
-    {cls:"audio", title:"AUDIO", ids:["bass","mid","high"]},
-    {cls:"vid", title:"VIDEO", ids:["motion","bright","cut"]},
+    {cls:"", ids:mods.map(m=>m.id)},
+    {cls:"audio", ids:["bass","mid","high"]},
+    {cls:"vid", ids:["motion","bright","cut"]},
+    {cls:"", ids:["chaos","drift","spike"]},
   ];
   for(const g of groups) for(const id of g.ids){
-    const src = MODSRC.find(m=>m.id===id);
+    const src = MODSRC.find(x=>x.id===id);
+    if(!src) continue;
+    const m = modById(id);
     const card = document.createElement("div");
-    card.className = "modcard "+g.cls;
+    card.className = "modcard " + g.cls + (m ? " usermod" : "");
     const h = document.createElement("h4");
-    h.innerHTML = src.name;
+    const nm = document.createElement("span");
+    nm.textContent = src.name;
+    if(m){
+      nm.className = "modname";
+      nm.title = "Click to rename";
+      nm.onclick = ()=>{
+        const v = (prompt("Name this modulator", m.name) || "").trim();
+        if(!v) return;
+        m.name = v; rebuildMODSRC(); buildModPage(); renderRoutes();
+      };
+    }
+    h.appendChild(nm);
+    if(m && m.type !== "lfo"){
+      const tag = document.createElement("i");
+      tag.className = "mtype"; tag.textContent = m.type === "env" ? "ENV" : "MACRO";
+      h.appendChild(tag);
+    }
     const val = document.createElement("span");
     val.style.cssText = "margin-left:auto; color:var(--txt); font-size:9px;";
     h.appendChild(val);
+    if(m){
+      const del = document.createElement("button");
+      del.className = "moddel"; del.textContent = "✕";
+      attachTip(del, "REMOVE", "Deletes this modulator and every route using it.");
+      del.onclick = ()=>{
+        mods.splice(mods.indexOf(m), 1);
+        routes = routes.filter(r=>r.src !== m.id);
+        rebuildMODSRC(); buildModPage(); renderRoutes();
+        toast(m.name + " removed");
+      };
+      h.appendChild(del);
+    }
     card.appendChild(h);
     const cv = document.createElement("canvas");
-    cv.width = 250; cv.height = 52;
+    cv.width = 250; cv.height = 44;
     card.appendChild(cv);
 
-    if(LFOKEYS.includes(id)){
-      const st = lfoState[id];
-      const r1 = document.createElement("div"); r1.className="mcrow";
-      const l1 = document.createElement("label"); l1.textContent="RATE";
+    if(m && m.type === "lfo"){
+      const r1 = document.createElement("div"); r1.className = "mcrow";
+      const l1 = document.createElement("label"); l1.textContent = "RATE";
       const s1 = document.createElement("input");
-      s1.type="range"; s1.min=-2; s1.max=1.2; s1.step=0.01; s1.value=Math.log10(st.rate);
-      const v1 = document.createElement("span"); v1.className="mcval";
-      const upd1 = ()=>{ st.rate = Math.pow(10, parseFloat(s1.value)); v1.textContent = st.rate.toFixed(2)+"Hz"; };
-      s1.addEventListener("input", ()=>{ upd1(); refreshLfoUI(); }); upd1();
+      s1.type = "range"; s1.min = -2; s1.max = 1.2; s1.step = 0.01; s1.value = Math.log10(m.rate);
+      const v1 = document.createElement("span"); v1.className = "mcval";
+      const upd1 = ()=>{ m.rate = Math.pow(10, parseFloat(s1.value)); v1.textContent = m.rate.toFixed(2)+"Hz"; };
+      s1.addEventListener("input", upd1); upd1();
       r1.appendChild(l1); r1.appendChild(s1); r1.appendChild(v1);
       card.appendChild(r1);
-
-      const r2 = document.createElement("div"); r2.className="mcrow";
-      const l2 = document.createElement("label"); l2.textContent="SHAPE";
+      const r2 = document.createElement("div"); r2.className = "mcrow";
+      const l2 = document.createElement("label"); l2.textContent = "SHAPE";
       const sh = document.createElement("select");
-      for(const o of LFO_SHAPES){ const op=document.createElement("option"); op.value=o; op.textContent=o.toUpperCase(); sh.appendChild(op); }
-      sh.value = st.shape;
-      sh.onchange = ()=>{ st.shape = sh.value; refreshLfoUI(); };
+      for(const o of LFO_SHAPES){ const op = document.createElement("option"); op.value = o; op.textContent = o.toUpperCase(); sh.appendChild(op); }
+      sh.value = m.shape;
+      sh.onchange = ()=>{ m.shape = sh.value; };
       const sy = document.createElement("select");
-      for(const [v,n] of SYNC_DIVS){
-        const op=document.createElement("option"); op.value=v; op.textContent=n; sy.appendChild(op);
-      }
-      sy.value = String(st.sync||0);
-      sy.onchange = ()=>{ st.sync = parseFloat(sy.value); s1.disabled = st.sync>0; refreshLfoUI(); };
-      s1.disabled = (st.sync||0) > 0;
+      for(const [v,n] of SYNC_DIVS){ const op = document.createElement("option"); op.value = v; op.textContent = n; sy.appendChild(op); }
+      sy.value = String(m.sync || 0);
+      sy.onchange = ()=>{ m.sync = parseFloat(sy.value); s1.disabled = m.sync > 0; };
+      s1.disabled = (m.sync || 0) > 0;
       r2.appendChild(l2); r2.appendChild(sh); r2.appendChild(sy);
       card.appendChild(r2);
     }
+    else if(m && m.type === "env"){
+      const fmtT = v => v < 1 ? Math.round(v*1000)+"ms" : v.toFixed(2)+"s";
+      for(const [label, key, lo, hi] of [["ATTACK","a",0.005,4], ["DECAY","d",0.02,20]]){
+        const r = document.createElement("div"); r.className = "mcrow";
+        const l = document.createElement("label"); l.textContent = label;
+        const sl = document.createElement("input");
+        sl.type = "range"; sl.min = Math.log10(lo); sl.max = Math.log10(hi); sl.step = 0.01;
+        sl.value = Math.log10(Math.max(lo, m[key]));
+        const vv = document.createElement("span"); vv.className = "mcval";
+        const upd = ()=>{ m[key] = Math.pow(10, parseFloat(sl.value)); vv.textContent = fmtT(m[key]); };
+        sl.addEventListener("input", upd); upd();
+        r.appendChild(l); r.appendChild(sl); r.appendChild(vv);
+        card.appendChild(r);
+      }
+      const r3 = document.createElement("div"); r3.className = "mcrow";
+      const l3 = document.createElement("label"); l3.textContent = "TRIG";
+      const tg = document.createElement("select");
+      for(const [v,n] of ENV_TRIGS){ const op = document.createElement("option"); op.value = v; op.textContent = n; tg.appendChild(op); }
+      tg.value = m.trig;
+      tg.onchange = ()=>{ m.trig = tg.value; };
+      r3.appendChild(l3); r3.appendChild(tg);
+      card.appendChild(r3);
+      const r4 = document.createElement("div"); r4.className = "mcrow";
+      const l4 = document.createElement("label"); l4.textContent = "MODE";
+      const md = document.createElement("select");
+      for(const [v,n] of ENV_MODES){ const op = document.createElement("option"); op.value = v; op.textContent = n; md.appendChild(op); }
+      md.value = m.mode;
+      md.onchange = ()=>{ m.mode = md.value; };
+      const fire = document.createElement("button");
+      fire.textContent = "FIRE";
+      attachTip(fire, "FIRE", "Triggers the envelope by hand, whatever it is patched to.");
+      fire.onclick = ()=>{ m.manual = true; };
+      r4.appendChild(l4); r4.appendChild(md); r4.appendChild(fire);
+      card.appendChild(r4);
+    }
+    else if(m && m.type === "macro"){
+      const r1 = document.createElement("div"); r1.className = "mcrow";
+      const l1 = document.createElement("label"); l1.textContent = "VALUE";
+      const s1 = document.createElement("input");
+      s1.type = "range"; s1.min = -1; s1.max = 1; s1.step = 0.005; s1.value = m.val;
+      const v1 = document.createElement("span"); v1.className = "mcval";
+      const upd1 = ()=>{ m.val = parseFloat(s1.value); v1.textContent = m.val.toFixed(2); };
+      s1.addEventListener("input", upd1);
+      s1.addEventListener("dblclick", ()=>{ s1.value = 0; upd1(); });
+      upd1();
+      r1.appendChild(l1); r1.appendChild(s1); r1.appendChild(v1);
+      card.appendChild(r1);
+      modMacroRefs[m.id] = {slider:s1, upd:upd1};
+    }
+
     const dests = document.createElement("div");
     dests.className = "dests";
     card.appendChild(dests);
+    const pk = document.createElement("select");
+    pk.className = "patchpick";
+    const ph = document.createElement("option"); ph.value = ""; ph.textContent = "PATCH TO…"; pk.appendChild(ph);
+    let lastSec = null, grp = null;
+    for(const pp of PLIST){
+      if(pp.sec !== lastSec){
+        lastSec = pp.sec;
+        grp = document.createElement("optgroup");
+        const sd = SECTIONS.find(x=>x.id===pp.sec);
+        grp.label = sd ? sd.name : pp.sec.toUpperCase();
+        pk.appendChild(grp);
+      }
+      const o = document.createElement("option"); o.value = pp.id; o.textContent = pp.name;
+      grp.appendChild(o);
+    }
+    pk.onchange = ()=>{
+      if(!pk.value) return;
+      addRoute(id, pk.value);
+      toast(src.name + " → " + P[pk.value].name);
+      pk.value = "";
+    };
+    card.appendChild(pk);
     grid.appendChild(card);
     modCards[id] = {cv, ctx:cv.getContext("2d"), val, dests, card};
   }
 }
+const modMacroRefs = {};
+
 function drawModPage(){
   /* the mod page lives in the dock now, so only draw when that tab is showing */
   const grid = document.getElementById("modgrid");
@@ -722,7 +914,9 @@ function drawModPage(){
     g.clearRect(0,0,W,H);
     g.strokeStyle = "#1e1e26"; g.beginPath(); g.moveTo(0,H/2); g.lineTo(W,H/2); g.stroke();
     const h = modHist[id];
-    g.strokeStyle = id.startsWith("lfo") ? "#ff7a18" : (["bass","mid","high"].includes(id) ? "#2ee6d6" : "#ff3ea5");
+    const mm = modById(id);
+    g.strokeStyle = mm ? (mm.type==="env" ? "#b4ff5a" : mm.type==="macro" ? "#ff2fa0" : "#ff7a18")
+                       : (["bass","mid","high"].includes(id) ? "#2ee6d6" : "#ff3ea5");
     g.lineWidth = 1.5; g.beginPath();
     for(let i=0;i<MODHIST_N;i++){
       const v = h.buf[(h.w+i)%MODHIST_N];
@@ -776,6 +970,13 @@ function openModMenu(ev, p){
     }
     const sep = document.createElement("div"); sep.className="mmsep"; sep.textContent="ADD ANOTHER";
     m.appendChild(sep);
+  }
+  {
+    const b = document.createElement("div");
+    b.className = "mmrow anim";
+    b.textContent = "\u2726  ANIMATE \u2014 new LFO just for this";
+    b.onclick = e=>{ e.stopPropagation(); window.__animateParam(p.id); closeModMenu(); };
+    m.appendChild(b);
   }
 
   for(const src of MODSRC){
@@ -1416,12 +1617,9 @@ function buildAudioSection(){
 let refreshAudioDeviceUI = ()=>{};
 function refreshAudioUI(){ for(const r of audioUIRefs) r.refresh(); }
 function refreshLfoUI(){
-  for(const k of LFOKEYS){
-    const r = lfoUIRefs[k]; if(!r) continue;
-    r.slider.value = Math.log10(lfoState[k].rate);
-    r.val.textContent = lfoState[k].rate.toFixed(2);
-    r.shp.value = lfoState[k].shape;
-    if(r.sync){ r.sync.value = String(lfoState[k].sync||0); r.slider.disabled = (lfoState[k].sync||0)>0; }
+  for(const id in modMacroRefs){
+    const m = modById(id), r = modMacroRefs[id];
+    if(m && r){ r.slider.value = m.val; r.upd(); }
   }
 }
 function refreshUI(){
@@ -1565,7 +1763,7 @@ function onMidi(e){
     onMidi._lastClock = ts;
     return;
   }
-  if(st === 0xFA){ for(const k of LFOKEYS) lfoState[k].phase = 0; return; }
+  if(st === 0xFA){ for(const m of mods) if(m.type === "lfo") m.phase = 0; return; }
   if(st >= 0xF0) return;
   const d1 = e.data[1], d2 = e.data[2];
   const type = st & 0xf0;

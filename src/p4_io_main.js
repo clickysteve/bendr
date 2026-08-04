@@ -289,9 +289,10 @@ function randomizeAll(){
   }
   if(Math.random()<0.5) flowField = Math.floor(Math.random()*7);
   if(Math.random()<0.3) flowEdge = Math.floor(Math.random()*3);
-  for(const k of LFOKEYS){
-    lfoState[k].rate = Math.pow(10, -1.5+Math.random()*2.2);
-    if(Math.random()<0.4) lfoState[k].shape = ["sine","tri","saw","sqr","snh"][Math.floor(Math.random()*5)];
+  for(const m of mods){
+    if(m.type !== "lfo") continue;
+    m.rate = Math.pow(10, -1.5+Math.random()*2.2);
+    if(Math.random()<0.4) m.shape = ["sine","tri","saw","sqr","snh"][Math.floor(Math.random()*5)];
   }
   applyState(bases, rts);
   renderChain();
@@ -323,7 +324,7 @@ function captureState(){
       if(m==="pattern"||m==="synth"||m==="text"||m==="feed") o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed};
     } return o; })(),
     srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
-  for(const k of LFOKEYS) st[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
+  st.mods = JSON.parse(JSON.stringify(mods));
   return st;
 }
 function restoreState(st){
@@ -350,7 +351,7 @@ function restoreState(st){
       if(st.chan[ch][p.id] !== undefined) chanBase[ch][p.id] = st.chan[ch][p.id];
     if(st.master) for(const p of MLIST) if(st.master[p.id] !== undefined) mBase[p.id] = st.master[p.id];
     routes = (st.routes||[]).map(r=>({ch:"A", ...r}));
-    if(st.lfo1 || st.audioCfg) applyExtras(st);
+    if(st.mods || st.lfo1 || st.audioCfg) applyExtras(st);
     refreshUI(); renderRoutes(); refreshLfoUI(); refreshAudioUI();
   } else {
     applyState(st.bases||{}, st.routes||[], st);   /* legacy single-channel state */
@@ -376,7 +377,18 @@ function restoreState(st){
   renderChain();
 }
 function applyExtras(extra){
-  for(const k of LFOKEYS){ if(extra[k]) Object.assign(lfoState[k], extra[k]); }
+  if(extra.mods && extra.mods.length){
+    mods = JSON.parse(JSON.stringify(extra.mods));
+    for(const m of mods){
+      if(m.type === "lfo" && m.phase === undefined) m.phase = Math.random();
+      if(m.type === "env"){ m.level = m.level || 0; m.stage = "d"; m.prevGate = false; }
+    }
+    modSeq = Math.max(modSeq, mods.length);
+    rebuildMODSRC(); buildModPage();
+  } else {
+    /* patches saved before modulators became a list */
+    for(const k of LFOKEYS){ const m = modById(k); if(m && extra[k]) Object.assign(m, extra[k]); }
+  }
   if(extra.audioCfg){
     for(const k of ["bass","mid","high"]) if(extra.audioCfg[k]) Object.assign(audioCfg[k], extra.audioCfg[k]);
     if(extra.audioCfg.response !== undefined) audioCfg.response = extra.audioCfg.response;
@@ -410,10 +422,8 @@ function initPatch(){
   morphOverride.clear();
   morphA=null; morphB=null; morphOverride.clear();
   for(const el of ["morphBtnA","morphBtnB"]){ const b=document.getElementById(el); if(b) b.classList.remove("on"); }
-  Object.assign(lfoState.lfo1, {rate:0.3,  shape:"sine", sync:0});
-  Object.assign(lfoState.lfo2, {rate:1.7,  shape:"snh",  sync:0});
-  Object.assign(lfoState.lfo3, {rate:0.07, shape:"tri",  sync:0});
-  Object.assign(lfoState.lfo4, {rate:5.5,  shape:"sine", sync:0});
+  mods = defaultMods();
+  rebuildMODSRC(); buildModPage(); renderRoutes();
   Object.assign(audioCfg.bass, {lo:30,   hi:150,   gain:1});
   Object.assign(audioCfg.mid,  {lo:300,  hi:2200,  gain:1});
   Object.assign(audioCfg.high, {lo:4000, hi:11000, gain:1});
@@ -442,7 +452,7 @@ document.getElementById("btnSave").onclick = ()=>{
       if(m==="pattern"||m==="synth"||m==="text"||m==="feed") o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed};
     } return o; })(),
     srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
-  for(const k of LFOKEYS) state[k] = {rate:lfoState[k].rate, shape:lfoState[k].shape, sync:lfoState[k].sync||0};
+  state.mods = JSON.parse(JSON.stringify(mods));
   const blob = new Blob([JSON.stringify(state,null,1)], {type:"application/json"});
   dl(URL.createObjectURL(blob), "bendr-"+stamp()+".json");
   toast("State saved");
@@ -1242,6 +1252,12 @@ function refreshSnapUI(){
   const sb = document.getElementById("snapStoreBtn");
   if(sb) sb.classList.toggle("on", snapStoreArm);
 }
+window.__animateParam = function(pid){
+  const m = mkLfo({rate:0.25, shape:"sine"});
+  mods.push(m); rebuildMODSRC(); buildModPage();
+  addRoute(m.id, pid);
+  toast(m.name+" \u2192 "+P[pid].name+" \u2014 shape it on the MOD tab");
+};
 window.__snapHit = i=>{ if(snapStoreArm){ snapStore(i); snapStoreArm=false; } else snapRecall(i); refreshSnapUI(); };
 
 /* ---------------- performance recorder ----------------

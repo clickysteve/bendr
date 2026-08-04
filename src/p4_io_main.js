@@ -128,6 +128,7 @@ for(const [name, base, tog] of FBK){
 }
 
 function applyState(bases, rts, extra, chOnly){
+  if(typeof cancelGlide === "function") cancelGlide();
   /* a preset's flat value map loads into the target channel (default: active) plus master */
   const targets = chOnly ? [chOnly] : (linkChans ? CHANNELS : [activeChan]);
   for(const p of CLIST){
@@ -149,6 +150,7 @@ function applyState(bases, rts, extra, chOnly){
 function loadPreset(i){
   const pr = PRESETS[i]; if(!pr) return;
   pushHistory();
+  cancelGlide();
   applyState(pr[1], pr[2]);
   const tg = pr[3];
   flowField = (tg && tg.ff) || 0;
@@ -312,6 +314,7 @@ function captureState(){
   return st;
 }
 function restoreState(st){
+  if(typeof cancelGlide === "function") cancelGlide();
   if(st.rescanMode !== undefined) rescanMode = st.rescanMode;
   if(st.chainOrder && st.chainOrder.length>=4) chainOrder = st.chainOrder.slice();
   if(st.stageEnabled) stageEnabled = {...stageEnabled, ...st.stageEnabled};
@@ -369,6 +372,8 @@ function undo(){
 document.getElementById("btnUndo").onclick = undo;
 function initPatch(){
   pushHistory();
+  cancelGlide();
+  if(perfRec.mode !== "off") perfStop();
   fbTrailMode=false; rescanMode=false; keyChroma=false;
   mixMode=0; edgeMode=0; showKeyMatte=false; wipeInv=false; linkChans=false;
   fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbTap=0; outModel=0; fieldSrc=0; flowField=0; flowEdge=0;
@@ -687,7 +692,7 @@ function setDock(t){
     t = dockTab === "text" ? "matrix" : dockTab;
   }
   dockTab = t;
-  const map = {matrix:"matrix", mod:"modgrid", text:"textdock"};
+  const map = {bends:"bendsdock", matrix:"matrix", mod:"modgrid", text:"textdock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);
     if(el) el.classList.toggle("on", k===t);
@@ -696,6 +701,8 @@ function setDock(t){
   const hint = document.getElementById("dockHint");
   if(hint) hint.textContent = t==="mod" ? "right-click any parameter to patch it"
                             : t==="text" ? "typing here never triggers shortcuts"
+                            : t==="bends" ? "hold a pad \u2014 Q W E R T Y do the same"
+                            : t==="perform" ? "shift and a number recalls a snapshot"
                             : "patch sources into any parameter";
   if(t==="text") syncTextEditor();
   refreshDockTabs();
@@ -1092,19 +1099,7 @@ btnPop.onclick = ()=>{
 /* big performance randomize/mutate pads */
 document.getElementById("btnRnd").onclick = randomizeAll;
 document.getElementById("btnMut").onclick = mutate;
-/* the bend pads are a performance surface, not always wanted — folding them
-   away gives the mod matrix and the text editor the whole width of the dock */
-let bendPane = true;
-function setBendPane(on){
-  if(isTouch) on = true;   /* on a phone the pads live behind their own tab */
-  bendPane = on;
-  document.body.classList.toggle("nobend", !on);
-  const b = document.getElementById("btnBendPane");
-  if(b) b.classList.toggle("on", on);
-  sizeCanvas();
-  try{ localStorage.setItem("bendr.bendpane", on ? "1" : "0"); }catch(e){}
-}
-document.getElementById("btnBendPane").onclick = ()=>setBendPane(!bendPane);
+document.getElementById("btnBendPane").onclick = ()=>setDock(dockTab==="bends" ? "matrix" : "bends");
 document.getElementById("btnModPane").onclick = ()=>setDock(dockTab==="mod" ? "matrix" : "mod");
 
 /* bend buttons: mouse + touch */
@@ -1190,6 +1185,9 @@ function applySnapValues(to, m, from){
     mBase[p.id] = a + (to.master[p.id]-a)*m;
   }
 }
+/* a glide in flight must not keep writing over a preset, an init or an undo
+   that happens while it is travelling */
+function cancelGlide(){ glideFrom = glideTo = null; }
 function updateGlide(dt){
   if(!glideTo) return;
   glideT = Math.min(1, glideT + dt/Math.max(0.02, glideLen));
@@ -2039,7 +2037,13 @@ if(OUTPUT_MODE){
     try{ localStorage.setItem("bendr.mtab", t); }catch(e){}
     setTimeout(sizeCanvas, 60);
   }
-  document.querySelectorAll("#mtabs button").forEach(b=>{ b.onclick = ()=>setMTab(b.dataset.mtab); });
+  document.querySelectorAll("#mtabs button").forEach(b=>{
+    b.onclick = ()=>{
+      setMTab(b.dataset.mtab);
+      if(b.dataset.mtab === "bends") setDock("bends");
+      if(b.dataset.mtab === "matrix" && dockTab === "bends") setDock("matrix");
+    };
+  });
   let startTab = "controls";
   try{ startTab = localStorage.getItem("bendr.mtab") || "controls"; }catch(e){}
   setMTab(startTab);
@@ -2054,6 +2058,7 @@ if(OUTPUT_MODE){
 
   buildPanel();
   buildModPage();
+  buildPerformDock();
   setInterval(drawModPage, 50);
   setDock("matrix");
   {
@@ -2097,7 +2102,6 @@ if(OUTPUT_MODE){
   renderRoutes();
   wireMenus();
   wireDataTips();
-  { let bp = "1"; try{ bp = localStorage.getItem("bendr.bendpane") || "1"; }catch(e){} setBendPane(bp === "1"); }
   loadPreset(1);   /* RAINBOW RITE so it looks alive immediately */
   sizeCanvas();
   requestAnimationFrame(frame);

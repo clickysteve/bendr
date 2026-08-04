@@ -959,6 +959,81 @@ const tapeBtnRefs = [];
 const MIXMODES = ["FADE","WIPE H","WIPE V","DIAGONAL","BOX","CIRCLE","SPLIT H","SPLIT V",
   "BLINDS V","BLINDS H","CLOCK","DIAG BARS","BLOCKS","LUMA KEY","CHROMA KEY",
   "ADD","DIFFERENCE","MULTIPLY","SCREEN","LIGHTEN"];
+
+/* ---- PERFORM dock: snapshot bank + performance recorder ---- */
+function buildPerformDock(){
+  const host = document.getElementById("performdock");
+  if(!host) return;
+  host.innerHTML = "";
+
+  const colA = document.createElement("div"); colA.className = "pfcol";
+  const hA = document.createElement("h4"); hA.textContent = "SNAPSHOTS"; colA.appendChild(hA);
+  const grid = document.createElement("div"); grid.className = "snapgrid";
+  for(let i=0;i<SNAP_N;i++){
+    const b = document.createElement("button");
+    b.id = "snap"+i; b.className = "snapbtn"; b.textContent = (i+1);
+    attachTip(b, "SNAPSHOT "+(i+1),
+      "Click to recall this slot, gliding every control from where it is now to where the slot says. Arm STORE first to save into it instead.",
+      "Keyboard: shift+"+(i+1)+". A filled slot is outlined.");
+    b.onclick = ()=>window.__snapHit(i);
+    grid.appendChild(b);
+  }
+  colA.appendChild(grid);
+  const rowA = document.createElement("div"); rowA.className = "trow";
+  const sb = document.createElement("button"); sb.id = "snapStoreBtn"; sb.textContent = "STORE";
+  attachTip(sb, "STORE", "Arm this, then click a slot to write the whole rig into it. It disarms itself afterwards.");
+  sb.onclick = ()=>{ snapStoreArm = !snapStoreArm; refreshSnapUI(); };
+  const cl = document.createElement("button"); cl.textContent = "CLEAR ALL";
+  attachTip(cl, "CLEAR ALL", "Empties all eight slots.");
+  cl.onclick = ()=>{ for(let i=0;i<SNAP_N;i++) snapSlots[i]=null; refreshSnapUI(); toast("Snapshots cleared"); };
+  rowA.appendChild(sb); rowA.appendChild(cl);
+  colA.appendChild(rowA);
+
+  const colG = document.createElement("div"); colG.className = "pfcol";
+  const hG = document.createElement("h4"); hG.textContent = "GLIDE"; colG.appendChild(hG);
+  const gv = document.createElement("div");
+  gv.style.cssText = "color:var(--cyan); font-size:15px; letter-spacing:1px; padding:2px 0 4px;";
+  gv.textContent = snapGlide.toFixed(2)+"s";
+  const gs = document.createElement("input");
+  gs.type = "range"; gs.min = 0; gs.max = 12; gs.step = 0.05; gs.value = snapGlide;
+  gs.style.width = "170px";
+  attachTip(gs, "GLIDE", "How long a snapshot recall takes to travel. At zero it is a hard cut, like a preset; wound up it becomes a slow transformation of the whole rig, and is the most musical control in here.");
+  gs.addEventListener("input", ()=>{ snapGlide = parseFloat(gs.value); gv.textContent = snapGlide.toFixed(2)+"s"; });
+  colG.appendChild(gv); colG.appendChild(gs);
+
+  const colB = document.createElement("div"); colB.className = "pfcol";
+  const hB = document.createElement("h4"); hB.textContent = "PERFORMANCE RECORDER"; colB.appendChild(hB);
+  const rowB = document.createElement("div"); rowB.className = "trow"; rowB.style.minWidth = "300px";
+  const rb = document.createElement("button"); rb.id = "perfRecBtn"; rb.textContent = "● REC";
+  attachTip(rb, "RECORD PERFORMANCE",
+    "Writes down every control you move, twenty-four times a second, storing only what changed. Not video — gestures.",
+    "Because it is gestures, you can play the take back against completely different footage.");
+  rb.onclick = ()=>{ if(perfRec.mode==="rec") perfStop(); else perfStart(); };
+  const pb = document.createElement("button"); pb.id = "perfPlayBtn"; pb.textContent = "▶ PLAY";
+  attachTip(pb, "PLAY TAKE", "Replays the recorded take, moving the controls as you moved them. Touching anything while it plays fights the playback, which is a perfectly good way to perform over your own take.");
+  pb.onclick = ()=>{ if(perfRec.mode==="play") perfStop(); else perfPlay(); };
+  const lb = document.createElement("button"); lb.id = "perfLoopBtn"; lb.textContent = "LOOP";
+  attachTip(lb, "LOOP TAKE", "Runs the take round and round instead of stopping at the end.");
+  lb.onclick = ()=>{ perfRec.loop = !perfRec.loop; refreshPerfUI(); };
+  const cb = document.createElement("button"); cb.textContent = "CLR";
+  attachTip(cb, "CLEAR TAKE", "Throws the recorded take away.");
+  cb.onclick = ()=>{ perfClear(); toast("Take cleared"); };
+  rowB.appendChild(rb); rowB.appendChild(pb); rowB.appendChild(lb); rowB.appendChild(cb);
+  colB.appendChild(rowB);
+  const stt = document.createElement("div");
+  stt.id = "perfState";
+  stt.style.cssText = "color:var(--cyan); font-size:11px; letter-spacing:2px; padding:5px 0 0;";
+  stt.textContent = "NO TAKE";
+  colB.appendChild(stt);
+
+  const note = document.createElement("div");
+  note.className = "pfnote";
+  note.textContent = "Snapshots hold the whole rig — all four channels, every bus, every mode — and GLIDE decides how long it takes to get there. The recorder captures the moves rather than the picture, so a take built slowly over an hour can be replayed in real time, against other footage, and recorded out.";
+
+  host.appendChild(colA); host.appendChild(colG); host.appendChild(colB); host.appendChild(note);
+  refreshSnapUI(); refreshPerfUI();
+}
+
 function sectionExtras(id, d){
   if(id==="mixer" || id==="mixer2" || id==="mixerM"){
     const which = id==="mixer" ? 1 : (id==="mixer2" ? 2 : 3);
@@ -1009,77 +1084,6 @@ function sectionExtras(id, d){
       which===1 ? "Bus 1 combines channels A and B. Run the fader like a T-bar; wipes use SOFT for edge feather, DETAIL for blind/bar count, CTR X/Y for the origin. Give channel B a source first."
     : which===2 ? "Bus 2 combines channels C and D, exactly like bus 1. It only renders when the MASTER fader is above zero, so leaving it alone costs nothing."
     : "The master crossfade between the two buses \u2014 the same twenty transitions again, one level up. Push it off zero and channels C and D come alive.";
-    d.appendChild(note);
-  }
-  if(id==="snap"){
-    const grid = document.createElement("div");
-    grid.style.cssText = "display:grid; grid-template-columns:repeat(4,1fr); gap:5px; padding:2px 0 4px;";
-    for(let i=0;i<8;i++){
-      const b = document.createElement("button");
-      b.id = "snap"+i; b.className = "snapbtn"; b.textContent = (i+1);
-      attachTip(b, "SNAPSHOT "+(i+1),
-        "Click to recall this slot, gliding every control from where it is now to where the slot says. Arm STORE first to save into it instead.",
-        "Keyboard: shift+"+(i+1)+". A filled slot is outlined.");
-      b.onclick = ()=>window.__snapHit(i);
-      grid.appendChild(b);
-    }
-    d.appendChild(grid);
-    const tr = document.createElement("div"); tr.className="trow";
-    const sb = document.createElement("button"); sb.id="snapStoreBtn"; sb.textContent="STORE";
-    attachTip(sb, "STORE", "Arm this, then click a slot to write the whole rig into it. It disarms itself afterwards.");
-    sb.onclick = ()=>{ snapStoreArm = !snapStoreArm; refreshSnapUI(); };
-    tr.appendChild(sb);
-    const cl = document.createElement("button"); cl.textContent="CLEAR ALL";
-    attachTip(cl, "CLEAR ALL", "Empties all eight slots.");
-    cl.onclick = ()=>{ for(let i=0;i<8;i++) snapSlots[i]=null; refreshSnapUI(); toast("Snapshots cleared"); };
-    tr.appendChild(cl);
-    d.appendChild(tr);
-    /* glide time */
-    {
-      const row = document.createElement("div"); row.className="prow";
-      const lab = document.createElement("label"); lab.textContent = "GLIDE";
-      attachTip(lab, "GLIDE", "How long a snapshot recall takes to travel. At zero it is a hard cut, like a preset; wound up it becomes a slow transformation of the whole rig and is the most musical control in this section.");
-      const wrap = document.createElement("div"); wrap.className="sldwrap";
-      const sl = document.createElement("input");
-      sl.type="range"; sl.min=0; sl.max=12; sl.step=0.05; sl.value=snapGlide;
-      const v = document.createElement("span"); v.className="val"; v.textContent = snapGlide.toFixed(2)+"s";
-      sl.addEventListener("input", ()=>{ snapGlide = parseFloat(sl.value); v.textContent = snapGlide.toFixed(2)+"s"; });
-      wrap.appendChild(sl);
-      row.appendChild(lab); row.appendChild(wrap); row.appendChild(v);
-      d.appendChild(row);
-    }
-    const hr = document.createElement("div");
-    hr.style.cssText = "height:1px; background:var(--line); margin:8px 0 6px;";
-    d.appendChild(hr);
-    const pl = document.createElement("div");
-    pl.style.cssText = "font-size:7.5px; letter-spacing:1.5px; color:var(--dim); padding-bottom:3px;";
-    pl.textContent = "PERFORMANCE RECORDER";
-    d.appendChild(pl);
-    const tr2 = document.createElement("div"); tr2.className="trow";
-    const rb = document.createElement("button"); rb.id="perfRecBtn"; rb.textContent="\u25cf REC";
-    attachTip(rb, "RECORD PERFORMANCE",
-      "Writes down every control you move, twenty-four times a second, storing only what changed. Not video \u2014 gestures.",
-      "Because it is gestures, you can play the take back against completely different footage.");
-    rb.onclick = ()=>{ if(perfRec.mode==="rec") perfStop(); else perfStart(); };
-    const pb = document.createElement("button"); pb.id="perfPlayBtn"; pb.textContent="\u25b6 PLAY";
-    attachTip(pb, "PLAY TAKE", "Replays the recorded take, moving the controls as you moved them. Touching anything while it plays fights the playback, which is a legitimate way to perform over your own take.");
-    pb.onclick = ()=>{ if(perfRec.mode==="play") perfStop(); else perfPlay(); };
-    const lb = document.createElement("button"); lb.id="perfLoopBtn"; lb.textContent="LOOP";
-    attachTip(lb, "LOOP TAKE", "Runs the take round and round instead of stopping at the end.");
-    lb.onclick = ()=>{ perfRec.loop = !perfRec.loop; refreshPerfUI(); };
-    const cb = document.createElement("button"); cb.textContent="CLR";
-    attachTip(cb, "CLEAR TAKE", "Throws the recorded take away.");
-    cb.onclick = ()=>{ perfClear(); toast("Take cleared"); };
-    tr2.appendChild(rb); tr2.appendChild(pb); tr2.appendChild(lb); tr2.appendChild(cb);
-    d.appendChild(tr2);
-    const stt = document.createElement("div");
-    stt.id = "perfState";
-    stt.style.cssText = "color:var(--cyan); font-size:9px; letter-spacing:1.5px; padding:4px 0 2px;";
-    stt.textContent = "NO TAKE";
-    d.appendChild(stt);
-    const note = document.createElement("div");
-    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
-    note.textContent = "Snapshots hold the whole rig \u2014 all four channels, every bus, every mode \u2014 and GLIDE decides how long it takes to get there. The recorder captures the moves rather than the picture, so a take built slowly over an hour can be replayed in real time, against other footage, and recorded out.";
     d.appendChild(note);
   }
   if(id==="morph"){

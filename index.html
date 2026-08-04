@@ -79,7 +79,6 @@ body{
 .snapbtn.full{border-color:var(--cyan); color:var(--cyan);}
 .snapbtn.full:hover{border-color:var(--amber); color:#fff;}
 button.dim, input.dim, select.dim{opacity:.32; cursor:not-allowed;}
-body.nobend #bends{display:none;}
 /* ---------- panel zones ---------- */
 .zonehead{
   display:flex; align-items:center; gap:5px;
@@ -366,6 +365,13 @@ body.multi #mvlabels{display:grid;}
   padding:8px; align-content:start; overflow-y:auto;
 }
 #textdock{padding:10px 12px; overflow-y:auto;}
+#bendsdock .bendbtns{grid-template-columns:repeat(6,1fr); max-width:900px;}
+#dockBody > #performdock.on{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;}
+.pfcol{flex:0 0 auto; display:flex; flex-direction:column; gap:6px;}
+.pfcol .trow{width:100%;}
+.pfcol h4{font-size:8px; letter-spacing:2px; color:var(--dim); padding-bottom:3px;}
+.snapgrid{display:grid; grid-template-columns:repeat(4,54px); gap:6px;}
+.pfnote{color:var(--dim); font-size:8.5px; line-height:1.5; max-width:340px; flex:1 1 260px;}
 #textdock .edrow{display:flex; align-items:center; gap:8px; padding:5px 0; flex-wrap:wrap;}
 #textdock label{font-size:8.5px; letter-spacing:1.5px; color:var(--dim); white-space:nowrap;}
 #textdock input[type=range]{flex:1 1 80px; min-width:60px;}
@@ -381,8 +387,9 @@ body.multi #mvlabels{display:grid;}
 .sec.secdrag{opacity:.4;}
 .sec.secover{box-shadow:inset 0 3px 0 var(--cyan);}
 .sec h3 .grab{color:#3a3a46; font-size:9px; cursor:grab; letter-spacing:-1px;}
-#bends{flex:0 0 auto; padding:10px; border-right:1px solid var(--line); display:flex; flex-direction:column; gap:6px;}
-#bends h4, #matrix h4{font-size:8.5px; letter-spacing:2px; color:var(--dim); padding-bottom:2px;}
+#bendsdock{padding:12px 14px;}
+#performdock{padding:12px 14px;}
+#bendsdock h4, #performdock h4, #matrix h4{font-size:8.5px; letter-spacing:2px; color:var(--dim); padding-bottom:2px;}
 .bendbtns{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
 .bend{
   padding:10px 6px; font-size:9.5px; font-weight:700; letter-spacing:1px; text-align:center;
@@ -477,8 +484,8 @@ audio,video{display:none;}
     order:3; flex:1 1 auto; max-height:none; flex-direction:column;
     border-top:1px solid var(--line); overflow-y:auto; padding-bottom:78px;
   }
-  #bends{border-right:none; width:100%; flex:0 0 auto;}
-  .bendbtns{grid-template-columns:repeat(3,1fr); gap:8px;}
+  #bendsdock .bendbtns{grid-template-columns:repeat(3,1fr); gap:8px; max-width:none;}
+  #dockBody > #performdock.on{flex-direction:column; gap:14px;}
   .bend{padding:16px 6px; font-size:11px;}
   #matrix{width:100%;}
   .mrow{flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #1e1e26;}
@@ -490,8 +497,6 @@ audio,video{display:none;}
   body.mtab-controls #panel{display:block;}
   body.mtab-bends #panel, body.mtab-matrix #panel{display:none;}
   body.mtab-bends #lower, body.mtab-matrix #lower{display:flex;}
-  body.mtab-bends #matrix{display:none;}
-  body.mtab-matrix #bends{display:none;}
   body.mtab-video #panel, body.mtab-video #lower{display:none;}
   body.mtab-video #canvasWrap{aspect-ratio:auto; height:calc(100vh - 190px);}
 
@@ -518,7 +523,7 @@ audio,video{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v18.0</span>
+  <span id="ver" title="Build version">v19.0</span>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -651,8 +656,18 @@ audio,video{display:none;}
     </div>
     <div id="dragbar"></div>
     <div id="lower">
-      <div id="bends">
-        <h4>BEND — HOLD THESE</h4>
+      <div id="dock">
+        <div id="dockTabs">
+          <button data-dock="bends" data-tip="The six momentary bend pads. Hold one and it slams the rig somewhere for as long as you hold it, then lets go.">BEND</button>
+          <button data-dock="matrix" class="on" data-tip="The mod matrix: patch any source into any parameter, on any channel.">MATRIX</button>
+          <button data-dock="mod" data-tip="Every modulation source drawn live, with editable rates and shapes and a list of what each one is driving.">MOD</button>
+          <button data-dock="text" data-tip="The text and shape generator for this channel. Typing here never triggers keyboard shortcuts.">TEXT</button>
+          <button data-dock="perform" data-tip="Eight whole-rig snapshots with a glide time, and the performance recorder.">PERFORM</button>
+          <span style="flex:1;"></span>
+          <span id="dockHint"></span>
+        </div>
+        <div id="dockBody">
+      <div id="bendsdock">
         <div class="bendbtns">
           <button class="bend" data-bend="sync" data-tip="Momentary: slams the sync circuit out of lock while held, then it recovers. Bend pads apply to the channel you are editing (all of them with LINK on).">SYNC<small>hold Q</small></button>
           <button class="bend" data-bend="roll" data-tip="Momentary: breaks vertical hold so the picture rolls, with the blanking bar travelling through it.">ROLL<small>hold W</small></button>
@@ -662,15 +677,7 @@ audio,video{display:none;}
           <button class="bend" data-bend="kill" data-tip="Momentary: total collapse - sync, tracking and vertical hold all at once.">V-HOLD<small>hold Y</small></button>
         </div>
       </div>
-      <div id="dock">
-        <div id="dockTabs">
-          <button data-dock="matrix" class="on" data-tip="The mod matrix: patch any source into any parameter, on any channel.">MATRIX</button>
-          <button data-dock="mod" data-tip="Every modulation source drawn live, with editable rates and shapes and a list of what each one is driving.">MOD</button>
-          <button data-dock="text" data-tip="The text and shape generator for this channel. Typing here never triggers keyboard shortcuts.">TEXT</button>
-          <span style="flex:1;"></span>
-          <span id="dockHint"></span>
-        </div>
-        <div id="dockBody">
+      <div id="performdock"></div>
       <div id="matrix">
         <h4>MOD MATRIX — PATCH SOURCES INTO ANY PARAMETER <button id="btnAddRoute" style="margin-left:8px; padding:2px 8px;" data-tip="Add a modulation route: pick a source, a channel, a destination parameter and an amount. Right-clicking a parameter does the same thing faster.">+ ROUTE</button></h4>
         <div id="routes"></div>
@@ -766,7 +773,7 @@ audio,video{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v18.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v19.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once, <b>COPY</b> and <b>SWAP</b> move settings between a channel and its partner on the same bus (A&harr;B, C&harr;D).</p>
@@ -778,7 +785,7 @@ audio,video{display:none;}
   <h3>PATTERN SYNTH</h3>
   <p><b>SYNTH</b> under SOURCE turns a channel into a pattern generator rather than a player. It is built like a video synthesiser: coordinates go through a shape (scan, radial, spiral, plasma, lissajous, rings, starburst, grid, tunnel, cells, interference, polygon), then an oscillator with a selectable waveform, then cross-modulation between the axes, a wavefolder, a comparator, and finally a colouriser \u2014 mono, RGB phase, HSV sweep, duotone or hard bands. Every control is a modulation destination, so patching an LFO into CROSS MOD or FREQ X makes it a moving source. It runs entirely on the GPU, so it costs one pass and no file.</p>
   <h3>SNAPSHOTS AND THE PERFORMANCE RECORDER</h3>
-  <p>Eight slots hold the whole rig \u2014 all four channels, every bus, every mode. Arm <b>STORE</b> and click a slot to save; click a slot to recall (or <kbd>shift</kbd> and a number). <b>GLIDE</b> decides how long the recall takes to travel: at zero it is a hard cut like a preset, wound up it becomes a slow transformation of everything at once, which is the most musical control in the application.</p>
+  <p>Eight slots on the <b>PERFORM</b> tab of the dock hold the whole rig \u2014 all four channels, every bus, every mode. Arm <b>STORE</b> and click a slot to save; click a slot to recall (or <kbd>shift</kbd> and a number). <b>GLIDE</b> decides how long the recall takes to travel: at zero it is a hard cut like a preset, wound up it becomes a slow transformation of everything at once, which is the most musical control in the application.</p>
   <p>The <b>performance recorder</b> writes down every control you move, twenty-four times a second, storing only what changed. It is recording gestures rather than pixels, which means a take built slowly over an hour can be played back in real time \u2014 and played back against completely different footage. Takes are saved inside the patch file. Touching a control while a take plays fights the playback, which is a perfectly good way to perform over your own recording.</p>
   <h3>TEXT / SHAPES</h3>
   <p><b>TEXT</b> turns the selected channel into a text and shape generator — type anything, pick a font, position/scroll/repeat it, add outline, and layer a shape underneath (circle, ring, rect, triangle, cross, bars, grid, concentric, starburst) with count, spin and pulse. It feeds the channel like any other source, so you can glitch it, feed it back, and mix it against video on the other channel.</p>
@@ -808,6 +815,7 @@ audio,video{display:none;}
   <h3>MOVEMENT</h3>
   <p>Real bent circuits never sit still. Use the <b>MOD MATRIX</b> to patch four LFOs, chaos, drift, random spikes, or audio bands into any parameter. Set AUDIO to SOURCE to react to the video's own soundtrack, or MIC to react to the room. The <b>AUDIO REACT</b> section sets each band's frequency range and gain, with live level meters.</p>
   <h3>PERFORMANCE</h3>
+  <p>The dock under the picture has five tabs: <b>BEND</b>, <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b> and <b>PERFORM</b>. Each gets the full width, and the dock resizes by dragging the bar above it.</p>
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
   <h3>MIXER, MORPH, KEYER &amp; TIME BASE</h3>
   <p>Each of the three <b>MIXERS</b> gets the same twenty modes: a plain fade, twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and a movable origin, luma and chroma key transitions, and add / difference / multiply / screen / lighten blends. Run the fader like a T-bar. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor.</p>
@@ -819,7 +827,7 @@ audio,video{display:none;}
   <p>TAP sets the tempo; LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
   <h3>FINDING YOUR WAY AROUND</h3>
   <p>The top bar holds four menus \u2014 PATCH, SOURCE, ENGINE, OUTPUT \u2014 and everything you touch mid-performance stays out in the open: the preset list, RANDOMIZE and MUTATE, BEND and MOD to fold those panes in and out, and MULTI, BYPASS, REC, POP OUT and FULL on the right.</p>
-  <p>The panel is in four zones. <b>MIX &middot; PERFORM</b> sits under the channel buttons and does not move: the three mixers and the snapshot bank, which are what you reach for while something is playing. <b>CHANNEL &middot; SIGNAL PATH</b> holds everything belonging to the selected channel, in the order the signal actually travels &mdash; source, framing, frame store, feedback, then the reorderable stages, then the keyer &mdash; and it is the only zone you can rearrange, by dragging the handle on the left of a section. <b>FOLLOW CHAIN</b> in that zone's header re-sorts it to match whatever order you have dragged the stages into on the rail above the picture, and RESET puts it back. <b>MASTER OUT</b> and <b>TOOLS</b> are pinned at the bottom.</p>
+  <p>The panel is in four zones. <b>MIX</b> sits under the channel buttons and does not move: the three mixers, which are the last thing in the signal path and the first thing you reach for. <b>CHANNEL &middot; SIGNAL PATH</b> holds everything belonging to the selected channel, in the order the signal actually travels &mdash; source, framing, frame store, feedback, then the reorderable stages, then the keyer &mdash; and it is the only zone you can rearrange, by dragging the handle on the left of a section. <b>FOLLOW CHAIN</b> in that zone's header re-sorts it to match whatever order you have dragged the stages into on the rail above the picture, and RESET puts it back. <b>MASTER OUT</b> and <b>TOOLS</b> are pinned at the bottom.</p>
   <p>Hover any parameter name and you get a description of what it does and enough of the mechanism to know why it behaves the way it does. The same works on section headers, mode buttons, the bend pads and the menus. To reset one control, double-click its slider or press the <b>&#8634;</b> that appears when you hover the row; shift-clicking that takes it to the bottom of its range instead. RESET at the top of a section does the whole section, INIT does everything. Sections in the channel zone drag by the handle on the left to reorder, and the order is remembered.</p>
   <h3>KEYS</h3>
   <p><kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>1</kbd>–<kbd>9</kbd> presets &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> snapshot &nbsp; <kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>V</kbd> multiview &nbsp; <kbd>shift</kbd>+<kbd>1</kbd>–<kbd>8</kbd> snapshots &nbsp; <kbd>H</kbd> this help</p>
@@ -1901,7 +1909,6 @@ const SECTIONS = [
   {id:"mixer",    name:"MIX BUS 1",         cls:"mag",  zone:"mix"},
   {id:"mixer2",   name:"MIX BUS 2",         cls:"mag",  zone:"mix"},
   {id:"mixerM",   name:"MASTER MIX",        cls:"mag",  zone:"mix"},
-  {id:"snap",     name:"SNAPSHOTS / PERFORM", cls:"cyan", zone:"mix"},
 
   {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan", zone:"chain"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag",  zone:"chain"},
@@ -1924,7 +1931,7 @@ const SECTIONS = [
   {id:"morph",    name:"PRESET MORPH",      cls:"mag",  zone:"tools"},
 ];
 const ZONES = [
-  {id:"mix",   label:"MIX \u00b7 PERFORM",     note:"How the four channels combine, and the snapshot bank that moves the whole rig at once. Pinned here because it is the desk \u2014 these are the controls you reach for while something is playing."},
+  {id:"mix",   label:"MIX",                 note:"How the four channels combine. Pinned here because it is the desk \u2014 these faders are the last thing in the signal path and the first thing you reach for."},
   {id:"chain", label:"CHANNEL \u00b7 SIGNAL PATH", note:"Everything belonging to the channel selected above, in the order the signal actually travels: source, framing, frame store, feedback, then the reorderable stages, then the keyer. Drag by the handle to rearrange."},
   {id:"out",   label:"MASTER OUT",          note:"The shared display stage, after the mixer. Every channel ends up here."},
   {id:"tools", label:"TOOLS",               note:"Performance and modulation tools that do not belong to any one channel."},
@@ -2493,7 +2500,7 @@ const SECHELP = {
 };
 
 /* Master sections are single-instance; everything else exists once per channel. */
-const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","overlay","morph","snap"]);
+const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","overlay","morph"]);
 const CHANNELS = ["A","B","C","D"];
 const BUSPAIR = {A:"B", B:"A", C:"D", D:"C"};   // each channel's partner on its mixer bus
 const P = {};           // id -> param descriptor
@@ -3677,6 +3684,81 @@ const tapeBtnRefs = [];
 const MIXMODES = ["FADE","WIPE H","WIPE V","DIAGONAL","BOX","CIRCLE","SPLIT H","SPLIT V",
   "BLINDS V","BLINDS H","CLOCK","DIAG BARS","BLOCKS","LUMA KEY","CHROMA KEY",
   "ADD","DIFFERENCE","MULTIPLY","SCREEN","LIGHTEN"];
+
+/* ---- PERFORM dock: snapshot bank + performance recorder ---- */
+function buildPerformDock(){
+  const host = document.getElementById("performdock");
+  if(!host) return;
+  host.innerHTML = "";
+
+  const colA = document.createElement("div"); colA.className = "pfcol";
+  const hA = document.createElement("h4"); hA.textContent = "SNAPSHOTS"; colA.appendChild(hA);
+  const grid = document.createElement("div"); grid.className = "snapgrid";
+  for(let i=0;i<SNAP_N;i++){
+    const b = document.createElement("button");
+    b.id = "snap"+i; b.className = "snapbtn"; b.textContent = (i+1);
+    attachTip(b, "SNAPSHOT "+(i+1),
+      "Click to recall this slot, gliding every control from where it is now to where the slot says. Arm STORE first to save into it instead.",
+      "Keyboard: shift+"+(i+1)+". A filled slot is outlined.");
+    b.onclick = ()=>window.__snapHit(i);
+    grid.appendChild(b);
+  }
+  colA.appendChild(grid);
+  const rowA = document.createElement("div"); rowA.className = "trow";
+  const sb = document.createElement("button"); sb.id = "snapStoreBtn"; sb.textContent = "STORE";
+  attachTip(sb, "STORE", "Arm this, then click a slot to write the whole rig into it. It disarms itself afterwards.");
+  sb.onclick = ()=>{ snapStoreArm = !snapStoreArm; refreshSnapUI(); };
+  const cl = document.createElement("button"); cl.textContent = "CLEAR ALL";
+  attachTip(cl, "CLEAR ALL", "Empties all eight slots.");
+  cl.onclick = ()=>{ for(let i=0;i<SNAP_N;i++) snapSlots[i]=null; refreshSnapUI(); toast("Snapshots cleared"); };
+  rowA.appendChild(sb); rowA.appendChild(cl);
+  colA.appendChild(rowA);
+
+  const colG = document.createElement("div"); colG.className = "pfcol";
+  const hG = document.createElement("h4"); hG.textContent = "GLIDE"; colG.appendChild(hG);
+  const gv = document.createElement("div");
+  gv.style.cssText = "color:var(--cyan); font-size:15px; letter-spacing:1px; padding:2px 0 4px;";
+  gv.textContent = snapGlide.toFixed(2)+"s";
+  const gs = document.createElement("input");
+  gs.type = "range"; gs.min = 0; gs.max = 12; gs.step = 0.05; gs.value = snapGlide;
+  gs.style.width = "170px";
+  attachTip(gs, "GLIDE", "How long a snapshot recall takes to travel. At zero it is a hard cut, like a preset; wound up it becomes a slow transformation of the whole rig, and is the most musical control in here.");
+  gs.addEventListener("input", ()=>{ snapGlide = parseFloat(gs.value); gv.textContent = snapGlide.toFixed(2)+"s"; });
+  colG.appendChild(gv); colG.appendChild(gs);
+
+  const colB = document.createElement("div"); colB.className = "pfcol";
+  const hB = document.createElement("h4"); hB.textContent = "PERFORMANCE RECORDER"; colB.appendChild(hB);
+  const rowB = document.createElement("div"); rowB.className = "trow"; rowB.style.minWidth = "300px";
+  const rb = document.createElement("button"); rb.id = "perfRecBtn"; rb.textContent = "● REC";
+  attachTip(rb, "RECORD PERFORMANCE",
+    "Writes down every control you move, twenty-four times a second, storing only what changed. Not video — gestures.",
+    "Because it is gestures, you can play the take back against completely different footage.");
+  rb.onclick = ()=>{ if(perfRec.mode==="rec") perfStop(); else perfStart(); };
+  const pb = document.createElement("button"); pb.id = "perfPlayBtn"; pb.textContent = "▶ PLAY";
+  attachTip(pb, "PLAY TAKE", "Replays the recorded take, moving the controls as you moved them. Touching anything while it plays fights the playback, which is a perfectly good way to perform over your own take.");
+  pb.onclick = ()=>{ if(perfRec.mode==="play") perfStop(); else perfPlay(); };
+  const lb = document.createElement("button"); lb.id = "perfLoopBtn"; lb.textContent = "LOOP";
+  attachTip(lb, "LOOP TAKE", "Runs the take round and round instead of stopping at the end.");
+  lb.onclick = ()=>{ perfRec.loop = !perfRec.loop; refreshPerfUI(); };
+  const cb = document.createElement("button"); cb.textContent = "CLR";
+  attachTip(cb, "CLEAR TAKE", "Throws the recorded take away.");
+  cb.onclick = ()=>{ perfClear(); toast("Take cleared"); };
+  rowB.appendChild(rb); rowB.appendChild(pb); rowB.appendChild(lb); rowB.appendChild(cb);
+  colB.appendChild(rowB);
+  const stt = document.createElement("div");
+  stt.id = "perfState";
+  stt.style.cssText = "color:var(--cyan); font-size:11px; letter-spacing:2px; padding:5px 0 0;";
+  stt.textContent = "NO TAKE";
+  colB.appendChild(stt);
+
+  const note = document.createElement("div");
+  note.className = "pfnote";
+  note.textContent = "Snapshots hold the whole rig — all four channels, every bus, every mode — and GLIDE decides how long it takes to get there. The recorder captures the moves rather than the picture, so a take built slowly over an hour can be replayed in real time, against other footage, and recorded out.";
+
+  host.appendChild(colA); host.appendChild(colG); host.appendChild(colB); host.appendChild(note);
+  refreshSnapUI(); refreshPerfUI();
+}
+
 function sectionExtras(id, d){
   if(id==="mixer" || id==="mixer2" || id==="mixerM"){
     const which = id==="mixer" ? 1 : (id==="mixer2" ? 2 : 3);
@@ -3727,77 +3809,6 @@ function sectionExtras(id, d){
       which===1 ? "Bus 1 combines channels A and B. Run the fader like a T-bar; wipes use SOFT for edge feather, DETAIL for blind/bar count, CTR X/Y for the origin. Give channel B a source first."
     : which===2 ? "Bus 2 combines channels C and D, exactly like bus 1. It only renders when the MASTER fader is above zero, so leaving it alone costs nothing."
     : "The master crossfade between the two buses \u2014 the same twenty transitions again, one level up. Push it off zero and channels C and D come alive.";
-    d.appendChild(note);
-  }
-  if(id==="snap"){
-    const grid = document.createElement("div");
-    grid.style.cssText = "display:grid; grid-template-columns:repeat(4,1fr); gap:5px; padding:2px 0 4px;";
-    for(let i=0;i<8;i++){
-      const b = document.createElement("button");
-      b.id = "snap"+i; b.className = "snapbtn"; b.textContent = (i+1);
-      attachTip(b, "SNAPSHOT "+(i+1),
-        "Click to recall this slot, gliding every control from where it is now to where the slot says. Arm STORE first to save into it instead.",
-        "Keyboard: shift+"+(i+1)+". A filled slot is outlined.");
-      b.onclick = ()=>window.__snapHit(i);
-      grid.appendChild(b);
-    }
-    d.appendChild(grid);
-    const tr = document.createElement("div"); tr.className="trow";
-    const sb = document.createElement("button"); sb.id="snapStoreBtn"; sb.textContent="STORE";
-    attachTip(sb, "STORE", "Arm this, then click a slot to write the whole rig into it. It disarms itself afterwards.");
-    sb.onclick = ()=>{ snapStoreArm = !snapStoreArm; refreshSnapUI(); };
-    tr.appendChild(sb);
-    const cl = document.createElement("button"); cl.textContent="CLEAR ALL";
-    attachTip(cl, "CLEAR ALL", "Empties all eight slots.");
-    cl.onclick = ()=>{ for(let i=0;i<8;i++) snapSlots[i]=null; refreshSnapUI(); toast("Snapshots cleared"); };
-    tr.appendChild(cl);
-    d.appendChild(tr);
-    /* glide time */
-    {
-      const row = document.createElement("div"); row.className="prow";
-      const lab = document.createElement("label"); lab.textContent = "GLIDE";
-      attachTip(lab, "GLIDE", "How long a snapshot recall takes to travel. At zero it is a hard cut, like a preset; wound up it becomes a slow transformation of the whole rig and is the most musical control in this section.");
-      const wrap = document.createElement("div"); wrap.className="sldwrap";
-      const sl = document.createElement("input");
-      sl.type="range"; sl.min=0; sl.max=12; sl.step=0.05; sl.value=snapGlide;
-      const v = document.createElement("span"); v.className="val"; v.textContent = snapGlide.toFixed(2)+"s";
-      sl.addEventListener("input", ()=>{ snapGlide = parseFloat(sl.value); v.textContent = snapGlide.toFixed(2)+"s"; });
-      wrap.appendChild(sl);
-      row.appendChild(lab); row.appendChild(wrap); row.appendChild(v);
-      d.appendChild(row);
-    }
-    const hr = document.createElement("div");
-    hr.style.cssText = "height:1px; background:var(--line); margin:8px 0 6px;";
-    d.appendChild(hr);
-    const pl = document.createElement("div");
-    pl.style.cssText = "font-size:7.5px; letter-spacing:1.5px; color:var(--dim); padding-bottom:3px;";
-    pl.textContent = "PERFORMANCE RECORDER";
-    d.appendChild(pl);
-    const tr2 = document.createElement("div"); tr2.className="trow";
-    const rb = document.createElement("button"); rb.id="perfRecBtn"; rb.textContent="\u25cf REC";
-    attachTip(rb, "RECORD PERFORMANCE",
-      "Writes down every control you move, twenty-four times a second, storing only what changed. Not video \u2014 gestures.",
-      "Because it is gestures, you can play the take back against completely different footage.");
-    rb.onclick = ()=>{ if(perfRec.mode==="rec") perfStop(); else perfStart(); };
-    const pb = document.createElement("button"); pb.id="perfPlayBtn"; pb.textContent="\u25b6 PLAY";
-    attachTip(pb, "PLAY TAKE", "Replays the recorded take, moving the controls as you moved them. Touching anything while it plays fights the playback, which is a legitimate way to perform over your own take.");
-    pb.onclick = ()=>{ if(perfRec.mode==="play") perfStop(); else perfPlay(); };
-    const lb = document.createElement("button"); lb.id="perfLoopBtn"; lb.textContent="LOOP";
-    attachTip(lb, "LOOP TAKE", "Runs the take round and round instead of stopping at the end.");
-    lb.onclick = ()=>{ perfRec.loop = !perfRec.loop; refreshPerfUI(); };
-    const cb = document.createElement("button"); cb.textContent="CLR";
-    attachTip(cb, "CLEAR TAKE", "Throws the recorded take away.");
-    cb.onclick = ()=>{ perfClear(); toast("Take cleared"); };
-    tr2.appendChild(rb); tr2.appendChild(pb); tr2.appendChild(lb); tr2.appendChild(cb);
-    d.appendChild(tr2);
-    const stt = document.createElement("div");
-    stt.id = "perfState";
-    stt.style.cssText = "color:var(--cyan); font-size:9px; letter-spacing:1.5px; padding:4px 0 2px;";
-    stt.textContent = "NO TAKE";
-    d.appendChild(stt);
-    const note = document.createElement("div");
-    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
-    note.textContent = "Snapshots hold the whole rig \u2014 all four channels, every bus, every mode \u2014 and GLIDE decides how long it takes to get there. The recorder captures the moves rather than the picture, so a take built slowly over an hour can be replayed in real time, against other footage, and recorded out.";
     d.appendChild(note);
   }
   if(id==="morph"){
@@ -4313,6 +4324,7 @@ for(const [name, base, tog] of FBK){
 }
 
 function applyState(bases, rts, extra, chOnly){
+  if(typeof cancelGlide === "function") cancelGlide();
   /* a preset's flat value map loads into the target channel (default: active) plus master */
   const targets = chOnly ? [chOnly] : (linkChans ? CHANNELS : [activeChan]);
   for(const p of CLIST){
@@ -4334,6 +4346,7 @@ function applyState(bases, rts, extra, chOnly){
 function loadPreset(i){
   const pr = PRESETS[i]; if(!pr) return;
   pushHistory();
+  cancelGlide();
   applyState(pr[1], pr[2]);
   const tg = pr[3];
   flowField = (tg && tg.ff) || 0;
@@ -4497,6 +4510,7 @@ function captureState(){
   return st;
 }
 function restoreState(st){
+  if(typeof cancelGlide === "function") cancelGlide();
   if(st.rescanMode !== undefined) rescanMode = st.rescanMode;
   if(st.chainOrder && st.chainOrder.length>=4) chainOrder = st.chainOrder.slice();
   if(st.stageEnabled) stageEnabled = {...stageEnabled, ...st.stageEnabled};
@@ -4554,6 +4568,8 @@ function undo(){
 document.getElementById("btnUndo").onclick = undo;
 function initPatch(){
   pushHistory();
+  cancelGlide();
+  if(perfRec.mode !== "off") perfStop();
   fbTrailMode=false; rescanMode=false; keyChroma=false;
   mixMode=0; edgeMode=0; showKeyMatte=false; wipeInv=false; linkChans=false;
   fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbTap=0; outModel=0; fieldSrc=0; flowField=0; flowEdge=0;
@@ -4872,7 +4888,7 @@ function setDock(t){
     t = dockTab === "text" ? "matrix" : dockTab;
   }
   dockTab = t;
-  const map = {matrix:"matrix", mod:"modgrid", text:"textdock"};
+  const map = {bends:"bendsdock", matrix:"matrix", mod:"modgrid", text:"textdock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);
     if(el) el.classList.toggle("on", k===t);
@@ -4881,6 +4897,8 @@ function setDock(t){
   const hint = document.getElementById("dockHint");
   if(hint) hint.textContent = t==="mod" ? "right-click any parameter to patch it"
                             : t==="text" ? "typing here never triggers shortcuts"
+                            : t==="bends" ? "hold a pad \u2014 Q W E R T Y do the same"
+                            : t==="perform" ? "shift and a number recalls a snapshot"
                             : "patch sources into any parameter";
   if(t==="text") syncTextEditor();
   refreshDockTabs();
@@ -5277,19 +5295,7 @@ btnPop.onclick = ()=>{
 /* big performance randomize/mutate pads */
 document.getElementById("btnRnd").onclick = randomizeAll;
 document.getElementById("btnMut").onclick = mutate;
-/* the bend pads are a performance surface, not always wanted — folding them
-   away gives the mod matrix and the text editor the whole width of the dock */
-let bendPane = true;
-function setBendPane(on){
-  if(isTouch) on = true;   /* on a phone the pads live behind their own tab */
-  bendPane = on;
-  document.body.classList.toggle("nobend", !on);
-  const b = document.getElementById("btnBendPane");
-  if(b) b.classList.toggle("on", on);
-  sizeCanvas();
-  try{ localStorage.setItem("bendr.bendpane", on ? "1" : "0"); }catch(e){}
-}
-document.getElementById("btnBendPane").onclick = ()=>setBendPane(!bendPane);
+document.getElementById("btnBendPane").onclick = ()=>setDock(dockTab==="bends" ? "matrix" : "bends");
 document.getElementById("btnModPane").onclick = ()=>setDock(dockTab==="mod" ? "matrix" : "mod");
 
 /* bend buttons: mouse + touch */
@@ -5375,6 +5381,9 @@ function applySnapValues(to, m, from){
     mBase[p.id] = a + (to.master[p.id]-a)*m;
   }
 }
+/* a glide in flight must not keep writing over a preset, an init or an undo
+   that happens while it is travelling */
+function cancelGlide(){ glideFrom = glideTo = null; }
 function updateGlide(dt){
   if(!glideTo) return;
   glideT = Math.min(1, glideT + dt/Math.max(0.02, glideLen));
@@ -6224,7 +6233,13 @@ if(OUTPUT_MODE){
     try{ localStorage.setItem("bendr.mtab", t); }catch(e){}
     setTimeout(sizeCanvas, 60);
   }
-  document.querySelectorAll("#mtabs button").forEach(b=>{ b.onclick = ()=>setMTab(b.dataset.mtab); });
+  document.querySelectorAll("#mtabs button").forEach(b=>{
+    b.onclick = ()=>{
+      setMTab(b.dataset.mtab);
+      if(b.dataset.mtab === "bends") setDock("bends");
+      if(b.dataset.mtab === "matrix" && dockTab === "bends") setDock("matrix");
+    };
+  });
   let startTab = "controls";
   try{ startTab = localStorage.getItem("bendr.mtab") || "controls"; }catch(e){}
   setMTab(startTab);
@@ -6239,6 +6254,7 @@ if(OUTPUT_MODE){
 
   buildPanel();
   buildModPage();
+  buildPerformDock();
   setInterval(drawModPage, 50);
   setDock("matrix");
   {
@@ -6282,7 +6298,6 @@ if(OUTPUT_MODE){
   renderRoutes();
   wireMenus();
   wireDataTips();
-  { let bp = "1"; try{ bp = localStorage.getItem("bendr.bendpane") || "1"; }catch(e){} setBendPane(bp === "1"); }
   loadPreset(1);   /* RAINBOW RITE so it looks alive immediately */
   sizeCanvas();
   requestAnimationFrame(frame);

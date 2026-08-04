@@ -1043,7 +1043,6 @@ const SECTIONS = [
   {id:"mixer",    name:"MIX BUS 1",         cls:"mag",  zone:"mix"},
   {id:"mixer2",   name:"MIX BUS 2",         cls:"mag",  zone:"mix"},
   {id:"mixerM",   name:"MASTER MIX",        cls:"mag",  zone:"mix"},
-  {id:"snap",     name:"SNAPSHOTS / PERFORM", cls:"cyan", zone:"mix"},
 
   {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan", zone:"chain"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag",  zone:"chain"},
@@ -1066,7 +1065,7 @@ const SECTIONS = [
   {id:"morph",    name:"PRESET MORPH",      cls:"mag",  zone:"tools"},
 ];
 const ZONES = [
-  {id:"mix",   label:"MIX \u00b7 PERFORM",     note:"How the four channels combine, and the snapshot bank that moves the whole rig at once. Pinned here because it is the desk \u2014 these are the controls you reach for while something is playing."},
+  {id:"mix",   label:"MIX",                 note:"How the four channels combine. Pinned here because it is the desk \u2014 these faders are the last thing in the signal path and the first thing you reach for."},
   {id:"chain", label:"CHANNEL \u00b7 SIGNAL PATH", note:"Everything belonging to the channel selected above, in the order the signal actually travels: source, framing, frame store, feedback, then the reorderable stages, then the keyer. Drag by the handle to rearrange."},
   {id:"out",   label:"MASTER OUT",          note:"The shared display stage, after the mixer. Every channel ends up here."},
   {id:"tools", label:"TOOLS",               note:"Performance and modulation tools that do not belong to any one channel."},
@@ -1635,7 +1634,7 @@ const SECHELP = {
 };
 
 /* Master sections are single-instance; everything else exists once per channel. */
-const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","overlay","morph","snap"]);
+const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","overlay","morph"]);
 const CHANNELS = ["A","B","C","D"];
 const BUSPAIR = {A:"B", B:"A", C:"D", D:"C"};   // each channel's partner on its mixer bus
 const P = {};           // id -> param descriptor

@@ -341,8 +341,8 @@ if(OUTPUT_MODE){
     }
   }, 700);
   document.getElementById("btnChainReset").onclick = ()=>{
-    chainOrder = ["sig","col","glitch","lab","flow"];
-    stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true};
+    chainOrder = CHAIN_STAGES.slice();
+    stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true, scan:true};
     renderChain();
   };
   renderRoutes();

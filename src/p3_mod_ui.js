@@ -1582,6 +1582,7 @@ const STAGE_INFO = {
   glitch: {name:"GLITCH LAB",   sec:["glitch"]},
   lab:    {name:"SIGNAL LAB",   sec:["lab"]},
   flow:   {name:"FLOW / MOSH",  sec:["flow"]},
+  scan:   {name:"SCAN",         sec:["scan"]},
 };
 let dragStage = null;
 const isTouch = window.matchMedia("(hover:none) and (pointer:coarse)").matches;
@@ -1836,12 +1837,32 @@ function sectionExtras(id, d){
     : "The same again for the master crossfade between the two buses.";
     d.appendChild(note);
   }
+  if(id==="scan"){
+    const tr = document.createElement("div"); tr.className="trow";
+    mkToggle(tr, "scanRevH", ()=>"SWEEP: "+(scanRevH?"REVERSED":"NORMAL"), ()=>{ scanRevH=!scanRevH; },
+      "Reverses the horizontal sweep. Not a mirror of the picture: the beam genuinely travels the other way, so it composes with everything that depends on scan order - the wobble phase, the velocity brightness, the sync model upstream.");
+    mkToggle(tr, "scanRevV", ()=>"FIELD: "+(scanRevV?"REVERSED":"NORMAL"), ()=>{ scanRevV=!scanRevV; },
+      "Reverses the field, so the raster is written from the bottom up.");
+    d.appendChild(tr);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "The picture is drawn as a stack of glowing lines whose vertical position is pushed by brightness, then photographed. Where the lines bunch you get a bright ridge, where they splay you get a gap - that density, not the displacement, is what the look actually is. SCAN DISPLACE is the only control that has to be above zero; TILT turns a deflection into an apparent surface; VELOCITY GAIN brightens the beam where it sweeps slower. LINES and DETAIL cost real geometry, so they are the two to pull back if it gets heavy.";
+    d.appendChild(note);
+  }
+  if(id==="sync"){
+    const tr = document.createElement("div"); tr.className="trow";
+    mkToggle(tr, "syncLatch", ()=>"LOCK: "+(syncLatch?"LATCHED OFF":"RECOVERS"), ()=>{ syncLatch=!syncLatch; },
+      "Normally a loss of lock shears the picture and then the loop re-acquires over the next few hundred milliseconds, because that is what a working circuit does. LATCHED means it never comes back: every shear stays where it happened and the next one lands on top of it. Turn it off again and the whole accumulated mess unwinds at once.");
+    d.appendChild(tr);
+  }
   if(id==="feedback"){
     const tr = document.createElement("div"); tr.className="trow";
     const bm = document.createElement("button"); bm.textContent="MODE: MIX"; bm.id="fbModeBtn";
     bm.onclick = ()=>{ fbTrailMode=!fbTrailMode; bm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX"); };
     tr.appendChild(bm);
     mkToggle(tr, "rescan", ()=>"RESCAN: "+(rescanMode?"FULL":"CLEAN"), ()=>{ rescanMode=!rescanMode; }, "CLEAN taps the loop before the display stage. FULL taps it after, so scanlines, mask, curvature and bloom all go back round \u2014 the software equivalent of pointing a camera at the monitor it is feeding.");
+    mkToggle(tr, "fbServo", ()=>"SERVO: "+(fbNoServo?"DEFEATED":"ON"), ()=>{ fbNoServo=!fbNoServo; },
+      "The auto-level servo keeps the loop off the black and white attractors, which is why AUTO LEVEL exists and why the interesting settings stay findable. Defeating it removes the safety net: the loop is then free to run away to white or collapse to black and stay there, which is what a feedback rig with no operator actually does.");
     d.appendChild(tr);
     const tr2 = document.createElement("div"); tr2.className="trow";
     const WRAPS=["CLAMP","REPEAT","MIRROR"], MIRS=["NO MIRROR","MIRROR H","MIRROR V","QUAD"],

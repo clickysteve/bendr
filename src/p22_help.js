@@ -292,6 +292,27 @@ const PHELP = {
   blackLevel:"Where black sits. Lift it for the washed-out blacks of a badly set-up monitor; drop it to crush.",
   whiteClip:"Where the picture clips to white. Below 1 the highlights blow out early.",
   phosphor:"Phosphor persistence: each frame leaves a decaying afterglow. This is a display-stage trail, quite different from feedback — it never re-enters the chain.",
+  scanAmt:"How hard brightness pushes the scan line up. This is the whole machine in one control: video luminance patched into the vertical deflection, so the picture physically bends the raster instead of being sampled by it. At zero the stage does nothing and costs nothing.",
+  scanLines:"How many scan lines are drawn. Fewer means you see the individual lines and the gaps between them, which is the look; more approaches a continuous surface. This is real geometry, so it is one of the two controls that actually costs frame rate.",
+  scanSamples:"How many points each line is drawn from. Too few and a steep displacement turns into visible facets; too many is wasted. The other control that costs frame rate.",
+  scanWidth:"How wide the beam is. Thin lines give you the drawn, wiry look; wide ones close the gaps into a surface.",
+  scanVel:"How much the beam brightens where it sweeps slowly. On a real tube a slower beam deposits more energy per unit length, which is why the ridges of a displaced raster glow and the steep faces go dim. Turning this off leaves you with something that looks like a displacement map rather than a photographed tube.",
+  scanGain:"Overall brightness of the drawn raster. The lines add where they overlap, so this interacts with LINES: doubling the line count roughly doubles the brightness of a flat area.",
+  scanTiltX:"Tilts the raster away from you. This is what turns a two-dimensional deflection into an apparent surface, and it is the reason the effect reads as three-dimensional when it is nothing of the kind.",
+  scanTiltY:"Rotates the raster about the vertical, so you see the displacement from the side.",
+  scanPersp:"How much perspective is applied to the tilt. Zero is an isometric view; wound up, the far edge converges.",
+  scanMono:"Discards the colour and draws the raster in luminance only, which is what the original did - it was a black and white monitor being re-shot.",
+  scanHue:"Colourises the drawn raster by brightness, so the displacement and the colour carry the same information. Fights with MONO on purpose.",
+  scanCurve:"Bends the whole raster into an S, the way a continuous-wind yoke does. It is applied before the displacement, so the picture bends with it.",
+  scanSkew:"Leans the raster sideways, which a bench monitor would call parallelogram. Also applied before displacement.",
+  scanCollapse:"Removes the current from the vertical deflection, so the raster falls in on itself. At full the entire frame is smeared along a single line, which is a genuinely strange thing to look at and hard to get any other way.",
+  scanWobAmt:"Drives the deflection from an oscillator, the way a Wobbulator does by adding extra yokes and feeding them from a signal generator.",
+  scanWobFreq:"The oscillator frequency, as a multiple of the field rate.",
+  scanWobLock:"How firmly the oscillator is locked to the field rate. Fully locked, the distortion stands still because it repeats identically every frame. Unlocked, it crawls, and the crawl is the characteristic gesture of the instrument.",
+  scanLissa:"Drives the horizontal deflection from a second oscillator as well, so the two axes trace a Lissajous figure and the raster ties itself in knots.",
+  phosR:"How long the red phosphor holds, relative to the persistence control.",
+  phosG:"How long the green phosphor holds. On real P22 phosphors green is the slowest, which is why a fast movement on a tube leaves a green-tinted wake rather than a grey one.",
+  phosB:"How long the blue phosphor holds. Blue decays fastest, so it forms the leading edge of a trail.",
   hvSag:"On a real tube the high-voltage supply sags when the picture is bright, so the raster grows. Bright scenes literally get wider.",
 
   /* ---- output overlay ---- */
@@ -351,6 +372,7 @@ const SECHELP = {
   color:"A straightforward colour corrector at the end of the per-channel chain — levels, saturation, hue, and the graphic operations.",
   crt:"The master display stage, shared by everything. Not a filter but a model of a screen: mask geometry, beam profile, persistence, and the output transform.",
   overlay:"Everything between the picture and the eye: the lens, the glass in front of the screen, the panel itself, and the deck's own burnt-in display. Not effects on the signal, but artefacts of whatever it is being watched through.",
+  scan:"A scan processor, in the sense the word had before it meant anything digital. The picture is not sampled; it is drawn, as a stack of glowing lines whose vertical position is pushed by brightness, and then photographed. The apparent depth is an artefact of that, not a model of a scene. Where the lines bunch you get a bright ridge and where they splay you get a gap, which is the part a displacement map cannot reproduce and the part that makes it look like a machine.",
   lab:"Techniques from the open-source glitch canon, rebuilt: sparse line jitter, NTSC crosstalk, slitscan, bit crush, moire, and video-rate field modulation.",
   audio:"Sets what the audio-reactive mod sources listen to: each band's frequency range and gain, the input device, and the response time.",
   lfo:"Rates and shapes for the four LFOs, plus tempo and the sync divisions.",
@@ -445,6 +467,13 @@ let fbBlend = 0;       // 0 mix 1 add 2 screen 3 max 4 min 5 difference
 let fbNL = 0;          // 0 clamp 1 tanh 2 wrap 3 fold
 let fbInvert = false;  // invert each pass
 let fbTap = 0;         // 0 pre-display  1 post-display (rescan)
+/* deflection reversal is a switch on the yoke, not a continuous control */
+let scanRevH = false, scanRevV = false;
+/* Two ways to let the machine fail without recovering. Everything else here is
+   bounded because a control needs bounds, but a model that always recovers is
+   a model that cannot actually break. */
+let syncLatch = false;    // the PLL never re-acquires
+let fbNoServo = false;    // nothing pulls feedback gain back to unity
 let flowField = 0;     // FLOW field: 0 motion 1 contour 2 curl-noise 3 radial 4 spiral 5 chroma 6 weave
 let flowEdge = 0;      // FLOW edge: 0 clamp 1 repeat 2 mirror
 let outModel = 0;      // display model index

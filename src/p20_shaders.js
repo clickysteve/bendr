@@ -505,6 +505,136 @@ const FS_MIX = COMMON + KEYFN +
 "  }\n" +
 "  O = vec4(clamp(src,0.0,1.6),1.0);\n}\n";
 
+/* ---------------- the scan processor ----------------
+   Every other stage here is a fragment shader: a full-screen triangle, one
+   output pixel sampled from one input pixel. This one is not, and it cannot be.
+
+   A Rutt/Etra intercepts a monitor's deflection signals before the yoke and
+   patches video luminance into the vertical position control, so bright parts
+   of the picture physically pull the scan line up the tube. A camera then
+   re-shoots the tube. The apparent depth is an artefact of photographing a 2D
+   deflection, not a 3D scene.
+
+   The part that matters, and the part every digital version misses, is that the
+   result is DRAWN rather than sampled. It is a stack of continuous glowing
+   lines, and where those lines bunch together you get a bright caustic ridge,
+   where they splay apart you get a dark gap. A fragment shader has no notion of
+   line density, so a displacement map cannot produce that. So: real geometry,
+   accumulated additively, with the beam getting brighter where it sweeps slower
+   - because a slower beam deposits more energy per unit length. That one term
+   is most of the difference between this and a displacement modifier.
+
+   No vertex buffers. Position comes from gl_VertexID and gl_InstanceID, and
+   luminance is fetched in the vertex shader, which WebGL2 guarantees. Lines are
+   expanded to ribbons because gl.lineWidth is clamped to 1 on essentially every
+   desktop platform. */
+const VS_SCAN =
+"#version 300 es\n" +
+"precision highp float;\n" +
+"uniform sampler2D u_tex;\n" +
+"uniform vec2 u_res;\n" +
+"uniform float u_lines,u_samples,u_time;\n" +
+"uniform float u_scanAmt,u_scanWidth,u_scanVel,u_scanTiltX,u_scanTiltY,u_scanPersp;\n" +
+"uniform float u_scanCurve,u_scanCollapse,u_scanRevH,u_scanRevV;\n" +
+"uniform float u_scanWobAmt,u_scanWobFreq,u_scanWobLock,u_scanLissa,u_scanSkew;\n" +
+"out vec3 v_col;\n" +
+"out float v_gain;\n" +
+"float lum3v(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }\n" +
+"/* where the beam is when it is this far along this line, before the ribbon is\n" +
+"   built around it. Everything that bends the raster happens here, so it all\n" +
+"   composes with everything else. */\n" +
+"vec2 beamAt(float sx, float line, out vec3 col){\n" +
+"  float u = sx;\n" +
+"  float v = line;\n" +
+"  if(u_scanRevH > 0.5) u = 1.0 - u;\n" +          /* reverse the horizontal sweep */
+"  if(u_scanRevV > 0.5) v = 1.0 - v;\n" +          /* reverse the field */
+"  col = texture(u_tex, vec2(u, v)).rgb;\n" +
+"  float y = lum3v(col);\n" +
+"  vec2 p = vec2(sx*2.0-1.0, (1.0-line)*2.0-1.0);\n" +
+"  /* S-curve: the continuous-wind yoke, bending the whole raster */\n" +
+"  p.x += sin(p.y*3.14159)*u_scanCurve*0.4;\n" +
+"  /* skew, which is the same control a bench monitor calls parallelogram */\n" +
+"  p.x += p.y*u_scanSkew*0.5;\n" +
+"  /* the deflection oscillators. Locked to a multiple of the field rate the\n" +
+"     pattern stands still; detuned it crawls, which is the whole Wobbulator\n" +
+"     gesture. */\n" +
+"  if(u_scanWobAmt > 0.0005){\n" +
+"    float f = floor(u_scanWobFreq*12.0 + 0.5) + (1.0-u_scanWobLock)*fract(u_scanWobFreq*12.0);\n" +
+"    float ph = p.y*f*3.14159 + u_time*(1.0-u_scanWobLock)*2.0;\n" +
+"    p.x += sin(ph)*u_scanWobAmt*0.5;\n" +
+"    if(u_scanLissa > 0.0005) p.y += sin(p.x*f*1.61803*3.14159 + u_time*(1.0-u_scanWobLock)*1.7)*u_scanWobAmt*u_scanLissa*0.5;\n" +
+"  }\n" +
+"  /* raster collapse: remove the current from one deflection system and the\n" +
+"     whole frame smears down onto a single line, or a point */\n" +
+"  p.y *= 1.0 - clamp(u_scanCollapse, 0.0, 1.0);\n" +
+"  /* and the thing the machine is actually for: luminance into the vertical\n" +
+"     position control */\n" +
+"  p.y += (y - 0.35)*u_scanAmt*1.6;\n" +
+"  /* tilt is what turns a deflection into an apparent surface */\n" +
+"  float cx = cos(u_scanTiltX), sx2 = sin(u_scanTiltX);\n" +
+"  float cy = cos(u_scanTiltY), sy = sin(u_scanTiltY);\n" +
+"  float dz = (y - 0.35)*u_scanAmt*1.6;\n" +
+"  vec3 q = vec3(p.x, p.y, dz);\n" +
+"  q = vec3(q.x*cy + q.z*sy, q.y, -q.x*sy + q.z*cy);\n" +
+"  q = vec3(q.x, q.y*cx - q.z*sx2, q.y*sx2 + q.z*cx);\n" +
+"  float w = 1.0 + q.z*u_scanPersp*0.6;\n" +
+"  return vec2(q.x, q.y)/max(w, 0.15);\n}\n" +
+"void main(){\n" +
+"  float line = (float(gl_InstanceID) + 0.5)/u_lines;\n" +
+"  int vid = gl_VertexID;\n" +
+"  float si = float(vid >> 1);\n" +
+"  float side = (vid & 1) == 0 ? -1.0 : 1.0;\n" +
+"  float sx = si/(u_samples-1.0);\n" +
+"  vec3 col;\n" +
+"  vec2 here = beamAt(sx, line, col);\n" +
+"  /* the tangent gives two things at once: which way to lay the ribbon, and how\n" +
+"     fast the beam is travelling, which is what sets its brightness */\n" +
+"  float d = 1.0/(u_samples-1.0);\n" +
+"  vec3 tc;\n" +
+"  vec2 ahead = beamAt(min(sx+d, 1.0), line, tc);\n" +
+"  vec2 back  = beamAt(max(sx-d, 0.0), line, tc);\n" +
+"  vec2 tang = ahead - back;\n" +
+"  float speed = max(length(tang)/(2.0*d), 0.02);\n" +
+"  vec2 nrm = normalize(vec2(-tang.y, tang.x*u_res.x/u_res.y));\n" +
+"  float wpx = (0.7 + u_scanWidth*7.0)/u_res.y*2.0;\n" +
+"  gl_Position = vec4(here + nrm*side*wpx, 0.0, 1.0);\n" +
+"  v_col = col;\n" +
+"  /* a slower beam deposits more energy per unit length. Without this you have\n" +
+"     a displacement map with extra steps. */\n" +
+"  /* a flat, undisplaced line sweeps two NDC units per unit of x, so that is\n" +
+"     the reference: gain one where the beam is at nominal speed, brighter\n" +
+"     where the displacement slows it, dimmer where it is thrown across */\n" +
+"  v_gain = mix(1.0, clamp(2.0/speed, 0.05, 8.0), u_scanVel);\n}\n";
+
+const FS_SCAN =
+"#version 300 es\nprecision highp float;\n" +
+"in vec3 v_col;\nin float v_gain;\nout vec4 O;\n" +
+"uniform float u_scanGain,u_scanMono,u_scanHue;\n" +
+"vec3 hsv2s(vec3 c){\n" +
+"  vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0))*6.0 - 3.0);\n" +
+"  return c.z * mix(vec3(1.0), clamp(p-1.0, 0.0, 1.0), c.y);\n}\n" +
+"void main(){\n" +
+"  vec3 c = v_col;\n" +
+"  float y = dot(c, vec3(0.299,0.587,0.114));\n" +
+"  c = mix(c, vec3(y), u_scanMono);\n" +
+"  if(u_scanHue > 0.002) c = mix(c, hsv2s(vec3(fract(u_scanHue + y*0.35), 0.85, 1.0))*y, u_scanHue);\n" +
+"  O = vec4(c*v_gain*u_scanGain, 1.0);\n}\n";
+
+/* Phosphor persistence, as an accumulator rather than a one-frame echo.
+   The reason a CRT trail is coloured rather than grey is that the three P22
+   phosphors do not decay at the same rate - green hangs on longest, blue goes
+   first - so fast motion leaves a green-tinted wake with a blue leading edge.
+   One buffer, three decay constants. */
+const FS_PHOS = COMMON +
+"uniform sampler2D u_cur; uniform sampler2D u_prev;\n" +
+"uniform float u_phosphor,u_phosR,u_phosG,u_phosB;\n" +
+"void main(){\n" +
+"  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  vec3 c = texture(u_cur, uv).rgb;\n" +
+"  vec3 p = texture(u_prev, uv).rgb;\n" +
+"  vec3 k = clamp(vec3(u_phosR, u_phosG, u_phosB)*u_phosphor, 0.0, 0.995);\n" +
+"  O = vec4(max(c, p*k), 1.0);\n}\n";
+
 /* pass 2: the bent signal path — physical sync model + NTSC + tape */
 const FS_SIG = COMMON + KEYFN +
 "uniform sampler2D u_tex; uniform sampler2D u_dispT;\n" +
@@ -903,8 +1033,8 @@ const FS_CRT = COMMON +
 "  }\n" +
 "  /* phosphor persistence */\n" +
 "  if(u_phosphor>0.003 && u_hasPersist>0.5){\n" +
-"    vec3 pv = texture(u_persist, clamp(cuv,0.0,1.0)).rgb;\n" +
-"    c = max(c, pv*u_phosphor);\n" +
+"    /* the decay has already been applied in the store, per channel */\n" +
+"    c = max(c, texture(u_persist, clamp(cuv,0.0,1.0)).rgb);\n" +
 "  }\n" +
 "  /* defocus + bloom + halation */\n" +
 "  if(u_defocus>0.003 || u_bloom>0.003){\n" +

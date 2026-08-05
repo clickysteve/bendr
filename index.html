@@ -809,7 +809,7 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v33.0</span>
+  <span id="ver" title="Build version">v34.0</span>
   <button id="btnHelpTop" data-tip="The manual: what everything is, why it behaves the way it does, and every keyboard shortcut. Also on the H key.">?</button>
   <div id="tempobox" data-tip="Tap four times in time and the tempo follows. Any modulator with a sync division locks to it, and incoming MIDI clock overrides it automatically.">
     <button id="btnTap">TAP</button><span id="beatLed"></span><span id="bpmVal">120.0</span>
@@ -1096,7 +1096,7 @@ body.nomix #mixbuses{display:none;}
   <div id="helpToc"></div>
   <div id="helpSection"></div>
   <div id="helpBody">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v33.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v34.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once; the small selector next to it picks a target, and <b>COPY</b> writes this channel's effects onto it while <b>SWAP</b> exchanges the two outright, sources included. Any channel can reach any other, so D can be copied onto A as easily as A onto B, and shift-clicking COPY sends it to all three at once.</p>
@@ -1718,6 +1718,136 @@ const FS_MIX = COMMON + KEYFN +
 "  }\n" +
 "  O = vec4(clamp(src,0.0,1.6),1.0);\n}\n";
 
+/* ---------------- the scan processor ----------------
+   Every other stage here is a fragment shader: a full-screen triangle, one
+   output pixel sampled from one input pixel. This one is not, and it cannot be.
+
+   A Rutt/Etra intercepts a monitor's deflection signals before the yoke and
+   patches video luminance into the vertical position control, so bright parts
+   of the picture physically pull the scan line up the tube. A camera then
+   re-shoots the tube. The apparent depth is an artefact of photographing a 2D
+   deflection, not a 3D scene.
+
+   The part that matters, and the part every digital version misses, is that the
+   result is DRAWN rather than sampled. It is a stack of continuous glowing
+   lines, and where those lines bunch together you get a bright caustic ridge,
+   where they splay apart you get a dark gap. A fragment shader has no notion of
+   line density, so a displacement map cannot produce that. So: real geometry,
+   accumulated additively, with the beam getting brighter where it sweeps slower
+   - because a slower beam deposits more energy per unit length. That one term
+   is most of the difference between this and a displacement modifier.
+
+   No vertex buffers. Position comes from gl_VertexID and gl_InstanceID, and
+   luminance is fetched in the vertex shader, which WebGL2 guarantees. Lines are
+   expanded to ribbons because gl.lineWidth is clamped to 1 on essentially every
+   desktop platform. */
+const VS_SCAN =
+"#version 300 es\n" +
+"precision highp float;\n" +
+"uniform sampler2D u_tex;\n" +
+"uniform vec2 u_res;\n" +
+"uniform float u_lines,u_samples,u_time;\n" +
+"uniform float u_scanAmt,u_scanWidth,u_scanVel,u_scanTiltX,u_scanTiltY,u_scanPersp;\n" +
+"uniform float u_scanCurve,u_scanCollapse,u_scanRevH,u_scanRevV;\n" +
+"uniform float u_scanWobAmt,u_scanWobFreq,u_scanWobLock,u_scanLissa,u_scanSkew;\n" +
+"out vec3 v_col;\n" +
+"out float v_gain;\n" +
+"float lum3v(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }\n" +
+"/* where the beam is when it is this far along this line, before the ribbon is\n" +
+"   built around it. Everything that bends the raster happens here, so it all\n" +
+"   composes with everything else. */\n" +
+"vec2 beamAt(float sx, float line, out vec3 col){\n" +
+"  float u = sx;\n" +
+"  float v = line;\n" +
+"  if(u_scanRevH > 0.5) u = 1.0 - u;\n" +          /* reverse the horizontal sweep */
+"  if(u_scanRevV > 0.5) v = 1.0 - v;\n" +          /* reverse the field */
+"  col = texture(u_tex, vec2(u, v)).rgb;\n" +
+"  float y = lum3v(col);\n" +
+"  vec2 p = vec2(sx*2.0-1.0, (1.0-line)*2.0-1.0);\n" +
+"  /* S-curve: the continuous-wind yoke, bending the whole raster */\n" +
+"  p.x += sin(p.y*3.14159)*u_scanCurve*0.4;\n" +
+"  /* skew, which is the same control a bench monitor calls parallelogram */\n" +
+"  p.x += p.y*u_scanSkew*0.5;\n" +
+"  /* the deflection oscillators. Locked to a multiple of the field rate the\n" +
+"     pattern stands still; detuned it crawls, which is the whole Wobbulator\n" +
+"     gesture. */\n" +
+"  if(u_scanWobAmt > 0.0005){\n" +
+"    float f = floor(u_scanWobFreq*12.0 + 0.5) + (1.0-u_scanWobLock)*fract(u_scanWobFreq*12.0);\n" +
+"    float ph = p.y*f*3.14159 + u_time*(1.0-u_scanWobLock)*2.0;\n" +
+"    p.x += sin(ph)*u_scanWobAmt*0.5;\n" +
+"    if(u_scanLissa > 0.0005) p.y += sin(p.x*f*1.61803*3.14159 + u_time*(1.0-u_scanWobLock)*1.7)*u_scanWobAmt*u_scanLissa*0.5;\n" +
+"  }\n" +
+"  /* raster collapse: remove the current from one deflection system and the\n" +
+"     whole frame smears down onto a single line, or a point */\n" +
+"  p.y *= 1.0 - clamp(u_scanCollapse, 0.0, 1.0);\n" +
+"  /* and the thing the machine is actually for: luminance into the vertical\n" +
+"     position control */\n" +
+"  p.y += (y - 0.35)*u_scanAmt*1.6;\n" +
+"  /* tilt is what turns a deflection into an apparent surface */\n" +
+"  float cx = cos(u_scanTiltX), sx2 = sin(u_scanTiltX);\n" +
+"  float cy = cos(u_scanTiltY), sy = sin(u_scanTiltY);\n" +
+"  float dz = (y - 0.35)*u_scanAmt*1.6;\n" +
+"  vec3 q = vec3(p.x, p.y, dz);\n" +
+"  q = vec3(q.x*cy + q.z*sy, q.y, -q.x*sy + q.z*cy);\n" +
+"  q = vec3(q.x, q.y*cx - q.z*sx2, q.y*sx2 + q.z*cx);\n" +
+"  float w = 1.0 + q.z*u_scanPersp*0.6;\n" +
+"  return vec2(q.x, q.y)/max(w, 0.15);\n}\n" +
+"void main(){\n" +
+"  float line = (float(gl_InstanceID) + 0.5)/u_lines;\n" +
+"  int vid = gl_VertexID;\n" +
+"  float si = float(vid >> 1);\n" +
+"  float side = (vid & 1) == 0 ? -1.0 : 1.0;\n" +
+"  float sx = si/(u_samples-1.0);\n" +
+"  vec3 col;\n" +
+"  vec2 here = beamAt(sx, line, col);\n" +
+"  /* the tangent gives two things at once: which way to lay the ribbon, and how\n" +
+"     fast the beam is travelling, which is what sets its brightness */\n" +
+"  float d = 1.0/(u_samples-1.0);\n" +
+"  vec3 tc;\n" +
+"  vec2 ahead = beamAt(min(sx+d, 1.0), line, tc);\n" +
+"  vec2 back  = beamAt(max(sx-d, 0.0), line, tc);\n" +
+"  vec2 tang = ahead - back;\n" +
+"  float speed = max(length(tang)/(2.0*d), 0.02);\n" +
+"  vec2 nrm = normalize(vec2(-tang.y, tang.x*u_res.x/u_res.y));\n" +
+"  float wpx = (0.7 + u_scanWidth*7.0)/u_res.y*2.0;\n" +
+"  gl_Position = vec4(here + nrm*side*wpx, 0.0, 1.0);\n" +
+"  v_col = col;\n" +
+"  /* a slower beam deposits more energy per unit length. Without this you have\n" +
+"     a displacement map with extra steps. */\n" +
+"  /* a flat, undisplaced line sweeps two NDC units per unit of x, so that is\n" +
+"     the reference: gain one where the beam is at nominal speed, brighter\n" +
+"     where the displacement slows it, dimmer where it is thrown across */\n" +
+"  v_gain = mix(1.0, clamp(2.0/speed, 0.05, 8.0), u_scanVel);\n}\n";
+
+const FS_SCAN =
+"#version 300 es\nprecision highp float;\n" +
+"in vec3 v_col;\nin float v_gain;\nout vec4 O;\n" +
+"uniform float u_scanGain,u_scanMono,u_scanHue;\n" +
+"vec3 hsv2s(vec3 c){\n" +
+"  vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0))*6.0 - 3.0);\n" +
+"  return c.z * mix(vec3(1.0), clamp(p-1.0, 0.0, 1.0), c.y);\n}\n" +
+"void main(){\n" +
+"  vec3 c = v_col;\n" +
+"  float y = dot(c, vec3(0.299,0.587,0.114));\n" +
+"  c = mix(c, vec3(y), u_scanMono);\n" +
+"  if(u_scanHue > 0.002) c = mix(c, hsv2s(vec3(fract(u_scanHue + y*0.35), 0.85, 1.0))*y, u_scanHue);\n" +
+"  O = vec4(c*v_gain*u_scanGain, 1.0);\n}\n";
+
+/* Phosphor persistence, as an accumulator rather than a one-frame echo.
+   The reason a CRT trail is coloured rather than grey is that the three P22
+   phosphors do not decay at the same rate - green hangs on longest, blue goes
+   first - so fast motion leaves a green-tinted wake with a blue leading edge.
+   One buffer, three decay constants. */
+const FS_PHOS = COMMON +
+"uniform sampler2D u_cur; uniform sampler2D u_prev;\n" +
+"uniform float u_phosphor,u_phosR,u_phosG,u_phosB;\n" +
+"void main(){\n" +
+"  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  vec3 c = texture(u_cur, uv).rgb;\n" +
+"  vec3 p = texture(u_prev, uv).rgb;\n" +
+"  vec3 k = clamp(vec3(u_phosR, u_phosG, u_phosB)*u_phosphor, 0.0, 0.995);\n" +
+"  O = vec4(max(c, p*k), 1.0);\n}\n";
+
 /* pass 2: the bent signal path — physical sync model + NTSC + tape */
 const FS_SIG = COMMON + KEYFN +
 "uniform sampler2D u_tex; uniform sampler2D u_dispT;\n" +
@@ -2116,8 +2246,8 @@ const FS_CRT = COMMON +
 "  }\n" +
 "  /* phosphor persistence */\n" +
 "  if(u_phosphor>0.003 && u_hasPersist>0.5){\n" +
-"    vec3 pv = texture(u_persist, clamp(cuv,0.0,1.0)).rgb;\n" +
-"    c = max(c, pv*u_phosphor);\n" +
+"    /* the decay has already been applied in the store, per channel */\n" +
+"    c = max(c, texture(u_persist, clamp(cuv,0.0,1.0)).rgb);\n" +
 "  }\n" +
 "  /* defocus + bloom + halation */\n" +
 "  if(u_defocus>0.003 || u_bloom>0.003){\n" +
@@ -2768,6 +2898,7 @@ const SECTIONS = [
   {id:"glitch",   name:"GLITCH LAB",        cls:"mag",  zone:"chain"},
   {id:"lab",      name:"SIGNAL LAB",        cls:"mag",  zone:"chain"},
   {id:"flow",     name:"FLOW / MOSH",       cls:"mag",  zone:"chain"},
+  {id:"scan",     name:"SCAN PROCESSOR",    cls:"cyan", zone:"chain"},
   {id:"keyer",    name:"KEYER",             cls:"cyan", zone:"chain"},
 
   /* the display and the overlay are master, shared by every channel, so they
@@ -2994,6 +3125,25 @@ const PDEF = [
   ["timeGrad","TIME SHEAR","flow",-1,1,0],
   ["shearAxis","SHEAR AXIS","flow",0,1,0],
 
+  ["scanAmt","SCAN DISPLACE","scan",0,1,0],
+  ["scanLines","SCAN LINES","scan",60,720,320],
+  ["scanSamples","SCAN DETAIL","scan",64,640,256],
+  ["scanWidth","BEAM WIDTH","scan",0,1,0.12],
+  ["scanVel","VELOCITY GAIN","scan",0,1,0.8],
+  ["scanGain","SCAN LEVEL","scan",0,3,1],
+  ["scanTiltX","TILT X","scan",-1,1,0],
+  ["scanTiltY","TILT Y","scan",-1,1,0],
+  ["scanPersp","PERSPECTIVE","scan",0,1,0.3],
+  ["scanMono","MONO","scan",0,1,0],
+  ["scanHue","COLOURISE","scan",0,1,0],
+  ["scanCurve","S-CURVE","scan",-1,1,0],
+  ["scanSkew","RASTER SKEW","scan",-1,1,0],
+  ["scanCollapse","RASTER COLLAPSE","scan",0,1,0],
+  ["scanWobAmt","WOBBLE","scan",0,1,0],
+  ["scanWobFreq","WOBBLE FREQ","scan",0,1,0.25],
+  ["scanWobLock","WOBBLE LOCK","scan",0,1,1],
+  ["scanLissa","LISSAJOUS","scan",0,1,0],
+
   ["keyThresh","THRESHOLD","keyer",0,1,0.5],
   ["keySoft","SOFTNESS","keyer",0.01,1,0.2],
   ["keyInv","INVERT","keyer",0,1,0],
@@ -3128,6 +3278,9 @@ const PDEF = [
   ["whiteClip","WHITE CLIP","crt",0.5,1.5,1],
   ["phosphor","PERSISTENCE","crt",0,0.95,0],
   ["hvSag","HV SAG","crt",0,1,0],
+  ["phosR","PERSIST RED","crt",0,1,0.86],
+  ["phosG","PERSIST GREEN","crt",0,1,1],
+  ["phosB","PERSIST BLUE","crt",0,1,0.66],
 
   ["letterbox","LETTERBOX","overlay",0,0.4,0],
   ["pillarbox","PILLARBOX","overlay",0,0.4,0],
@@ -3448,6 +3601,27 @@ const PHELP = {
   blackLevel:"Where black sits. Lift it for the washed-out blacks of a badly set-up monitor; drop it to crush.",
   whiteClip:"Where the picture clips to white. Below 1 the highlights blow out early.",
   phosphor:"Phosphor persistence: each frame leaves a decaying afterglow. This is a display-stage trail, quite different from feedback — it never re-enters the chain.",
+  scanAmt:"How hard brightness pushes the scan line up. This is the whole machine in one control: video luminance patched into the vertical deflection, so the picture physically bends the raster instead of being sampled by it. At zero the stage does nothing and costs nothing.",
+  scanLines:"How many scan lines are drawn. Fewer means you see the individual lines and the gaps between them, which is the look; more approaches a continuous surface. This is real geometry, so it is one of the two controls that actually costs frame rate.",
+  scanSamples:"How many points each line is drawn from. Too few and a steep displacement turns into visible facets; too many is wasted. The other control that costs frame rate.",
+  scanWidth:"How wide the beam is. Thin lines give you the drawn, wiry look; wide ones close the gaps into a surface.",
+  scanVel:"How much the beam brightens where it sweeps slowly. On a real tube a slower beam deposits more energy per unit length, which is why the ridges of a displaced raster glow and the steep faces go dim. Turning this off leaves you with something that looks like a displacement map rather than a photographed tube.",
+  scanGain:"Overall brightness of the drawn raster. The lines add where they overlap, so this interacts with LINES: doubling the line count roughly doubles the brightness of a flat area.",
+  scanTiltX:"Tilts the raster away from you. This is what turns a two-dimensional deflection into an apparent surface, and it is the reason the effect reads as three-dimensional when it is nothing of the kind.",
+  scanTiltY:"Rotates the raster about the vertical, so you see the displacement from the side.",
+  scanPersp:"How much perspective is applied to the tilt. Zero is an isometric view; wound up, the far edge converges.",
+  scanMono:"Discards the colour and draws the raster in luminance only, which is what the original did - it was a black and white monitor being re-shot.",
+  scanHue:"Colourises the drawn raster by brightness, so the displacement and the colour carry the same information. Fights with MONO on purpose.",
+  scanCurve:"Bends the whole raster into an S, the way a continuous-wind yoke does. It is applied before the displacement, so the picture bends with it.",
+  scanSkew:"Leans the raster sideways, which a bench monitor would call parallelogram. Also applied before displacement.",
+  scanCollapse:"Removes the current from the vertical deflection, so the raster falls in on itself. At full the entire frame is smeared along a single line, which is a genuinely strange thing to look at and hard to get any other way.",
+  scanWobAmt:"Drives the deflection from an oscillator, the way a Wobbulator does by adding extra yokes and feeding them from a signal generator.",
+  scanWobFreq:"The oscillator frequency, as a multiple of the field rate.",
+  scanWobLock:"How firmly the oscillator is locked to the field rate. Fully locked, the distortion stands still because it repeats identically every frame. Unlocked, it crawls, and the crawl is the characteristic gesture of the instrument.",
+  scanLissa:"Drives the horizontal deflection from a second oscillator as well, so the two axes trace a Lissajous figure and the raster ties itself in knots.",
+  phosR:"How long the red phosphor holds, relative to the persistence control.",
+  phosG:"How long the green phosphor holds. On real P22 phosphors green is the slowest, which is why a fast movement on a tube leaves a green-tinted wake rather than a grey one.",
+  phosB:"How long the blue phosphor holds. Blue decays fastest, so it forms the leading edge of a trail.",
   hvSag:"On a real tube the high-voltage supply sags when the picture is bright, so the raster grows. Bright scenes literally get wider.",
 
   /* ---- output overlay ---- */
@@ -3507,6 +3681,7 @@ const SECHELP = {
   color:"A straightforward colour corrector at the end of the per-channel chain — levels, saturation, hue, and the graphic operations.",
   crt:"The master display stage, shared by everything. Not a filter but a model of a screen: mask geometry, beam profile, persistence, and the output transform.",
   overlay:"Everything between the picture and the eye: the lens, the glass in front of the screen, the panel itself, and the deck's own burnt-in display. Not effects on the signal, but artefacts of whatever it is being watched through.",
+  scan:"A scan processor, in the sense the word had before it meant anything digital. The picture is not sampled; it is drawn, as a stack of glowing lines whose vertical position is pushed by brightness, and then photographed. The apparent depth is an artefact of that, not a model of a scene. Where the lines bunch you get a bright ridge and where they splay you get a gap, which is the part a displacement map cannot reproduce and the part that makes it look like a machine.",
   lab:"Techniques from the open-source glitch canon, rebuilt: sparse line jitter, NTSC crosstalk, slitscan, bit crush, moire, and video-rate field modulation.",
   audio:"Sets what the audio-reactive mod sources listen to: each band's frequency range and gain, the input device, and the response time.",
   lfo:"Rates and shapes for the four LFOs, plus tempo and the sync divisions.",
@@ -3601,6 +3776,13 @@ let fbBlend = 0;       // 0 mix 1 add 2 screen 3 max 4 min 5 difference
 let fbNL = 0;          // 0 clamp 1 tanh 2 wrap 3 fold
 let fbInvert = false;  // invert each pass
 let fbTap = 0;         // 0 pre-display  1 post-display (rescan)
+/* deflection reversal is a switch on the yoke, not a continuous control */
+let scanRevH = false, scanRevV = false;
+/* Two ways to let the machine fail without recovering. Everything else here is
+   bounded because a control needs bounds, but a model that always recovers is
+   a model that cannot actually break. */
+let syncLatch = false;    // the PLL never re-acquires
+let fbNoServo = false;    // nothing pulls feedback gain back to unity
 let flowField = 0;     // FLOW field: 0 motion 1 contour 2 curl-noise 3 radial 4 spiral 5 chroma 6 weave
 let flowEdge = 0;      // FLOW edge: 0 clamp 1 repeat 2 mirror
 let outModel = 0;      // display model index
@@ -3668,14 +3850,31 @@ const progMIX = makeProg(FS_MIX);
 const progMULTI = makeProg(FS_MULTI);
 const progGEN = makeProg(FS_GEN);
 const progLAB = makeProg(FS_LAB);
+/* the scan processor brings its own vertex shader, because it draws geometry
+   rather than a full-screen triangle */
+function makeProg2(vsSrc, fsSrc){
+  const p = gl.createProgram();
+  gl.attachShader(p, makeShader(gl.VERTEX_SHADER, vsSrc));
+  gl.attachShader(p, makeShader(gl.FRAGMENT_SHADER, fsSrc));
+  gl.linkProgram(p);
+  pendingProgs.push(p);
+  return {prog:p, loc:{}};
+}
+const progSCAN = makeProg2(VS_SCAN, FS_SCAN);
+const progPHOS = makeProg(FS_PHOS);
+/* Additive accumulation is what produces the bright ridge where lines bunch,
+   and it wants more headroom than eight bits. Float if the machine has it. */
+const floatRT = gl.getExtension("EXT_color_buffer_float") ? true : false;
+if(!gl.getExtension("EXT_float_blend")) { /* additive float blending may be slow; still correct */ }
 /* now that every one of them is in flight, ask how they got on */
 checkPrograms();
 
 let rtFailed = false;
-function makeRT(w,h){
+function makeRT(w,h,float16){
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  if(float16 && floatRT) gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,w,h,0,gl.RGBA,gl.HALF_FLOAT,null);
+  else gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -5473,6 +5672,7 @@ const STAGE_INFO = {
   glitch: {name:"GLITCH LAB",   sec:["glitch"]},
   lab:    {name:"SIGNAL LAB",   sec:["lab"]},
   flow:   {name:"FLOW / MOSH",  sec:["flow"]},
+  scan:   {name:"SCAN",         sec:["scan"]},
 };
 let dragStage = null;
 const isTouch = window.matchMedia("(hover:none) and (pointer:coarse)").matches;
@@ -5727,12 +5927,32 @@ function sectionExtras(id, d){
     : "The same again for the master crossfade between the two buses.";
     d.appendChild(note);
   }
+  if(id==="scan"){
+    const tr = document.createElement("div"); tr.className="trow";
+    mkToggle(tr, "scanRevH", ()=>"SWEEP: "+(scanRevH?"REVERSED":"NORMAL"), ()=>{ scanRevH=!scanRevH; },
+      "Reverses the horizontal sweep. Not a mirror of the picture: the beam genuinely travels the other way, so it composes with everything that depends on scan order - the wobble phase, the velocity brightness, the sync model upstream.");
+    mkToggle(tr, "scanRevV", ()=>"FIELD: "+(scanRevV?"REVERSED":"NORMAL"), ()=>{ scanRevV=!scanRevV; },
+      "Reverses the field, so the raster is written from the bottom up.");
+    d.appendChild(tr);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "The picture is drawn as a stack of glowing lines whose vertical position is pushed by brightness, then photographed. Where the lines bunch you get a bright ridge, where they splay you get a gap - that density, not the displacement, is what the look actually is. SCAN DISPLACE is the only control that has to be above zero; TILT turns a deflection into an apparent surface; VELOCITY GAIN brightens the beam where it sweeps slower. LINES and DETAIL cost real geometry, so they are the two to pull back if it gets heavy.";
+    d.appendChild(note);
+  }
+  if(id==="sync"){
+    const tr = document.createElement("div"); tr.className="trow";
+    mkToggle(tr, "syncLatch", ()=>"LOCK: "+(syncLatch?"LATCHED OFF":"RECOVERS"), ()=>{ syncLatch=!syncLatch; },
+      "Normally a loss of lock shears the picture and then the loop re-acquires over the next few hundred milliseconds, because that is what a working circuit does. LATCHED means it never comes back: every shear stays where it happened and the next one lands on top of it. Turn it off again and the whole accumulated mess unwinds at once.");
+    d.appendChild(tr);
+  }
   if(id==="feedback"){
     const tr = document.createElement("div"); tr.className="trow";
     const bm = document.createElement("button"); bm.textContent="MODE: MIX"; bm.id="fbModeBtn";
     bm.onclick = ()=>{ fbTrailMode=!fbTrailMode; bm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX"); };
     tr.appendChild(bm);
     mkToggle(tr, "rescan", ()=>"RESCAN: "+(rescanMode?"FULL":"CLEAN"), ()=>{ rescanMode=!rescanMode; }, "CLEAN taps the loop before the display stage. FULL taps it after, so scanlines, mask, curvature and bloom all go back round \u2014 the software equivalent of pointing a camera at the monitor it is feeding.");
+    mkToggle(tr, "fbServo", ()=>"SERVO: "+(fbNoServo?"DEFEATED":"ON"), ()=>{ fbNoServo=!fbNoServo; },
+      "The auto-level servo keeps the loop off the black and white attractors, which is why AUTO LEVEL exists and why the interesting settings stay findable. Defeating it removes the safety net: the loop is then free to run away to white or collapse to black and stay there, which is what a feedback rig with no operator actually does.");
     d.appendChild(tr);
     const tr2 = document.createElement("div"); tr2.className="trow";
     const WRAPS=["CLAMP","REPEAT","MIRROR"], MIRS=["NO MIRROR","MIRROR H","MIRROR V","QUAD"],
@@ -6426,6 +6646,8 @@ PRESETS.push(["MELT \u00b7 CIRCLE BLEED", {"chan": {"A": {"genFreqX": 0.09, "gen
 
 PRESETS.push(["DIRTY MIXER \u00b7 CROSSBAR FAULT", {"chan": {"A": {"genFreqX": 0.14, "genFreqY": 0.07, "genHue": 0.12, "genSpread": 1.25, "chromaBleed": 0.55, "chromaDelay": 0.3, "rainbow": 0.25, "saturation": 1.2, "glow": 0.3}, "B": {"genFreqX": 0.3, "genFreqY": 0.22, "genHue": 0.62, "genBands": 7, "contour": 0.3, "saturation": 1.25}}, "master": {"abMix": 0.5, "wipeSoft": 0.05, "edgeAmt": 0.3, "edgeWidth": 0.22, "edgeHold": 0.7, "edgeCreep": 0.5, "wipeBord": 0.3, "wipeBordCol": 0.14, "mixDirt": 0.7, "mixDirtRate": 0.45, "mixDirtDrop": 0.8, "mixDirtCut": 0.55, "mixDirtKnock": 0.7, "mixDirtNoise": 0.5, "scanlines": 0.32, "vignette": 0.4, "bloom": 0.3, "halation": 0.25, "grain": 0.2, "lensCA": 0.3, "lightLeak": 0.2, "osdShow": 0.9, "osdGlow": 0.6}, "routes": [{"ch": "A", "src": "lfo1", "dst": "abMix", "amt": 0.45}, {"ch": "A", "src": "lfo4", "dst": "mixDirt", "amt": 0.3}], "audioCfg": {"bass": {"lo": 30, "hi": 150, "gain": 1}, "mid": {"lo": 300, "hi": 2200, "gain": 1}, "high": {"lo": 4000, "hi": 11000, "gain": 1}, "response": 0.5}, "fbTrailMode": false, "rescanMode": false, "keyChroma": false, "mixMode": 1, "edgeMode": 0, "wipeInv": false, "activeChan": "A", "linkChans": false, "mixMode2": 0, "wipeInv2": false, "mixModeM": 0, "wipeInvM": false, "mixBlend": 2, "mixBlend2": 0, "mixBlendM": 0, "mixKey": 0, "mixKey2": 0, "mixKeyM": 0, "fbWrap": 0, "fbMirror": 0, "fbBlend": 0, "fbNL": 0, "fbInvert": false, "fbTap": 0, "outModel": 0, "osdMode": 0, "osdDate": 2, "fieldSrc": 0, "flowField": 0, "flowEdge": 0, "chainOrder": ["sig", "col", "glitch", "lab", "flow"], "stageEnabled": {"sig": true, "col": true, "glitch": true, "lab": true, "flow": true}, "busSrc": {"b1": ["A", "B"], "b2": ["C", "D"]}, "genMode": {"A": {"shape": 0, "wave": 0, "col": 2}, "B": {"shape": 7, "wave": 3, "col": 4}, "C": {"shape": 0, "wave": 0, "col": 1}, "D": {"shape": 0, "wave": 0, "col": 1}}, "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "C": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}, "D": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}}, "srcText": {"A": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "B": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "C": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "D": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}}, "mods": [{"id": "lfo1", "type": "lfo", "name": "LFO 1", "rate": 0.06, "shape": "tri", "phase": 0.8253412995992825, "snh": 0, "sync": 0}, {"id": "lfo2", "type": "lfo", "name": "LFO 2", "rate": 1.6982436524617444, "shape": "snh", "phase": 0.12453162469815826, "snh": 0, "sync": 0}, {"id": "lfo3", "type": "lfo", "name": "LFO 3", "rate": 0.0707945784384138, "shape": "tri", "phase": 0.9578821927416256, "snh": 0, "sync": 0}, {"id": "lfo4", "type": "lfo", "name": "LFO 4", "rate": 0.13, "shape": "snh", "phase": 0.32377943033823176, "snh": 0, "sync": 0}, {"id": "lfo5", "type": "lfo", "name": "LFO 5", "rate": 0.016982436524617443, "shape": "tri", "phase": 0.6386992951546443, "snh": 0, "sync": 0}, {"id": "lfo6", "type": "lfo", "name": "LFO 6", "rate": 0.8912509381337456, "shape": "saw", "phase": 0.27703329526621123, "snh": 0, "sync": 0}, {"id": "lfo7", "type": "lfo", "name": "LFO 7", "rate": 3.0902954325135905, "shape": "sqr", "phase": 0.18160376469231443, "snh": 0, "sync": 0}, {"id": "lfo8", "type": "lfo", "name": "LFO 8", "rate": 0.1288249551693134, "shape": "drift", "phase": 0.2055807543055579, "snh": 0, "sync": 0}]}, null]);
 
+PRESETS.push(["SCAN \u00b7 DEFLECTION", {"chan": {"A": {"genFreqX": 0.16, "genFreqY": 0.1, "genRate": 0.06, "genHue": 0.5, "genSpread": 1.3, "scanAmt": 0.62, "scanLines": 300, "scanSamples": 320, "scanWidth": 0.08, "scanVel": 0.9, "scanGain": 1.1, "scanTiltX": 0.52, "scanTiltY": 0.12, "scanPersp": 0.42, "scanMono": 0.65, "scanHue": 0.35, "scanWobAmt": 0.12, "scanWobFreq": 0.22}}, "master": {"scanlines": 0.12, "curvature": 0.26, "vignette": 0.42, "bloom": 0.32, "bloomRad": 0.5, "halation": 0.3, "phosphor": 0.72, "phosR": 0.8, "phosB": 0.5}, "routes": [{"ch": "A", "src": "lfo1", "dst": "scanTiltY", "amt": 0.35}, {"ch": "A", "src": "lfo3", "dst": "scanAmt", "amt": 0.22}, {"ch": "A", "src": "lfo2", "dst": "scanWobFreq", "amt": 0.3}], "audioCfg": {"bass": {"lo": 30, "hi": 150, "gain": 1}, "mid": {"lo": 300, "hi": 2200, "gain": 1}, "high": {"lo": 4000, "hi": 11000, "gain": 1}, "response": 0.5}, "fbTrailMode": false, "rescanMode": false, "keyChroma": false, "showKeyMatte": false, "mixMode": 0, "edgeMode": 0, "wipeInv": false, "activeChan": "A", "linkChans": false, "mixMode2": 0, "wipeInv2": false, "mixModeM": 0, "wipeInvM": false, "mixBlend": 0, "mixBlend2": 0, "mixBlendM": 0, "mixKey": 0, "mixKey2": 0, "mixKeyM": 0, "fbWrap": 0, "fbMirror": 0, "fbBlend": 0, "fbNL": 0, "fbInvert": false, "fbTap": 0, "outModel": 0, "osdMode": 1, "osdDate": 0, "fieldSrc": 0, "flowField": 0, "flowEdge": 0, "scanRevH": false, "scanRevV": false, "syncLatch": false, "fbNoServo": false, "chainOrder": ["sig", "col", "glitch", "lab", "flow", "scan"], "stageEnabled": {"sig": true, "col": true, "glitch": true, "lab": true, "flow": true, "scan": true}, "busSrc": {"b1": ["A", "B"], "b2": ["C", "D"]}, "genMode": {"A": {"shape": 2, "wave": 0, "col": 2}, "B": {"shape": 0, "wave": 0, "col": 1}, "C": {"shape": 0, "wave": 0, "col": 1}, "D": {"shape": 0, "wave": 0, "col": 1}}, "srcMode": {"A": {"mode": "synth", "pattern": "testcard", "feed": "PGM"}, "B": {"mode": "pattern", "pattern": "testcard", "feed": "PGM"}, "C": {"mode": "pattern", "pattern": "testcard", "feed": "PGM"}, "D": {"mode": "pattern", "pattern": "testcard", "feed": "PGM"}}, "srcText": {"A": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "B": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "C": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "D": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}}, "mods": [{"id": "lfo1", "type": "lfo", "name": "LFO 1", "rate": 0.035, "shape": "sine", "phase": 0.025904936244317778, "snh": 0, "sync": 0}, {"id": "lfo2", "type": "lfo", "name": "LFO 2", "rate": 0.021, "shape": "tri", "phase": 0.22930449400470732, "snh": 0, "sync": 0}, {"id": "lfo3", "type": "lfo", "name": "LFO 3", "rate": 0.05, "shape": "sine2", "phase": 0.6527490145683039, "snh": 0, "sync": 0}, {"id": "lfo4", "type": "lfo", "name": "LFO 4", "rate": 5.495408738576246, "shape": "sine", "phase": 0.026283097953750945, "snh": 0, "sync": 0}, {"id": "lfo5", "type": "lfo", "name": "LFO 5", "rate": 0.016982436524617443, "shape": "tri", "phase": 0.6239967635463207, "snh": 0, "sync": 0}, {"id": "lfo6", "type": "lfo", "name": "LFO 6", "rate": 0.8912509381337456, "shape": "saw", "phase": 0.23292823259065654, "snh": 0, "sync": 0}, {"id": "lfo7", "type": "lfo", "name": "LFO 7", "rate": 3.0902954325135905, "shape": "sqr", "phase": 0.8116328026373475, "snh": 0, "sync": 0}, {"id": "lfo8", "type": "lfo", "name": "LFO 8", "rate": 0.1288249551693134, "shape": "drift", "phase": 0.45335334558427975, "snh": 0, "sync": 0}]}, null]);
+
 function applyState(bases, rts, extra, chOnly){
   if(typeof cancelGlide === "function") cancelGlide();
   /* a preset's flat value map loads into the target channel (default: active) plus master */
@@ -6642,6 +6864,7 @@ function captureState(){
     mixMode2, wipeInv2, mixModeM, wipeInvM,
     mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
     fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
+    scanRevH, scanRevV, syncLatch, fbNoServo,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
@@ -6686,7 +6909,7 @@ function restoreState(st){
   if(st.wipeInv !== undefined) wipeInv = st.wipeInv;
   if(st.wipeInv2 !== undefined) wipeInv2 = st.wipeInv2;
   if(st.wipeInvM !== undefined) wipeInvM = st.wipeInvM;
-  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","osdMode","osdDate","fieldSrc","flowField","flowEdge","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM","mixKey","mixKey2","mixKeyM"]){
+  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","osdMode","osdDate","fieldSrc","flowField","flowEdge","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM","mixKey","mixKey2","mixKeyM","scanRevH","scanRevV","syncLatch","fbNoServo"]){
     if(st[k] !== undefined) eval(k+" = st."+k);
   }
   if(st.fbInvert !== undefined) fbInvert = st.fbInvert;
@@ -6791,7 +7014,7 @@ document.getElementById("btnUndo").onclick = undo;
    preset loader, which is exactly how a preset came to inherit the previous
    patch's wipe, mix type, key, chain order and bus routing. One list now, and
    every path that establishes a known state goes through it. */
-const CHAIN_STAGES = ["sig","col","glitch","lab","flow"];
+const CHAIN_STAGES = ["sig","col","glitch","lab","flow","scan"];
 function resetGlobals(){
   fbTrailMode=false; rescanMode=false; keyChroma=false; showKeyMatte=false;
   mixMode=0;  mixMode2=0;  mixModeM=0;
@@ -6803,7 +7026,8 @@ function resetGlobals(){
   outModel=0; fieldSrc=0; flowField=0; flowEdge=0;
   osdMode=1; osdDate=0;
   chainOrder = CHAIN_STAGES.slice();
-  stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true};
+  stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true, scan:true};
+  scanRevH = false; scanRevV = false; syncLatch = false; fbNoServo = false;
   busSrc.b1 = ["A","B"]; busSrc.b2 = ["C","D"];
   for(const ch of CHANNELS) genMode[ch] = {shape:0, wave:0, col:1};
   copyDest = BUSPAIR[activeChan];
@@ -8060,9 +8284,14 @@ function updateSyncChannel(ch, ci, dt, t){
   }
   for(const ev of S.ev){
     const age = t-ev.t0;
-    ev.env = Math.min(age/0.03,1)*Math.exp(-Math.max(0,age-0.03)/ev.rel);
+    /* LATCHED: the loop never re-acquires. A circuit that has genuinely given
+       up does not politely recover after 300 milliseconds, and being unable to
+       reach that state was the tool refusing to break properly. */
+    ev.env = syncLatch ? Math.min(age/0.03, 1)
+                       : Math.min(age/0.03,1)*Math.exp(-Math.max(0,age-0.03)/ev.rel);
   }
-  S.ev = S.ev.filter(ev=>ev.env>0.012);
+  if(syncLatch){ while(S.ev.length > 10) S.ev.shift(); }
+  else S.ev = S.ev.filter(ev=>ev.env>0.012);
   /* tracking band drifts vertically like a real mistracking head */
   S.trackV += -0.6*S.trackV*sdt + 0.35*rq*gaussR();
   S.trackC += S.trackV*sdt*0.25;
@@ -8266,7 +8495,40 @@ function colExtras(pr, now, ch){
 }
 const FLOW_IDS = ["mosh","moshVec","melt","swirl","moshBlock","timeGrad","flowStretch","flowRepel","flowNoise","flowHue","flowFade"];
 const LAB_IDS = ["sparseJit","ntscArt","ntscFringe","snow","fmAmt","slitscan","bitCrush","bandKey","rowSmear","moire","fieldMod"];
+/* The scan processor is the one stage that draws geometry. It gets its own
+   target because it accumulates additively into float, and because the number
+   of primitives is a parameter rather than a constant. */
+let scanRT = null;
+function runScan(inTex, dstRT, now, ch){
+  const lines = Math.max(8, Math.round(getCur("scanLines", ch)));
+  const samples = Math.max(8, Math.round(getCur("scanSamples", ch)));
+  if(!scanRT) scanRT = makeRT(procW, procH, true);
+  if(!scanRT) return;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, scanRT.fbo);
+  gl.viewport(0, 0, procW, procH);
+  gl.clearColor(0,0,0,1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE);          /* where lines bunch, they add up */
+  gl.useProgram(progSCAN.prog);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, inTex);
+  gl.uniform1i(U(progSCAN,"u_tex"), 0);
+  gl.uniform2f(U(progSCAN,"u_res"), procW, procH);
+  gl.uniform1f(U(progSCAN,"u_lines"), lines);
+  gl.uniform1f(U(progSCAN,"u_samples"), samples);
+  gl.uniform1f(U(progSCAN,"u_time"), now);
+  gl.uniform1f(U(progSCAN,"u_scanRevH"), scanRevH?1:0);
+  gl.uniform1f(U(progSCAN,"u_scanRevV"), scanRevV?1:0);
+  setParamUniforms(progSCAN, ch);
+  /* two vertices per sample makes the ribbon; one instance per scanline */
+  gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, samples*2, lines);
+  gl.disable(gl.BLEND);
+  runPass(progCOPY, scanRT.tex, dstRT.fbo, procW, procH, null, ch);
+}
 function stageNeeded(id, ch){
+  if(id === "scan") return getCur("scanAmt",ch) > 0.003 || getCur("scanCollapse",ch) > 0.003
+                        || getCur("scanWobAmt",ch) > 0.003 || Math.abs(getCur("scanCurve",ch)) > 0.003
+                        || scanRevH || scanRevV;
   if(id === "lab") return LAB_IDS.some(k=>getCur(k,ch)>0.003);
   if(id === "glitch") return getCur("pixelSort",ch)>0.003 || getCur("blockShift",ch)>0.003 || getCur("dotify",ch)>0.003 || getCur("driftWarp",ch)>0.003 || getCur("fmWarp",ch)>0.003;
   if(id === "flow") return FLOW_IDS.some(k=>Math.abs(getCur(k,ch))>0.003);
@@ -8274,6 +8536,7 @@ function stageNeeded(id, ch){
 }
 function runStage(id, inTex, dstRT, now, ch){
   const C = chanRT[ch];
+  if(id === "scan")   return runScan(inTex, dstRT, now, ch);
   if(id === "sig")    return runPass(progSIG, inTex, dstRT.fbo, procW, procH, pr=>sigExtras(pr,now,ch), ch);
   if(id === "col")    return runPass(progCOL, inTex, dstRT.fbo, procW, procH, pr=>colExtras(pr,now,ch), ch);
   if(id === "glitch") return runPass(progGLITCH, inTex, dstRT.fbo, procW, procH, pr=>{ gl.uniform1f(U(pr,"u_time"), now); }, ch);
@@ -8451,11 +8714,14 @@ function renderFrame(now, dt){
   updateSyncModel(dt, now);
   /* feedback auto-level servo — keeps the loop off the black/white attractors */
   for(const ch of CHANNELS){
-    const amt = getCur("fbAuto", ch);
+    const amt = fbNoServo ? 0 : getCur("fbAuto", ch);
     if(amt > 0.003){
       const target = 0.42;
       const err = target - (modVal.bright || 0.4);
       autoGain[ch] = Math.max(0.6, Math.min(1.4, autoGain[ch] + err*dt*1.2*amt));
+    } else if(fbNoServo){
+      /* servo defeated: nothing pulls the gain back to unity, so the loop is
+         free to run away to white or collapse to black and stay there */
     } else autoGain[ch] += (1-autoGain[ch])*Math.min(1, dt*3);
   }
 
@@ -8589,11 +8855,18 @@ function renderFrame(now, dt){
 
   /* phosphor persistence store */
   if(wantPersist){
+    /* a real accumulator: keep whichever is brighter, this frame or the decayed
+       trail, per channel. It used to be a full CRT pass writing the current
+       frame into the store, which made a one-frame echo rather than a decay. */
     gl.bindFramebuffer(gl.FRAMEBUFFER, persistB.fbo);
     gl.viewport(0,0,procW,procH);
-    gl.useProgram(progCRT.prog);
-    gl.uniform2f(U(progCRT,"u_res"), procW, procH);
+    gl.useProgram(progPHOS.prog);
+    gl.uniform2f(U(progPHOS,"u_res"), procW, procH);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, mixOut.tex);
+    gl.uniform1i(U(progPHOS,"u_cur"), 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, persistA.tex);
+    gl.uniform1i(U(progPHOS,"u_prev"), 1);
+    setParamUniforms(progPHOS, "A");
     draw();
     const t = persistA; persistA = persistB; persistB = t;
   }
@@ -9126,8 +9399,8 @@ if(OUTPUT_MODE){
     }
   }, 700);
   document.getElementById("btnChainReset").onclick = ()=>{
-    chainOrder = ["sig","col","glitch","lab","flow"];
-    stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true};
+    chainOrder = CHAIN_STAGES.slice();
+    stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true, scan:true};
     renderChain();
   };
   renderRoutes();

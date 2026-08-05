@@ -20,6 +20,7 @@ const SECTIONS = [
   {id:"glitch",   name:"GLITCH LAB",        cls:"mag",  zone:"chain"},
   {id:"lab",      name:"SIGNAL LAB",        cls:"mag",  zone:"chain"},
   {id:"flow",     name:"FLOW / MOSH",       cls:"mag",  zone:"chain"},
+  {id:"scan",     name:"SCAN PROCESSOR",    cls:"cyan", zone:"chain"},
   {id:"keyer",    name:"KEYER",             cls:"cyan", zone:"chain"},
 
   /* the display and the overlay are master, shared by every channel, so they
@@ -246,6 +247,25 @@ const PDEF = [
   ["timeGrad","TIME SHEAR","flow",-1,1,0],
   ["shearAxis","SHEAR AXIS","flow",0,1,0],
 
+  ["scanAmt","SCAN DISPLACE","scan",0,1,0],
+  ["scanLines","SCAN LINES","scan",60,720,320],
+  ["scanSamples","SCAN DETAIL","scan",64,640,256],
+  ["scanWidth","BEAM WIDTH","scan",0,1,0.12],
+  ["scanVel","VELOCITY GAIN","scan",0,1,0.8],
+  ["scanGain","SCAN LEVEL","scan",0,3,1],
+  ["scanTiltX","TILT X","scan",-1,1,0],
+  ["scanTiltY","TILT Y","scan",-1,1,0],
+  ["scanPersp","PERSPECTIVE","scan",0,1,0.3],
+  ["scanMono","MONO","scan",0,1,0],
+  ["scanHue","COLOURISE","scan",0,1,0],
+  ["scanCurve","S-CURVE","scan",-1,1,0],
+  ["scanSkew","RASTER SKEW","scan",-1,1,0],
+  ["scanCollapse","RASTER COLLAPSE","scan",0,1,0],
+  ["scanWobAmt","WOBBLE","scan",0,1,0],
+  ["scanWobFreq","WOBBLE FREQ","scan",0,1,0.25],
+  ["scanWobLock","WOBBLE LOCK","scan",0,1,1],
+  ["scanLissa","LISSAJOUS","scan",0,1,0],
+
   ["keyThresh","THRESHOLD","keyer",0,1,0.5],
   ["keySoft","SOFTNESS","keyer",0.01,1,0.2],
   ["keyInv","INVERT","keyer",0,1,0],
@@ -380,6 +400,9 @@ const PDEF = [
   ["whiteClip","WHITE CLIP","crt",0.5,1.5,1],
   ["phosphor","PERSISTENCE","crt",0,0.95,0],
   ["hvSag","HV SAG","crt",0,1,0],
+  ["phosR","PERSIST RED","crt",0,1,0.86],
+  ["phosG","PERSIST GREEN","crt",0,1,1],
+  ["phosB","PERSIST BLUE","crt",0,1,0.66],
 
   ["letterbox","LETTERBOX","overlay",0,0.4,0],
   ["pillarbox","PILLARBOX","overlay",0,0.4,0],

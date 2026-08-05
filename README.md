@@ -70,6 +70,20 @@ Last, over everything, the deck's own display: a transport symbol, a tape counte
 
 ![The lens, the glass, the panel and the deck's burnt-in display](docs/doc_overlay.png)
 
+## The scan processor
+
+Every other stage here is a fragment shader: one output pixel from one input pixel. This one is not, and it cannot be.
+
+A scan processor intercepts a monitor's deflection signals before the yoke and patches video luminance into the vertical position control, so bright parts of the picture physically pull the scan line up the tube. A camera then re-shoots the tube. The apparent depth is an artefact of photographing a two-dimensional deflection, not a model of a scene.
+
+The part that matters is that the result is *drawn* rather than sampled. It is a stack of continuous glowing lines, and where those lines bunch you get a bright caustic ridge, where they splay you get a dark gap. A fragment shader has no notion of line density, so a displacement map cannot produce that — which is why most digital versions get the geometry and miss the physics.
+
+So it is real geometry: one instanced line strip per scanline, expanded to a ribbon in the vertex shader because `gl.lineWidth` is clamped to 1 on essentially every desktop platform, with no vertex buffers at all — position comes from `gl_VertexID` and `gl_InstanceID`, and luminance is fetched in the vertex shader. It accumulates additively into a float target, and the beam brightens where it sweeps slower, because a slower beam deposits more energy per unit length. That last term is most of the difference between this and a displacement modifier.
+
+On top of the displacement sit the raster operations a Wobbulator adds by bolting extra yokes onto a receiver: sweep and field reversal (the scan order genuinely reverses, so it composes with everything downstream), S-curve and skew from a continuous-wind yoke, raster collapse that removes the vertical deflection entirely and smears the whole frame onto one line, and a deflection oscillator that can be locked to a multiple of the field rate — locked it stands still, detuned it crawls, and that crawl is the characteristic gesture of the instrument.
+
+![The scan processor](docs/doc_scan.png)
+
 ## Signal chain
 
 The rail above the picture is the live signal path. **Drag the pills to reorder the stages, click one to bypass it.** Order changes everything: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.
@@ -138,6 +152,16 @@ Each channel takes a video file (streamed from disk, so a 4GB file is no heavier
 The sidebar is per-channel, and only per-channel: everything shared by all four — the three mixers, the display stage and the output overlay — is on a tab in the dock under the picture. Each stage section carries its own bypass, wired to the same state as the rail above the picture, so switching TAPE / SYNC out of the chain reads the same in both places. The dock folds away entirely with the button on its tab strip or a double-click on the bar above it, and both the folded state and the height you drag it to are remembered.
 
 Each channel button carries a live thumbnail of what that channel is producing and the name of what is loaded on it, so you can tell at a glance what is where. The tempo has a beat LED beside it that flashes on the beat and accents the bar, because a number is not something you can check against music.
+
+## Letting it fail
+
+Two switches exist so the models can reach states they cannot get out of, because a model that always recovers is a model that cannot actually break.
+
+**LOCK: LATCHED** stops the sync PLL re-acquiring. Normally a loss of lock shears the picture and the loop pulls itself back over the next few hundred milliseconds, because that is what a working circuit does. Latched, every shear stays where it happened and the next one lands on top of it. Switching it back unwinds the whole accumulated mess at once.
+
+**SERVO: DEFEATED** removes the feedback auto-level safety net, so the loop is free to run away to white or collapse to black and stay there — which is what a feedback rig with no operator actually does.
+
+The phosphor persistence is also a real accumulator now, with separate decay per primary. Green P22 is the slowest and blue the fastest, which is why fast movement on a tube leaves a green-tinted wake with a blue leading edge rather than a grey smear.
 
 ## Finding things, and not losing them
 

@@ -54,14 +54,31 @@ const progMIX = makeProg(FS_MIX);
 const progMULTI = makeProg(FS_MULTI);
 const progGEN = makeProg(FS_GEN);
 const progLAB = makeProg(FS_LAB);
+/* the scan processor brings its own vertex shader, because it draws geometry
+   rather than a full-screen triangle */
+function makeProg2(vsSrc, fsSrc){
+  const p = gl.createProgram();
+  gl.attachShader(p, makeShader(gl.VERTEX_SHADER, vsSrc));
+  gl.attachShader(p, makeShader(gl.FRAGMENT_SHADER, fsSrc));
+  gl.linkProgram(p);
+  pendingProgs.push(p);
+  return {prog:p, loc:{}};
+}
+const progSCAN = makeProg2(VS_SCAN, FS_SCAN);
+const progPHOS = makeProg(FS_PHOS);
+/* Additive accumulation is what produces the bright ridge where lines bunch,
+   and it wants more headroom than eight bits. Float if the machine has it. */
+const floatRT = gl.getExtension("EXT_color_buffer_float") ? true : false;
+if(!gl.getExtension("EXT_float_blend")) { /* additive float blending may be slow; still correct */ }
 /* now that every one of them is in flight, ask how they got on */
 checkPrograms();
 
 let rtFailed = false;
-function makeRT(w,h){
+function makeRT(w,h,float16){
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  if(float16 && floatRT) gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,w,h,0,gl.RGBA,gl.HALF_FLOAT,null);
+  else gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);

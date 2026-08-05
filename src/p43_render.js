@@ -38,9 +38,14 @@ function updateSyncChannel(ch, ci, dt, t){
   }
   for(const ev of S.ev){
     const age = t-ev.t0;
-    ev.env = Math.min(age/0.03,1)*Math.exp(-Math.max(0,age-0.03)/ev.rel);
+    /* LATCHED: the loop never re-acquires. A circuit that has genuinely given
+       up does not politely recover after 300 milliseconds, and being unable to
+       reach that state was the tool refusing to break properly. */
+    ev.env = syncLatch ? Math.min(age/0.03, 1)
+                       : Math.min(age/0.03,1)*Math.exp(-Math.max(0,age-0.03)/ev.rel);
   }
-  S.ev = S.ev.filter(ev=>ev.env>0.012);
+  if(syncLatch){ while(S.ev.length > 10) S.ev.shift(); }
+  else S.ev = S.ev.filter(ev=>ev.env>0.012);
   /* tracking band drifts vertically like a real mistracking head */
   S.trackV += -0.6*S.trackV*sdt + 0.35*rq*gaussR();
   S.trackC += S.trackV*sdt*0.25;
@@ -244,7 +249,40 @@ function colExtras(pr, now, ch){
 }
 const FLOW_IDS = ["mosh","moshVec","melt","swirl","moshBlock","timeGrad","flowStretch","flowRepel","flowNoise","flowHue","flowFade"];
 const LAB_IDS = ["sparseJit","ntscArt","ntscFringe","snow","fmAmt","slitscan","bitCrush","bandKey","rowSmear","moire","fieldMod"];
+/* The scan processor is the one stage that draws geometry. It gets its own
+   target because it accumulates additively into float, and because the number
+   of primitives is a parameter rather than a constant. */
+let scanRT = null;
+function runScan(inTex, dstRT, now, ch){
+  const lines = Math.max(8, Math.round(getCur("scanLines", ch)));
+  const samples = Math.max(8, Math.round(getCur("scanSamples", ch)));
+  if(!scanRT) scanRT = makeRT(procW, procH, true);
+  if(!scanRT) return;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, scanRT.fbo);
+  gl.viewport(0, 0, procW, procH);
+  gl.clearColor(0,0,0,1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE);          /* where lines bunch, they add up */
+  gl.useProgram(progSCAN.prog);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, inTex);
+  gl.uniform1i(U(progSCAN,"u_tex"), 0);
+  gl.uniform2f(U(progSCAN,"u_res"), procW, procH);
+  gl.uniform1f(U(progSCAN,"u_lines"), lines);
+  gl.uniform1f(U(progSCAN,"u_samples"), samples);
+  gl.uniform1f(U(progSCAN,"u_time"), now);
+  gl.uniform1f(U(progSCAN,"u_scanRevH"), scanRevH?1:0);
+  gl.uniform1f(U(progSCAN,"u_scanRevV"), scanRevV?1:0);
+  setParamUniforms(progSCAN, ch);
+  /* two vertices per sample makes the ribbon; one instance per scanline */
+  gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, samples*2, lines);
+  gl.disable(gl.BLEND);
+  runPass(progCOPY, scanRT.tex, dstRT.fbo, procW, procH, null, ch);
+}
 function stageNeeded(id, ch){
+  if(id === "scan") return getCur("scanAmt",ch) > 0.003 || getCur("scanCollapse",ch) > 0.003
+                        || getCur("scanWobAmt",ch) > 0.003 || Math.abs(getCur("scanCurve",ch)) > 0.003
+                        || scanRevH || scanRevV;
   if(id === "lab") return LAB_IDS.some(k=>getCur(k,ch)>0.003);
   if(id === "glitch") return getCur("pixelSort",ch)>0.003 || getCur("blockShift",ch)>0.003 || getCur("dotify",ch)>0.003 || getCur("driftWarp",ch)>0.003 || getCur("fmWarp",ch)>0.003;
   if(id === "flow") return FLOW_IDS.some(k=>Math.abs(getCur(k,ch))>0.003);
@@ -252,6 +290,7 @@ function stageNeeded(id, ch){
 }
 function runStage(id, inTex, dstRT, now, ch){
   const C = chanRT[ch];
+  if(id === "scan")   return runScan(inTex, dstRT, now, ch);
   if(id === "sig")    return runPass(progSIG, inTex, dstRT.fbo, procW, procH, pr=>sigExtras(pr,now,ch), ch);
   if(id === "col")    return runPass(progCOL, inTex, dstRT.fbo, procW, procH, pr=>colExtras(pr,now,ch), ch);
   if(id === "glitch") return runPass(progGLITCH, inTex, dstRT.fbo, procW, procH, pr=>{ gl.uniform1f(U(pr,"u_time"), now); }, ch);
@@ -429,11 +468,14 @@ function renderFrame(now, dt){
   updateSyncModel(dt, now);
   /* feedback auto-level servo — keeps the loop off the black/white attractors */
   for(const ch of CHANNELS){
-    const amt = getCur("fbAuto", ch);
+    const amt = fbNoServo ? 0 : getCur("fbAuto", ch);
     if(amt > 0.003){
       const target = 0.42;
       const err = target - (modVal.bright || 0.4);
       autoGain[ch] = Math.max(0.6, Math.min(1.4, autoGain[ch] + err*dt*1.2*amt));
+    } else if(fbNoServo){
+      /* servo defeated: nothing pulls the gain back to unity, so the loop is
+         free to run away to white or collapse to black and stay there */
     } else autoGain[ch] += (1-autoGain[ch])*Math.min(1, dt*3);
   }
 
@@ -567,11 +609,18 @@ function renderFrame(now, dt){
 
   /* phosphor persistence store */
   if(wantPersist){
+    /* a real accumulator: keep whichever is brighter, this frame or the decayed
+       trail, per channel. It used to be a full CRT pass writing the current
+       frame into the store, which made a one-frame echo rather than a decay. */
     gl.bindFramebuffer(gl.FRAMEBUFFER, persistB.fbo);
     gl.viewport(0,0,procW,procH);
-    gl.useProgram(progCRT.prog);
-    gl.uniform2f(U(progCRT,"u_res"), procW, procH);
+    gl.useProgram(progPHOS.prog);
+    gl.uniform2f(U(progPHOS,"u_res"), procW, procH);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, mixOut.tex);
+    gl.uniform1i(U(progPHOS,"u_cur"), 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, persistA.tex);
+    gl.uniform1i(U(progPHOS,"u_prev"), 1);
+    setParamUniforms(progPHOS, "A");
     draw();
     const t = persistA; persistA = persistB; persistB = t;
   }

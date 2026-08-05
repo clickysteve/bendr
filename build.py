@@ -10,6 +10,10 @@ result, the size, and where each part landed so a stack trace can be read.
 import io, os, subprocess, sys, gzip, hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# the parts live in src/ in the repository and beside this script in a
+# scratch checkout, so resolve both rather than requiring one layout
+SRC = os.path.join(HERE, "src") if os.path.isdir(os.path.join(HERE, "src")) else HERE
+VENDOR = os.path.join(SRC, "vendor") if os.path.isdir(os.path.join(SRC, "vendor")) else SRC
 # Order is load-bearing: everything lands in one script tag and one scope, so a
 # later part can use a const from an earlier one with no imports and no bundler.
 PARTS = [
@@ -26,12 +30,12 @@ PARTS = [
 ]
 SIZE_BUDGET = 700_000          # fail rather than drift past this unnoticed
 
-def read(name):
-    with io.open(os.path.join(HERE, name), encoding="utf-8") as f:
+def read(name, where=None):
+    with io.open(os.path.join(where or SRC, name), encoding="utf-8") as f:
         return f.read()
 
 p1 = read("p1_shell.html")
-muxer = read("mp4-muxer.min.js")
+muxer = read("mp4-muxer.min.js", VENDOR)
 
 idx = p1.rfind("<script>")
 if idx < 0:

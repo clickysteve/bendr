@@ -80,7 +80,7 @@ The part that matters is that the result is *drawn* rather than sampled. It is a
 
 So it is real geometry: one instanced line strip per scanline, expanded to a ribbon in the vertex shader because `gl.lineWidth` is clamped to 1 on essentially every desktop platform, with no vertex buffers at all — position comes from `gl_VertexID` and `gl_InstanceID`, and luminance is fetched in the vertex shader. It accumulates additively into a float target, and the beam brightens where it sweeps slower, because a slower beam deposits more energy per unit length. That last term is most of the difference between this and a displacement modifier.
 
-On top of the displacement sit the raster operations a Wobbulator adds by bolting extra yokes onto a receiver: sweep and field reversal (the scan order genuinely reverses, so it composes with everything downstream), S-curve and skew from a continuous-wind yoke, raster collapse that removes the vertical deflection entirely and smears the whole frame onto one line, and a deflection oscillator that can be locked to a multiple of the field rate — locked it stands still, detuned it crawls, and that crawl is the characteristic gesture of the instrument.
+On top of the displacement sit the raster operations you get by bolting extra deflection yokes onto a receiver and driving them yourself: sweep and field reversal (the scan order genuinely reverses, so it composes with everything downstream), S-curve and skew from a continuous-wind yoke, raster collapse that removes the vertical deflection entirely and smears the whole frame onto one line, and a deflection oscillator that can be locked to a multiple of the field rate — locked it stands still, detuned it crawls, and that crawl is the characteristic gesture of the instrument.
 
 ![The scan processor](docs/doc_scan.png)
 
@@ -90,9 +90,11 @@ The rail above the picture is the live signal path. **Drag the pills to reorder 
 
 ```
 per channel (A B C D):  INPUT → framing → FEEDBACK / RESCAN → frame store
-                          → [ TAPE/SYNC · COLOUR/ENH · GLITCH LAB · SIGNAL LAB · FLOW/MOSH ]  ← reorderable
+                          → [ TAPE/SYNC · COLOUR/ENH · GLITCH LAB · SIGNAL LAB
+                              · FLOW/MOSH · SCAN · BLOCK · TIME ]  ← reorderable
                   A + B:  → MIX BUS 1 ┐
-                  C + D:  → MIX BUS 2 ┴→ MASTER MIX → MASTER OUTPUT → OVERLAY
+                  C + D:  → MIX BUS 2 ┴→ MASTER MIX
+                          → FIELDS → MASTER OUTPUT → CODEC MOSH → OVERLAY
 ```
 
 - **Tape / sync** — a per-scanline PLL simulation runs on the CPU every frame, once per channel: correlated drift, loss-of-lock shear with exponential re-lock, a drifting tracking band, head-switch skew, AGC breathing, a rolling blanking bar when v-hold slips. Composite rot on top: chroma bleed and delay, directional luma bleed, vertical colour bleed, rainbow fringing, dot crawl, ringing, streaky bandwidth-limited noise, comet-tail dropouts.
@@ -106,11 +108,16 @@ per channel (A B C D):  INPUT → framing → FEEDBACK / RESCAN → frame store
 - **CRT rephoto** — bloom, film-style halation, glass defocus and grain, for the look of a photograph *of* a screen rather than a clean render.
 - **Glitch lab** — pixel sorting (bright runs stretch into streaks), macroblock databending, halftone dropout, channel-driven drift warp, FM contour warp.
 - **Flow / mosh** — a temporal-smear stage with its own frame store, advected along a selectable vector field: real per-pixel optical flow estimated from the picture, brightness contours, curl noise, radial, spiral, chroma, weave. P-frame push drags the held frame along that field, which on the motion setting is what datamosh actually is — the picture stops updating while the movement keeps pulling it apart. Mosh gate restricts the holding to the moving parts of the frame or to the still parts; curl rotates the whole field so drift becomes orbit. Plus melt with its own angle and brightness gate, swirl with scale and speed, vector trash with block size and rate, stretch, edge repel, flow noise, per-pass hue and decay, re-sharpening, time shear on either axis, and clamp / repeat / mirror edges.
-- **Feedback / rescan** — a full feedback rig: zoom, rotate, shear, offset and mirror in the loop, edge mode (clamp for tunnels, repeat for lattices, mirror for mandalas), per-pass colour rotation, saturation, value gain and per-channel RGB gain, chromatic displacement, blur plus sharpen (an activator–inhibitor pair that grows Turing patterns), a four-way non-linearity (clamp / soft / wrap / fold) with drive and pivot, threshold, loop noise, vertical roll, sync jitter and an auto-level servo. RESCAN: FULL feeds the display output back through the entire chain. Thirty presets prefixed **FB** are named after the looks they produce.
+- **Feedback / rescan** — a full feedback rig: zoom, rotate, shear, offset and mirror in the loop, edge mode (clamp for tunnels, repeat for lattices, mirror for mandalas), per-pass colour rotation, saturation, value gain and per-channel RGB gain, chromatic displacement, blur plus sharpen (an activator–inhibitor pair that grows Turing patterns), a four-way non-linearity (clamp / soft / wrap / fold) with drive and pivot, threshold, loop noise, vertical roll, sync jitter and an auto-level servo. a sign switch on either axis (a reflection, which no rotation can reach, and the thing that turns a rotating tunnel into an alternating one), RESCAN: FULL feeds the display output back through the entire chain. Forty presets prefixed **FB** are named after the looks they produce, ten of them laid out along the classic phase diagram: set the rotation to a whole fraction of a turn and the picture locks into that many arms, detune it slightly and the arms shear past each other, add the reflection and you get pinwheels and travelling waves.
 - **Signal lab** — sparse line jitter, NTSC crosstalk with separate artifact and fringing controls, shaped snow with clumping, FM wobble, slitscan, row smear, 1-bit crush with ordered dither, moiré, a multi-band sequential keyer, and field modulation that varies across the frame rather than per-frame.
+- **Block transform** — a real separable 8-point DCT and inverse, two passes, one per axis. Quantise the coefficients and the picture comes back as a lossy codec would give it back: ringing round every edge, whole blocks flattened to their average, chroma crushed harder than luma because that is what a codec does first. The HF penalty tilts the quantiser toward the high frequencies, which is the difference between a soft picture and a blocky one.
+- **Time displace** — every other stage samples the current frame at a different place; this one samples a different frame at the same place. A twelve-frame ring of the picture is held in a texture array and each pixel chooses how far back to look, from a vertical ramp (slit-scan), a horizontal sweep, the picture's own brightness (bright things lag behind dark ones), a radial push, or the per-line ramp a time-base corrector produces as it fails. Interpolate off gives visible time-quantised bands.
+- **PNG avalanche** — filtered-image corruption rather than block corruption. A row's prediction filter is changed after the fact, so the error propagates down through every row that referenced it and the picture tears into a diagonal cascade that heals only where a run is contained.
 - **Keyer** — luma or chroma key with a matte viewer; masks the glitch chain and/or the feedback.
 - **Mixers** — three of them (bus 1, bus 2, master), each combining two fully-processed inputs: a fader plus twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and movable origin, key transitions, and add/difference/multiply/screen/lighten blends.
 - **Preset morph** — snapshot two whole panel states and blend every slider between them.
+- **Fields** — interlace, applied to the master output where it belongs rather than inside a channel. Video was never frames: it is two half-height pictures sampled a fiftieth of a second apart and combed together. WEAVE interleaves them so anything that moved between them serrates; BOB shows one field and fills the gaps, so the picture jitters by half a line at field rate; BLEND averages them and ghosts everything that moves. Swapping the field order is a fault, and it produces the stuttering backward-and-forward motion that is instantly recognisable and almost impossible to fake any other way. Plus line twitter on high vertical detail and 3:2 telecine judder.
+- **Codec mosh** — an actual encoder and decoder wired back to back with the bitstream broken in between. A keyframe is a whole picture; everything between it is only the difference from the frame before, carried mostly as motion vectors. Throw the keyframes away and the decoder never gets a new picture, so it keeps applying new movement to an old one — the motion of the current shot paints itself onto a picture from before the cut. On top of the key removal: differences held and re-applied, dropped, and re-injected out of order from a couple of seconds back; a real quantiser starved of bitrate; and a resync control that lets a keyframe through every so often so the picture snaps back to reality and starts falling apart again. Nothing here is a shader imitating a codec, so the artefacts are the decoder's own. It costs a frame or two of delay, and the decoder will occasionally give up and re-acquire, which is visible and is meant to be.
 - **Master output** — a display stage rather than a filter: seven display models (flat, aperture grille, slot mask, shadow mask, LCD stripe, mono monitor, green screen) with beam-profile scanlines that widen with brightness, phosphor persistence, HV sag, bloom, halation, defocus, grain, and a full output transform. Plus an overlay stage: letterbox and pillarbox mattes, bezel, glass glare, dust, scratches, screen moiré, rolling shutter and safe-area guides.
 
 | ![Datamosh](docs/doc_out_datamosh.png) | ![Halftone](docs/doc_out_dots.png) | ![Liquid melt](docs/doc_out_melt.png) |
@@ -120,6 +127,14 @@ per channel (A B C D):  INPUT → framing → FEEDBACK / RESCAN → frame store
 | ![Contour lines](docs/doc_vol1.png) | ![Triangles](docs/doc_triangles.png) | ![CRT rephoto](docs/doc_crt.png) |
 |---|---|---|
 | VOL I — ENHANCER LINES | TRIANGLES | CRT REPHOTO |
+
+![Ten feedback regimes](docs/doc_regimes.png)
+
+*The same loop, ten settings of four numbers: rotation, scale, reflection, gain.*
+
+![The codec round trip](docs/doc_codec.png)
+
+*Clean, then the same picture with the keyframes removed, then starved of bitrate with the differences arriving out of order.*
 
 Presets named after the glitch art series on [allmyfriendsarejpegs.com](https://allmyfriendsarejpegs.com): VOL I / II / III, TRIANGLES, 80S TRIANGLE, BLADE RUNNER TRIANGLE, CRT REPHOTO and JPEGS.
 
@@ -131,7 +146,7 @@ Any channel can be a generator rather than a player. It is built like a video sy
 
 ## Snapshots and the performance recorder
 
-The dock under the picture has five tabs — mod matrix, modulation page, text editor, mix (the transition detail), and perform, which holds the snapshot bank, the recorder and the bend pads together. Eight snapshot slots hold the whole rig — all four channels, every bus, every mode — with a **glide** time. At zero a recall is a hard cut; wound up it becomes a slow transformation of everything at once.
+The dock under the picture has eight tabs — mod matrix, modulation page, text editor, mix (the transition detail), scope (the monitoring), out (the display, fields and codec stages, all of them shared by every channel), audio, and perform, which holds the snapshot bank, the recorder and the bend pads together. Eight snapshot slots hold the whole rig — all four channels, every bus, every mode — with a **glide** time. At zero a recall is a hard cut; wound up it becomes a slow transformation of everything at once.
 
 The **performance recorder** writes down every control you move, twenty-four times a second, storing only what changed. It records gestures rather than pixels, so a take built slowly over an hour can be played back in real time, against completely different footage. Takes are saved inside the patch file.
 
@@ -163,9 +178,19 @@ Two switches exist so the models can reach states they cannot get out of, becaus
 
 The phosphor persistence is also a real accumulator now, with separate decay per primary. Green P22 is the slowest and blue the fastest, which is why fast movement on a tube leaves a green-tinted wake with a blue leading edge rather than a grey smear.
 
+## Watching the signal
+
+The SCOPE tab is a monitoring bay rather than a decoration. The **waveform monitor** plots luminance against horizontal position for the whole frame, with graticule lines at black and white, so you can see clipping and crushed blacks that the picture itself hides. The **vectorscope** plots the chroma of every sampled pixel on the U/V plane with the six colour-bar targets marked, so a hue rotation reads as the whole cloud turning and an over-saturated pass reads as it hitting the edge. Both read back the finished programme at low resolution ten times a second, and only while the tab is open, so they cost nothing when you are not looking.
+
+![Waveform monitor, vectorscope and probe](docs/doc_scope.png)
+
+**PROBE** puts an internal signal on the output instead of the picture. SYNC TRACE draws the sync model's own per-line horizontal displacement as a trace down the frame, which is the thing that produces the shear you can see but not measure. LINE STATE shows the AGC gain, the noise floor and the high-frequency loss for every line as three coloured bars. It is the difference between "the picture is doing something odd" and knowing which part of the model is doing it.
+
+![The sync model's per-line displacement, on the output](docs/doc_probe.png)
+
 ## Finding things, and not losing them
 
-There are 349 parameters. Press `/` and type, and the panel narrows to whatever matches — the parameter's name, its section, or the body of its help text, so "roll" finds V ROLL and a phrase from a description finds the control it describes. Two chips beside the box answer the other two questions you have while playing: **MOVING** shows only what something is currently driving, and **CHANGED** shows only what you have moved off its default.
+There are 404 parameters. Press `/` and type, and the panel narrows to whatever matches — the parameter's name, its section, or the body of its help text, so "roll" finds V ROLL and a phrase from a description finds the control it describes. Two chips beside the box answer the other two questions you have while playing: **MOVING** shows only what something is currently driving, and **CHANGED** shows only what you have moved off its default.
 
 The six bend pads have their own strip beside the faders rather than living on a tab, because you should never have to go looking for them mid-set.
 

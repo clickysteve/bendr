@@ -317,6 +317,7 @@ if(OUTPUT_MODE){
   /* the pills, the route rows and the mod cards are rebuilt as you work, so
      sweep up anything they bring with them */
   setInterval(()=>window.__adoptTitles(), 2000);
+  buildProbeUI();
   initHelpUI();
   { const hb = document.getElementById("btnHelpTop"); if(hb) hb.onclick = ()=>window.__openHelp(); }
   { const hb = document.getElementById("btnHelp"); if(hb) hb.onclick = ()=>window.__openHelp(); }
@@ -342,7 +343,7 @@ if(OUTPUT_MODE){
   }, 700);
   document.getElementById("btnChainReset").onclick = ()=>{
     chainOrder = CHAIN_STAGES.slice();
-    stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true, scan:true};
+    stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true, scan:true, dct:true, tdisp:true};
     renderChain();
   };
   renderRoutes();

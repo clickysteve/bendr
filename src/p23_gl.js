@@ -66,6 +66,23 @@ function makeProg2(vsSrc, fsSrc){
 }
 const progSCAN = makeProg2(VS_SCAN, FS_SCAN);
 const progPHOS = makeProg(FS_PHOS);
+const progFIELD = makeProg(FS_FIELD);
+const progDCT = makeProg(FS_DCT);
+const progTDISP = makeProg(FS_TDISP);
+/* A ring of whole frames the shader can address per pixel. One texture array
+   per channel, allocated only when something asks for it, because at 4K each
+   layer is 33 MB. */
+const TD_LAYERS = 12;
+function makeHistArray(w,h,n){
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex);
+  gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, w, h, n, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return {tex, fbo: gl.createFramebuffer(), w, h, n, head:0};
+}
 /* Additive accumulation is what produces the bright ridge where lines bunch,
    and it wants more headroom than eight bits. Float if the machine has it. */
 const floatRT = gl.getExtension("EXT_color_buffer_float") ? true : false;

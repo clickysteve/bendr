@@ -450,3 +450,246 @@ window.addEventListener("drop", e=>{
   if(f) handleFile(f, activeChan);
 });
 
+
+/* ---- codec mosh ---------------------------------------------------------
+   Datamoshing done the way it is actually done, rather than approximated with
+   a shader. The finished picture is encoded to video every frame; the encoded
+   chunks are damaged on the way past; the damaged stream is decoded and the
+   result is what you see.
+
+   The whole effect rests on one fact about how video is stored. A keyframe is
+   a complete picture. Everything between keyframes is only the difference from
+   the frame before, carried mostly as motion vectors: "this block moved here".
+   Throw the keyframes away and the decoder never gets a new picture, so it
+   keeps applying new movement to an old one. The motion of the current shot
+   paints itself onto a picture from before the cut. That is the bloom.
+
+   Nothing here is speculative about the codec: we hand a VideoEncoder real
+   frames and hand a VideoDecoder real chunks, and every artefact is the
+   decoder's own reaction to a stream it cannot fully resolve. The cost is that
+   the pipeline is asynchronous, so the moshed picture lands a frame or two
+   behind, and that a decoder pushed this way will occasionally give up, which
+   is why there is a resurrection policy below rather than a try/catch.        */
+
+let moshEnc = null, moshDec = null, moshTex = null;
+let moshW = 0, moshH = 0;                 /* size the pair was configured for */
+let moshCodec = "";                       /* which codec we settled on */
+let moshSeen = false;                     /* has a key chunk reached the decoder */
+let moshNeedKey = false;                  /* force a key on the next encode */
+let moshRing = [];                        /* recent deltas, for re-injection */
+let moshLast = null;
+let moshStamp = 0;                        /* monotonic stamps for the decoder */
+let moshCount = 0;                        /* frames handed to the encoder */
+let moshFails = 0;                        /* decoder deaths since the last good run */
+let moshGood = 0;                         /* frames decoded since the last death */
+let moshBuilding = false;
+let moshHasFrame = false;
+let moshOff = false;                      /* given up: unsupported or too fragile */
+let moshNote = "";
+const MOSH_SUPPORTED = (typeof VideoEncoder === "function" && typeof VideoDecoder === "function"
+                        && typeof VideoFrame === "function" && typeof EncodedVideoChunk === "function");
+
+/* deterministic-ish cheap noise; Math.random is fine here, this is a fault
+   generator and nothing downstream needs to reproduce it */
+function moshRnd(){ return Math.random(); }
+
+function moshReset(){
+  moshSeen = false; moshNeedKey = true; moshRing.length = 0; moshLast = null;
+  moshStamp = 0; moshGood = 0;
+}
+
+function moshStop(){
+  try{ if(moshEnc && moshEnc.state !== "closed") moshEnc.close(); }catch(e){}
+  try{ if(moshDec && moshDec.state !== "closed") moshDec.close(); }catch(e){}
+  moshEnc = null; moshDec = null; moshW = 0; moshH = 0; moshHasFrame = false;
+  moshReset();
+}
+
+/* The decoder is the fragile half: feed it a stream with holes in it for long
+   enough and it will eventually error rather than produce a frame. Rebuilding
+   it and demanding a fresh keyframe is the correct response, and it is also
+   visible in a good way — the picture snaps back and starts falling apart
+   again. We only give up entirely if it dies repeatedly without ever managing
+   a run of good frames, which means the environment cannot do this at all. */
+function moshDied(){
+  moshFails++;
+  if(moshGood > 30) moshFails = 1;        /* it was working; treat as a one-off */
+  if(moshFails > 6){
+    moshOff = true; moshNote = "decoder unavailable";
+    moshStop();
+    return;
+  }
+  try{ if(moshDec && moshDec.state !== "closed") moshDec.close(); }catch(e){}
+  moshDec = null;
+  moshReset();
+}
+
+async function moshBuild(w, h){
+  if(moshBuilding || moshOff || !MOSH_SUPPORTED) return;
+  moshBuilding = true;
+  moshStop();
+  /* even dimensions, and small enough that a software encoder keeps up */
+  w = Math.max(64, w & ~1); h = Math.max(64, h & ~1);
+  const CANDIDATES = [
+    {codec:"avc1.42001f", extra:{avc:{format:"annexb"}}, dec:{}},
+    {codec:"vp8",         extra:{},                      dec:{}},
+    {codec:"vp09.00.10.08", extra:{},                    dec:{}},
+  ];
+  try{
+    for(const c of CANDIDATES){
+      const ecfg = Object.assign({codec:c.codec, width:w, height:h, framerate:30,
+                                  bitrate:2_000_000, latencyMode:"realtime"}, c.extra);
+      let ok = false;
+      try{ ok = (await VideoEncoder.isConfigSupported(ecfg)).supported; }catch(e){ ok = false; }
+      if(!ok) continue;
+      const dcfg = Object.assign({codec:c.codec, codedWidth:w, codedHeight:h,
+                                  optimizeForLatency:true}, c.dec);
+      try{ if(!(await VideoDecoder.isConfigSupported(dcfg)).supported) continue; }catch(e){ continue; }
+      const enc = new VideoEncoder({output:(chunk)=>moshChunk(chunk), error:()=>{ moshStop(); }});
+      const dec = new VideoDecoder({output:(frame)=>{ moshGood++; moshUpload(frame); },
+                                    error:()=>{ moshDied(); }});
+      enc.configure(ecfg); dec.configure(dcfg);
+      moshEnc = enc; moshDec = dec; moshW = w; moshH = h; moshCodec = c.codec;
+      moshReset();
+      moshNote = c.codec;
+      break;
+    }
+    if(!moshEnc){ moshOff = true; moshNote = "no codec"; }
+  }catch(e){
+    moshOff = true; moshNote = "unavailable";
+  }
+  moshBuilding = false;
+}
+
+/* EncodedVideoChunk is immutable and single-use as far as timestamps go, so we
+   keep our own copies: the bytes plus the type. Re-emitting means building a
+   fresh chunk with the next stamp, which is what lets the same difference be
+   applied more than once. */
+function moshCopy(c){
+  const b = new Uint8Array(c.byteLength);
+  c.copyTo(b);
+  return {type:c.type, data:b};
+}
+function moshEmit(rec){
+  if(!moshDec || moshDec.state !== "configured") return;
+  if(moshDec.decodeQueueSize > 6) return;        /* never build latency */
+  moshStamp += 33333;
+  try{
+    moshDec.decode(new EncodedVideoChunk({type:rec.type, timestamp:moshStamp,
+                                          duration:33333, data:rec.data}));
+  }catch(e){ moshDied(); }
+}
+
+function moshChunk(chunk){
+  if(!moshDec) return;
+  const rec = moshCopy(chunk);
+  const rate = mCur.moshRate;
+  if(rec.type === "key"){
+    /* the decoder needs exactly one whole picture to have something to damage */
+    if(!moshSeen || moshNeedKey){ moshSeen = true; moshNeedKey = false; moshEmit(rec); return; }
+    if(moshRnd() < mCur.moshKey) return;         /* the removal that makes the effect */
+    moshEmit(rec);
+    return;
+  }
+  moshRing.push(rec);
+  if(moshRing.length > 90) moshRing.shift();
+  moshLast = rec;
+  if(!moshSeen) return;                          /* nothing to apply movement to yet */
+  if(moshRnd() < mCur.moshSkip*rate) return;     /* the picture stalls */
+  moshEmit(rec);
+  if(moshRnd() < mCur.moshHold*rate){
+    /* the same movement applied again, to a picture it was never measured from */
+    const n = 1 + Math.floor(moshRnd()*mCur.moshHold*5);
+    for(let i=0;i<n;i++) moshEmit(rec);
+  }
+  if(moshRnd() < mCur.moshShuffle*rate && moshRing.length > 10){
+    moshEmit(moshRing[Math.floor(moshRnd()*(moshRing.length-6))]);
+  }
+}
+
+function moshUpload(frame){
+  try{
+    if(!moshTex){
+      moshTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, moshTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+    gl.bindTexture(gl.TEXTURE_2D, moshTex);
+    /* the decoded frame is top-down; everything else here is bottom-up */
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, frame);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    moshHasFrame = true;
+  }catch(e){ /* a frame we cannot upload is a frame we skip */ }
+  try{ frame.close(); }catch(e){}
+}
+
+/* called once per rendered frame, with the finished picture on the canvas */
+function moshPush(){
+  if(moshOff || !MOSH_SUPPORTED) return;
+  /* the offline render advances frames as fast as it can, and the codec pair is
+     asynchronous, so feeding it there would queue without bound and land the
+     wrong picture on the wrong frame. It is a realtime stage. */
+  if(offline){ if(moshEnc) moshStop(); return; }
+  if(mCur.moshAmt < 0.003){
+    if(moshEnc) moshStop();
+    return;
+  }
+  /* Keep the round trip cheap. A software encoder has to finish inside a frame
+     or the queue grows without bound and the picture falls further behind every
+     second, so this is capped well below the processing resolution. It also
+     happens to be the right look: the artefact is the codec, not the detail. */
+  const tw = Math.min(640, canvas.width), th = Math.round(tw * canvas.height / Math.max(1,canvas.width));
+  if(!moshEnc || Math.abs(moshW - (tw & ~1)) > 1 || Math.abs(moshH - (th & ~1)) > 1){
+    moshBuild(tw, th);
+    return;
+  }
+  if(!moshDec){                               /* rebuilt after a death */
+    try{
+      moshDec = new VideoDecoder({output:(frame)=>{ moshGood++; moshUpload(frame); },
+                                  error:()=>{ moshDied(); }});
+      moshDec.configure({codec:moshCodec, codedWidth:moshW, codedHeight:moshH, optimizeForLatency:true});
+      moshNeedKey = true; moshSeen = false;
+    }catch(e){ moshDied(); return; }
+  }
+  if(moshEnc.state !== "configured") return;
+  if(moshEnc.encodeQueueSize > 2) return;
+  /* bitrate starve: the encoder spends what it has on movement and lets the
+     detail go, which is where the blocking comes from */
+  const q = mCur.moshQ;
+  const want = Math.round(4_000_000 * Math.pow(0.02, q));
+  if(Math.abs(want - (moshEnc.__br||0)) > want*0.25){
+    try{ moshEnc.configure({codec:moshCodec, width:moshW, height:moshH, framerate:30,
+                            bitrate:want, latencyMode:"realtime",
+                            avc: moshCodec.indexOf("avc") === 0 ? {format:"annexb"} : undefined});
+         moshEnc.__br = want; moshNeedKey = true; moshSeen = false; }catch(e){}
+  }
+  let vf = null;
+  try{ vf = new VideoFrame(canvas, {timestamp: (moshCount++)*33333, duration:33333}); }
+  catch(e){ return; }
+  const period = Math.max(2, Math.round((1 - mCur.moshResync)*300) + 2);
+  const wantKey = !moshSeen || moshNeedKey || (mCur.moshResync > 0.003 && (moshCount % period) === 0);
+  try{ moshEnc.encode(vf, {keyFrame: wantKey}); }catch(e){ moshStop(); }
+  try{ vf.close(); }catch(e){}
+}
+
+/* blend the decoded picture over the clean one, straight to the screen */
+function moshDraw(){
+  if(!moshHasFrame || !moshTex || mCur.moshAmt < 0.003) return;
+  const a = Math.min(1, mCur.moshAmt);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0,0,canvas.width,canvas.height);
+  gl.enable(gl.BLEND);
+  gl.blendColor(0,0,0,a);
+  gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA);
+  gl.useProgram(progCOPY.prog);
+  gl.uniform2f(U(progCOPY,"u_res"), canvas.width, canvas.height);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, moshTex);
+  gl.uniform1i(U(progCOPY,"u_tex"), 0);
+  draw();
+  gl.disable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+}

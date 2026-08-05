@@ -252,7 +252,7 @@ const LAB_IDS = ["sparseJit","ntscArt","ntscFringe","snow","fmAmt","slitscan","b
 /* The scan processor is the one stage that draws geometry. It gets its own
    target because it accumulates additively into float, and because the number
    of primitives is a parameter rather than a constant. */
-let scanRT = null;
+let scanRT = null, fieldPrev = null, fieldOut = null;
 function runScan(inTex, dstRT, now, ch){
   const lines = Math.max(8, Math.round(getCur("scanLines", ch)));
   const samples = Math.max(8, Math.round(getCur("scanSamples", ch)));
@@ -280,10 +280,12 @@ function runScan(inTex, dstRT, now, ch){
   runPass(progCOPY, scanRT.tex, dstRT.fbo, procW, procH, null, ch);
 }
 function stageNeeded(id, ch){
+  if(id === "dct") return getCur("dctAmt",ch) > 0.003;
+  if(id === "tdisp") return getCur("tdAmt",ch) > 0.003;
   if(id === "scan") return getCur("scanAmt",ch) > 0.003 || getCur("scanCollapse",ch) > 0.003
                         || getCur("scanWobAmt",ch) > 0.003 || Math.abs(getCur("scanCurve",ch)) > 0.003
                         || scanRevH || scanRevV;
-  if(id === "lab") return LAB_IDS.some(k=>getCur(k,ch)>0.003);
+  if(id === "lab") return LAB_IDS.some(k=>getCur(k,ch)>0.003) || getCur("pngAmt",ch)>0.003;
   if(id === "glitch") return getCur("pixelSort",ch)>0.003 || getCur("blockShift",ch)>0.003 || getCur("dotify",ch)>0.003 || getCur("driftWarp",ch)>0.003 || getCur("fmWarp",ch)>0.003;
   if(id === "flow") return FLOW_IDS.some(k=>Math.abs(getCur(k,ch))>0.003);
   return true;
@@ -291,6 +293,49 @@ function stageNeeded(id, ch){
 function runStage(id, inTex, dstRT, now, ch){
   const C = chanRT[ch];
   if(id === "scan")   return runScan(inTex, dstRT, now, ch);
+  if(id === "tdisp"){
+    if(!C.hist || C.hist.w !== procW || C.hist.h !== procH){
+      if(C.hist){ gl.deleteTexture(C.hist.tex); gl.deleteFramebuffer(C.hist.fbo); }
+      C.hist = makeHistArray(procW, procH, TD_LAYERS);
+      /* prime every layer with the live picture, or the stage fades up out of
+         black for the first half second while the ring fills */
+      const HP = C.hist;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, HP.fbo);
+      gl.viewport(0,0,procW,procH);
+      gl.useProgram(progCOPY.prog);
+      gl.uniform2f(U(progCOPY,"u_res"), procW, procH);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, inTex);
+      gl.uniform1i(U(progCOPY,"u_tex"), 0);
+      for(let L=0; L<HP.n; L++){
+        gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, HP.tex, 0, L);
+        draw();
+      }
+    }
+    const H = C.hist;
+    /* write this frame into the ring, then read the ring back per pixel */
+    H.head = (H.head + 1) % H.n;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, H.fbo);
+    gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, H.tex, 0, H.head);
+    gl.viewport(0,0,procW,procH);
+    gl.useProgram(progCOPY.prog);
+    gl.uniform2f(U(progCOPY,"u_res"), procW, procH);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, inTex);
+    gl.uniform1i(U(progCOPY,"u_tex"), 0);
+    draw();
+    return runPass(progTDISP, inTex, dstRT.fbo, procW, procH, pr=>{
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, H.tex);
+      gl.uniform1i(U(pr,"u_hist"), 1);
+      gl.uniform1f(U(pr,"u_layers"), H.n);
+      gl.uniform1f(U(pr,"u_head"), H.head);
+      gl.uniform1f(U(pr,"u_time"), now);
+    }, ch);
+  }
+  if(id === "dct"){
+    /* separable: one axis, then the other, through a scratch buffer */
+    const tmp = (dstRT === scratch1) ? scratch2 : scratch1;
+    runPass(progDCT, inTex, tmp.fbo, procW, procH, pr=>gl.uniform1f(U(pr,"u_axis"), 0), ch);
+    return runPass(progDCT, tmp.tex, dstRT.fbo, procW, procH, pr=>gl.uniform1f(U(pr,"u_axis"), 1), ch);
+  }
   if(id === "sig")    return runPass(progSIG, inTex, dstRT.fbo, procW, procH, pr=>sigExtras(pr,now,ch), ch);
   if(id === "col")    return runPass(progCOL, inTex, dstRT.fbo, procW, procH, pr=>colExtras(pr,now,ch), ch);
   if(id === "glitch") return runPass(progGLITCH, inTex, dstRT.fbo, procW, procH, pr=>{ gl.uniform1f(U(pr,"u_time"), now); }, ch);
@@ -413,6 +458,7 @@ function renderChannel(ch, now, dt){
   gl.uniform1f(U(progFB,"u_fbBlend"), fbBlend);
   gl.uniform1f(U(progFB,"u_fbNL"), fbNL);
   gl.uniform1f(U(progFB,"u_fbInvert"), fbInvert?1:0);
+  gl.uniform1f(U(progFB,"u_fbFlip"), fbFlip);
   gl.uniform1f(U(progFB,"u_autoGain"), autoGain[ch]);
   gl.uniform1f(U(progFB,"u_flipMode"), Math.round(getCur("flipMode",ch)));
   gl.uniform1f(U(progFB,"u_mirrorMode"), Math.round(getCur("mirrorMode",ch)));
@@ -585,6 +631,32 @@ function renderFrame(now, dt){
     return;
   }
 
+  /* the field stage sits between the mixer and the display, because interlace
+     is a property of the signal leaving the desk, not of any one channel */
+  let outTex = mixOut.tex;   /* not dispTex: that name is the sync model's texture */
+  if(mCur.ilAmt > 0.003){
+    if(!fieldPrev) fieldPrev = makeRT(procW, procH);
+    if(!fieldOut) fieldOut = makeRT(procW, procH);
+    if(fieldPrev && fieldOut){
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fieldOut.fbo);
+      gl.viewport(0,0,procW,procH);
+      gl.useProgram(progFIELD.prog);
+      gl.uniform2f(U(progFIELD,"u_res"), procW, procH);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, mixOut.tex);
+      gl.uniform1i(U(progFIELD,"u_tex"), 0);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, fieldPrev.tex);
+      gl.uniform1i(U(progFIELD,"u_prevField"), 1);
+      gl.uniform1f(U(progFIELD,"u_ilMode"), ilMode);
+      gl.uniform1f(U(progFIELD,"u_ilOrder"), ilOrder?1:0);
+      gl.uniform1f(U(progFIELD,"u_parity"), frameNo % 2);
+      gl.uniform1f(U(progFIELD,"u_time"), now);
+      setParamUniforms(progFIELD, "A");
+      draw();
+      outTex = fieldOut.tex;
+      /* keep this frame as the other field for next time */
+      runPass(progCOPY, mixOut.tex, fieldPrev.fbo, procW, procH, null, "A");
+    }
+  }
   if(mCur.osdShow > 0.003) updateOSD(now, dt);
   /* CRT -> screen */
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -592,10 +664,14 @@ function renderFrame(now, dt){
   gl.useProgram(progCRT.prog);
   gl.uniform2f(U(progCRT,"u_res"), canvas.width, canvas.height);
   gl.uniform2f(U(progCRT,"u_procRes"), procW, procH);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, mixOut.tex);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, outTex);
   gl.uniform1i(U(progCRT,"u_tex"), 0);
   gl.uniform1f(U(progCRT,"u_time"), now);
   gl.uniform1f(U(progCRT,"u_outModel"), outModel);
+  gl.uniform1f(U(progCRT,"u_probe"), probeMode);
+  gl.uniform1f(U(progCRT,"u_rows"), SROWS);
+  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, dispTex);
+  gl.uniform1i(U(progCRT,"u_probeT"), 3);
   /* the persistence pair only exists once phosphor is actually turned up */
   const wantPersist = mCur.phosphor > 0.003;
   if(wantPersist){ ensureShared("persistA"); ensureShared("persistB"); }
@@ -606,6 +682,14 @@ function renderFrame(now, dt){
   gl.uniform1f(U(progCRT,"u_hasPersist"), wantPersist?1:0);
   setParamUniforms(progCRT, "A");
   draw();
+
+  /* the codec round trip taps the finished picture off the canvas. CLEAN feeds
+     the encoder before the moshed image is laid over the top, so the damage
+     never compounds; RECYCLED feeds it after, so every pass is built on the
+     last one's wreckage. */
+  if(!moshRecycle) moshPush();
+  moshDraw();
+  if(moshRecycle) moshPush();
 
   /* phosphor persistence store */
   if(wantPersist){
@@ -745,6 +829,89 @@ canvas.addEventListener("webglcontextrestored", ()=>{
 /* Live thumbnails on the channel buttons. A readback stalls the pipeline, so
    this happens twice a second at 48x27 - about five kilobytes a second in
    total - rather than every frame. */
+/* The scopes read the finished picture back at a low resolution and draw it as
+   a waveform and a vectorscope. Both are what an engineer would put on a bench
+   next to this, and both are the most honest thing you can show: they say what
+   the signal is doing rather than what it looks like. */
+const SCOPE_W = 128, SCOPE_H = 72;
+/* 75% colour bars, carried through the same colour-difference axes the plot
+   uses, so the boxes land where a correctly-encoded bar signal would */
+const SCOPE_TARGETS = (function(){
+  const bars = [[1,0,0,"R"],[0,1,0,"G"],[0,0,1,"B"],[1,1,0,"YL"],[0,1,1,"CY"],[1,0,1,"MG"]];
+  return bars.map(function(b){
+    const r=b[0]*0.75, g=b[1]*0.75, bl=b[2]*0.75;
+    const y = 0.299*r + 0.587*g + 0.114*bl;
+    return {u:(bl-y)*0.565, v:(r-y)*0.713, n:b[3]};
+  });
+})();
+const scopePix = new Uint8Array(SCOPE_W*SCOPE_H*4);
+let scopeRT = null, scopeAt = 0;
+function updateScopes(now){
+  if(dockTab !== "scope") return;
+  if(now - scopeAt < 0.1) return;
+  scopeAt = now;
+  const wc = document.getElementById("scopeWave"), vc = document.getElementById("scopeVec");
+  if(!wc || !vc) return;
+  if(!scopeRT) scopeRT = makeRT(SCOPE_W, SCOPE_H);
+  if(!scopeRT) return;
+  runPass(progCOPY, mixOut.tex, scopeRT.fbo, SCOPE_W, SCOPE_H, null, "A");
+  gl.bindFramebuffer(gl.FRAMEBUFFER, scopeRT.fbo);
+  gl.readPixels(0,0,SCOPE_W,SCOPE_H, gl.RGBA, gl.UNSIGNED_BYTE, scopePix);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  /* waveform: luminance against horizontal position, every line overlaid */
+  const g = wc.getContext("2d");
+  g.fillStyle = "#07070a"; g.fillRect(0,0,wc.width,wc.height);
+  g.strokeStyle = "#1c1c24"; g.lineWidth = 1;
+  for(let i=0;i<=4;i++){
+    const y = Math.round(wc.height - i/4*wc.height) + 0.5;
+    g.beginPath(); g.moveTo(0,y); g.lineTo(wc.width,y); g.stroke();
+  }
+  const img = g.getImageData(0,0,wc.width,wc.height);
+  const d = img.data;
+  for(let y=0;y<SCOPE_H;y++){
+    for(let x=0;x<SCOPE_W;x++){
+      const o = (y*SCOPE_W+x)*4;
+      const lum = (scopePix[o]*0.299 + scopePix[o+1]*0.587 + scopePix[o+2]*0.114)/255;
+      const px = Math.floor(x/SCOPE_W*wc.width);
+      const py = Math.floor((1-lum)*(wc.height-1));
+      const q = (py*wc.width+px)*4;
+      d[q] = Math.min(255, d[q]+40); d[q+1] = Math.min(255, d[q+1]+90); d[q+2] = Math.min(255, d[q+2]+80); d[q+3] = 255;
+    }
+  }
+  g.putImageData(img,0,0);
+  /* vectorscope: the two colour-difference axes against each other */
+  const v = vc.getContext("2d");
+  v.fillStyle = "#07070a"; v.fillRect(0,0,vc.width,vc.height);
+  const cx = vc.width/2, cy = vc.height/2, R = Math.min(cx,cy)-4;
+  v.strokeStyle = "#1c1c24";
+  for(const r of [0.33,0.66,1]){ v.beginPath(); v.arc(cx,cy,R*r,0,6.2832); v.stroke(); }
+  v.beginPath(); v.moveTo(cx-R,cy); v.lineTo(cx+R,cy); v.moveTo(cx,cy-R); v.lineTo(cx,cy+R); v.stroke();
+  /* the six 75% colour-bar targets, which is what makes this readable as an
+     instrument rather than a scatter plot: a hue rotation turns the cloud away
+     from the boxes, and an over-saturated pass pushes past them */
+  v.strokeStyle = "#3a3a48"; v.fillStyle = "#6b6b7a";
+  v.font = "8px monospace"; v.textAlign = "center";
+  for(const t of SCOPE_TARGETS){
+    const px = cx + t.u*R*1.4, py = cy - t.v*R*1.4;
+    v.strokeRect(px-3.5, py-3.5, 7, 7);
+    v.fillText(t.n, px, py-6);
+  }
+  const vi = v.getImageData(0,0,vc.width,vc.height), vd = vi.data;
+  for(let i=0;i<SCOPE_W*SCOPE_H;i++){
+    const o = i*4;
+    const r = scopePix[o]/255, gg = scopePix[o+1]/255, b = scopePix[o+2]/255;
+    const y = 0.299*r + 0.587*gg + 0.114*b;
+    const u = (b - y)*0.565, w2 = (r - y)*0.713;
+    const px = Math.round(cx + u*R*1.4), py = Math.round(cy - w2*R*1.4);
+    if(px<0||py<0||px>=vc.width||py>=vc.height) continue;
+    const q = (py*vc.width+px)*4;
+    vd[q] = Math.min(255, vd[q]+Math.round(r*90));
+    vd[q+1] = Math.min(255, vd[q+1]+Math.round(gg*90));
+    vd[q+2] = Math.min(255, vd[q+2]+Math.round(b*90));
+    vd[q+3] = 255;
+  }
+  v.putImageData(vi,0,0);
+}
 const THUMB_W = 48, THUMB_H = 27;
 const thumbPix = new Uint8Array(THUMB_W*THUMB_H*4);
 let thumbAt = 0, thumbRT = null, thumbImg = null;
@@ -777,6 +944,7 @@ function updateThumbs(now){
 function frameEnd(now, dt){
   serviceGrabs();
   updateThumbs(now);
+  updateScopes(now);
   if(offline) return;
   const S = cur();
   if(S.mode==="file" && S.video.duration && !seeking){

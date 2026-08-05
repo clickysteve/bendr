@@ -21,11 +21,15 @@ const SECTIONS = [
   {id:"lab",      name:"SIGNAL LAB",        cls:"mag",  zone:"chain"},
   {id:"flow",     name:"FLOW / MOSH",       cls:"mag",  zone:"chain"},
   {id:"scan",     name:"SCAN PROCESSOR",    cls:"cyan", zone:"chain"},
+  {id:"dct",      name:"BLOCK TRANSFORM",   cls:"mag",  zone:"chain"},
+  {id:"tdisp",    name:"TIME DISPLACE",     cls:"mag",  zone:"chain"},
   {id:"keyer",    name:"KEYER",             cls:"cyan", zone:"chain"},
 
   /* the display and the overlay are master, shared by every channel, so they
      belong beside the other master controls in the dock rather than at the
      bottom of a column that is otherwise entirely per-channel */
+  {id:"field",    name:"INTERLACE / FIELDS",cls:"",     zone:"outdock"},
+  {id:"codec",    name:"CODEC MOSH",        cls:"mag",  zone:"outdock"},
   {id:"crt",      name:"CRT DISPLAY",       cls:"cyan", zone:"outdock"},
   {id:"overlay",  name:"OUTPUT OVERLAY",    cls:"cyan", zone:"outdock"},
 
@@ -247,6 +251,33 @@ const PDEF = [
   ["timeGrad","TIME SHEAR","flow",-1,1,0],
   ["shearAxis","SHEAR AXIS","flow",0,1,0],
 
+  ["tdAmt","TIME DISPLACE","tdisp",0,1,0],
+  ["tdMap","DISPLACE MAP","tdisp",0,4,0],
+  ["tdSpread","REACH","tdisp",0,1,0.7],
+  ["tdSoft","INTERPOLATE","tdisp",0,1,1],
+  ["tdWarp","MAP DRIFT","tdisp",0,1,0],
+
+  ["dctAmt","BLOCK CODEC","dct",0,1,0],
+  ["dctQ","QUANTISER","dct",0,1,0.25],
+  ["dctTilt","HF PENALTY","dct",0,1,0.5],
+  ["dctChroma","CHROMA CRUSH","dct",0,1,0.4],
+  ["dctBlock","BLOCK SIZE","dct",0,1,0.35],
+
+  ["pngAmt","FILTER AVALANCHE","lab",0,1,0],
+  ["pngDir","AVALANCHE AXIS","lab",0,2,0],
+  ["pngRun","AVALANCHE RUN","lab",0,1,0.4],
+
+  ["ampAmt","CLASSIFIER","color",0,1,0],
+  ["ampBands","BAND COUNT","color",0,1,0.5],
+  ["ampPick","ISOLATE BAND","color",0,1,0],
+  ["ampCol","BAND COLOUR","color",0,1,0],
+  ["diffAmt","DIFFERENTIATOR","color",0,1,0],
+  ["diffScale","DIFF SCALE","color",0,1,0.2],
+  ["diffPolar","DIFF DIRECTION","color",0,1,0],
+  ["fgPos","CURVE ABOVE","color",-1,1,0],
+  ["fgNeg","CURVE BELOW","color",-1,1,0],
+  ["fgZero","DEAD ZONE","color",0,1,0],
+
   ["scanAmt","SCAN DISPLACE","scan",0,1,0],
   ["scanLines","SCAN LINES","scan",60,720,320],
   ["scanSamples","SCAN DETAIL","scan",64,640,256],
@@ -377,6 +408,23 @@ const PDEF = [
   ["edgeHue","EDGE HUE","color",0,1,0.45],
   ["emboss","EMBOSS","color",0,1,0],
   ["embossDir","EMBOSS DIR","color",0,1,0.12],
+
+  /* the field domain sits between the mixer and the display: interlace is a
+     property of the signal leaving the desk, not of any one channel */
+  ["ilAmt","INTERLACE","field",0,1,0],
+  ["ilTwitter","LINE TWITTER","field",0,1,0.4],
+  ["ilJudder","3:2 JUDDER","field",0,1,0],
+
+  /* a real encode/decode round trip, so these are transport controls for a
+     codec rather than numbers feeding a shader */
+  ["moshAmt","CODEC MOSH","codec",0,1,0],
+  ["moshKey","KEY REMOVAL","codec",0,1,0.95],
+  ["moshHold","DELTA HOLD","codec",0,1,0.25],
+  ["moshSkip","DELTA DROP","codec",0,1,0],
+  ["moshShuffle","CHUNK SHUFFLE","codec",0,1,0],
+  ["moshRate","EVENT RATE","codec",0,1,0.5],
+  ["moshQ","BITRATE STARVE","codec",0,1,0.35],
+  ["moshResync","RESYNC","codec",0,1,0],
 
   ["scanlines","SCANLINES","crt",0,1,0.18],
   ["beamWidth","BEAM WIDTH","crt",0.1,3,1],

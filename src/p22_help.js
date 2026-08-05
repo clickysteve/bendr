@@ -306,10 +306,44 @@ const PHELP = {
   scanCurve:"Bends the whole raster into an S, the way a continuous-wind yoke does. It is applied before the displacement, so the picture bends with it.",
   scanSkew:"Leans the raster sideways, which a bench monitor would call parallelogram. Also applied before displacement.",
   scanCollapse:"Removes the current from the vertical deflection, so the raster falls in on itself. At full the entire frame is smeared along a single line, which is a genuinely strange thing to look at and hard to get any other way.",
-  scanWobAmt:"Drives the deflection from an oscillator, the way a Wobbulator does by adding extra yokes and feeding them from a signal generator.",
+  scanWobAmt:"Drives the deflection from an oscillator, the way the modified receivers of the period did by adding extra yokes and feeding them from a signal generator.",
   scanWobFreq:"The oscillator frequency, as a multiple of the field rate.",
   scanWobLock:"How firmly the oscillator is locked to the field rate. Fully locked, the distortion stands still because it repeats identically every frame. Unlocked, it crawls, and the crawl is the characteristic gesture of the instrument.",
   scanLissa:"Drives the horizontal deflection from a second oscillator as well, so the two axes trace a Lissajous figure and the raster ties itself in knots.",
+  ampAmt:"A string of comparators against evenly spaced thresholds, giving a set of discrete bands rather than a colour map. The point is not the posterisation: each band is a separate signal you can isolate, invert or colour on its own, which is a space to explore rather than a look to apply.",
+  ampBands:"How many bands the greyscale is cut into, from two to eight.",
+  ampPick:"Isolates a single band as a matte and drops everything else. At zero all the bands show at once.",
+  ampCol:"Colours each band separately instead of leaving it as a level, so brightness becomes hue.",
+  diffAmt:"An edge detector, but a bank of them rather than one: DIFF SCALE chooses how coarse the derivative is. Sharp finds texture, slow finds shape, and the difference between the two is often more interesting than either.",
+  diffScale:"Which of six progressively longer time constants the differentiator uses.",
+  diffPolar:"Colours the derivative by direction rather than magnitude, so which way an edge faces becomes hue.",
+  fgPos:"Shapes the response above the midpoint. Positive expands the highlights, negative compresses them.",
+  fgNeg:"Shapes the response below the midpoint, independently of the response above it. Being able to bend the two halves in opposite directions is what makes this more than a contrast control.",
+  fgZero:"A dead zone around the midpoint where the amplifier does nothing. This is the part nobody implements and the part where the interesting behaviour lives: widen it and the picture separates into what is definitely bright, what is definitely dark, and a flat nothing in between.",
+  dctAmt:"The artefacts of a badly compressed picture are not properties of a file format, they are properties of a transform: a block DCT, coefficients quantised, transformed back. This does that as a two-pass separable transform in real time, so you get real ringing, real blocking and real chroma bleed with the quantiser under your hand instead of buried inside an encoder.",
+  dctQ:"How coarsely the coefficients are rounded. This is the single control that decides how broken it looks.",
+  dctTilt:"How much harder the quantiser treats high frequencies than low ones. Wound up, detail collapses first and flat areas survive, which is exactly the priority a real encoder has.",
+  dctChroma:"Crushes the colour coefficients harder than the luminance ones, which is what every codec does and why compressed colour smears across a block while the edges stay sharp.",
+  dctBlock:"The size of the block the transform works on, from four pixels to sixteen. Small blocks give fine mosaic; large ones give the slabs.",
+  pngAmt:"A PNG row is not stored as pixels but as a difference against a predictor, and the decoder rebuilds it by accumulating. Corrupt one byte and every pixel after it inherits the error, so a single bad value avalanches to the edge of the picture. That directional, accumulating corruption is completely unlike sorting or smearing.",
+  pngDir:"Which predictor the corrupted rows used, and therefore which way the error runs: along the line, down the column, or diagonally with a soft tail.",
+  pngRun:"How far an error runs before it is contained.",
+  tdAmt:"Every other stage samples the current frame at a different place. This one samples a different frame at the same place: each pixel chooses how far into the past to look.",
+  tdMap:"What decides how far back each pixel looks. A vertical ramp is slit-scan; a horizontal one sweeps; the picture's own brightness makes bright things lag behind dark ones; radial pushes time out from the centre; and the per-line ramp is exactly what a time-base corrector does as it fails.",
+  tdSpread:"How far back the oldest pixel reaches, across a ring of twelve frames.",
+  tdSoft:"Blends between neighbouring frames rather than stepping between them. Off gives you visible time-quantised bands, which is its own thing.",
+  tdWarp:"Drifts the map itself, so the boundary between now and then travels through the picture.",
+  ilAmt:"How much of the picture goes through the field domain. Video is not frames: it is sixty half-height pictures a second, each sampled at a different instant and offset by half a line. Almost everything that makes video look like video rather than film comes from that, and this is the control that puts it back.",
+  ilTwitter:"High vertical detail lands on one field only, so it flickers at half the frame rate. This is why broadcast graphics were always vertically soft: they had to be, or they crawled.",
+  ilJudder:"Film runs at 24 and video at 30, so some frames are held for three fields and some for two. The unevenness is the judder everybody recognises without being able to name.",
+  moshAmt:"How much of the moshed picture you see. The clean picture is encoded to video, the bitstream is damaged, and the result is decoded back: what comes out is a real codec failing, not a shader pretending. Costs an encode and a decode per frame, and lands a frame or two late.",
+  moshKey:"How often a keyframe is thrown away. A keyframe is a whole picture; everything between is only the difference from the last one. Remove the keyframes and the decoder keeps painting new movement onto an old picture, which is the entire trick.",
+  moshHold:"Re-sends the same difference several times over. The movement applies again and again to a picture it was never measured from, so shapes stretch and smear along their own motion.",
+  moshSkip:"Throws differences away instead of repeating them, so the picture stalls and then jumps.",
+  moshShuffle:"Re-injects a difference from a couple of seconds ago, out of order. Old movement arrives on top of the current picture.",
+  moshRate:"Scales how often all of the above actually fire. Low is an occasional fault; high is a stream that never recovers.",
+  moshQ:"Starves the encoder of bitrate, so it spends what it has on movement and lets detail go. This is where the blocking and the mud come from, and it is a real quantiser, not a block filter.",
+  moshResync:"Lets a keyframe through every so often, so the picture snaps back to reality and starts falling apart again. At zero it never recovers.",
   phosR:"How long the red phosphor holds, relative to the persistence control.",
   phosG:"How long the green phosphor holds. On real P22 phosphors green is the slowest, which is why a fast movement on a tube leaves a green-tinted wake rather than a grey one.",
   phosB:"How long the blue phosphor holds. Blue decays fastest, so it forms the leading edge of a trail.",
@@ -370,8 +404,12 @@ const SECHELP = {
   sync:"The timebase failing. A per-scanline phase-locked loop is simulated on the CPU every frame, so shears recover the way a real circuit grabs lock again.",
   vhs:"A whole tape deck, per channel: transport, tracking servo, head switching, physical tape damage and generation loss.",
   color:"A straightforward colour corrector at the end of the per-channel chain — levels, saturation, hue, and the graphic operations.",
+  field:"The field domain, sitting between the mixer and the display. Video was never frames: it is two interleaved half-height pictures, sampled a fiftieth of a second apart. Almost everything that reads as video rather than film starts here.",
+  codec:"An actual encoder and decoder, wired back to back with the bitstream broken in between. Keyframes are removed, differences are held, dropped and re-ordered, and the decoder is left to make what it can of it. Everything else in the instrument is a model of a failure; this one is the failure.",
   crt:"The master display stage, shared by everything. Not a filter but a model of a screen: mask geometry, beam profile, persistence, and the output transform.",
   overlay:"Everything between the picture and the eye: the lens, the glass in front of the screen, the panel itself, and the deck's own burnt-in display. Not effects on the signal, but artefacts of whatever it is being watched through.",
+  dct:"A block transform, run in real time rather than round-tripped through a file. Eight-point DCT along one axis, quantise, invert, then the same down the other - separable rather than a true 2D quantisation, but every artefact it makes is a real one.",
+  tdisp:"Per-pixel temporal addressing: a ring of twelve whole frames the shader can read per pixel, so each pixel can be looking at a different moment.",
   scan:"A scan processor, in the sense the word had before it meant anything digital. The picture is not sampled; it is drawn, as a stack of glowing lines whose vertical position is pushed by brightness, and then photographed. The apparent depth is an artefact of that, not a model of a scene. Where the lines bunch you get a bright ridge and where they splay you get a gap, which is the part a displacement map cannot reproduce and the part that makes it look like a machine.",
   lab:"Techniques from the open-source glitch canon, rebuilt: sparse line jitter, NTSC crosstalk, slitscan, bit crush, moire, and video-rate field modulation.",
   audio:"Sets what the audio-reactive mod sources listen to: each band's frequency range and gain, the input device, and the response time.",
@@ -379,7 +417,7 @@ const SECHELP = {
 };
 
 /* Master sections are single-instance; everything else exists once per channel. */
-const MASTER_SECS = new Set(["mixer","mixer2","mixerM","crt","overlay","morph"]);
+const MASTER_SECS = new Set(["mixer","mixer2","mixerM","field","codec","crt","overlay","morph"]);
 const CHANNELS = ["A","B","C","D"];
 const BUSPAIR = {A:"B", B:"A", C:"D", D:"C"};   // each channel's partner on its mixer bus
 /* COPY / SWAP are free routing: any channel to any other. The bus partner is
@@ -466,8 +504,14 @@ let fbMirror = 0;      // 0 none 1 H 2 V 3 quad
 let fbBlend = 0;       // 0 mix 1 add 2 screen 3 max 4 min 5 difference
 let fbNL = 0;          // 0 clamp 1 tanh 2 wrap 3 fold
 let fbInvert = false;  // invert each pass
+let fbFlip = 0;        // sign switch on the loop transform: 0 none 1 H 2 V 3 both
 let fbTap = 0;         // 0 pre-display  1 post-display (rescan)
 /* deflection reversal is a switch on the yoke, not a continuous control */
+/* which internal signal, if any, is on the output instead of the picture */
+let probeMode = 0;
+let moshRecycle = false;  // encode the decoded picture instead of the clean one
+let ilMode = 0;           // 0 weave 1 bob 2 blend
+let ilOrder = false;      // field order swapped
 let scanRevH = false, scanRevV = false;
 /* Two ways to let the machine fail without recovering. Everything else here is
    bounded because a control needs bounds, but a model that always recovers is

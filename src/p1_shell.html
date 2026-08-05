@@ -529,6 +529,13 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 #dockBody > #mixdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
 #dockBody > #audiodock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
 #dockBody > #outdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
+#dockBody > #scopedock.on{display:flex; gap:18px; padding:10px 12px; align-items:flex-start; overflow-y:auto;}
+.scopecol h4{font-size:8.5px; letter-spacing:2px; color:var(--dim); padding-bottom:5px;}
+#scopeWave, #scopeVec{background:#07070a; border:1px solid var(--line); border-radius:3px; display:block;}
+#probeRow{display:flex; flex-wrap:wrap; gap:5px;}
+#probeRow button{padding:5px 9px; font-size:8.5px; letter-spacing:1px;}
+#probeRow button.on{background:rgba(255,122,24,.2); border-color:var(--amber); color:var(--amber);}
+#probeNote{color:var(--dim); font-size:8.5px; padding-top:8px; line-height:1.6; max-width:520px;}
 #outdock .sec{flex:1 1 0; min-width:250px; border-bottom:none; padding:0;}
 #outdock .sec h3{padding-top:0;}
 .secbypass{
@@ -553,6 +560,8 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 #beatLed.bar{animation:beatflashbar .26s ease-out;}
 @keyframes beatflash{ from{background:var(--cyan); box-shadow:0 0 7px var(--cyan);} to{background:#2a2a34; box-shadow:inset 0 0 0 1px var(--line);} }
 @keyframes beatflashbar{ from{background:var(--amber); box-shadow:0 0 10px var(--amber);} to{background:#2a2a34; box-shadow:inset 0 0 0 1px var(--line);} }
+.racbtn{padding:2px 5px; font-size:7.5px; letter-spacing:1px; min-height:20px;}
+.racbtn.on{background:rgba(46,230,214,.2); border-color:var(--cyan); color:var(--cyan);}
 .mmaprow{display:flex; align-items:center; gap:7px; padding:3px 0; font-size:9px;}
 .mmapcc{color:var(--cyan); letter-spacing:1px; min-width:96px;}
 .mmapdst{flex:1; color:var(--txt); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
@@ -809,7 +818,7 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v34.0</span>
+  <span id="ver" title="Build version">v35.0</span>
   <button id="btnHelpTop" data-tip="The manual: what everything is, why it behaves the way it does, and every keyboard shortcut. Also on the H key.">?</button>
   <div id="tempobox" data-tip="Tap four times in time and the tempo follows. Any modulator with a sync division locks to it, and incoming MIDI clock overrides it automatically.">
     <button id="btnTap">TAP</button><span id="beatLed"></span><span id="bpmVal">120.0</span>
@@ -978,6 +987,7 @@ body.nomix #mixbuses{display:none;}
           <button data-dock="mod" data-tip="Every modulation source drawn live, with editable rates and shapes and a list of what each one is driving.">MOD</button>
           <button data-dock="text" data-tip="The text and shape generator for this channel. Typing here never triggers keyboard shortcuts.">TEXT</button>
           <button data-dock="mix" data-tip="The detail behind each transition: wipe softness and geometry, and the key settings. The faders themselves are on the strip under the picture.">MIX</button>
+          <button data-dock="scope" data-tip="A waveform monitor and a vectorscope reading the live output, and a probe that puts an internal signal on the picture instead of the picture.">SCOPE</button>
           <button data-dock="out" data-tip="The master output stage: the display model and everything the picture is watched through. Shared by all four channels.">OUT</button>
           <button data-dock="audio" data-tip="Where the audio-reactive modulators listen: the input, the three band ranges, and the response speed.">AUDIO</button>
           <button data-dock="perform" data-tip="Everything you play with while it is running: eight whole-rig snapshots with a glide time, the performance recorder, preset morph and the six bend pads.">PERFORM</button>
@@ -989,6 +999,21 @@ body.nomix #mixbuses{display:none;}
       <div id="mixdock"></div>
       <div id="audiodock"></div>
       <div id="outdock"></div>
+      <div id="scopedock">
+        <div class="scopecol">
+          <h4>WAVEFORM</h4>
+          <canvas id="scopeWave" width="256" height="150"></canvas>
+        </div>
+        <div class="scopecol">
+          <h4>VECTORSCOPE</h4>
+          <canvas id="scopeVec" width="150" height="150"></canvas>
+        </div>
+        <div class="scopecol" style="flex:1;">
+          <h4>PROBE — PUT AN INTERNAL SIGNAL ON THE OUTPUT</h4>
+          <div id="probeRow"></div>
+          <div id="probeNote"></div>
+        </div>
+      </div>
       <div id="performdock">
         <div id="pfmain"></div>
       </div>
@@ -1096,7 +1121,7 @@ body.nomix #mixbuses{display:none;}
   <div id="helpToc"></div>
   <div id="helpSection"></div>
   <div id="helpBody">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v34.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v35.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once; the small selector next to it picks a target, and <b>COPY</b> writes this channel's effects onto it while <b>SWAP</b> exchanges the two outright, sources included. Any channel can reach any other, so D can be copied onto A as easily as A onto B, and shift-clicking COPY sends it to all three at once.</p>

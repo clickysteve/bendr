@@ -383,6 +383,16 @@ function applyParams(dt){
   for(const r of routes){
     const p = P[r.dst]; if(!p) continue;
     let mv = modVal[r.src] || 0;
+    /* AC coupling, as on a modular input. In AC the slow-moving part of the
+       signal is removed and only what is changing gets through, so an envelope
+       becomes a pair of spikes, a slow LFO becomes almost nothing, and a
+       video-rate signal passes intact. One pole per route. */
+    if(r.ac){
+      const f = 0.4 + (r.acHz || 0.5)*12;
+      if(r.acS === undefined) r.acS = mv;
+      r.acS += (mv - r.acS)*Math.min(1, dt*f);
+      mv = mv - r.acS;
+    } else if(r.acS !== undefined) r.acS = undefined;
     if(r.inv) mv = -mv;
     mv = shapeMod(mv, r.curve || 0);
     const d = (p.max-p.min) * (r.amt*mv + (r.off || 0));
@@ -911,6 +921,33 @@ function openSectionHelp(id){
   document.getElementById("helpBox").scrollTop = 0;
 }
 /* contents, search, and a close that is not "any click anywhere" */
+/* The probe. Every one of these signals already exists and already drives
+   something; none of them was ever visible. A tool you cannot see inside is a
+   tool you can only use the way it was designed to be used, which is the
+   opposite of the point. */
+const PROBES = [
+  {v:0, name:"PICTURE", note:"Normal output."},
+  {v:1, name:"SYNC TRACE", note:"The per-scanline horizontal displacement the sync model is producing this frame, drawn as a trace against a centre line. Every shear, every loss of lock and every recovery is visible as a shape here before it is visible in the picture."},
+  {v:2, name:"LINE STATE", note:"The other three values the sync model hands the GPU per scanline: AGC gain in red, noise gain in green, and lost high-frequency detail in blue. Bands and drifts in this are what the tape controls are actually doing."},
+];
+function buildProbeUI(){
+  const row = document.getElementById("probeRow");
+  const note = document.getElementById("probeNote");
+  if(!row) return;
+  row.innerHTML = "";
+  const refresh = ()=>{
+    for(const b of row.children) b.classList.toggle("on", +b.dataset.v === probeMode);
+    const p = PROBES.find(x=>x.v === probeMode);
+    note.textContent = p ? p.note : "";
+  };
+  for(const p of PROBES){
+    const b = document.createElement("button");
+    b.textContent = p.name; b.dataset.v = p.v;
+    b.onclick = ()=>{ probeMode = p.v; refresh(); };
+    row.appendChild(b);
+  }
+  refresh();
+}
 function initHelpUI(){
   const help = document.getElementById("help");
   const box = document.getElementById("helpBox");
@@ -1583,6 +1620,8 @@ const STAGE_INFO = {
   lab:    {name:"SIGNAL LAB",   sec:["lab"]},
   flow:   {name:"FLOW / MOSH",  sec:["flow"]},
   scan:   {name:"SCAN",         sec:["scan"]},
+  dct:    {name:"BLOCK",        sec:["dct"]},
+  tdisp:  {name:"TIME",         sec:["tdisp"]},
 };
 let dragStage = null;
 const isTouch = window.matchMedia("(hover:none) and (pointer:coarse)").matches;
@@ -1662,7 +1701,7 @@ function resetSection(id){
     else if(linkChans){ for(const ch of CHANNELS){ chanBase[ch][p.id]=p.def; morphOverride.add(ch+":"+p.id); } }
     else { chanBase[activeChan][p.id] = p.def; morphOverride.add(activeChan+":"+p.id); }
   }
-  if(id==="feedback"){ fbTrailMode=false; rescanMode=false; fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; }
+  if(id==="feedback"){ fbTrailMode=false; rescanMode=false; fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbFlip=0; }
   if(id==="lab"){ fieldSrc=0; }
   if(id==="flow"){ flowField=0; flowEdge=0; }
   if(id==="gen"){ genMode[activeChan] = {shape:0, wave:0, col:1}; }
@@ -1866,9 +1905,11 @@ function sectionExtras(id, d){
     d.appendChild(tr);
     const tr2 = document.createElement("div"); tr2.className="trow";
     const WRAPS=["CLAMP","REPEAT","MIRROR"], MIRS=["NO MIRROR","MIRROR H","MIRROR V","QUAD"],
-          BLENDS=["MIX","ADD","SCREEN","MAX","MIN","DIFF"], NLS=["CLAMP","SOFT","WRAP","FOLD"];
+          BLENDS=["MIX","ADD","SCREEN","MAX","MIN","DIFF"], NLS=["CLAMP","SOFT","WRAP","FOLD"],
+          FLIPS=["NONE","FLIP H","FLIP V","FLIP BOTH"];
     mkToggle(tr2, "fbWrap", ()=>"EDGE: "+WRAPS[fbWrap], ()=>{ fbWrap=(fbWrap+1)%3; }, "What the loop does with picture that lands outside the frame. CLAMP smears the edge inward and builds tunnels; REPEAT tiles it into lattices; MIRROR reflects it into mandalas. This one choice decides the whole family of shapes the loop can make.");
     mkToggle(tr2, "fbMirror", ()=>MIRS[fbMirror], ()=>{ fbMirror=(fbMirror+1)%4; }, "Mirrors the fed-back image about the centre before it re-enters, forcing symmetry into the loop. QUAD mirrors both axes.");
+    mkToggle(tr2, "fbFlip", ()=>"SIGN: "+FLIPS[fbFlip], ()=>{ fbFlip=(fbFlip+1)%4; }, "Flips the sign of one or both axes of the loop transform. A flip is a reflection, not a rotation, so it cannot be reached with ROTATE at any angle: it makes the loop alternate hand each pass. With a rotation near a whole fraction of a turn this is what separates a steady spiral from a pinwheel, and it is the switch that turns a locked pattern into a drifting one.");
     d.appendChild(tr2);
     const tr3 = document.createElement("div"); tr3.className="trow";
     mkToggle(tr3, "fbBlend", ()=>"INJECT: "+BLENDS[fbBlend], ()=>{ fbBlend=(fbBlend+1)%6; }, "How the live picture is injected into the loop each pass. MIX crossfades; ADD and SCREEN build brightness; MAX keeps the brighter of the two, which is what gives long non-fading trails; DIFF subtracts, and is where the harsh psychedelic looks come from.");
@@ -1889,6 +1930,33 @@ function sectionExtras(id, d){
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
     note.textContent = "FIELD MOD is video-rate modulation: the field varies across the frame, so FIELD>HUE and FIELD>WARP modulate per-pixel rather than per-frame.";
     d.appendChild(note);
+  }
+  if(id==="field"){
+    const tr0 = document.createElement("div"); tr0.className="trow";
+    const IM = ["WEAVE","BOB","BLEND"];
+    mkToggle(tr0, "ilMode", ()=>"FIELDS: "+IM[ilMode], ()=>{ ilMode=(ilMode+1)%3; },
+      "How the two fields are recombined. WEAVE interleaves them, which is what an interlaced signal actually is, so anything that moved between them serrates. BOB shows only the current field and fills the gaps from its neighbours, so the picture jitters up and down by half a line at field rate - the signature of a cheap deinterlacer. BLEND averages them, which removes the comb and ghosts everything that moves.", IM);
+    mkToggle(tr0, "ilOrder", ()=>"FIELD ORDER: "+(ilOrder?"SWAPPED":"NORMAL"), ()=>{ ilOrder=!ilOrder; },
+      "Swaps which field is which. On a real signal this is a fault, and it produces the stuttering backward-and-forward motion that is instantly recognisable and almost impossible to fake convincingly any other way.");
+    d.appendChild(tr0);
+    const fnote = document.createElement("div");
+    fnote.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    fnote.textContent = "Interlace is applied to the master output, after the mixer and before the display, because that is where it happened.";
+    d.appendChild(fnote);
+  }
+  if(id==="codec"){
+    const trc = document.createElement("div"); trc.className="trow";
+    mkToggle(trc, "moshRecycle", ()=>"FEED: "+(moshRecycle?"RECYCLED":"CLEAN"),
+      ()=>{ moshRecycle=!moshRecycle; },
+      "CLEAN encodes the clean picture every frame, so the damage never compounds and the moshed image stays legible. RECYCLED encodes what came out of the decoder instead, so each pass is built on the last one's wreckage and the picture walks away and does not come back.");
+    const st = document.createElement("span");
+    st.id = "moshStat"; st.style.cssText = "color:var(--dim); font-size:8.5px; padding:0 4px; align-self:center;";
+    trc.appendChild(st);
+    d.appendChild(trc);
+    const cnote = document.createElement("div");
+    cnote.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    cnote.textContent = "A real encode/decode round trip: CODEC MOSH above zero starts it. It costs a frame or two of delay and some CPU, and the decoder will occasionally give up and re-acquire, which looks like the picture snapping back.";
+    d.appendChild(cnote);
   }
   if(id==="crt"){
     const tr = document.createElement("div"); tr.className="trow";
@@ -2207,6 +2275,19 @@ function refreshUI(){
     for(const k in tapeBtnRefs[0]) tapeBtnRefs[0][k].classList.toggle("on", k===m);
   }
 }
+/* the codec pair reports what it actually managed to negotiate, because
+   "nothing is happening" and "this browser has no encoder" look identical */
+setInterval(()=>{
+  const el = document.getElementById("moshStat");
+  if(!el) return;
+  if(!MOSH_SUPPORTED) el.textContent = "no WebCodecs in this browser";
+  else if(moshOff) el.textContent = moshNote || "off";
+  else if(!moshEnc) el.textContent = "idle";
+  else el.textContent = moshCodec + "  " + moshW + "x" + moshH
+       + "  q" + (moshDec ? moshDec.decodeQueueSize : 0)
+       + (moshFails ? "  re-acquired " + moshFails : "");
+}, 500);
+
 /* mod tick indicators (cheap: 15Hz) */
 setInterval(()=>{
   const routed = new Set(routes.map(r=>r.dst));
@@ -2337,6 +2418,13 @@ function renderRoutes(){
     attachTip(inv, "INVERT", "Flips this route only. The same source can push one parameter up while pulling another down.");
     inv.onclick = ()=>{ r.inv = !r.inv; inv.classList.toggle("on", !!r.inv); };
     const cv = document.createElement("select"); cv.className="rcurve";
+    const ac = document.createElement("button"); ac.className = "racbtn"; ac.textContent = "AC";
+    ac.classList.toggle("on", !!r.ac);
+    attachTip(ac, "AC COUPLE", "Removes the slow-moving part of this source and passes only what is changing. An envelope becomes a pair of spikes, a slow LFO becomes almost nothing, and anything fast passes intact. It turns any source into its own derivative, which roughly doubles what the matrix can say.", "Shift-click to slow the corner frequency, so more of the movement survives.");
+    ac.onclick = e=>{
+      if(e.shiftKey){ r.acHz = ((r.acHz || 0.5) <= 0.15) ? 1 : Math.max(0.05, (r.acHz || 0.5) - 0.25); toast("AC corner "+(0.4+(r.acHz)*12).toFixed(1)+" Hz"); return; }
+      r.ac = !r.ac; r.acS = undefined; ac.classList.toggle("on", !!r.ac);
+    };
     ROUTE_CURVES.forEach((n,ci)=>{ const o=document.createElement("option"); o.value=ci; o.textContent=n; cv.appendChild(o); });
     cv.value = r.curve || 0;
     attachTip(cv, "RESPONSE CURVE", "How the source's travel maps onto this destination. LIN is straight through, EXP holds back until the source is near its extremes, LOG does the opposite, S eases both ends, STEP quantises into four levels.");
@@ -2345,7 +2433,7 @@ function renderRoutes(){
     rm.onclick = ()=>{ routes.splice(i,1); renderRoutes(); };
     row.appendChild(go); row.appendChild(src); row.appendChild(chSel); row.appendChild(dst);
     row.appendChild(inv); row.appendChild(cv);
-    row.appendChild(amt); row.appendChild(av); row.appendChild(rm);
+    row.appendChild(ac); row.appendChild(amt); row.appendChild(av); row.appendChild(rm);
     routesDiv.appendChild(row);
   });
 }

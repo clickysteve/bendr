@@ -118,15 +118,64 @@ const FBK = [
 ["FB · STROBED",           {fbAmount:0.93,fbZoom:0.066,fbRotate:0.1,fbHue:0.05,fbJitter:0.6,fbBlur:0.05,fbNoise:0.08}, {wrap:0,nl:1}],
 ["FB · ASYMMETRIC PLUME",  {fbAmount:0.97,fbRotate:0.017,fbShiftX:0.017,fbShearX:0.25,fbHue:0.02,fbBlur:0.11,fbSharp:0.5,fbNoise:0.15,fbAuto:0.5}, {wrap:0,nl:1}],
 ["FB · QUAD MIRROR BLOOM", {fbAmount:0.95,fbZoom:0.05,fbRotate:0.04,fbHue:0.04,fbBlur:0.09,fbNoise:0.08,bloom:0.4,halation:0.3}, {wrap:2,mir:3,nl:1}],
+
+/* The regimes below are the classic camera-into-monitor experiment written out
+   as settings. The loop transform is an affine map with a sign switch: rotate
+   by an angle, scale a little either side of unity, optionally reflect. Set the
+   angle to a whole fraction of a turn and successive passes land back on each
+   other, so the picture locks into that many arms. Detune the angle slightly
+   and it cannot close, so the arms shear past each other and defects wander.
+   Add the reflection and the loop alternates hand every pass, which is where
+   the pinwheels and the travelling waves come from. Everything else here is
+   dressing; these four numbers are the whole phase diagram. */
+["FB · NINE-FOLD LOCK",    {fbAmount:0.95,fbZoom:0.055,fbRotate:0.6981,fbBlur:0.05,fbSharp:0.35,fbNoise:0.03,fbAuto:0.5,contrast:1.1}, {wrap:0,nl:1},
+ [{src:"lfo3",dst:"fbHue",amt:0.08,ch:"A"},{src:"lfo1",dst:"fbZoom",amt:0.02,ch:"A"}]],
+["FB · SIX-FOLD LOCK",     {fbAmount:0.95,fbZoom:0.06,fbRotate:1.0472,fbHue:0.02,fbBlur:0.05,fbSharp:0.35,fbNoise:0.03,fbAuto:0.5}, {wrap:0,nl:1},
+ [{src:"lfo3",dst:"fbHue",amt:0.08,ch:"A"},{src:"lfo1",dst:"fbZoom",amt:0.02,ch:"A"}]],
+["FB · DETUNED · SHEAR",   {fbAmount:0.955,fbZoom:0.055,fbRotate:1.0772,fbBlur:0.06,fbSharp:0.4,fbNoise:0.06,fbAuto:0.55}, {wrap:0,nl:1}],
+["FB · DISLOCATION DRIFT", {fbAmount:0.96,fbZoom:0.04,fbRotate:0.7331,fbShiftX:0.006,fbBlur:0.07,fbSharp:0.5,fbNoise:0.12,fbAuto:0.6}, {wrap:0,nl:1,flip:1}],
+["FB · PINWHEEL LOCK",     {fbAmount:0.94,fbZoom:0.03,fbRotate:-1.5708,fbHue:0.03,fbBlur:0.08,fbNoise:0.05,fbAuto:0.5}, {wrap:0,nl:1,flip:1,inv:1},
+ [{src:"lfo1",dst:"fbZoom",amt:0.025,ch:"A"}]],
+["FB · LOG SPIRAL",        {fbAmount:0.955,fbZoom:-0.055,fbRotate:-0.18,fbHue:0.015,fbBlur:0.07,fbSharp:0.25,fbNoise:0.04,fbAuto:0.45}, {wrap:0,nl:1}],
+["FB · COUNTER SPIRAL",    {fbAmount:0.955,fbZoom:0.055,fbRotate:0.18,fbHue:-0.015,fbBlur:0.07,fbSharp:0.25,fbNoise:0.04,fbAuto:0.45}, {wrap:0,nl:1,flip:2}],
+["FB · ALTERNATING TUNNEL",{fbAmount:0.95,fbZoom:0.08,fbRotate:0.09,fbBlur:0.05,fbSharp:0.4,fbNoise:0.04,fbAuto:0.5}, {wrap:0,nl:1,flip:3}],
+["FB · TRAVELLING WAVE",   {fbAmount:0.965,fbZoom:0.006,fbRotate:0.015,fbShiftX:0.012,fbShiftY:0.004,fbBlur:0.15,fbSharp:0.45,fbDrive:1.25,fbHue:0.02,fbNoise:0.18,fbAuto:0.6}, {wrap:0,nl:1,flip:1}],
+["FB · STANDING LATTICE",  {fbAmount:0.96,fbZoom:0.012,fbRotate:0.7854,fbBlur:0.09,fbSharp:0.8,fbThresh:0.42,fbThreshSoft:0.03,fbNoise:0.1,fbAuto:0.6}, {wrap:1,nl:0,flip:3},
+ [{src:"lfo2",dst:"fbThresh",amt:0.06,ch:"A"}]],
 ];
-for(const [name, base, tog] of FBK){
+for(const [name, base, tog, rts] of FBK){
   /* loop gain: the single most sensitive control — just under unity so the loop
      loses a little energy each pass instead of running away to white */
   if(base.fbVal === undefined) base.fbVal = 0.955;
+  /* the default pair walks the loop slowly so nothing sits still, but a preset
+     whose whole point is that the angle is exact has to be able to refuse it */
   PRESETS.push([name, Object.assign({fbAmount:0.9, scanlines:0.2, curvature:0.28, vignette:0.4}, base),
-    [{src:"drift",dst:"fbRotate",amt:0.08,ch:"A"},{src:"lfo3",dst:"fbHue",amt:0.1,ch:"A"}],
+    rts || [{src:"drift",dst:"fbRotate",amt:0.08,ch:"A"},{src:"lfo3",dst:"fbHue",amt:0.1,ch:"A"}],
     tog]);
 }
+
+/* ---- the field domain and the codec round trip ----
+   Both of these live on the master output rather than in a channel, so they
+   are written as flat maps of master parameters and nothing else. */
+const OUTP = [
+["FIELD \u00b7 INTERLACED", {ilAmt:0.85,ilTwitter:0.55,ilJudder:0,scanlines:0.14,beamWidth:1.1,curvature:0.24,vignette:0.38,halation:0.2},
+ {il:0,ilo:false}],
+["FIELD \u00b7 BAD DEINTERLACE", {ilAmt:1,ilTwitter:0.75,ilJudder:0,scanlines:0.1,curvature:0.22,vignette:0.36},
+ {il:1,ilo:true}],
+["FIELD \u00b7 3:2 TELECINE", {ilAmt:0.7,ilTwitter:0.3,ilJudder:0.85,scanlines:0.16,curvature:0.26,vignette:0.4,grain:0.18},
+ {il:2,ilo:false}],
+["CODEC \u00b7 KEYFRAME REMOVED", {moshAmt:1,moshKey:1,moshHold:0.2,moshSkip:0,moshShuffle:0,moshRate:0.5,moshQ:0.3,moshResync:0,scanlines:0.08,curvature:0.2,vignette:0.34},
+ {recycle:false}],
+["CODEC \u00b7 BLOOM", {moshAmt:1,moshKey:1,moshHold:0.7,moshSkip:0,moshShuffle:0.15,moshRate:0.8,moshQ:0.45,moshResync:0,scanlines:0.06,curvature:0.18,vignette:0.3},
+ {recycle:false}],
+["CODEC \u00b7 BITRATE STARVED", {moshAmt:1,moshKey:0.4,moshHold:0.15,moshSkip:0.1,moshShuffle:0,moshRate:0.5,moshQ:0.9,moshResync:0.6,scanlines:0.05,curvature:0.16,vignette:0.28},
+ {recycle:false}],
+["CODEC \u00b7 OUT OF ORDER", {moshAmt:0.85,moshKey:0.9,moshHold:0.2,moshSkip:0.25,moshShuffle:0.8,moshRate:0.9,moshQ:0.5,moshResync:0.25,scanlines:0.06,curvature:0.18,vignette:0.3},
+ {recycle:false}],
+["CODEC \u00b7 NEVER RECOVERS", {moshAmt:1,moshKey:1,moshHold:0.5,moshSkip:0.1,moshShuffle:0.3,moshRate:0.7,moshQ:0.7,moshResync:0,curvature:0.16,vignette:0.3},
+ {recycle:true}],
+];
+for(const [name, base, tog] of OUTP) PRESETS.push([name, base, [], tog]);
 
 PRESETS.push(["MELT \u00b7 CIRCLE BLEED", {"chan": {"A": {"genFreqX": 0.09, "genFreqY": 0.06, "genRate": 0.05, "genHue": 0.08, "genSpread": 1.2, "genSat": 0.85, "chromaBleed": 0.35, "saturation": 1.15, "glow": 0.35}, "B": {"genFreqX": 0.34, "genFreqY": 0.2, "genRate": 0.09, "genFM": 0.55, "genHue": 0.62, "genSpread": 1.5, "contour": 0.35, "contourBands": 8, "chromaBleed": 0.5, "chromaDelay": 0.2, "saturation": 1.3, "glow": 0.4}}, "master": {"abMix": 0.52, "wipeSoft": 0.06, "edgeAmt": 0.62, "edgeHold": 0.86, "edgeSwirl": 0.25, "edgeChroma": 0.65, "edgeCreep": 0.7, "scanlines": 0.28, "curvature": 0.28, "bloom": 0.25, "halation": 0.2}, "routes": [{"ch": "A", "src": "lfo1", "dst": "wipeX", "amt": 0.35}, {"ch": "A", "src": "lfo3", "dst": "edgeSwirl", "amt": 0.5}, {"ch": "A", "src": "lfo2", "dst": "abMix", "amt": 0.12}], "audioCfg": {"bass": {"lo": 30, "hi": 150, "gain": 1}, "mid": {"lo": 300, "hi": 2200, "gain": 1}, "high": {"lo": 4000, "hi": 11000, "gain": 1}, "response": 0.5}, "fbTrailMode": false, "rescanMode": false, "keyChroma": false, "mixMode": 5, "edgeMode": 0, "wipeInv": false, "activeChan": "A", "linkChans": false, "mixMode2": 0, "wipeInv2": false, "mixModeM": 0, "wipeInvM": false, "mixBlend": 0, "mixBlend2": 0, "mixBlendM": 0, "mixKey": 0, "mixKey2": 0, "mixKeyM": 0, "fbWrap": 0, "fbMirror": 0, "fbBlend": 0, "fbNL": 0, "fbInvert": false, "fbTap": 0, "outModel": 0, "fieldSrc": 0, "flowField": 0, "flowEdge": 0, "chainOrder": ["sig", "col", "glitch", "lab", "flow"], "stageEnabled": {"sig": true, "col": true, "glitch": true, "lab": true, "flow": true}, "busSrc": {"b1": ["A", "B"], "b2": ["C", "D"]}, "genMode": {"A": {"shape": 1, "wave": 0, "col": 2}, "B": {"shape": 2, "wave": 2, "col": 1}, "C": {"shape": 0, "wave": 0, "col": 1}, "D": {"shape": 0, "wave": 0, "col": 1}}, "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "C": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}, "D": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}}, "srcText": {"A": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "B": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "C": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "D": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}}, "mods": [{"id": "lfo1", "type": "lfo", "name": "LFO 1", "rate": 0.05, "shape": "sine", "phase": 0.46354626282197164, "snh": 0, "sync": 0}, {"id": "lfo2", "type": "lfo", "name": "LFO 2", "rate": 0.11, "shape": "tri", "phase": 0.9169826661389351, "snh": 0, "sync": 0}, {"id": "lfo3", "type": "lfo", "name": "LFO 3", "rate": 0.037, "shape": "sine2", "phase": 0.4304286177016956, "snh": 0, "sync": 0}, {"id": "lfo4", "type": "lfo", "name": "LFO 4", "rate": 5.495408738576246, "shape": "sine", "phase": 0.055445735688429365, "snh": 0, "sync": 0}, {"id": "lfo5", "type": "lfo", "name": "LFO 5", "rate": 0.016982436524617443, "shape": "tri", "phase": 0.0670557549083246, "snh": 0, "sync": 0}, {"id": "lfo6", "type": "lfo", "name": "LFO 6", "rate": 0.8912509381337456, "shape": "saw", "phase": 0.5590496733908549, "snh": 0, "sync": 0}, {"id": "lfo7", "type": "lfo", "name": "LFO 7", "rate": 3.0902954325135905, "shape": "sqr", "phase": 0.08658904215108909, "snh": 0, "sync": 0}, {"id": "lfo8", "type": "lfo", "name": "LFO 8", "rate": 0.1288249551693134, "shape": "drift", "phase": 0.38726246081341276, "snh": 0, "sync": 0}]}, null]);
 
@@ -176,8 +225,11 @@ function loadPreset(i){
   if(tg){
     /* tg.blend is the FEEDBACK blend; the mixer's mix type is tg.mixBlend */
     fbWrap = tg.wrap||0; fbMirror = tg.mir||0; fbBlend = tg.blend||0;
-    fbNL = tg.nl||0; fbInvert = !!tg.inv;
+    fbNL = tg.nl||0; fbInvert = !!tg.inv; fbFlip = tg.flip||0;
     if(tg.model!==undefined) outModel = tg.model;
+    if(tg.il!==undefined) ilMode = tg.il;
+    if(tg.ilo!==undefined) ilOrder = !!tg.ilo;
+    if(tg.recycle!==undefined) moshRecycle = !!tg.recycle;
     if(tg.mixBlend!==undefined) mixBlend = tg.mixBlend;
     if(tg.key!==undefined) mixKey = tg.key;
     if(tg.gm){
@@ -349,8 +401,8 @@ function captureState(){
     fbTrailMode, rescanMode, keyChroma, showKeyMatte, mixMode, edgeMode, wipeInv, activeChan, linkChans,
     mixMode2, wipeInv2, mixModeM, wipeInvM,
     mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
-    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
-    scanRevH, scanRevV, syncLatch, fbNoServo,
+    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbFlip, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
+    scanRevH, scanRevV, syncLatch, fbNoServo, ilMode, ilOrder, moshRecycle,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
@@ -395,7 +447,7 @@ function restoreState(st){
   if(st.wipeInv !== undefined) wipeInv = st.wipeInv;
   if(st.wipeInv2 !== undefined) wipeInv2 = st.wipeInv2;
   if(st.wipeInvM !== undefined) wipeInvM = st.wipeInvM;
-  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","osdMode","osdDate","fieldSrc","flowField","flowEdge","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM","mixKey","mixKey2","mixKeyM","scanRevH","scanRevV","syncLatch","fbNoServo"]){
+  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbFlip","fbTap","outModel","osdMode","osdDate","fieldSrc","flowField","flowEdge","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM","mixKey","mixKey2","mixKeyM","scanRevH","scanRevV","syncLatch","fbNoServo","ilMode","ilOrder","moshRecycle"]){
     if(st[k] !== undefined) eval(k+" = st."+k);
   }
   if(st.fbInvert !== undefined) fbInvert = st.fbInvert;
@@ -500,7 +552,7 @@ document.getElementById("btnUndo").onclick = undo;
    preset loader, which is exactly how a preset came to inherit the previous
    patch's wipe, mix type, key, chain order and bus routing. One list now, and
    every path that establishes a known state goes through it. */
-const CHAIN_STAGES = ["sig","col","glitch","lab","flow","scan"];
+const CHAIN_STAGES = ["sig","col","glitch","lab","flow","scan","dct","tdisp"];
 function resetGlobals(){
   fbTrailMode=false; rescanMode=false; keyChroma=false; showKeyMatte=false;
   mixMode=0;  mixMode2=0;  mixModeM=0;
@@ -508,12 +560,14 @@ function resetGlobals(){
   mixBlend=0; mixBlend2=0; mixBlendM=0;
   mixKey=0;   mixKey2=0;   mixKeyM=0;
   edgeMode=0; linkChans=false;
-  fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbTap=0;
+  fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbFlip=0; fbTap=0;
   outModel=0; fieldSrc=0; flowField=0; flowEdge=0;
   osdMode=1; osdDate=0;
   chainOrder = CHAIN_STAGES.slice();
-  stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true, scan:true};
+  stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true, scan:true, dct:true, tdisp:true};
   scanRevH = false; scanRevV = false; syncLatch = false; fbNoServo = false;
+  ilMode = 0; ilOrder = false; moshRecycle = false;
+  probeMode = 0;
   busSrc.b1 = ["A","B"]; busSrc.b2 = ["C","D"];
   for(const ch of CHANNELS) genMode[ch] = {shape:0, wave:0, col:1};
   copyDest = BUSPAIR[activeChan];
@@ -553,7 +607,7 @@ document.getElementById("btnSave").onclick = ()=>{
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
     mixMode2, wipeInv2, mixModeM, wipeInvM,
     mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
-    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
+    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbFlip, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),

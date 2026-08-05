@@ -373,7 +373,7 @@ function setDock(t){
     t = dockTab === "text" ? "matrix" : dockTab;
   }
   dockTab = t;
-  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", out:"outdock", audio:"audiodock", perform:"performdock"};
+  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", out:"outdock", scope:"scopedock", audio:"audiodock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);
     if(el) el.classList.toggle("on", k===t);
@@ -386,6 +386,7 @@ function setDock(t){
                             : t==="mix" ? "the faders themselves are on the strip under the picture"
                             : t==="audio" ? "band ranges decide what each modulator is listening for"
                             : t==="out" ? "the display and the glass in front of it, shared by every channel"
+                            : t==="scope" ? "what the signal actually looks like, and what is inside the machine"
                             : "patch sources into any parameter";
   if(t==="text") syncTextEditor();
   refreshDockTabs();

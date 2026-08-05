@@ -20,7 +20,13 @@ const KEYFN =
 "    float d = abs(atan(sin(ang-target), cos(ang-target)))/3.14159;\n" +
 "    v = (1.0-d)*smoothstep(0.02,0.25,length(yq.yz));\n" +
 "  }\n" +
-"  float k = smoothstep(th-soft*0.5-0.001, th+soft*0.5+0.001, v);\n" +
+"  /* A soft key is not a smoothstep. On a real keyer it is a high-gain\n" +
+"     amplifier driven into its rails: k = clamp(gain*(v - threshold) + 0.5).\n" +
+"     The edge is therefore made of a percentage of the source itself, so noise\n" +
+"     in the source becomes noise in the edge and grain becomes grain. A\n" +
+"     smoothstep edge is clean in a way nothing else in this signal path is. */\n" +
+"  float gain = 1.0/max(soft, 0.0156);\n" +
+"  float k = clamp((v - th)*gain + 0.5, 0.0, 1.0);\n" +
 "  return mix(k, 1.0-k, clamp(inv,0.0,1.0));\n}\n";
 
 /* pass 1 (per channel): source framing + feedback + frame-store echo */
@@ -35,7 +41,7 @@ const FS_FB = COMMON + KEYFN +
 "uniform float u_fbShearX,u_fbShearY,u_fbGainR,u_fbGainG,u_fbGainB,u_fbSat,u_fbVal,u_fbPost,u_fbChromOff;\n" +
 "uniform float u_fbBlur,u_fbBlur2,u_fbSharp,u_fbDrive,u_fbPivot,u_fbThresh,u_fbThreshSoft;\n" +
 "uniform float u_fbNoise,u_fbNoiseScale,u_fbRoll,u_fbJitter;\n" +
-"uniform float u_fbWrap,u_fbMirror,u_fbBlend,u_fbNL,u_fbInvert,u_autoGain;\n" +
+"uniform float u_fbWrap,u_fbMirror,u_fbBlend,u_fbNL,u_fbInvert,u_autoGain,u_fbFlip;\n" +
 "vec2 wrapUV(vec2 p){\n" +
 "  if(u_fbWrap>1.5){ vec2 t=fract(p*0.5)*2.0; return 1.0-abs(t-1.0); }\n" +
 "  if(u_fbWrap>0.5) return fract(p);\n" +
@@ -117,6 +123,14 @@ const FS_FB = COMMON + KEYFN +
 "    if(u_fbMirror<1.5) p.x = abs(p.x);\n" +
 "    else if(u_fbMirror<2.5) p.y = abs(p.y);\n" +
 "    else p = abs(p);\n" +
+"  }\n" +
+"  /* sign switch: a reflection, determinant -1, which no rotation can reach.\n" +
+"     It is what turns a rotating tunnel into an alternating one, and it is the\n" +
+"     axis the classic feedback regimes are organised along. */\n" +
+"  if(u_fbFlip>0.5){\n" +
+"    if(u_fbFlip<1.5) p.x = -p.x;\n" +
+"    else if(u_fbFlip<2.5) p.y = -p.y;\n" +
+"    else p = -p;\n" +
 "  }\n" +
 "  float ang = u_fbRotate*1.0;\n" +
 "  float ca = cos(ang), sa = sin(ang);\n" +
@@ -509,9 +523,9 @@ const FS_MIX = COMMON + KEYFN +
    Every other stage here is a fragment shader: a full-screen triangle, one
    output pixel sampled from one input pixel. This one is not, and it cannot be.
 
-   A Rutt/Etra intercepts a monitor's deflection signals before the yoke and
-   patches video luminance into the vertical position control, so bright parts
-   of the picture physically pull the scan line up the tube. A camera then
+   A scan processor intercepts a monitor's deflection signals before the yoke
+   and patches video luminance into the vertical position control, so bright
+   parts of the picture physically pull the scan line up the tube. A camera
    re-shoots the tube. The apparent depth is an artefact of photographing a 2D
    deflection, not a 3D scene.
 
@@ -556,8 +570,8 @@ const VS_SCAN =
 "  /* skew, which is the same control a bench monitor calls parallelogram */\n" +
 "  p.x += p.y*u_scanSkew*0.5;\n" +
 "  /* the deflection oscillators. Locked to a multiple of the field rate the\n" +
-"     pattern stands still; detuned it crawls, which is the whole Wobbulator\n" +
-"     gesture. */\n" +
+"     pattern stands still; detuned it crawls, and that crawl is the whole\n" +
+"     gesture of the instrument. */\n" +
 "  if(u_scanWobAmt > 0.0005){\n" +
 "    float f = floor(u_scanWobFreq*12.0 + 0.5) + (1.0-u_scanWobLock)*fract(u_scanWobFreq*12.0);\n" +
 "    float ph = p.y*f*3.14159 + u_time*(1.0-u_scanWobLock)*2.0;\n" +
@@ -634,6 +648,149 @@ const FS_PHOS = COMMON +
 "  vec3 p = texture(u_prev, uv).rgb;\n" +
 "  vec3 k = clamp(vec3(u_phosR, u_phosG, u_phosB)*u_phosphor, 0.0, 0.995);\n" +
 "  O = vec4(max(c, p*k), 1.0);\n}\n";
+
+/* ---------------- the field domain ----------------
+   Analogue video is not frames. It is sixty half-height pictures a second,
+   each sampled at a different instant and offset by half a line, and almost
+   everything that makes video look like video rather than film comes from
+   that. Interlace twitter is why broadcast graphics were always vertically
+   soft. The serrated edge on a fast pan is not compression, it is two
+   different moments in one frame.
+
+   This holds the previous field and recombines it with the current one, so
+   the comb is real temporal aliasing rather than a drawn pattern. */
+const FS_FIELD = COMMON +
+"uniform sampler2D u_tex; uniform sampler2D u_prevField;\n" +
+"uniform float u_ilAmt,u_ilMode,u_ilOrder,u_ilTwitter,u_ilJudder,u_parity,u_time;\n" +
+"void main(){\n" +
+"  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  vec3 cur = texture(u_tex, uv).rgb;\n" +
+"  if(u_ilAmt < 0.003){ O = vec4(cur,1.0); return; }\n" +
+"  float line = floor(gl_FragCoord.y);\n" +
+"  /* which field this line belongs to, and which field is being written now */\n" +
+"  float lineParity = mod(line, 2.0);\n" +
+"  float now = u_ilOrder > 0.5 ? 1.0 - u_parity : u_parity;\n" +
+"  bool thisField = abs(lineParity - now) < 0.5;\n" +
+"  vec3 prev = texture(u_prevField, uv).rgb;\n" +
+"  vec3 outc;\n" +
+"  if(u_ilMode < 0.5){\n" +
+"    /* WEAVE: the two fields simply interleave, so anything that moved between\n" +
+"       them serrates. This is what an interlaced signal actually is. */\n" +
+"    outc = thisField ? cur : prev;\n" +
+"  } else if(u_ilMode < 1.5){\n" +
+"    /* BOB: only the current field is real and the gaps are filled from its\n" +
+"       neighbours, so the whole picture jitters up and down by half a line at\n" +
+"       field rate. Cheap deinterlacers did this and it is unmistakable. */\n" +
+"    float py = 1.0/u_res.y;\n" +
+"    vec3 a = texture(u_tex, vec2(uv.x, uv.y + (thisField ? 0.0 : (now>0.5? py : -py)))).rgb;\n" +
+"    outc = a;\n" +
+"  } else {\n" +
+"    /* BLEND: average the fields. No comb, but everything that moves ghosts. */\n" +
+"    outc = mix(cur, prev, 0.5);\n" +
+"  }\n" +
+"  /* twitter: a high vertical frequency lands on one field only, so it flickers\n" +
+"     at half the frame rate. This is why broadcast graphics were soft. */\n" +
+"  if(u_ilTwitter > 0.003){\n" +
+"    float py = 1.0/u_res.y;\n" +
+"    vec3 up = texture(u_tex, vec2(uv.x, uv.y+py)).rgb;\n" +
+"    vec3 dn = texture(u_tex, vec2(uv.x, uv.y-py)).rgb;\n" +
+"    vec3 hf = cur - (up+dn)*0.5;\n" +
+"    float onThis = thisField ? 1.0 : -1.0;\n" +
+"    outc += hf*onThis*u_ilTwitter*1.6;\n" +
+"  }\n" +
+"  /* 3:2 pulldown: film at 24 into video at 30 means some frames are shown\n" +
+"     three fields and some two, and the unevenness is the judder everybody\n" +
+"     recognises without being able to name */\n" +
+"  if(u_ilJudder > 0.003){\n" +
+"    float ph = mod(floor(u_time*24.0), 5.0);\n" +
+"    float held = (ph < 2.0) ? 1.0 : 0.0;\n" +
+"    outc = mix(outc, prev, held*u_ilJudder*0.85);\n" +
+"  }\n" +
+"  O = vec4(mix(cur, outc, u_ilAmt), 1.0);\n}\n";
+
+/* ---------------- block transform ----------------
+   The artefacts everybody recognises from a badly compressed picture are not
+   properties of a file format, they are properties of a transform: an 8x8
+   block DCT, coefficients quantised, transformed back. Ringing around edges,
+   blocking where the quantiser is coarse, and colour smeared across a block
+   because chroma is carried at lower resolution.
+
+   Doing that as a file round-trip in a browser cannot hold a frame rate. Doing
+   it as a transform can, if it is separable: eight taps along one axis,
+   quantise, invert, then the same down the other. That is not identical to a
+   true 2D quantisation - it quantises each axis in turn - but every artefact
+   it produces is a real one, in real time, with the quantiser under your hand
+   rather than buried in an encoder. */
+const FS_DCT = COMMON +
+"uniform sampler2D u_tex;\n" +
+"uniform float u_axis,u_dctAmt,u_dctQ,u_dctTilt,u_dctChroma,u_dctBlock;\n" +
+"const float PI = 3.14159265;\n" +
+"void main(){\n" +
+"  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  vec3 src = texture(u_tex, uv).rgb;\n" +
+"  if(u_dctAmt < 0.003){ O = vec4(src,1.0); return; }\n" +
+"  float N = floor(4.0 + u_dctBlock*12.0);\n" +          /* block size, 4 to 16 */
+"  vec2 px = 1.0/u_res;\n" +
+"  vec2 dir = (u_axis < 0.5) ? vec2(px.x, 0.0) : vec2(0.0, px.y);\n" +
+"  float pos = (u_axis < 0.5) ? gl_FragCoord.x : gl_FragCoord.y;\n" +
+"  float base = floor(pos/N)*N;\n" +
+"  float k = pos - base;\n" +
+"  vec3 out3 = vec3(0.0);\n" +
+"  /* forward transform, quantise, inverse - all in one pass along this axis */\n" +
+"  for(int u=0; u<16; u++){\n" +
+"    if(float(u) >= N) break;\n" +
+"    float fu = float(u);\n" +
+"    vec3 co = vec3(0.0);\n" +
+"    for(int x=0; x<16; x++){\n" +
+"      if(float(x) >= N) break;\n" +
+"      vec2 sp = ((u_axis < 0.5) ? vec2(base+float(x)+0.5, gl_FragCoord.y)\n" +
+"                                : vec2(gl_FragCoord.x, base+float(x)+0.5))*px;\n" +
+"      co += texture(u_tex, clamp(sp,0.0,1.0)).rgb * cos((2.0*float(x)+1.0)*fu*PI/(2.0*N));\n" +
+"    }\n" +
+"    co *= (u == 0 ? sqrt(1.0/N) : sqrt(2.0/N));\n" +
+"    /* the quantiser gets coarser for higher frequencies, which is the whole\n" +
+"       reason compression looks the way it does */\n" +
+"    float step = (0.004 + u_dctQ*0.5) * (1.0 + fu*u_dctTilt*2.0);\n" +
+"    /* chroma is quantised harder than luma, as it always is */\n" +
+"    float y = dot(co, vec3(0.299,0.587,0.114));\n" +
+"    vec3 chroma = co - y;\n" +
+"    co = y + chroma*(1.0 - u_dctChroma*0.85);\n" +
+"    co = floor(co/step + 0.5)*step;\n" +
+"    out3 += co * (u == 0 ? sqrt(1.0/N) : sqrt(2.0/N)) * cos((2.0*k+1.0)*fu*PI/(2.0*N));\n" +
+"  }\n" +
+"  O = vec4(mix(src, out3, u_dctAmt), 1.0);\n}\n";
+
+/* ---------------- time displacement ----------------
+   Every other stage here samples the current frame at a different place. This
+   one samples a different frame at the same place: each pixel chooses how far
+   into the past to look, from a map. A vertical gradient gives you slit-scan.
+   The picture's own brightness gives you a self-referential warp where the
+   bright parts lag. A per-scanline ramp is exactly what a time-base corrector
+   does when it fails, which is why that one drops straight into the sync
+   model's vocabulary rather than looking like an effect. */
+const FS_TDISP = COMMON +
+"uniform sampler2D u_tex;\n" +
+"uniform mediump sampler2DArray u_hist;\n" +
+"uniform float u_layers,u_head,u_tdAmt,u_tdMap,u_tdSpread,u_tdSoft,u_tdWarp,u_time;\n" +
+"void main(){\n" +
+"  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  vec3 cur = texture(u_tex, uv).rgb;\n" +
+"  if(u_tdAmt < 0.003){ O = vec4(cur,1.0); return; }\n" +
+"  float m;\n" +
+"  if(u_tdMap < 0.5)      m = 1.0 - uv.y;\n" +                    /* slit-scan */
+"  else if(u_tdMap < 1.5) m = uv.x;\n" +                          /* sweep across */
+"  else if(u_tdMap < 2.5) m = dot(cur, vec3(0.299,0.587,0.114));\n" +   /* the picture times itself */
+"  else if(u_tdMap < 3.5) m = clamp(length(uv-0.5)*1.6, 0.0, 1.0);\n" + /* out from the centre */
+"  else                   m = fract(uv.y*u_res.y/8.0);\n" +       /* per-line: a failing TBC */
+"  m = mix(m, fract(m + u_time*0.05), u_tdWarp);\n" +
+"  float age = clamp(m, 0.0, 1.0)*u_tdSpread*(u_layers-1.0);\n" +
+"  float f = fract(age);\n" +
+"  float l0 = mod(u_head - floor(age) + u_layers*2.0, u_layers);\n" +
+"  float l1 = mod(l0 - 1.0 + u_layers, u_layers);\n" +
+"  vec3 a = texture(u_hist, vec3(uv, l0)).rgb;\n" +
+"  vec3 b = texture(u_hist, vec3(uv, l1)).rgb;\n" +
+"  vec3 past = mix(a, b, f*u_tdSoft);\n" +
+"  O = vec4(mix(cur, past, u_tdAmt), 1.0);\n}\n";
 
 /* pass 2: the bent signal path — physical sync model + NTSC + tape */
 const FS_SIG = COMMON + KEYFN +
@@ -815,6 +972,8 @@ const FS_COL = COMMON + KEYFN +
 "uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx,u_showKey;\n" +
 "uniform float u_negative,u_negMode,u_monoCol,u_monoHue,u_colorPass,u_passHue,u_passWidth;\n" +
 "uniform float u_silhouette,u_silThresh,u_silHue,u_findEdge,u_edgeHue,u_emboss,u_embossDir;\n" +
+"uniform float u_ampAmt,u_ampBands,u_ampPick,u_ampCol,u_diffAmt,u_diffScale,u_diffPolar;\n" +
+"uniform float u_fgPos,u_fgNeg,u_fgZero;\n" +
 "float lum(vec2 p){ return dot(texture(u_tex, clamp(p,0.0,1.0)).rgb, vec3(0.299,0.587,0.114)); }\n" +
 "vec3 hsv2(float h, float sa, float v){\n" +
 "  vec3 k = fract(vec3(h) + vec3(0.0, 2.0/3.0, 1.0/3.0));\n" +
@@ -940,6 +1099,55 @@ const FS_COL = COMMON + KEYFN +
 "    float em = (lum(uv+d2) - lum(uv-d2))*3.0 + 0.5;\n" +
 "    c = mix(c, vec3(em)*mix(vec3(1.0), c*1.6, 0.35), u_emboss);\n" +
 "  }\n" +
+"  /* ---- amplitude classifier ----\n" +
+"     A string of comparators against evenly spaced thresholds, producing a set\n" +
+"     of discrete binary channels rather than a colour map. The point is not the\n" +
+"     posterisation: it is that each band is a separate signal you can isolate,\n" +
+"     invert or colour independently, which is a combinatorial space rather than\n" +
+"     a look. */\n" +
+"  if(u_ampAmt > 0.003){\n" +
+"    float n = floor(2.0 + u_ampBands*6.0);\n" +
+"    float y = dot(c, vec3(0.299,0.587,0.114));\n" +
+"    float bi = floor(clamp(y,0.0,0.999)*n);\n" +
+"    vec3 banded;\n" +
+"    if(u_ampPick > 0.003){\n" +
+"      /* isolate one band as a matte */\n" +
+"      float want = floor(clamp(u_ampPick,0.0,0.999)*n);\n" +
+"      float on = abs(bi-want) < 0.5 ? 1.0 : 0.0;\n" +
+"      banded = mix(vec3(on), c*on, 1.0-u_ampCol);\n" +
+"    } else {\n" +
+"      float lev = (bi+0.5)/n;\n" +
+"      banded = mix(vec3(lev), hsv2(fract(bi/n + u_ampCol), 0.9, lev*1.15), u_ampCol);\n" +
+"    }\n" +
+"    c = mix(c, banded, u_ampAmt);\n" +
+"  }\n" +
+"  /* ---- differentiator bank ----\n" +
+"     Not one edge detector but a bank of six with progressively longer time\n" +
+"     constants, so you can pick how coarse the derivative is. Sharp finds\n" +
+"     texture; slow finds shape. */\n" +
+"  if(u_diffAmt > 0.003){\n" +
+"    float r = pow(2.0, floor(u_diffScale*5.999))/u_res.y;\n" +
+"    float cx = lum(uv+vec2(r,0.0)) - lum(uv-vec2(r,0.0));\n" +
+"    float cy = lum(uv+vec2(0.0,r)) - lum(uv-vec2(0.0,r));\n" +
+"    float mag = length(vec2(cx,cy));\n" +
+"    vec3 dv = (u_diffPolar > 0.5)\n" +
+"      ? hsv2(fract(atan(cy,cx)/6.2832 + 0.5), 0.9, clamp(mag*4.0,0.0,1.0))\n" +
+"      : vec3(clamp(mag*4.0, 0.0, 1.0));\n" +
+"    c = mix(c, dv, u_diffAmt);\n" +
+"  }\n" +
+"  /* ---- function generator ----\n" +
+"     A non-linear amplifier with independently shaped response above, below and\n" +
+"     around the midpoint. The dead zone is the part nobody implements and the\n" +
+"     part where the interesting behaviour lives: widen it and the picture\n" +
+"     separates into what is definitely bright, what is definitely dark, and a\n" +
+"     flat nothing in between. */\n" +
+"  if(abs(u_fgPos) > 0.003 || abs(u_fgNeg) > 0.003 || u_fgZero > 0.003){\n" +
+"    vec3 d = c - 0.5;\n" +
+"    vec3 dz = max(abs(d) - u_fgZero*0.5, 0.0)*sign(d);\n" +
+"    vec3 pos = pow(clamp(dz*2.0, 0.0, 1.0), vec3(exp(-u_fgPos*2.0)))*0.5;\n" +
+"    vec3 neg = pow(clamp(-dz*2.0, 0.0, 1.0), vec3(exp(-u_fgNeg*2.0)))*0.5;\n" +
+"    c = 0.5 + pos - neg;\n" +
+"  }\n" +
 "  c += c*c*u_glow*0.8;\n" +
 "  if(u_keyFx>0.001){\n" +
 "    vec3 dry = texture(u_tex, uv).rgb;\n" +
@@ -962,6 +1170,7 @@ const FS_CRT = COMMON +
 "uniform float u_lensDist,u_lensCA,u_lensStreak,u_streakHue,u_lensSmudge;\n" +
 "uniform float u_lightLeak,u_leakHue,u_gateWeave,u_gateHair,u_stuckPix,u_lcdGrid;\n" +
 "uniform float u_osdShow,u_osdGlow;\n" +
+"uniform sampler2D u_probeT; uniform float u_probe,u_rows;\n" +
 "vec3 hsvOut(vec3 c){\n" +
 "  vec3 q = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0))*6.0 - 3.0);\n" +
 "  return c.z * mix(vec3(1.0), clamp(q-1.0, 0.0, 1.0), c.y);\n}\n" +
@@ -1023,6 +1232,24 @@ const FS_CRT = COMMON +
 "  /* rolling shutter beat against the field rate */\n" +
 "  if(u_rollShutter>0.003){ cuv.y += sin((uv.y*3.0 + u_time*0.7)*3.14159)*u_rollShutter*0.004; }\n" +
 "  vec3 c = texture(u_tex, clamp(cuv,0.0,1.0)).rgb;\n" +
+"  /* PROBE: put an internal signal on the output instead of the picture. Every\n" +
+"     one of these already exists and drives something; none of them was ever\n" +
+"     visible. A tool you cannot see inside is a tool you can only use the way\n" +
+"     it was designed to be used. */\n" +
+"  if(u_probe > 0.5){\n" +
+"    float row = clamp(cuv.y, 0.0, 0.999)*u_rows;\n" +
+"    vec4 D = texelFetch(u_probeT, ivec2(int(row), 0), 0);\n" +
+"    if(u_probe < 1.5){\n" +
+"      /* the sync model's per-line displacement, drawn as a trace */\n" +
+"      float x = 0.5 + D.x*6.0;\n" +
+"      float tr = 1.0 - smoothstep(0.0, 3.0/u_res.x, abs(cuv.x - x));\n" +
+"      c = vec3(0.1,0.12,0.16)*step(abs(cuv.x-0.5), 0.0015)\n" +
+"        + vec3(0.15,1.0,0.85)*tr;\n" +
+"    } else if(u_probe < 2.5){\n" +
+"      /* per-line AGC gain and noise, as two stacked bars */\n" +
+"      c = vec3(D.y*0.9, D.z*0.9, D.w*0.9);\n" +
+"    }\n" +
+"  }\n" +
 "  /* transverse chromatic aberration: the three primaries focus at slightly\n" +
 "     different scales, so colour fringes grow towards the corners */\n" +
 "  if(u_lensCA>0.003){\n" +
@@ -1403,6 +1630,7 @@ const FS_LAB = COMMON +
 "uniform sampler2D u_tex;\n" +
 "uniform float u_time,u_frame;\n" +
 "uniform float u_sparseJit,u_jitThresh,u_ntscArt,u_ntscFringe,u_snow,u_snowAniso;\n" +
+"uniform float u_pngAmt,u_pngDir,u_pngRun;\n" +
 "uniform float u_fmAmt,u_fmCarrier,u_slitscan,u_slitDir,u_bitCrush,u_bitScale;\n" +
 "uniform float u_bandKey,u_bandN,u_bandHue,u_rowSmear,u_moire,u_moireFreq;\n" +
 "uniform float u_fieldMod,u_fieldHue,u_fieldWarp,u_fieldSrc;\n" +
@@ -1446,6 +1674,40 @@ const FS_LAB = COMMON +
 "    suv.y -= amt*0.02;\n" +
 "  }\n" +
 "  vec3 c = texture(u_tex, fract(suv)).rgb;\n" +
+"  /* ---- reconstruction filter avalanche ----\n" +
+"     A PNG row is not stored as pixels, it is stored as a difference against a\n" +
+"     predictor, and the decoder rebuilds it by accumulating. Corrupt one byte\n" +
+"     and every pixel after it inherits the error, so a single bad value\n" +
+"     avalanches to the edge of the picture. Which direction it runs is decided\n" +
+"     by which predictor the row used: SUB accumulates along the line, UP down\n" +
+"     the column, AVERAGE diagonally with a soft tail. That directional,\n" +
+"     accumulating character is completely unlike a sorting or a smear. */\n" +
+"  if(u_pngAmt > 0.003){\n" +
+"    vec2 stepv = (u_pngDir < 0.5) ? vec2(1.0/u_res.x, 0.0)\n" +
+"               : (u_pngDir < 1.5) ? vec2(0.0, 1.0/u_res.y)\n" +
+"               : vec2(1.0/u_res.x, 1.0/u_res.y)*0.7071;\n" +
+"    /* where the corruption started on this row or column */\n" +
+"    float lane = (u_pngDir < 0.5) ? floor(suv.y*u_res.y) : floor(suv.x*u_res.x);\n" +
+"    float hit = h21(vec2(lane, floor(u_time*3.0)));\n" +
+"    if(hit < u_pngAmt*0.5){\n" +
+"      vec3 acc = vec3(0.0);\n" +
+"      float w = 0.0;\n" +
+"      float span = 2.0 + u_pngRun*40.0;\n" +
+"      for(int i=1;i<=32;i++){\n" +
+"        float fi = float(i);\n" +
+"        if(fi > span) break;\n" +
+"        vec2 tp = suv - stepv*fi;\n" +
+"        float inb = step(0.0,tp.x)*step(tp.x,1.0)*step(0.0,tp.y)*step(tp.y,1.0);\n" +
+"        /* the error is a difference, so what accumulates is the gradient */\n" +
+"        vec3 a1 = texture(u_tex, clamp(tp,0.0,1.0)).rgb;\n" +
+"        vec3 a2 = texture(u_tex, clamp(tp - stepv,0.0,1.0)).rgb;\n" +
+"        acc += (a1-a2)*inb;\n" +
+"        w += inb;\n" +
+"      }\n" +
+"      float seed = h21(vec2(lane*1.7, 11.0))*2.0-1.0;\n" +
+"      c = fract(c + acc*u_pngAmt*1.6 + seed*u_pngAmt*0.25);\n" +
+"    }\n" +
+"  }\n" +
 "  /* NTSC crosstalk: two scalars for the two canonical composite artefacts */\n" +
 "  if(u_ntscArt>0.003 || u_ntscFringe>0.003){\n" +
 "    float px = 1.0/u_res.x;\n" +

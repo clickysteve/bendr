@@ -174,13 +174,31 @@ Six momentary bend pads (mouse, `Q W E R T Y`, or MIDI notes C1–F1), MIDI CC l
 
 ## Development
 
-Source lives in `src/` as four parts (shell/CSS, GL engine + shaders, modulation + UI, I/O + main loop) plus a vendored MP4 muxer. Build the single-file `index.html` with:
+Source lives in `src/` as ten parts plus a vendored MP4 muxer. They are concatenated, in order, into a single `<script>`, which is what lets a later part use a `const` from an earlier one with no imports, no bundler and no module loader — and is why the file still runs from `file://` with the network off.
+
+| part | what is in it |
+|---|---|
+| `p1_shell.html` | markup, all the CSS, the help overlay |
+| `p20_shaders.js` | GLSL source strings, nothing else |
+| `p21_params.js` | section table, parameter registry, get/set |
+| `p22_help.js` | per-parameter and per-section help text |
+| `p23_gl.js` | context, programs, render targets, uniforms |
+| `p3_mod_ui.js` | modulation engine, audio, panel and dock construction |
+| `p40_presets.js` | presets, state capture and restore, undo |
+| `p41_sources.js` | file, camera, screen, pattern, text, synth, re-entry |
+| `p42_capture.js` | recording, stills, multiview, snapshots, performance recorder |
+| `p43_render.js` | sync model, render loop, deck display |
+| `p44_offline.js` | offline MP4 render, MIDI, keyboard, init |
+
+Build the single-file `index.html` with:
 
 ```
 python3 build.py
 ```
 
-`test/e2e-example.js` shows how the app is exercised headlessly with Playwright.
+The build syntax-checks the concatenated script, prints the gzipped size and a hash, fails on a size budget, and prints where each part landed so a line number in a stack trace can be resolved by eye.
+
+`test/e2e-example.js` shows how the app is exercised headlessly with Playwright. Note that the canvas is created without `preserveDrawingBuffer`, so reading a frame back has to happen inside the frame callback: `await page.evaluate(() => window.__grab())` returns a data URL captured at the right moment.
 
 ## License
 

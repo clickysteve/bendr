@@ -1,0 +1,729 @@
+/* ---------------- physical sync model (CPU-side PLL simulation) ----------------
+   Real sync corruption isn't random rectangles: it's a phase-locked loop losing
+   grip. We evolve smooth correlated processes per scanline and hand the GPU a
+   displacement/gain/noise profile each frame. */
+const SNC = 25;
+/* per-channel PLL state: each channel is its own deck, so each drifts on its own */
+function newSyncState(){
+  return {ou:new Float32Array(SNC), ouf:new Float32Array(SNC), ev:[],
+          trackC:0.65, trackV:0, hunt:0, huntPh:Math.random()*6.28,
+          clogC:0.5+ (Math.random()-0.5)*0.5, clogV:0, creaseJ:0};
+}
+const syncState = {};
+const dispData = new Float32Array(SROWS*SCHAN*4);
+function gaussR(){ return (Math.random()+Math.random()+Math.random()-1.5)*1.633; }
+
+function updateSyncChannel(ch, ci, dt, t){
+  if(!syncState[ch]) syncState[ch] = newSyncState();
+  const S = syncState[ch];
+  const g = id=>getCur(id, ch);
+  const jit=g("jitter"), tear=g("tear"), tsz=g("tearSize"), wob=g("hWobble"), wfq=g("wobbleFreq"),
+        wow=g("tapeWow"), wowR=g("wowRate"), flut=g("flutter"), trk=g("tracking"),
+        tph=g("trackPhase"), hunt=g("trackHunt"), hsw=g("headSwitch"), sp=g("tapeSpeed"),
+        stre=g("tapeStretch"), crs=g("crease"), crsP=g("creasePos"), clog=g("headClog"), azi=g("azimuth");
+  const sdt = Math.min(dt, 0.05), rq = Math.sqrt(sdt);
+  for(let i=0;i<SNC;i++){
+    S.ou[i]  += -6*S.ou[i]*sdt  + 2.4*rq*gaussR();
+    S.ouf[i] += -45*S.ouf[i]*sdt + 10*rq*gaussR();
+  }
+  /* spawn loss-of-lock events: sharp shear at one line, exponential re-lock below */
+  const rate = tear*tear*15 + trk*1.1 + sp*0.6;
+  if(Math.random() < rate*sdt && S.ev.length < 10){
+    const whole = Math.random() < 0.18;   // occasionally the whole frame gets sucked sideways
+    S.ev.push({
+      t0:t, r0: whole ? SROWS-1 : Math.floor(Math.random()*SROWS),
+      A:(0.05+0.45*Math.random()*Math.random())*(Math.random()<0.5?-1:1)*(0.35+0.65*tear),
+      L:(10+tsz*90)*(0.5+Math.random())*(whole?6:1),
+      rel:0.08+Math.random()*0.5, env:0});
+  }
+  for(const ev of S.ev){
+    const age = t-ev.t0;
+    ev.env = Math.min(age/0.03,1)*Math.exp(-Math.max(0,age-0.03)/ev.rel);
+  }
+  S.ev = S.ev.filter(ev=>ev.env>0.012);
+  /* tracking band drifts vertically like a real mistracking head */
+  S.trackV += -0.6*S.trackV*sdt + 0.35*rq*gaussR();
+  S.trackC += S.trackV*sdt*0.25;
+  if(S.trackC<0.08){S.trackC=0.08; S.trackV=Math.abs(S.trackV);}
+  if(S.trackC>0.92){S.trackC=0.92; S.trackV=-Math.abs(S.trackV);}
+  /* servo hunt: the auto-tracking circuit searching, overshooting, snapping back */
+  S.huntPh += sdt*(0.35 + hunt*2.4);
+  const huntTri = Math.abs(((S.huntPh*0.5)%1)*2-1);
+  S.hunt = hunt*(huntTri-0.5)*0.55 + hunt*0.10*Math.sin(S.huntPh*9.3);
+  const bandC = Math.min(0.97, Math.max(0.03, S.trackC + tph*0.45 + S.hunt));
+  /* head clog: a dead band that wanders slowly and kills the signal inside it */
+  S.clogV += -0.25*S.clogV*sdt + 0.10*rq*gaussR();
+  S.clogC += S.clogV*sdt*0.2;
+  if(S.clogC<0.05){S.clogC=0.05; S.clogV=Math.abs(S.clogV);}
+  if(S.clogC>0.95){S.clogC=0.95; S.clogV=-Math.abs(S.clogV);}
+  /* tape crease: a hard fold that shears one band sideways and jitters frame to frame */
+  S.creaseJ += (gaussR()*0.5 - S.creaseJ)*Math.min(1, sdt*22);
+  const hsRows = Math.max(0, Math.floor(SROWS*0.05*hsw*(1.0+sp)));
+  const bw = 0.035+0.05*trk + hunt*0.02;
+  const wowF1 = 5.2*(0.25+wowR*3.0), wowF2 = 17.0*(0.25+wowR*3.0);
+  const wowT1 = t*0.9*(0.3+wowR*2.6), wowT2 = t*1.4*(0.3+wowR*2.6);
+  const clogW = 0.012 + clog*0.075, creaseW = 0.006 + crs*0.03;
+  const off = ci*SROWS*4;
+  for(let r=0;r<SROWS;r++){
+    const fy = r/SROWS;
+    let d = (Math.sin(fy*wowF1+wowT1)+0.6*Math.sin(fy*wowF2-wowT2))*0.006*wow
+          + Math.sin(fy*(6.0+wfq*80.0)+t*4.2)*0.013*wob;
+    /* scrape flutter: fast, low-amplitude, high spatial frequency */
+    if(flut>0.003) d += Math.sin(fy*(120.0+flut*420.0)+t*37.0)*0.004*flut
+                      + Math.sin(fy*(311.0)-t*61.0)*0.0022*flut;
+    /* tape stretch: the top of the frame reads long, so geometry leans */
+    if(stre>0.003){ const k=1.0-fy; d += k*k*0.06*stre; }
+    const xc = fy*(SNC-1), ic = Math.min(SNC-2, Math.floor(xc)), fc = xc-ic;
+    const sm = fc*fc*(3-2*fc);
+    const ouv  = S.ou[ic]*(1-sm)+S.ou[ic+1]*sm;
+    const oufv = S.ouf[ic]*(1-sm)+S.ouf[ic+1]*sm;
+    d += ouv*0.004*(0.12+jit);            // the picture is never perfectly still
+    const g0 = (fy-bandC)/bw;
+    const bp = Math.exp(-g0*g0);
+    d += bp*trk*oufv*0.02;
+    let ng = bp*trk*(0.3+0.4*Math.abs(oufv));
+    let hf = bp*trk*0.35 + sp*0.12;
+    for(const ev of S.ev){
+      if(r<=ev.r0) d += ev.A*ev.env*Math.exp(-(ev.r0-r)/ev.L);
+    }
+    if(r<hsRows){
+      const k = (hsRows-r)/hsRows;
+      d += (0.045*k*k + 0.02*k*oufv)*hsw;
+      ng += hsw*0.9*k*k;
+      hf += hsw*0.5*k;
+    }
+    /* head clog band: no RF, so no chroma and no detail, just noise */
+    if(clog>0.003){
+      const gc = (fy-S.clogC)/clogW;
+      const cb = Math.exp(-gc*gc);
+      ng += cb*clog*1.5;
+      hf += cb*clog;
+    }
+    /* crease */
+    if(crs>0.003){
+      const gk = (fy-crsP)/creaseW;
+      const cb = Math.exp(-gk*gk);
+      d += cb*crs*(0.09 + 0.05*S.creaseJ);
+      ng += cb*crs*0.8;
+      hf += cb*crs*0.7;
+    }
+    /* azimuth error: alternate head passes lose the high band */
+    if(azi>0.003) hf += azi*0.75*(r%2);
+    const gn = 1 - Math.min(0.38, Math.abs(d)*2.0) - Math.min(0.5, ng*0.18);
+    const o = off + r*4;
+    dispData[o]=d; dispData[o+1]=gn; dispData[o+2]=ng; dispData[o+3]=Math.min(1, hf);
+  }
+}
+function updateSyncModel(dt, t){
+  for(let ci=0; ci<CHANNELS.length && ci<SCHAN; ci++) updateSyncChannel(CHANNELS[ci], ci, dt, t);
+  gl.bindTexture(gl.TEXTURE_2D, dispTex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,SROWS,SCHAN,0,gl.RGBA,gl.FLOAT,dispData);
+}
+
+/* ---------------- main loop ---------------- */
+const osd = document.getElementById("osd");
+let lastT = performance.now()/1000, fpsAcc=0, fpsN=0, fpsShow=0;
+const stutterHeld = {}, stutterT = {};
+for(const ch of CHANNELS){ stutterHeld[ch]=false; stutterT[ch]=0; }
+/* STILL freezes a channel's source outright; STROBE holds each frame for a
+   while before letting the next through; SHAKE knocks it off position. */
+const stillHeld = {}, shakeOff = {}, shakeT = {};
+for(const ch of CHANNELS){ stillHeld[ch]=false; shakeOff[ch]={x:0,y:0}; shakeT[ch]=0; }
+function sourceFrozen(ch){
+  if(stillHeld[ch]) return true;
+  const st = getCur("strobe", ch);
+  if(st > 0.003){
+    const hold = 1 + Math.floor(st*st*22);
+    if(frameNo % hold !== 0) return true;
+  }
+  return false;
+}
+window.__toggleStill = ch=>{
+  ch = ch || activeChan;
+  stillHeld[ch] = !stillHeld[ch];
+  toast("Channel "+ch+(stillHeld[ch] ? ": frozen" : ": running"));
+  return stillHeld[ch];
+};
+window.__stillOf = ch=>!!stillHeld[ch||activeChan];
+let offline = false, liveList = "A";
+
+/* video content analysis — the picture itself as a mod source (reads channel A) */
+const anaC = document.createElement("canvas"); anaC.width=32; anaC.height=18;
+const anaCtx = anaC.getContext("2d", {willReadFrequently:true});
+const anaPrev = new Float32Array(576);
+let mdAvg=0.02, motionPeak=0.05, cutV=0;
+function updateContentAnalysis(dt){
+  const S = SRC.A;
+  let src = null;
+  if(S.mode==="pattern" || S.mode==="text") src = S.patCanvas;
+  else if(S.video.readyState>=2 && S.video.videoWidth>0) src = S.video;
+  if(!src){ modVal.motion *= 1-Math.min(1,dt*4); cutV *= Math.exp(-dt*5); modVal.cut = cutV; return; }
+  try{ anaCtx.drawImage(src, 0, 0, 32, 18); }catch(e){ return; }
+  const d = anaCtx.getImageData(0,0,32,18).data;
+  let sum=0, diff=0;
+  for(let i=0,j=0;i<d.length;i+=4,j++){
+    const l = (d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114)/255;
+    sum += l; diff += Math.abs(l-anaPrev[j]); anaPrev[j] = l;
+  }
+  const mean = sum/576, md = diff/576;
+  modVal.bright = mean;
+  motionPeak = Math.max(motionPeak*(1-dt*0.05), md, 0.02);
+  modVal.motion += (Math.min(1, md/motionPeak) - modVal.motion)*Math.min(1, dt*10);
+  if(md > Math.max(0.06, mdAvg*3.5)) cutV = 1;
+  mdAvg = mdAvg*0.95 + md*0.05;
+  cutV *= Math.exp(-dt*5);
+  modVal.cut = cutV;
+}
+
+/* This used to run at the top of every frame, writing inline styles and then
+   reading clientWidth - a forced synchronous layout, sixty times a second,
+   whether or not anything had moved. It now runs when the pane actually
+   changes size, and on the two occasions the raster does. */
+let sizeDirty = true;
+function markSizeDirty(){ sizeDirty = true; }
+function sizeCanvasIfNeeded(){ if(sizeDirty){ sizeDirty = false; sizeCanvas(); } }
+function sizeCanvas(){
+  if(offline) return;
+  const wrap = document.getElementById("canvasWrap");
+  if(!wrap) return;
+  const dpr = Math.min(window.devicePixelRatio||1, isTouch ? 1.5 : 2);
+  const cw = Math.max(2, wrap.clientWidth), ch = Math.max(2, wrap.clientHeight);
+  /* the picture keeps the processing raster's aspect and is letterboxed inside
+     the pane, so it is never stretched to whatever shape the window happens to
+     be — and the pop-out, which mirrors this canvas, stays correct too */
+  const ar = procW/procH;
+  let dw = cw, dh = cw/ar;
+  if(dh > ch){ dh = ch; dw = ch*ar; }
+  canvas.style.width = dw+"px"; canvas.style.height = dh+"px";
+  canvas.style.left = Math.round((cw-dw)/2)+"px";
+  canvas.style.top  = Math.round((ch-dh)/2)+"px";
+  const mv = document.getElementById("mvlabels");
+  if(mv){
+    mv.style.width = dw+"px"; mv.style.height = dh+"px";
+    mv.style.left = canvas.style.left; mv.style.top = canvas.style.top;
+  }
+  const w = Math.max(2, Math.floor(dw*dpr)), h = Math.max(2, Math.floor(dh*dpr));
+  if(canvas.width!==w || canvas.height!==h){ canvas.width=w; canvas.height=h; }
+}
+window.addEventListener("resize", sizeCanvas);
+
+function runPass(pr, inTex, outFbo, outW, outH, extras, ch){
+  gl.bindFramebuffer(gl.FRAMEBUFFER, outFbo);
+  gl.viewport(0,0,outW,outH);
+  gl.useProgram(pr.prog);
+  gl.uniform2f(U(pr,"u_res"), outW, outH);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, inTex);
+  gl.uniform1i(U(pr,"u_tex"), 0);
+  if(extras) extras(pr);
+  setParamUniforms(pr, ch);
+  draw();
+}
+function sigExtras(pr, now, ch){
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, dispTex);
+  gl.uniform1i(U(pr,"u_dispT"), 1);
+  gl.uniform1f(U(pr,"u_rows"), SROWS);
+  gl.uniform1f(U(pr,"u_rollBar"), Math.min(1, Math.pow(Math.abs(getCur("vRoll",ch)),1.2)*5));
+  gl.uniform1f(U(pr,"u_time"), now);
+  gl.uniform1f(U(pr,"u_frame"), frameNo);
+  gl.uniform1f(U(pr,"u_bypass"), bypass);
+  gl.uniform1f(U(pr,"u_vrollpos"), vrollpos[ch]);
+  gl.uniform1f(U(pr,"u_humpos"), humpos[ch]);
+  gl.uniform1f(U(pr,"u_keyMode"), keyChroma?1:0);
+  gl.uniform1f(U(pr,"u_chanIdx"), Math.max(0, CHANNELS.indexOf(ch)));
+  const tp = transport[ch] || "play";
+  gl.uniform1f(U(pr,"u_tpStill"), tp==="still" ? 0.75 : 0);
+  gl.uniform1f(U(pr,"u_tpShuttle"), tp==="ff" ? 0.55 : (tp==="rew" ? -0.55 : 0));
+}
+function colExtras(pr, now, ch){
+  gl.uniform1f(U(pr,"u_time"), now);
+  gl.uniform1f(U(pr,"u_bypass"), bypass);
+  gl.uniform1f(U(pr,"u_keyMode"), keyChroma?1:0);
+  gl.uniform1f(U(pr,"u_showKey"), showKeyMatte?1:0);
+  gl.uniform1f(U(pr,"u_negMode"), Math.round(getCur("negMode", ch||"A")));
+}
+const FLOW_IDS = ["mosh","moshVec","melt","swirl","moshBlock","timeGrad","flowStretch","flowRepel","flowNoise","flowHue","flowFade"];
+const LAB_IDS = ["sparseJit","ntscArt","ntscFringe","snow","fmAmt","slitscan","bitCrush","bandKey","rowSmear","moire","fieldMod"];
+function stageNeeded(id, ch){
+  if(id === "lab") return LAB_IDS.some(k=>getCur(k,ch)>0.003);
+  if(id === "glitch") return getCur("pixelSort",ch)>0.003 || getCur("blockShift",ch)>0.003 || getCur("dotify",ch)>0.003 || getCur("driftWarp",ch)>0.003 || getCur("fmWarp",ch)>0.003;
+  if(id === "flow") return FLOW_IDS.some(k=>Math.abs(getCur(k,ch))>0.003);
+  return true;
+}
+function runStage(id, inTex, dstRT, now, ch){
+  const C = chanRT[ch];
+  if(id === "sig")    return runPass(progSIG, inTex, dstRT.fbo, procW, procH, pr=>sigExtras(pr,now,ch), ch);
+  if(id === "col")    return runPass(progCOL, inTex, dstRT.fbo, procW, procH, pr=>colExtras(pr,now,ch), ch);
+  if(id === "glitch") return runPass(progGLITCH, inTex, dstRT.fbo, procW, procH, pr=>{ gl.uniform1f(U(pr,"u_time"), now); }, ch);
+  if(id === "lab")    return runPass(progLAB, inTex, dstRT.fbo, procW, procH, pr=>{
+    gl.uniform1f(U(pr,"u_time"), now); gl.uniform1f(U(pr,"u_frame"), frameNo);
+    gl.uniform1f(U(pr,"u_fieldSrc"), fieldSrc);
+  }, ch);
+  if(id === "flow"){
+    /* if the stage has been idle, prime its history with the live picture so it
+       doesn't fade up from black (or flash a stale frame) when you turn it on */
+    if(frameNo - (C.flowLast || -99) > 1){
+      runPass(progCOPY, inTex, C.flowA.fbo, procW, procH, null, ch);
+      runPass(progCOPY, inTex, C.flowSrc.fbo, procW, procH, null, ch);
+    }
+    C.flowLast = frameNo;
+    runPass(progFLOW, inTex, dstRT.fbo, procW, procH, pr=>{
+      gl.uniform1f(U(pr,"u_time"), now);
+      gl.uniform1f(U(pr,"u_flowField"), flowField);
+      gl.uniform1f(U(pr,"u_flowEdge"), flowEdge);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, C.flowA.tex);
+      gl.uniform1i(U(pr,"u_flowPrev"), 1);
+      gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, C.flowSrc.tex);
+      gl.uniform1i(U(pr,"u_srcPrev"), 2);
+    }, ch);
+    /* keep this frame's input for next frame's motion estimate */
+    runPass(progCOPY, inTex, C.flowSrc.fbo, procW, procH, null, ch);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, dstRT.fbo);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, C.flowB.fbo);
+    gl.blitFramebuffer(0,0,procW,procH, 0,0,procW,procH, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    const t = C.flowA; C.flowA = C.flowB; C.flowB = t;
+    return;
+  }
+}
+
+function srcReady(ch){
+  const S = SRC[ch];
+  if(S.mode === "pattern" || S.mode === "text" || S.mode === "synth" || S.mode === "feed") return true;
+  return S.video.readyState >= 2 && S.video.videoWidth > 0;
+}
+window.__chanHasSource = srcReady;
+
+/* upload a channel's source frame into its texture */
+function uploadSource(ch, dt){
+  const S = SRC[ch];
+  if(sourceFrozen(ch)) return;   /* leave the texture holding its last frame */
+  if(S.mode === "synth" || S.mode === "feed"){ S.aspect = procW/procH; S.has = 1; S.patClock += dt*S.speed; return; }
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
+  if(S.mode === "pattern" || S.mode === "text"){
+    S.patClock += dt*S.speed*(S.tpRate===undefined?1:S.tpRate);
+    if(S.mode === "text") drawTextSource(S, S.patClock); else drawPattern(S, S.patClock);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, S.patCanvas);
+    S.aspect = S.patCanvas.width/S.patCanvas.height; S.has = 1;
+  } else if(S.video.readyState >= 2 && S.video.videoWidth > 0){
+    try{
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, S.video);
+      S.aspect = S.video.videoWidth/S.video.videoHeight; S.has = 1;
+    }catch(err){}
+  }
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+}
+
+/* run one channel's entire chain, leaving the result in chanRT[ch].out */
+/* the pattern synth is computed straight into a render target, so it costs one
+   full-screen pass and needs no canvas upload */
+function renderGen(ch, now){
+  const C = chanRT[ch], M = genMode[ch];
+  gl.bindFramebuffer(gl.FRAMEBUFFER, C.gen.fbo);
+  gl.viewport(0,0,procW,procH);
+  gl.useProgram(progGEN.prog);
+  gl.uniform2f(U(progGEN,"u_res"), procW, procH);
+  gl.uniform1f(U(progGEN,"u_time"), now);
+  gl.uniform1f(U(progGEN,"u_shape"), M.shape);
+  gl.uniform1f(U(progGEN,"u_wave"), M.wave);
+  gl.uniform1f(U(progGEN,"u_colmode"), M.col);
+  setParamUniforms(progGEN, ch);
+  draw();
+  return C.gen.tex;
+}
+function renderChannel(ch, now, dt){
+  ensureChanRT(ch);
+  const C = chanRT[ch], S = SRC[ch];
+  const chanSrcTex = (S.mode === "synth") ? (sourceFrozen(ch) ? C.gen.tex : renderGen(ch, now))
+                   : (S.mode === "feed") ? feedTex(S.feed || "PGM")
+                   : srcTex[ch];
+
+  /* time base: bent frame store */
+  const delayN = Math.max(1, Math.min(RING_N-1, Math.round(getCur("delayF",ch))));
+  const useTime = getCur("echo",ch)>0.003 || getCur("stutter",ch)>0.003 || stutterHeld[ch];
+  if(useTime) ensureRing(C);
+  if(getCur("stutter",ch)>0.003){
+    if(!stutterHeld[ch] && Math.random() < Math.pow(getCur("stutter",ch),2)*dt*10){
+      stutterHeld[ch] = true; stutterT[ch] = 0.08 + Math.random()*0.6*getCur("stutter",ch);
+    }
+  }
+  if(stutterHeld[ch]){ stutterT[ch] -= dt; if(stutterT[ch]<=0) stutterHeld[ch]=false; }
+  const hasDelay = (C.ring && C.ringFilled >= delayN) ? 1 : 0;
+  const readIdx = C.ring ? ((C.ringW - delayN + RING_N*2) % RING_N) : 0;
+
+  /* pass 1: source framing + feedback + echo */
+  gl.bindFramebuffer(gl.FRAMEBUFFER, C.fbNext.fbo);
+  gl.viewport(0,0,procW,procH);
+  gl.useProgram(progFB.prog);
+  gl.uniform2f(U(progFB,"u_res"), procW, procH);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, chanSrcTex);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, (rescanMode?C.crt:C.fbPrev).tex);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, hasDelay?C.ring[readIdx].tex:chanSrcTex);
+  gl.uniform1i(U(progFB,"u_src"), 0);
+  gl.uniform1i(U(progFB,"u_prev"), 1);
+  gl.uniform1i(U(progFB,"u_delayT"), 2);
+  gl.uniform1f(U(progFB,"u_srcAspect"), S.aspect);
+  gl.uniform1f(U(progFB,"u_hasSrc"), S.has);
+  gl.uniform1f(U(progFB,"u_hasDelay"), hasDelay);
+  gl.uniform1f(U(progFB,"u_time"), now);
+  gl.uniform1f(U(progFB,"u_fbMode"), fbTrailMode?1:0);
+  gl.uniform1f(U(progFB,"u_keyMode"), keyChroma?1:0);
+  gl.uniform1f(U(progFB,"u_edgeMode"), edgeMode);
+  gl.uniform1f(U(progFB,"u_fbWrap"), fbWrap);
+  gl.uniform1f(U(progFB,"u_fbMirror"), fbMirror);
+  gl.uniform1f(U(progFB,"u_fbBlend"), fbBlend);
+  gl.uniform1f(U(progFB,"u_fbNL"), fbNL);
+  gl.uniform1f(U(progFB,"u_fbInvert"), fbInvert?1:0);
+  gl.uniform1f(U(progFB,"u_autoGain"), autoGain[ch]);
+  gl.uniform1f(U(progFB,"u_flipMode"), Math.round(getCur("flipMode",ch)));
+  gl.uniform1f(U(progFB,"u_mirrorMode"), Math.round(getCur("mirrorMode",ch)));
+  gl.uniform1f(U(progFB,"u_multiN"), Math.round(getCur("multiN",ch)));
+  gl.uniform1f(U(progFB,"u_shakeX"), shakeOff[ch].x);
+  gl.uniform1f(U(progFB,"u_shakeY"), shakeOff[ch].y);
+  setParamUniforms(progFB, ch);
+  draw();
+
+  /* frame ring capture (frozen while stuttering) */
+  if(useTime && C.ring && !stutterHeld[ch]){
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, C.fbNext.fbo);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, C.ring[C.ringW].fbo);
+    gl.blitFramebuffer(0,0,procW,procH, 0,0,procW,procH, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+    C.ringW = (C.ringW+1)%RING_N; C.ringFilled = Math.min(C.ringFilled+1, RING_N);
+  }
+
+  /* FX chain in the order set on the rail */
+  const active = chainOrder.filter(id=>stageEnabled[id] && stageNeeded(id, ch));
+  let srcT = C.fbNext.tex;
+  const scratch = [scratch1, scratch2];
+  let si = 0;
+  for(let k=0; k<active.length; k++){
+    const last = (k === active.length-1);
+    const dst = last ? C.out : scratch[si];
+    runStage(active[k], srcT, dst, now, ch);
+    srcT = dst.tex;
+    si ^= 1;
+  }
+  if(active.length === 0) runPass(progCOPY, srcT, C.out.fbo, procW, procH, null, ch);
+
+  /* this channel's output becomes next frame's feedback source */
+  const t = C.fbPrev; C.fbPrev = C.out; C.out = t;
+  /* keep .out pointing at the freshly rendered image */
+  const swap = C.fbPrev; C.fbPrev = C.out; C.out = swap;
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, C.out.fbo);
+  gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, C.fbPrev.fbo);
+  gl.blitFramebuffer(0,0,procW,procH, 0,0,procW,procH, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+}
+
+function renderFrame(now, dt){
+  if(ctxLost) return;
+  frameNo++;
+  sizeCanvasIfNeeded();
+  updateAudio(dt);
+  driveTransport(dt);
+  updateContentAnalysis(dt);
+  updateGlide(dt);
+  updatePerf(dt);
+  updateMod(dt, now);
+  pushModHistory();
+  applyParams(dt);
+  updateSyncModel(dt, now);
+  /* feedback auto-level servo — keeps the loop off the black/white attractors */
+  for(const ch of CHANNELS){
+    const amt = getCur("fbAuto", ch);
+    if(amt > 0.003){
+      const target = 0.42;
+      const err = target - (modVal.bright || 0.4);
+      autoGain[ch] = Math.max(0.6, Math.min(1.4, autoGain[ch] + err*dt*1.2*amt));
+    } else autoGain[ch] += (1-autoGain[ch])*Math.min(1, dt*3);
+  }
+
+  for(const ch of CHANNELS){
+    const sk = getCur("shake", ch);
+    if(sk > 0.003){
+      shakeT[ch] -= dt;
+      if(shakeT[ch] <= 0){
+        shakeT[ch] = 0.02 + (1-getCur("shakeRate",ch))*0.35;
+        shakeOff[ch].x = (Math.random()*2-1)*sk*0.09;
+        shakeOff[ch].y = (Math.random()*2-1)*sk*0.09;
+      }
+    } else { shakeOff[ch].x = 0; shakeOff[ch].y = 0; }
+    const vr = getCur("vRoll",ch);
+    vrollpos[ch] = (vrollpos[ch] + Math.sign(vr)*Math.pow(Math.abs(vr),2.2)*dt*3.0) % 1;
+    humpos[ch] = (humpos[ch] + dt*(0.05 + getCur("humBar",ch)*0.1)) % 1;
+  }
+
+  /* a channel only costs anything when its fader can actually let it through */
+  const b1 = busSrc.b1, b2 = busSrc.b2;
+  const masterLive = mCur.busMix > 0.0005 || multiView;
+  const live = {A:false, B:false, C:false, D:false};
+  live[b1[0]] = true;
+  if(srcReady(b1[1]) && (mCur.abMix > 0.0005 || multiView)) live[b1[1]] = true;
+  if(masterLive){
+    if(srcReady(b2[0])) live[b2[0]] = true;
+    if(srcReady(b2[1]) && (mCur.cdMix > 0.0005 || multiView)) live[b2[1]] = true;
+  }
+  /* a re-entry source only works if the channel it is reading is still rendering */
+  for(let pass=0; pass<3; pass++){
+    for(const ch of CHANNELS){
+      if(!live[ch]) continue;
+      const S = SRC[ch];
+      if(S.mode !== "feed") continue;
+      const f = S.feed || "PGM";
+      if(f === "BUS1" || f === "BUS2" || f === "PGM") continue;
+      if(f !== ch && !live[f] && srcReady(f)) live[f] = true;
+    }
+  }
+  liveList = CHANNELS.filter(c=>live[c]).join("+");
+  for(const ch of CHANNELS){
+    if(!live[ch]) continue;
+    uploadSource(ch, dt);
+    renderChannel(ch, now, dt);
+  }
+
+  /* mixer tree: BUS 1 and BUS 2 each take any two channels, then MASTER
+     crossfades the two buses. So A can meet C, or D can meet B. */
+  /* the melt stage reads the previous frame of this same mixer stage, so the
+     two buffers ping-pong rather than one being copied into the other */
+  function edgeLive(ids){ return mCur[ids[MIXP_EDGE]] > 0.002 && mCur[ids[MIXP_EDGE+2]] > 0.002; }
+  function mixPass(dstRT, texA, texB, hasB, ids, mode, inv, blend, key, prevTex){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dstRT.fbo);
+    gl.viewport(0,0,procW,procH);
+    gl.useProgram(progMIX.prog);
+    gl.uniform2f(U(progMIX,"u_res"), procW, procH);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texA);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texB);
+    gl.uniform1i(U(progMIX,"u_texA"), 0);
+    gl.uniform1i(U(progMIX,"u_texB"), 1);
+    gl.uniform1f(U(progMIX,"u_hasB"), hasB?1:0);
+    gl.uniform1f(U(progMIX,"u_mixMode"), mode);
+    gl.uniform1f(U(progMIX,"u_wipeInv"), inv?1:0);
+    gl.uniform1f(U(progMIX,"u_mixBlend"), blend||0);
+    gl.uniform1f(U(progMIX,"u_mixKey"), key||0);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, prevTex || blackTex);
+    gl.uniform1i(U(progMIX,"u_prev"), 2);
+    gl.uniform1f(U(progMIX,"u_hasPrev"), prevTex?1:0);
+    gl.uniform1f(U(progMIX,"u_time"), now);
+    setParamUniforms(progMIX, "A");
+    for(let i=0;i<MIXP.length;i++) gl.uniform1f(U(progMIX,"u_"+MIXP[i]), mCur[ids[i]]);
+    draw();
+  }
+  let p1 = null, p2t = null, pM = null;
+  if(masterLive){
+    ensureShared("busOut1"); ensureShared("busOut2");
+    if(edgeLive(MIXBUS.b1)){ ensureShared("busHist1"); const t = busOut1; busOut1 = busHist1; busHist1 = t; p1 = busHist1.tex; }
+    if(edgeLive(MIXBUS.b2)){ ensureShared("busHist2"); const t = busOut2; busOut2 = busHist2; busHist2 = t; p2t = busHist2.tex; }
+    if(edgeLive(MIXBUS.bM)){ ensureShared("mixHist"); const t = mixOut; mixOut = mixHist; mixHist = t; pM = mixHist.tex; }
+    mixPass(busOut1, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv, mixBlend, mixKey, p1);
+    mixPass(busOut2, chanOutTex(b2[0]), chanOutTex(b2[1]), live[b2[1]], MIXBUS.b2, mixMode2, wipeInv2, mixBlend2, mixKey2, p2t);
+    mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mixModeM, wipeInvM, mixBlendM, mixKeyM, pM);
+  } else {
+    /* nothing on bus 2, so bus 1 goes straight to master and costs one pass, as before */
+    if(edgeLive(MIXBUS.b1)){ ensureShared("mixHist"); const t = mixOut; mixOut = mixHist; mixHist = t; p1 = mixHist.tex; }
+    mixPass(mixOut, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv, mixBlend, mixKey, p1);
+  }
+
+  if(multiView){
+    for(const ch of CHANNELS) ensureChanRT(ch);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0,0,canvas.width,canvas.height);
+    gl.useProgram(progMULTI.prog);
+    gl.uniform2f(U(progMULTI,"u_res"), canvas.width, canvas.height);
+    const bind = (unit, name, tex)=>{
+      gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.uniform1i(U(progMULTI,name), unit);
+    };
+    bind(0,"u_a",chanOutTex("A")); bind(1,"u_b",chanOutTex("B"));
+    bind(2,"u_c",chanOutTex("C")); bind(3,"u_d",chanOutTex("D"));
+    bind(4,"u_b1",busOut1 ? busOut1.tex : mixOut.tex); bind(5,"u_pgm",mixOut.tex);
+    const cellOf = {A:0,B:1,C:3,D:4};
+    gl.uniform1f(U(progMULTI,"u_active"), cellOf[activeChan]);
+    for(const ch of CHANNELS) gl.uniform1f(U(progMULTI,"u_live"+ch), live[ch]?1:0);
+    draw();
+    frameEnd(now, dt);
+    return;
+  }
+
+  if(mCur.osdShow > 0.003) updateOSD(now, dt);
+  /* CRT -> screen */
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0,0,canvas.width,canvas.height);
+  gl.useProgram(progCRT.prog);
+  gl.uniform2f(U(progCRT,"u_res"), canvas.width, canvas.height);
+  gl.uniform2f(U(progCRT,"u_procRes"), procW, procH);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, mixOut.tex);
+  gl.uniform1i(U(progCRT,"u_tex"), 0);
+  gl.uniform1f(U(progCRT,"u_time"), now);
+  gl.uniform1f(U(progCRT,"u_outModel"), outModel);
+  /* the persistence pair only exists once phosphor is actually turned up */
+  const wantPersist = mCur.phosphor > 0.003;
+  if(wantPersist){ ensureShared("persistA"); ensureShared("persistB"); }
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, persistA ? persistA.tex : blackTex);
+  gl.uniform1i(U(progCRT,"u_persist"), 1);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, osdTex);
+  gl.uniform1i(U(progCRT,"u_osd"), 2);
+  gl.uniform1f(U(progCRT,"u_hasPersist"), wantPersist?1:0);
+  setParamUniforms(progCRT, "A");
+  draw();
+
+  /* phosphor persistence store */
+  if(wantPersist){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, persistB.fbo);
+    gl.viewport(0,0,procW,procH);
+    gl.useProgram(progCRT.prog);
+    gl.uniform2f(U(progCRT,"u_res"), procW, procH);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, mixOut.tex);
+    draw();
+    const t = persistA; persistA = persistB; persistB = t;
+  }
+
+  /* full rescan: give each channel a CRT-processed copy to eat next frame */
+  if(rescanMode){
+    for(const ch of CHANNELS){
+      if(!chanRT[ch].allocated) continue;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, chanRT[ch].crt.fbo);
+      gl.viewport(0,0,procW,procH);
+      gl.uniform2f(U(progCRT,"u_res"), procW, procH);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, chanRT[ch].out.tex);
+      draw();
+    }
+  }
+
+  frameEnd(now, dt);
+}
+/* ---------------- the deck's on-screen display ----------------
+   Every consumer machine burnt its own state into the picture: a transport
+   symbol, a counter that ran whether or not anything was recorded, and on the
+   camcorders a date stamp that half the world forgot to set. It is drawn on a
+   2D canvas rather than in the shader because it is type, and type wants a
+   font. The canvas only redraws when what it says changes. */
+const OSD_W = 960, OSD_H = 540;
+const osdCanvas = document.createElement("canvas");
+osdCanvas.width = OSD_W; osdCanvas.height = OSD_H;
+const osdCtx = osdCanvas.getContext("2d");
+const osdTex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, osdTex);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,0]));
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+const OSD_MODES = ["REC", "PLAY", "PAUSE", "STOP", "FF", "REW"];
+let osdLast = "", osdBlink = 0;
+function osdCount(t){
+  const h = Math.floor(t/3600), m = Math.floor(t/60)%60, sec = Math.floor(t)%60;
+  const p2 = n=>(n<10?"0":"")+n;
+  return p2(h)+":"+p2(m)+":"+p2(sec);
+}
+let osdPrevNow = -1;
+function updateOSD(now, dt){
+  /* wall time, not the render delta: a tape counter that slows down because the
+     machine is busy is a counter nobody can trust */
+  const rdt = (osdPrevNow >= 0) ? Math.max(0, Math.min(1, now - osdPrevNow)) : 0;
+  osdPrevNow = now;
+  /* the counter only runs on the transports that would move the tape */
+  if(osdMode === 0 || osdMode === 1) osdCounter += rdt;
+  else if(osdMode === 4) osdCounter += rdt*7;
+  else if(osdMode === 5) osdCounter = Math.max(0, osdCounter - rdt*7);
+  osdBlink = Math.floor(now*1.4) % 2;
+  const mode = OSD_MODES[osdMode] || "PLAY";
+  const d = new Date();
+  const p2 = n=>(n<10?"0":"")+n;
+  const datestr = osdDate === 0 ? ""
+    : osdDate === 1 ? (p2(d.getDate())+"." + p2(d.getMonth()+1) + "." + d.getFullYear())
+    : (p2(d.getDate())+"." + p2(d.getMonth()+1) + "." + d.getFullYear() + "  " + p2(d.getHours())+":"+p2(d.getMinutes()));
+  const key = mode+"|"+osdCount(osdCounter)+"|"+datestr+"|"+mCur.osdSize.toFixed(2)+"|"+osdBlink;
+  if(key === osdLast) return;
+  osdLast = key;
+  const g = osdCtx;
+  g.clearRect(0,0,OSD_W,OSD_H);
+  const sc = mCur.osdSize;
+  const fs = Math.round(30*sc);
+  g.font = "700 "+fs+"px ui-monospace, 'SF Mono', Menlo, Consolas, monospace";
+  g.textBaseline = "top";
+  const ink = "#f3e14a";
+  const pad = Math.round(34*sc);
+  g.shadowColor = "rgba(0,0,0,0.85)";
+  g.shadowBlur = 0; g.shadowOffsetX = Math.round(2*sc); g.shadowOffsetY = Math.round(2*sc);
+  g.fillStyle = ink;
+  /* transport symbol, drawn rather than typed so it reads as a machine glyph */
+  let x = pad;
+  const y = pad, sz = fs*0.72;
+  const tri = (ox, flip)=>{
+    g.beginPath();
+    if(flip){ g.moveTo(ox+sz,y+fs*0.16); g.lineTo(ox+sz,y+fs*0.16+sz); g.lineTo(ox,y+fs*0.16+sz*0.5); }
+    else { g.moveTo(ox,y+fs*0.16); g.lineTo(ox,y+fs*0.16+sz); g.lineTo(ox+sz,y+fs*0.16+sz*0.5); }
+    g.closePath(); g.fill();
+  };
+  if(osdMode === 0){
+    if(osdBlink){
+      g.beginPath(); g.arc(x+sz*0.5, y+fs*0.16+sz*0.5, sz*0.5, 0, 6.2832); g.fill();
+    }
+    x += sz*1.5;
+  } else if(osdMode === 1){ tri(x,false); x += sz*1.5; }
+  else if(osdMode === 2){
+    g.fillRect(x, y+fs*0.16, sz*0.3, sz);
+    g.fillRect(x+sz*0.55, y+fs*0.16, sz*0.3, sz);
+    x += sz*1.5;
+  } else if(osdMode === 3){ g.fillRect(x, y+fs*0.16, sz, sz); x += sz*1.5; }
+  else if(osdMode === 4){ tri(x,false); tri(x+sz*0.75,false); x += sz*2.2; }
+  else { tri(x,true); tri(x+sz*0.75,true); x += sz*2.2; }
+  const label = (osdMode === 0 && !osdBlink) ? "" : mode;
+  g.fillText(label, x, y);
+  g.fillText(osdCount(osdCounter), OSD_W - pad - g.measureText("00:00:00").width, y);
+  if(datestr){
+    g.fillText(datestr, OSD_W - pad - g.measureText(datestr).width, OSD_H - pad - fs);
+  }
+  g.shadowOffsetX = 0; g.shadowOffsetY = 0;
+  gl.bindTexture(gl.TEXTURE_2D, osdTex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,osdCanvas);
+}
+
+/* A GPU reset, a driver update or a laptop waking from sleep takes the WebGL
+   context away. Without this the render loop keeps running against a dead
+   context, every call silently does nothing, and the picture is black forever
+   with no way back but a reload and no clue that anything happened. */
+let ctxLost = false;
+canvas.addEventListener("webglcontextlost", e=>{
+  e.preventDefault();
+  ctxLost = true;
+  toast("Graphics context lost \u2014 your patch is safe. Reload the page to carry on.", true);
+}, false);
+canvas.addEventListener("webglcontextrestored", ()=>{
+  ctxLost = false;
+  toast("Graphics context restored \u2014 reload if the picture does not come back", true);
+}, false);
+function frameEnd(now, dt){
+  serviceGrabs();
+  if(offline) return;
+  const S = cur();
+  if(S.mode==="file" && S.video.duration && !seeking){
+    seek.value = S.video.currentTime/S.video.duration;
+    tcode.textContent = fmtT(S.video.currentTime)+" / "+fmtT(S.video.duration);
+  } else if(S.mode!=="file"){
+    tcode.textContent = "--:-- / --:--";
+  }
+  fpsAcc += 1/Math.max(dt,1e-4); fpsN++;
+  if(fpsN>=30){ fpsShow = Math.round(fpsAcc/fpsN); fpsAcc=0; fpsN=0;
+    osd.textContent = procH+"p \u00b7 "+fpsShow+" fps"+(" \u00b7 "+liveList)+(multiView?" \u00b7 MULTI":"")+(recorder?" \u00b7 REC":"")+(perfRec.mode!=="off"?" \u00b7 "+perfRec.mode.toUpperCase():"")+(audioMode!=="off"?" \u00b7 AUD":"")+(rescanMode?" \u00b7 RESCAN":"");
+    updateTempoUI();
+  }
+}
+
+let lastTickMs = 0;
+function doTick(){
+  if(offline) return;
+  const nowMs = performance.now();
+  if(nowMs - lastTickMs < 6) return;
+  lastTickMs = nowMs;
+  const now = nowMs/1000;
+  let dt = now-lastT; lastT = now;
+  dt = Math.min(dt, 0.1);
+  renderFrame(now, dt);
+  if(outTrack && outTrack.requestFrame){ try{ outTrack.requestFrame(); }catch(e){} }
+}
+window.__tick = doTick;
+function frame(){
+  requestAnimationFrame(frame);
+  doTick();
+}
+

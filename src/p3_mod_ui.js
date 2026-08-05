@@ -306,10 +306,41 @@ function snapshotAll(){
   for(const p of MLIST) st.master[p.id] = mBase[p.id];
   return st;
 }
+/* Copying 961 string-keyed floats from base to current every frame, and then
+   clamping all 961 again, was the second largest per-frame cost after the
+   uniform loop - and almost all of it was copying values onto themselves.
+   Only the parameters that modulation actually wrote last frame need putting
+   back, so the work is now proportional to the number of routes rather than to
+   the size of the parameter set. A full resync happens whenever a base value
+   changes, whenever morph or a snapshot glide is running, and once every
+   thirty frames regardless, so a missed epoch bump heals itself. */
+const CIDS = CLIST.map(p=>p.id), MIDS = MLIST.map(p=>p.id);
+let paramEpoch = 0, curSynced = -1;
+const curTouched = new Set();
+function bumpParams(){ paramEpoch++; }
+function syncAllCur(){
+  for(const ch of CHANNELS){
+    const cb = chanBase[ch], cc = chanCur[ch];
+    for(let i=0;i<CIDS.length;i++) cc[CIDS[i]] = cb[CIDS[i]];
+  }
+  for(let i=0;i<MIDS.length;i++) mCur[MIDS[i]] = mBase[MIDS[i]];
+}
 function applyParams(dt){
-  /* start from the stored base values for both channels and the master set */
-  for(const ch of CHANNELS){ const cb=chanBase[ch], cc=chanCur[ch]; for(const p of CLIST) cc[p.id]=cb[p.id]; }
-  for(const p of MLIST) mCur[p.id]=mBase[p.id];
+  const morphing = !!(morphA && morphB);
+  const full = curSynced !== paramEpoch || morphing || glideFrom || (frameNo % 30) === 0;
+  if(full){
+    syncAllCur();
+    curSynced = paramEpoch;
+    curTouched.clear();
+  } else {
+    for(const k of curTouched){
+      const ci = k.indexOf(":");
+      const ch = k.slice(0, ci), id = k.slice(ci+1);
+      if(ch === "M") mCur[id] = mBase[id];
+      else chanCur[ch][id] = chanBase[ch][id];
+    }
+    curTouched.clear();
+  }
 
   /* preset morph: interpolate the whole rig between two stored snapshots */
   if(morphA && morphB){
@@ -338,11 +369,11 @@ function applyParams(dt){
     if(r.inv) mv = -mv;
     mv = shapeMod(mv, r.curve || 0);
     const d = (p.max-p.min) * (r.amt*mv + (r.off || 0));
-    if(p.master){ mCur[p.id] += d; }
+    if(p.master){ mCur[p.id] += d; curTouched.add("M:"+p.id); }
     else {
       const rc = r.ch || "A";
-      if(rc === "AB"){ for(const ch of CHANNELS) chanCur[ch][p.id] += d; }
-      else chanCur[rc][p.id] += d;
+      if(rc === "AB"){ for(const ch of CHANNELS){ chanCur[ch][p.id] += d; curTouched.add(ch+":"+p.id); } }
+      else { chanCur[rc][p.id] += d; curTouched.add(rc+":"+p.id); }
     }
   }
 
@@ -354,15 +385,28 @@ function applyParams(dt){
     if(bendMix[b] > 0.002){
       for(const pid in BENDS[b]){
         const p = P[pid]; if(!p) continue;
-        if(p.master){ mCur[pid] = mCur[pid] + (BENDS[b][pid]-mCur[pid])*bendMix[b]; }
-        else for(const ch of bendTargets) chanCur[ch][pid] = chanCur[ch][pid] + (BENDS[b][pid]-chanCur[ch][pid])*bendMix[b];
+        if(p.master){ mCur[pid] = mCur[pid] + (BENDS[b][pid]-mCur[pid])*bendMix[b]; curTouched.add("M:"+pid); }
+        else for(const ch of bendTargets){
+          chanCur[ch][pid] = chanCur[ch][pid] + (BENDS[b][pid]-chanCur[ch][pid])*bendMix[b];
+          curTouched.add(ch+":"+pid);
+        }
       }
     }
   }
 
-  /* clamp */
-  for(const ch of CHANNELS){ const cc=chanCur[ch]; for(const p of CLIST) cc[p.id] = Math.min(p.max, Math.max(p.min, cc[p.id])); }
-  for(const p of MLIST) mCur[p.id] = Math.min(p.max, Math.max(p.min, mCur[p.id]));
+  /* clamp only what was written: base values are already in range */
+  if(full || morphing){
+    for(const ch of CHANNELS){ const cc=chanCur[ch]; for(const p of CLIST) cc[p.id] = Math.min(p.max, Math.max(p.min, cc[p.id])); }
+    for(const p of MLIST) mCur[p.id] = Math.min(p.max, Math.max(p.min, mCur[p.id]));
+  } else {
+    for(const k of curTouched){
+      const ci = k.indexOf(":");
+      const ch = k.slice(0, ci), id = k.slice(ci+1), p = P[id];
+      if(!p) continue;
+      if(ch === "M") mCur[id] = Math.min(p.max, Math.max(p.min, mCur[id]));
+      else chanCur[ch][id] = Math.min(p.max, Math.max(p.min, chanCur[ch][id]));
+    }
+  }
 }
 
 /* ---------------- audio ---------------- */
@@ -1935,6 +1979,7 @@ function refreshLfoUI(){
   }
 }
 function refreshUI(){
+  bumpParams();
   for(const p of PLIST){
     const r = uiRefs[p.id]; if(!r) continue;
     const v = getBase(p.id);

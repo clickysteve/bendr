@@ -10,7 +10,20 @@ result, the size, and where each part landed so a stack trace can be read.
 import io, os, subprocess, sys, gzip, hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PARTS = ["p2_engine.js", "p3_mod_ui.js", "p4_io_main.js"]
+# Order is load-bearing: everything lands in one script tag and one scope, so a
+# later part can use a const from an earlier one with no imports and no bundler.
+PARTS = [
+    "p20_shaders.js",   # GLSL source strings, nothing else
+    "p21_params.js",    # section table, parameter registry, get/set
+    "p22_help.js",      # per-parameter and per-section help text
+    "p23_gl.js",        # context, programs, render targets, uniforms
+    "p3_mod_ui.js",     # modulation engine, audio, panel and dock construction
+    "p40_presets.js",   # presets, user presets, state capture/restore, undo
+    "p41_sources.js",   # file, camera, screen, pattern, text, synth, feed
+    "p42_capture.js",   # record, stills, multiview, snapshot bank, recorder
+    "p43_render.js",    # sync model, render loop, deck display
+    "p44_offline.js",   # offline MP4 render, MIDI, keyboard, init
+]
 SIZE_BUDGET = 700_000          # fail rather than drift past this unnoticed
 
 def read(name):

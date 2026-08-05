@@ -731,7 +731,7 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v31.0</span>
+  <span id="ver" title="Build version">v32.0</span>
   <button id="btnHelpTop" data-tip="The manual: what everything is, why it behaves the way it does, and every keyboard shortcut. Also on the H key.">?</button>
   <div id="tempobox" data-tip="Tap four times in time and the tempo follows. Any modulator with a sync division locks to it, and incoming MIDI clock overrides it automatically.">
     <button id="btnTap">TAP</button><span id="bpmVal">120.0</span>
@@ -1006,7 +1006,7 @@ body.nomix #mixbuses{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v31.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v32.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once; the small selector next to it picks a target, and <b>COPY</b> writes this channel's effects onto it while <b>SWAP</b> exchanges the two outright, sources included. Any channel can reach any other, so D can be copied onto A as easily as A onto B, and shift-clicking COPY sends it to all three at once.</p>
@@ -2202,7 +2202,10 @@ const FS_GLITCH = COMMON +
 "uniform sampler2D u_tex;\n" +
 "uniform float u_time;\n" +
 "uniform float u_pixelSort,u_sortThresh,u_blockShift,u_blockSize,u_dotify,u_dotSize,u_driftWarp,u_fmWarp;\n" +
-"float lumAt(vec2 p){ return dot(texture(u_tex, fract(p)).rgb, vec3(0.299,0.587,0.114)); }\n" +
+/* An analysis tap, not a displacement: where it runs off the frame it has to
+   read the edge. Wrapping made the pixel-sort run search find the top of the
+   picture below the bottom of it and stretch a false streak from the seam. */
+"float lumAt(vec2 p){ return dot(texture(u_tex, clamp(p,0.0,1.0)).rgb, vec3(0.299,0.587,0.114)); }\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  vec2 suv = uv;\n" +
@@ -2227,6 +2230,8 @@ const FS_GLITCH = COMMON +
 "    float r1 = h21(cell*1.31 + tk*17.0);\n" +
 "    if(r1 < u_blockShift*0.4){\n" +
 "      vec2 off = (vec2(h21(cell+31.0+tk), h21(cell+57.0+tk))-0.5)*0.35*u_blockShift;\n" +
+      /* this one wraps on purpose: a databent macroblock address really does
+         fetch from somewhere else in the buffer */
 "      vec3 bc = texture(u_tex, fract(suv+off)).rgb;\n" +
 "      float r2 = h21(cell+99.0);\n" +
 "      if(r2<0.22) bc = bc.gbr;\n" +
@@ -2246,7 +2251,7 @@ const FS_GLITCH = COMMON +
 "        if(lumAt(suv + vec2(0.0, float(k)*2.0*py)) <= th) break;\n" +
 "        d += 2.0*py;\n" +
 "      }\n" +
-"      vec3 sc = texture(u_tex, fract(suv + vec2(0.0, d))).rgb;\n" +
+"      vec3 sc = texture(u_tex, clamp(suv + vec2(0.0, d), 0.0, 1.0)).rgb;\n" +
 "      c = mix(c, sc, u_pixelSort);\n" +
 "    }\n" +
 "  }\n" +
@@ -2437,8 +2442,8 @@ const FS_LAB = COMMON +
 "  if(u_ntscArt>0.003 || u_ntscFringe>0.003){\n" +
 "    float px = 1.0/u_res.x;\n" +
 "    vec3 yq = rgb2yiq(c);\n" +
-"    vec3 l = rgb2yiq(texture(u_tex, fract(suv-vec2(px*2.0,0.0))).rgb);\n" +
-"    vec3 r = rgb2yiq(texture(u_tex, fract(suv+vec2(px*2.0,0.0))).rgb);\n" +
+"    vec3 l = rgb2yiq(texture(u_tex, vec2(clamp(suv.x-px*2.0,0.0,1.0), fract(suv.y))).rgb);\n" +
+"    vec3 r = rgb2yiq(texture(u_tex, vec2(clamp(suv.x+px*2.0,0.0,1.0), fract(suv.y))).rgb);\n" +
 "    float carrier = sin(suv.x*u_res.x*1.8 + floor(suv.y*u_res.y)*2.4 + u_time*9.0);\n" +
 "    /* luma leaking into chroma = artifact colour; chroma leaking into luma = fringing */\n" +
 "    yq.yz += (yq.x - 0.5*(l.x+r.x))*u_ntscArt*2.2*vec2(carrier, carrier*0.87);\n" +
@@ -3444,6 +3449,9 @@ function getBase(id, ch){ const p=P[id]; return p.master ? mBase[id] : chanBase[
 function setBase(id, v, ch){
   const p=P[id]; if(!p) return;
   v = Math.min(p.max, Math.max(p.min, v));
+  /* the frame loop keeps a copy of these and only refreshes it when something
+     has actually moved, so every write has to say so */
+  if(typeof bumpParams === "function") bumpParams();
   if(p.master){ mBase[id]=v; return; }
   if(ch){ chanBase[ch][id]=v; return; }
   if(linkChans){ for(const c of CHANNELS) chanBase[c][id]=v; }
@@ -3453,10 +3461,12 @@ function getCur(id, ch){ const p=P[id]; return p.master ? mCur[id] : chanCur[ch|
 function copyChannel(from, to){
   if(from === to) return;
   for(const p of CLIST) chanBase[to][p.id] = chanBase[from][p.id];
+  if(typeof bumpParams === "function") bumpParams();
 }
 function swapChannels(a, b){
   if(a === b) return;
   for(const p of CLIST){ const t = chanBase[a][p.id]; chanBase[a][p.id] = chanBase[b][p.id]; chanBase[b][p.id] = t; }
+  if(typeof bumpParams === "function") bumpParams();
 }
 let fbTrailMode = false;   // false=MIX  true=TRAIL(lighten)
 let rescanMode = false;    // true = feedback taps the CRT-processed output (full rescan)
@@ -3511,26 +3521,48 @@ let showKeyMatte = false;  // keyer matte viewer
 
 /* ---------------- GL engine ---------------- */
 const canvas = document.getElementById("glcanvas");
-const gl = canvas.getContext("webgl2", {preserveDrawingBuffer:true, antialias:false, alpha:false});
+/* preserveDrawingBuffer made the compositor keep a copy of the default
+   framebuffer every single frame, and the only thing that wanted it was reading
+   the canvas back for a still. Stills are captured inside the frame callback
+   instead, which is where the buffer is valid anyway. */
+const gl = canvas.getContext("webgl2", {preserveDrawingBuffer:false, antialias:false, alpha:false});
 if(!gl){ document.body.innerHTML = "<p style='padding:40px;font-family:monospace'>WebGL2 not available in this browser.</p>"; throw new Error("no webgl2"); }
 
+/* Asking for COMPILE_STATUS immediately after each compileShader forces the
+   driver to finish that shader before starting the next one. Kick all of them
+   off first and only ask afterwards, so the driver can pipeline the lot.
+   Same for linking. */
+const pendingShaders = [], pendingProgs = [];
 function makeShader(type, src){
   const s = gl.createShader(type);
   gl.shaderSource(s, src); gl.compileShader(s);
-  if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
+  pendingShaders.push({s, src});
+  return s;
+}
+function checkPrograms(){
+  for(const {s} of pendingShaders){
+    if(gl.getShaderParameter(s, gl.COMPILE_STATUS)) continue;
     const log = gl.getShaderInfoLog(s);
     console.error("SHADER ERROR:\n"+log);
-    toast("Shader error — see console", true);
+    if(typeof toast === "function") toast("Shader error — see console", true);
     throw new Error(log);
   }
-  return s;
+  pendingShaders.length = 0;
+  for(const pr of pendingProgs){
+    if(gl.getProgramParameter(pr, gl.LINK_STATUS)) continue;
+    const log = gl.getProgramInfoLog(pr);
+    console.error("LINK ERROR:\n"+log);
+    if(typeof toast === "function") toast("Shader link error — see console", true);
+    throw new Error(log);
+  }
+  pendingProgs.length = 0;
 }
 function makeProg(fsSrc){
   const p = gl.createProgram();
   gl.attachShader(p, makeShader(gl.VERTEX_SHADER, VS));
   gl.attachShader(p, makeShader(gl.FRAGMENT_SHADER, fsSrc));
   gl.linkProgram(p);
-  if(!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  pendingProgs.push(p);
   return {prog:p, loc:{}};
 }
 function U(pr, name){
@@ -3543,7 +3575,10 @@ const progMIX = makeProg(FS_MIX);
 const progMULTI = makeProg(FS_MULTI);
 const progGEN = makeProg(FS_GEN);
 const progLAB = makeProg(FS_LAB);
+/* now that every one of them is in flight, ask how they got on */
+checkPrograms();
 
+let rtFailed = false;
 function makeRT(w,h){
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -3555,6 +3590,18 @@ function makeRT(w,h){
   const fbo = gl.createFramebuffer();
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  /* At 4K this asks for well over a gigabyte of texture. When a driver refuses,
+     it does so silently and every pass after it draws into nothing, so the
+     picture goes black with no explanation. Say something instead. */
+  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE){
+    if(!rtFailed){
+      rtFailed = true;
+      if(typeof toast === "function")
+        toast("Out of graphics memory at "+w+"\u00d7"+h+" \u2014 drop the processing resolution", true);
+    }
+    gl.deleteTexture(tex); gl.deleteFramebuffer(fbo);
+    return null;
+  }
   return {tex, fbo, w, h};
 }
 let procW=1280, procH=720;
@@ -3644,10 +3691,23 @@ function allocRTs(){
   freeRT(scratch1); freeRT(scratch2); freeRT(mixOut); freeRT(busOut1); freeRT(busOut2);
   freeRT(persistA); freeRT(persistB);
   freeRT(busHist1); freeRT(busHist2); freeRT(mixHist);
+  rtFailed = false;
   scratch1 = makeRT(procW,procH); scratch2 = makeRT(procW,procH); mixOut = makeRT(procW,procH);
   /* the other six are only wanted when the feature that reads them is on. At
      720p that hardly matters; at 2160p they are 190 MB of nothing. */
   busOut1 = busOut2 = persistA = persistB = busHist1 = busHist2 = mixHist = null;
+  /* if the driver refused, step the raster down and try again rather than
+     leaving a set of half-allocated buffers and a black picture */
+  if(rtFailed && procH > 360){
+    const ladder = [360, 540, 720, 1080, 1440, 2160];
+    const next = ladder[Math.max(0, ladder.indexOf(procH) - 1)] || 360;
+    if(next < procH){
+      procH = next; procW = Math.round(next*16/9/2)*2;
+      RING_N = next >= 2160 ? 6 : next >= 1440 ? 12 : next >= 1080 ? 20 : 30;
+      const rs = document.getElementById("selRes"); if(rs) rs.value = String(next);
+      allocRTs();
+    }
+  }
 }
 const MAX_TEX = gl.getParameter(gl.MAX_TEXTURE_SIZE);
 function setProcRes(h){
@@ -4044,10 +4104,41 @@ function snapshotAll(){
   for(const p of MLIST) st.master[p.id] = mBase[p.id];
   return st;
 }
+/* Copying 961 string-keyed floats from base to current every frame, and then
+   clamping all 961 again, was the second largest per-frame cost after the
+   uniform loop - and almost all of it was copying values onto themselves.
+   Only the parameters that modulation actually wrote last frame need putting
+   back, so the work is now proportional to the number of routes rather than to
+   the size of the parameter set. A full resync happens whenever a base value
+   changes, whenever morph or a snapshot glide is running, and once every
+   thirty frames regardless, so a missed epoch bump heals itself. */
+const CIDS = CLIST.map(p=>p.id), MIDS = MLIST.map(p=>p.id);
+let paramEpoch = 0, curSynced = -1;
+const curTouched = new Set();
+function bumpParams(){ paramEpoch++; }
+function syncAllCur(){
+  for(const ch of CHANNELS){
+    const cb = chanBase[ch], cc = chanCur[ch];
+    for(let i=0;i<CIDS.length;i++) cc[CIDS[i]] = cb[CIDS[i]];
+  }
+  for(let i=0;i<MIDS.length;i++) mCur[MIDS[i]] = mBase[MIDS[i]];
+}
 function applyParams(dt){
-  /* start from the stored base values for both channels and the master set */
-  for(const ch of CHANNELS){ const cb=chanBase[ch], cc=chanCur[ch]; for(const p of CLIST) cc[p.id]=cb[p.id]; }
-  for(const p of MLIST) mCur[p.id]=mBase[p.id];
+  const morphing = !!(morphA && morphB);
+  const full = curSynced !== paramEpoch || morphing || glideFrom || (frameNo % 30) === 0;
+  if(full){
+    syncAllCur();
+    curSynced = paramEpoch;
+    curTouched.clear();
+  } else {
+    for(const k of curTouched){
+      const ci = k.indexOf(":");
+      const ch = k.slice(0, ci), id = k.slice(ci+1);
+      if(ch === "M") mCur[id] = mBase[id];
+      else chanCur[ch][id] = chanBase[ch][id];
+    }
+    curTouched.clear();
+  }
 
   /* preset morph: interpolate the whole rig between two stored snapshots */
   if(morphA && morphB){
@@ -4076,11 +4167,11 @@ function applyParams(dt){
     if(r.inv) mv = -mv;
     mv = shapeMod(mv, r.curve || 0);
     const d = (p.max-p.min) * (r.amt*mv + (r.off || 0));
-    if(p.master){ mCur[p.id] += d; }
+    if(p.master){ mCur[p.id] += d; curTouched.add("M:"+p.id); }
     else {
       const rc = r.ch || "A";
-      if(rc === "AB"){ for(const ch of CHANNELS) chanCur[ch][p.id] += d; }
-      else chanCur[rc][p.id] += d;
+      if(rc === "AB"){ for(const ch of CHANNELS){ chanCur[ch][p.id] += d; curTouched.add(ch+":"+p.id); } }
+      else { chanCur[rc][p.id] += d; curTouched.add(rc+":"+p.id); }
     }
   }
 
@@ -4092,15 +4183,28 @@ function applyParams(dt){
     if(bendMix[b] > 0.002){
       for(const pid in BENDS[b]){
         const p = P[pid]; if(!p) continue;
-        if(p.master){ mCur[pid] = mCur[pid] + (BENDS[b][pid]-mCur[pid])*bendMix[b]; }
-        else for(const ch of bendTargets) chanCur[ch][pid] = chanCur[ch][pid] + (BENDS[b][pid]-chanCur[ch][pid])*bendMix[b];
+        if(p.master){ mCur[pid] = mCur[pid] + (BENDS[b][pid]-mCur[pid])*bendMix[b]; curTouched.add("M:"+pid); }
+        else for(const ch of bendTargets){
+          chanCur[ch][pid] = chanCur[ch][pid] + (BENDS[b][pid]-chanCur[ch][pid])*bendMix[b];
+          curTouched.add(ch+":"+pid);
+        }
       }
     }
   }
 
-  /* clamp */
-  for(const ch of CHANNELS){ const cc=chanCur[ch]; for(const p of CLIST) cc[p.id] = Math.min(p.max, Math.max(p.min, cc[p.id])); }
-  for(const p of MLIST) mCur[p.id] = Math.min(p.max, Math.max(p.min, mCur[p.id]));
+  /* clamp only what was written: base values are already in range */
+  if(full || morphing){
+    for(const ch of CHANNELS){ const cc=chanCur[ch]; for(const p of CLIST) cc[p.id] = Math.min(p.max, Math.max(p.min, cc[p.id])); }
+    for(const p of MLIST) mCur[p.id] = Math.min(p.max, Math.max(p.min, mCur[p.id]));
+  } else {
+    for(const k of curTouched){
+      const ci = k.indexOf(":");
+      const ch = k.slice(0, ci), id = k.slice(ci+1), p = P[id];
+      if(!p) continue;
+      if(ch === "M") mCur[id] = Math.min(p.max, Math.max(p.min, mCur[id]));
+      else chanCur[ch][id] = Math.min(p.max, Math.max(p.min, chanCur[ch][id]));
+    }
+  }
 }
 
 /* ---------------- audio ---------------- */
@@ -5673,6 +5777,7 @@ function refreshLfoUI(){
   }
 }
 function refreshUI(){
+  bumpParams();
   for(const p of PLIST){
     const r = uiRefs[p.id]; if(!r) continue;
     const v = getBase(p.id);
@@ -6346,7 +6451,11 @@ function applyExtras(extra){
       if(m.type === "lfo" && m.phase === undefined) m.phase = Math.random();
       if(m.type === "env"){ m.level = m.level || 0; m.stage = "d"; m.prevGate = false; }
     }
-    modSeq = Math.max(modSeq, mods.length);
+    /* ids are minted from a counter, so it has to clear the highest suffix any
+       saved modulator already carries, not merely the count of them */
+    let hi = mods.length;
+    for(const m of mods){ const n = parseInt(String(m.id).replace(/^\D+/, ""), 10); if(n > hi) hi = n; }
+    modSeq = Math.max(modSeq, hi);
     rebuildMODSRC(); buildModPage();
   } else {
     /* patches saved before modulators became a list */
@@ -7175,9 +7284,13 @@ function fmtT(s){ if(!isFinite(s)) return "--:--"; s=Math.floor(s); return Math.
 let recorder=null, recChunks=[], recStart=0, recTimer=null;
 const btnRec = document.getElementById("btnRec"), recTime = document.getElementById("recTime");
 btnRec.onclick = toggleRec;
+let recStream = null;
 function toggleRec(){
   if(recorder){ recorder.stop(); return; }
-  const stream = canvas.captureStream(60);
+  /* each recording used to add another live capture stream to the canvas and
+     never let go of it */
+  if(recStream){ try{ recStream.getTracks().forEach(t=>t.stop()); }catch(e){} }
+  const stream = recStream = canvas.captureStream(60);
   if(audioCtx && recDest && audioMode==="source"){
     for(const tr of recDest.stream.getAudioTracks()) stream.addTrack(tr);
   }
@@ -7195,6 +7308,7 @@ function toggleRec(){
     const blob = new Blob(recChunks, {type: isMp4 ? "video/mp4" : "video/webm"});
     dl(URL.createObjectURL(blob), "bendr-"+stamp()+(isMp4?".mp4":".webm"));
     recorder=null; btnRec.classList.remove("rec-on"); btnRec.textContent="● REC";
+    if(recStream){ try{ recStream.getTracks().forEach(t=>t.stop()); }catch(e){} recStream=null; }
     recTime.style.display="none"; clearInterval(recTimer);
     toast("Recording saved ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
   };
@@ -7207,8 +7321,19 @@ function toggleRec(){
     recTime.textContent = Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
   }, 250);
 }
+/* the drawing buffer is only valid inside the frame callback now, so a still
+   is a request that the next frame fulfils */
+let grabQueue = [];
+function serviceGrabs(){
+  if(!grabQueue.length) return;
+  const q = grabQueue; grabQueue = [];
+  for(const fn of q){ try{ fn(canvas); }catch(e){ console.error(e); } }
+}
+function grabCanvas(fn){ grabQueue.push(fn); }
+/* so a test, or anything else outside the loop, can still read a frame */
+window.__grab = (type)=>new Promise(res=>grabCanvas(c=>res(c.toDataURL(type||"image/png"))));
 document.getElementById("btnSnap").onclick = ()=>{
-  canvas.toBlob(b=>{ if(b){ dl(URL.createObjectURL(b), "bendr-"+stamp()+".png"); toast("Still saved"); } }, "image/png");
+  grabCanvas(c=>c.toBlob(b=>{ if(b){ dl(URL.createObjectURL(b), "bendr-"+stamp()+".png"); toast("Still saved"); } }, "image/png"));
 };
 document.getElementById("btnFull").onclick = ()=>{
   const w = document.getElementById("canvasWrap");
@@ -8282,6 +8407,7 @@ canvas.addEventListener("webglcontextrestored", ()=>{
   toast("Graphics context restored \u2014 reload if the picture does not come back", true);
 }, false);
 function frameEnd(now, dt){
+  serviceGrabs();
   if(offline) return;
   const S = cur();
   if(S.mode==="file" && S.video.duration && !seeking){
@@ -8344,10 +8470,33 @@ async function offlineRender(){
   video.pause(); videoB.pause();
   const oldW = canvas.width, oldH = canvas.height;
   canvas.width = W; canvas.height = H;
+  /* This used to hold the whole file in one growing ArrayBuffer and then copy
+     it again into a Blob. At 14 Mbit/s that is about 105 MB a minute, twice
+     over, so a ten-minute render peaked around two gigabytes and took the tab
+     with it. Write to disk directly where the browser allows it, and otherwise
+     keep the chunks as a list, which a Blob can take without a second copy. */
+  let fileHandle = null, fileStream = null;
+  const suggested = "bendr-"+stamp()+".mp4";
+  if(window.showSaveFilePicker){
+    try{
+      fileHandle = await window.showSaveFilePicker({suggestedName: suggested,
+        types:[{description:"MP4 video", accept:{"video/mp4":[".mp4"]}}]});
+      fileStream = await fileHandle.createWritable();
+    }catch(e){ if(e && e.name === "AbortError"){ offline=false; ov.style.display="none"; canvas.width=oldW; canvas.height=oldH; return; } }
+  }
+  const parts = [];
+  const target = fileStream
+    ? new Mp4Muxer.FileSystemWritableFileStreamTarget(fileStream, {chunked: true})
+    : new Mp4Muxer.StreamTarget({
+        onData: (data, position) => { parts.push({position, data: data.slice()}); },
+        chunked: true,
+      });
   const muxer = new Mp4Muxer.Muxer({
-    target: new Mp4Muxer.ArrayBufferTarget(),
+    target,
     video: {codec: mcodec, width: W, height: H},
-    fastStart: "in-memory",
+    /* seeking metadata has to go at the front, which needs a rewrite the
+       stream target cannot do, so it goes at the end when we are streaming */
+    fastStart: fileStream ? false : "in-memory",
   });
   const enc = new VideoEncoder({
     output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
@@ -8376,16 +8525,29 @@ async function offlineRender(){
       await new Promise(r=>setTimeout(r,0));
     }
   }
-  if(!renderCancel){
-    ovTxt.textContent = "FINALIZING…";
-    await enc.flush();
-    muxer.finalize();
-    const blob = new Blob([muxer.target.buffer], {type:"video/mp4"});
-    dl(URL.createObjectURL(blob), "bendr-"+stamp()+".mp4");
-    toast("Rendered "+total+" frames → MP4, "+(blob.size/1048576).toFixed(1)+" MB (video only — REC captures audio)");
-  } else {
-    try{ enc.close(); }catch(e){}
-    toast("Render cancelled", true);
+  try{
+    if(!renderCancel){
+      ovTxt.textContent = "FINALIZING…";
+      await enc.flush();
+      muxer.finalize();
+      if(fileStream){
+        await fileStream.close();
+        toast("Rendered "+total+" frames \u2192 "+fileHandle.name+" (video only \u2014 REC captures audio)");
+      } else {
+        parts.sort((a,b)=>a.position-b.position);
+        const blob = new Blob(parts.map(x=>x.data), {type:"video/mp4"});
+        dl(URL.createObjectURL(blob), suggested);
+        toast("Rendered "+total+" frames \u2192 MP4, "+(blob.size/1048576).toFixed(1)+" MB (video only \u2014 REC captures audio)");
+      }
+    } else {
+      if(fileStream){ try{ await fileStream.abort(); }catch(e){} }
+      toast("Render cancelled", true);
+    }
+  } finally {
+    /* the encoder used to be closed only on the cancel path, so every
+       completed render left one behind */
+    try{ if(enc.state !== "closed") enc.close(); }catch(e){}
+    parts.length = 0;
   }
   canvas.width = oldW; canvas.height = oldH;
   ov.style.display = "none";

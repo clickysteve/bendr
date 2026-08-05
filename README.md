@@ -133,6 +133,12 @@ Each channel takes a video file (streamed from disk, so a 4GB file is no heavier
 
 **CAM** opens whatever is selected in the device list beside it, so a built-in webcam, a USB one, an HDMI capture stick and a virtual camera from streaming software all work the same way. Device names only appear once camera access has been granted, so the list reads DEVICE 1, DEVICE 2 until the first time CAM is pressed. **SCREEN** captures a screen, a window or a browser tab, which is the general way to bring in anything that is not a camera.
 
+## The panel, the dock and the picture
+
+The sidebar is per-channel, and only per-channel: everything shared by all four — the three mixers, the display stage and the output overlay — is on a tab in the dock under the picture. Each stage section carries its own bypass, wired to the same state as the rail above the picture, so switching TAPE / SYNC out of the chain reads the same in both places. The dock folds away entirely with the button on its tab strip or a double-click on the bar above it, and both the folded state and the height you drag it to are remembered.
+
+Each channel button carries a live thumbnail of what that channel is producing and the name of what is loaded on it, so you can tell at a glance what is where. The tempo has a beat LED beside it that flashes on the beat and accents the bar, because a number is not something you can check against music.
+
 ## Finding things, and not losing them
 
 There are 349 parameters. Press `/` and type, and the panel narrows to whatever matches — the parameter's name, its section, or the body of its help text, so "roll" finds V ROLL and a phrase from a description finds the control it describes. Two chips beside the box answer the other two questions you have while playing: **MOVING** shows only what something is currently driving, and **CHANGED** shows only what you have moved off its default.
@@ -197,6 +203,8 @@ python3 build.py
 ```
 
 The build syntax-checks the concatenated script, prints the gzipped size and a hash, fails on a size budget, and prints where each part landed so a line number in a stack trace can be resolved by eye.
+
+Recording and the offline render both work at the **processing resolution**, not the window size, and the bitrate scales with the pixel rate — glitch material is close to the worst case an encoder ever sees.
 
 `test/e2e-example.js` shows how the app is exercised headlessly with Playwright. Note that the canvas is created without `preserveDrawingBuffer`, so reading a frame back has to happen inside the frame callback: `await page.evaluate(() => window.__grab())` returns a data URL captured at the right moment.
 

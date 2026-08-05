@@ -373,18 +373,19 @@ function setDock(t){
     t = dockTab === "text" ? "matrix" : dockTab;
   }
   dockTab = t;
-  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", audio:"audiodock", perform:"performdock"};
+  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", out:"outdock", audio:"audiodock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);
     if(el) el.classList.toggle("on", k===t);
   }
-  document.querySelectorAll("#dockTabs button").forEach(b=>b.classList.toggle("on", b.dataset.dock===t));
+  document.querySelectorAll("#dockTabs button[data-dock]").forEach(b=>b.classList.toggle("on", b.dataset.dock===t));
   const hint = document.getElementById("dockHint");
   if(hint) hint.textContent = t==="mod" ? "right-click any parameter to patch it"
                             : t==="text" ? "typing here never triggers shortcuts"
                             : t==="perform" ? "shift and a number recalls a snapshot \u00b7 Q W E R T Y hold the pads"
                             : t==="mix" ? "the faders themselves are on the strip under the picture"
                             : t==="audio" ? "band ranges decide what each modulator is listening for"
+                            : t==="out" ? "the display and the glass in front of it, shared by every channel"
                             : "patch sources into any parameter";
   if(t==="text") syncTextEditor();
   refreshDockTabs();

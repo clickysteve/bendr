@@ -22,8 +22,11 @@ const SECTIONS = [
   {id:"flow",     name:"FLOW / MOSH",       cls:"mag",  zone:"chain"},
   {id:"keyer",    name:"KEYER",             cls:"cyan", zone:"chain"},
 
-  {id:"crt",      name:"CRT DISPLAY",       cls:"cyan", zone:"out"},
-  {id:"overlay",  name:"OUTPUT OVERLAY",    cls:"cyan", zone:"out"},
+  /* the display and the overlay are master, shared by every channel, so they
+     belong beside the other master controls in the dock rather than at the
+     bottom of a column that is otherwise entirely per-channel */
+  {id:"crt",      name:"CRT DISPLAY",       cls:"cyan", zone:"outdock"},
+  {id:"overlay",  name:"OUTPUT OVERLAY",    cls:"cyan", zone:"outdock"},
 
   /* morph lives on the PERFORM tab with the snapshots and the recorder,
      because it is the same job: recalling states while it runs */
@@ -31,7 +34,6 @@ const SECTIONS = [
 ];
 const ZONES = [
   {id:"chain", label:"CHANNEL \u00b7 SIGNAL PATH", note:"Everything belonging to the channel selected above, in the order the signal actually travels: source, framing, frame store, feedback, then the reorderable stages, then the keyer. Drag by the handle to rearrange."},
-  {id:"out",   label:"MASTER OUT",          note:"The shared display stage, after the mixer. Every channel ends up here."},
 ];
 const PDEF = [
   ["abMix","BUS 1 FADER","mixer",0,1,0],

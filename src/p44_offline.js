@@ -13,7 +13,7 @@ async function offlineRender(){
   let codec=null, mcodec=null;
   for(const [c,m] of candidates){
     try{
-      const s = await VideoEncoder.isConfigSupported({codec:c, width:W, height:H, bitrate:14_000_000, framerate:fps});
+      const s = await VideoEncoder.isConfigSupported({codec:c, width:W, height:H, bitrate:bitrateFor(W,H,fps), framerate:fps});
       if(s.supported){ codec=c; mcodec=m; break; }
     }catch(e){}
   }
@@ -59,7 +59,7 @@ async function offlineRender(){
     output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
     error: e => { console.error(e); toast("Encoder error: "+e.message, true); renderCancel = true; },
   });
-  enc.configure({codec, width:W, height:H, bitrate:14_000_000, framerate:fps});
+  enc.configure({codec, width:W, height:H, bitrate:bitrateFor(W,H,fps), framerate:fps});
   const total = Math.max(1, Math.floor(video.duration*fps));
   const seekTo = (v,t)=>new Promise(res=>{
     const h = ()=>{ v.removeEventListener("seeked", h); res(); };
@@ -114,6 +114,46 @@ async function offlineRender(){
 }
 
 /* ---------------- init ---------------- */
+/* Shown once, and it earns its interruption: this thing can produce full-frame
+   flashing at any rate you ask it for, and it is meant to be projected in a
+   room with other people in it. */
+function firstRunNotice(){
+  let seen = false;
+  try{ seen = localStorage.getItem("bendr.seen") === "1"; }catch(e){}
+  if(seen) return;
+  const wrap = document.createElement("div");
+  wrap.id = "firstrun";
+  wrap.innerHTML =
+    "<div class='frbox'>" +
+    "<h3>BEFORE YOU START</h3>" +
+    "<p><b>This tool can produce rapid full-frame flashing.</b> STROBE, INV FLICKER and the feedback " +
+    "presets can all be driven to rates that are unsafe for people with photosensitive epilepsy, and " +
+    "there is no rate ceiling because a ceiling would make some of it useless. If you are projecting " +
+    "to a room, treat that as your responsibility: check the material before you show it, and warn " +
+    "people at the door.</p>" +
+    "<p>Four things worth knowing:</p>" +
+    "<p>Drop a video anywhere on the picture to load it. Press <b>/</b> to search the panel. Hold " +
+    "<b>Q W E R T Y</b> for the bend pads. Press <b>H</b> for the manual, which explains not just what " +
+    "each control does but why it behaves the way it does.</p>" +
+    "<p>Your patch saves itself as you work, so a reload picks up where you left off.</p>" +
+    "<button id='frOk'>UNDERSTOOD</button>" +
+    "</div>";
+  document.body.appendChild(wrap);
+  document.getElementById("frOk").onclick = ()=>{
+    wrap.remove();
+    try{ localStorage.setItem("bendr.seen", "1"); }catch(e){}
+  };
+}
+
+/* the state a new session opens in */
+function openingPatch(){
+  initPatch();
+  routes = [];
+  for(const ch of CHANNELS){ SRC[ch].mode = "pattern"; SRC[ch].pattern = "testcard"; SRC[ch].name = "pattern"; }
+  setBase("scanlines", 0.22); setBase("curvature", 0.18); setBase("vignette", 0.28);
+  refreshUI(); renderRoutes(); refreshToggles(); syncChanInputUI();
+  if(typeof selPreset !== "undefined") selPreset.value = "";
+}
 window.__pcur = (id,ch)=>getCur(id,ch);
 window.__dbg = ()=>({chan:activeChan,
   ...Object.fromEntries(CHANNELS.map(ch=>[ch,
@@ -195,10 +235,45 @@ if(OUTPUT_MODE){
     bar.addEventListener("touchstart", ()=>{ dragging = true; }, {passive:true});
     window.addEventListener("mousemove", move);
     window.addEventListener("touchmove", move, {passive:true});
-    window.addEventListener("mouseup", ()=>{ dragging=false; document.body.style.cursor=""; });
-    window.addEventListener("touchend", ()=>{ dragging=false; });
+    const stop = ()=>{
+      if(!dragging) return;
+      dragging=false; document.body.style.cursor="";
+      /* the height you chose used to be forgotten the moment you reloaded */
+      try{ localStorage.setItem("bendr.dockh", parseInt(low.style.height,10)||0); }catch(e){}
+    };
+    window.addEventListener("mouseup", stop);
+    window.addEventListener("touchend", stop);
+    /* double-clicking the bar folds the dock away entirely, so the picture can
+       have the height when you are not patching */
+    bar.addEventListener("dblclick", ()=>toggleDock());
+    let stashed = 0;
+    window.__toggleDock = toggleDock;
+    function toggleDock(force){
+      const open = force !== undefined ? force : document.body.classList.contains("nodock");
+      if(open){
+        document.body.classList.remove("nodock");
+        low.style.height = (stashed || 250) + "px";
+      } else {
+        stashed = parseInt(low.style.height,10) || low.getBoundingClientRect().height || 250;
+        document.body.classList.add("nodock");
+      }
+      try{ localStorage.setItem("bendr.dockopen", open ? "1" : "0"); }catch(e){}
+      markSizeDirty();
+      const db = document.getElementById("dockFold");
+      if(db) db.innerHTML = open ? "&#9662;" : "&#9656;";
+    }
+    { let h = 0, wasOpen = true;
+      try{ h = parseInt(localStorage.getItem("bendr.dockh"),10)||0;
+           wasOpen = (localStorage.getItem("bendr.dockopen") || "1") === "1"; }catch(e){}
+      if(h > 110) low.style.height = h + "px";
+      if(!wasOpen) toggleDock(false);
+    }
+    { const db = document.getElementById("dockFold");
+      if(db) db.onclick = ()=>toggleDock(); }
   }
-  document.querySelectorAll("#dockTabs button").forEach(b=>{ b.onclick = ()=>setDock(b.dataset.dock); });
+  /* [data-dock] only: the fold button lives in this strip too and was having
+     its own handler overwritten by this loop */
+  document.querySelectorAll("#dockTabs button[data-dock]").forEach(b=>{ b.onclick = ()=>setDock(b.dataset.dock); });
   {
     const rs = document.getElementById("selRes");
     rs.onchange = ()=>{
@@ -217,7 +292,34 @@ if(OUTPUT_MODE){
     window.addEventListener("resize", markSizeDirty);
     window.addEventListener("orientationchange", markSizeDirty);
   }
-  { const hb = document.getElementById("btnHelpTop"); if(hb) hb.onclick = ()=>help.classList.toggle("show"); }
+  /* Two tooltip systems were running side by side - the custom panel and the
+     browser's own title attribute - on controls sitting twenty pixels apart,
+     with different delays and different appearance. Convert whatever is left. */
+  {
+    let n = 0;
+    for(const el of document.querySelectorAll("[title]")){
+      const t = el.getAttribute("title");
+      if(!t) continue;
+      el.removeAttribute("title");
+      attachTip(el, "", t);
+      n++;
+    }
+    /* and anything built later goes through the same door */
+    window.__adoptTitles = ()=>{
+      for(const el of document.querySelectorAll("[title]")){
+        const t = el.getAttribute("title");
+        if(!t) continue;
+        el.removeAttribute("title");
+        attachTip(el, "", t);
+      }
+    };
+  }
+  /* the pills, the route rows and the mod cards are rebuilt as you work, so
+     sweep up anything they bring with them */
+  setInterval(()=>window.__adoptTitles(), 2000);
+  initHelpUI();
+  { const hb = document.getElementById("btnHelpTop"); if(hb) hb.onclick = ()=>window.__openHelp(); }
+  { const hb = document.getElementById("btnHelp"); if(hb) hb.onclick = ()=>window.__openHelp(); }
   setActiveChan("A");
   syncChanInputUI();
   renderChain();
@@ -265,10 +367,14 @@ if(OUTPUT_MODE){
     if(bb) bb.onclick = ()=>{ bopen = !bopen; bapply(); try{ localStorage.setItem("bendr.bendstrip", bopen?"1":"0"); }catch(e){} };
     bapply();
   }
-  loadPreset(1);   /* RAINBOW RITE so it looks alive immediately */
+  /* A new session opens on a bare test card: no routes, no effects, nothing
+     modulating. Somewhere to start from rather than something to undo. The
+     presets are one keypress away when you want them. */
+  openingPatch();
   histStack.length = 0;
   const resumed = restoreAutosave();
   sizeCanvas();
   requestAnimationFrame(frame);
   if(!resumed) toast("BENDR ready — drop a video anywhere, press / to search the panel, H for help");
+  firstRunNotice();
 }

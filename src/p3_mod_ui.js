@@ -150,8 +150,24 @@ const modVal = {};
 
 /* tempo: tap or MIDI clock; synced LFOs derive their rate from it */
 let bpm = 120, extClockAt = -1e9, clockEma = 0;   // no external clock until one arrives
+/* A number is not something you can check against music at a glance. */
+let beatPhase = 0, beatCount = 0;
+function advanceBeat(dt){
+  beatPhase += dt*(bpm/60);
+  if(beatPhase >= 1){
+    beatPhase -= Math.floor(beatPhase);
+    beatCount = (beatCount + 1) % 4;
+    const led = document.getElementById("beatLed");
+    if(led){
+      led.classList.remove("hit", "bar");
+      void led.offsetWidth;                 /* restart the animation */
+      led.classList.add(beatCount === 0 ? "bar" : "hit");
+    }
+  }
+}
 const tapTimes = [];
 function tapTempo(){
+  beatPhase = 0; beatCount = 3;   /* the tap you just made is the beat */
   const now = performance.now();
   if(tapTimes.length && now-tapTimes[tapTimes.length-1] > 2200) tapTimes.length = 0;
   tapTimes.push(now);
@@ -251,6 +267,7 @@ function envFired(m, dt){
   return false;
 }
 function updateMod(dt, t){
+  advanceBeat(dt);
   for(const m of mods){
     if(m.type === "lfo"){
       if(m.sync > 0) m.rate = (bpm/60)/m.sync;
@@ -573,8 +590,51 @@ const panel = document.getElementById("panel");
 const uiRefs = {};   // id -> {slider, val, tick, row, label}
 let midiLearnMode = false, midiLearnTarget = null;
 const midiMap = {};  // "ch:cc" -> paramId
+/* Mapping worked; knowing what you had mapped did not. The only trace was a
+   dot appended to a label somewhere in a seven-screen column. */
+function renderMidiMap(){
+  const host = document.getElementById("midimap");
+  if(!host) return;
+  host.innerHTML = "";
+  const keys = Object.keys(midiMap);
+  if(!keys.length){
+    const d = document.createElement("div");
+    d.style.cssText = "color:var(--dim); font-size:8.5px; padding:3px 0;";
+    d.textContent = "Nothing mapped yet. Turn on MIDI LEARN under ENGINE, click a parameter name, then move a control.";
+    host.appendChild(d);
+    return;
+  }
+  keys.sort((a,b)=>{
+    const [ac,an] = a.split(":").map(Number), [bc,bn] = b.split(":").map(Number);
+    return ac-bc || an-bn;
+  });
+  for(const k of keys){
+    const [ch, cc] = k.split(":");
+    const pid = midiMap[k], p = P[pid];
+    const row = document.createElement("div"); row.className = "mmaprow";
+    const src = document.createElement("span"); src.className = "mmapcc";
+    src.textContent = "CH " + (parseInt(ch,10)+1) + "  CC " + cc;
+    const arrow = document.createElement("span"); arrow.className = "arrow"; arrow.textContent = "\u2192";
+    const dst = document.createElement("span"); dst.className = "mmapdst";
+    dst.textContent = p ? p.name + "  (" + p.sec + ")" : pid;
+    const go = document.createElement("button"); go.className = "rgo"; go.textContent = "\u25ce";
+    attachTip(go, "SHOW THIS PARAMETER", "Scrolls to the control this is mapped onto and flashes it.");
+    go.onclick = ()=>{ if(typeof focusParam === "function") focusParam(pid); };
+    const rm = document.createElement("button"); rm.textContent = "\u2715";
+    attachTip(rm, "UNMAP", "Forgets this mapping. The control itself is untouched.");
+    rm.onclick = ()=>{
+      delete midiMap[k];
+      const r = uiRefs[pid];
+      if(r && !Object.values(midiMap).includes(pid)) r.label.classList.remove("mapped");
+      renderMidiMap();
+    };
+    row.appendChild(src); row.appendChild(arrow); row.appendChild(dst); row.appendChild(go); row.appendChild(rm);
+    host.appendChild(row);
+  }
+}
 
 function fmt(p, v){ return (Math.abs(v)<10 ? v.toFixed(2) : v.toFixed(1)); }
+const chanThumbs = {};
 function buildChanBar(){
   const bar = document.createElement("div");
   bar.id = "chanbar";
@@ -582,7 +642,16 @@ function buildChanBar(){
     const b = document.createElement("button");
     b.className = "chanbtn ch"+ch;
     b.dataset.chan = ch;
-    b.innerHTML = "<b>"+ch+"</b><small>\u2014</small>";
+    /* the four buttons all said BARS and nothing else, so you could not tell
+       what was loaded where without opening a menu per channel */
+    b.innerHTML = "<b>"+ch+"</b>";
+    const cv = document.createElement("canvas");
+    cv.width = 48; cv.height = 27;
+    cv.className = "chanthumb";
+    b.appendChild(cv);
+    const sm = document.createElement("small"); sm.textContent = "\u2014";
+    b.appendChild(sm);
+    chanThumbs[ch] = cv.getContext("2d", {willReadFrequently:false});
     attachTip(b, "CHANNEL "+ch, "Everything below this bar - the source, the framing, the whole effect chain and the bend pads - belongs to the channel selected here. Channels A and B feed mixer bus 1; C and D feed bus 2.", "Sections tagged MASTER are shared across all four.");
     b.onclick = ()=>{ setActiveChan(ch); };
     return b;
@@ -805,6 +874,86 @@ const stripMelt = [];
    it. The two chips answer the other two questions you actually have live:
    what is moving, and what have I changed. */
 let filterOn = false;
+/* the manual, opened at one section and laid out as reference */
+function openSectionHelp(id){
+  const box = document.getElementById("helpSection");
+  const body = document.getElementById("helpBody");
+  const toc = document.getElementById("helpToc");
+  if(!box) return;
+  const sec = SECTIONS.find(x=>x.id===id);
+  box.innerHTML = "";
+  const h = document.createElement("h3");
+  h.textContent = sec ? sec.name : id.toUpperCase();
+  box.appendChild(h);
+  if(SECHELP[id]){
+    const p0 = document.createElement("p");
+    p0.textContent = SECHELP[id];
+    box.appendChild(p0);
+  }
+  for(const p of PLIST){
+    if(p.sec !== id) continue;
+    const row = document.createElement("div"); row.className = "hsparam";
+    const nm = document.createElement("div"); nm.className = "hsname"; nm.textContent = p.name;
+    const bd = document.createElement("div"); bd.className = "hsbody";
+    bd.textContent = PHELP[p.id] || "";
+    row.appendChild(nm); row.appendChild(bd);
+    box.appendChild(row);
+  }
+  const back = document.createElement("button");
+  back.textContent = "\u2039 THE WHOLE MANUAL";
+  back.style.marginTop = "12px";
+  back.onclick = ()=>{ box.classList.remove("on"); body.style.display = ""; if(toc) toc.style.display = ""; };
+  box.appendChild(back);
+  box.classList.add("on");
+  body.style.display = "none";
+  if(toc) toc.style.display = "none";
+  document.getElementById("help").classList.add("show");
+  document.getElementById("helpBox").scrollTop = 0;
+}
+/* contents, search, and a close that is not "any click anywhere" */
+function initHelpUI(){
+  const help = document.getElementById("help");
+  const box = document.getElementById("helpBox");
+  const body = document.getElementById("helpBody");
+  const toc = document.getElementById("helpToc");
+  const sec = document.getElementById("helpSection");
+  const search = document.getElementById("helpSearch");
+  if(!help || !body) return;
+  const close = ()=>{ help.classList.remove("show"); };
+  document.getElementById("helpClose").onclick = close;
+  /* clicking the backdrop closes; clicking inside the panel does not, so you
+     can keep it open beside the control you are setting up */
+  help.addEventListener("click", e=>{ if(e.target === help) close(); });
+  const heads = Array.prototype.slice.call(body.querySelectorAll("h3"));
+  for(const h of heads){
+    const b = document.createElement("button");
+    b.textContent = h.textContent;
+    b.onclick = ()=>{ h.scrollIntoView({block:"start"}); };
+    toc.appendChild(b);
+  }
+  search.addEventListener("keydown", e=>e.stopPropagation());
+  search.addEventListener("input", ()=>{
+    const q = search.value.trim().toLowerCase();
+    let group = null, groupHit = false;
+    const groups = [];
+    for(const node of Array.prototype.slice.call(body.children)){
+      if(node.tagName === "H3"){ group = [node]; groups.push(group); groupHit = false; }
+      else if(group) group.push(node);
+      else groups.push([node]);
+    }
+    for(const g of groups){
+      const text = g.map(n=>n.textContent).join(" ").toLowerCase();
+      const hit = !q || text.indexOf(q) >= 0;
+      for(const n of g) n.classList.toggle("nomatch", !hit);
+    }
+    toc.style.display = q ? "none" : "";
+  });
+  window.__openHelp = ()=>{
+    sec.classList.remove("on"); body.style.display = ""; toc.style.display = "";
+    search.value = ""; search.dispatchEvent(new Event("input"));
+    help.classList.add("show"); box.scrollTop = 0;
+  };
+}
 function buildFilterBar(){
   const bar = document.createElement("div"); bar.id = "pfilter";
   const inp = document.createElement("input");
@@ -872,6 +1021,26 @@ function buildPanel(){
     const tag = MASTER_SECS.has(sec.id) ? "<span class='sectag master'>MASTER</span>"
                                         : "<span class='sectag chan'></span>";
     h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+sec.name+tag;
+    /* Sections that belong to a bypassable stage get the bypass here as well as
+       on the rail above the picture, wired to the same state. Clicking a rail
+       pill used to be the only way, it was silent, and a bypassed pill looked
+       almost exactly like the three that are not controls at all. */
+    const stg = stageOfSection(sec.id);
+    if(stg){
+      const by = document.createElement("button");
+      by.className = "secbypass";
+      by.dataset.stage = stg;
+      attachTip(by, "BYPASS STAGE", "Switches the whole "+STAGE_INFO[stg].name+" stage out of the signal path, on every channel. The same control as the pill on the rail above the picture, and it turns amber when the stage is off.");
+      by.onclick = e=>{ e.stopPropagation(); stageEnabled[stg] = !stageEnabled[stg]; renderChain(); refreshBypassBtns(); };
+      h.appendChild(by);
+    }
+    /* the manual is an essay; this is the reference. Same words, but arranged
+       as "what is in front of me right now" rather than as prose. */
+    const hb = document.createElement("button");
+    hb.className = "sechelp"; hb.textContent = "?";
+    attachTip(hb, "SECTION REFERENCE", "Opens the manual at this section, with every control in it and what each one does.");
+    hb.onclick = e=>{ e.stopPropagation(); openSectionHelp(sec.id); };
+    h.appendChild(hb);
     const rb = document.createElement("button");
     rb.className = "secreset"; rb.textContent = "RESET";
     attachTip(rb, "RESET SECTION", "Returns every control in this section to its default, on the channel you are editing.", "Individual controls reset with a double-click, or the \u21ba that appears when you hover the row.");
@@ -893,6 +1062,7 @@ function buildPanel(){
     for(const p of PLIST.filter(p=>p.sec===sec.id && !STRIP_PARAMS.has(p.id))){
       const row = document.createElement("div"); row.className="prow";
       const lab = document.createElement("label"); lab.textContent = p.name;
+      lab.htmlFor = "prm_" + p.id;
       attachTip(lab, p.name, PHELP[p.id] || "",
         "Double-click the slider or press \u21ba to reset \u00b7 right-click to patch a modulator \u00b7 click while MIDI learn is on to map a controller");
       lab.onclick = ()=>{ if(midiLearnMode){ setLearnTarget(p.id); } };
@@ -901,6 +1071,8 @@ function buildPanel(){
       const wrap = document.createElement("div"); wrap.className="sldwrap";
       const s = document.createElement("input");
       s.type="range"; s.min=p.min; s.max=p.max; s.step=(p.max-p.min)/400; s.value=getBase(p.id);
+      s.id = "prm_" + p.id;
+      s.setAttribute("aria-label", p.name + " (" + p.sec + ")");
       s.addEventListener("pointerdown", armGesture);
       s.addEventListener("input", ()=>{
         const v = parseFloat(s.value);
@@ -927,9 +1099,10 @@ function buildPanel(){
       d2.appendChild(row);
       uiRefs[p.id] = {slider:s, val, tick, row, label:lab};
     }
+    sectionExtrasAfter(sec.id, body);
     /* the transition sections live on the dock's MIX tab and preset morph on
        PERFORM; only the channel path and the master out are in the sidebar */
-    const DOCKZONE = {mix:"mixdock", perform:"performdock"};
+    const DOCKZONE = {mix:"mixdock", perform:"performdock", outdock:"outdock"};
     const host = DOCKZONE[sec.zone] ? document.getElementById(DOCKZONE[sec.zone])
                                     : (zoneEls[sec.zone] || zoneEls.chain);
     host.appendChild(d);
@@ -1389,6 +1562,20 @@ function collapseAll(v){
 }
 
 /* ---- signal chain rail: drag to reorder, click to bypass ---- */
+/* which bypassable stage a panel section belongs to, if any */
+function stageOfSection(id){
+  for(const k in STAGE_INFO) if(STAGE_INFO[k].sec.indexOf(id) >= 0) return k;
+  return null;
+}
+function refreshBypassBtns(){
+  for(const b of document.querySelectorAll(".secbypass")){
+    const off = !stageEnabled[b.dataset.stage];
+    b.classList.toggle("off", off);
+    b.textContent = off ? "BYPASSED" : "ON";
+    const sec = b.closest(".sec");
+    if(sec) sec.classList.toggle("bypassed", off);
+  }
+}
 const STAGE_INFO = {
   sig:    {name:"TAPE / SYNC",  sec:["signal","sync","vhs"]},
   col:    {name:"COLOUR / ENH", sec:["enhancer","contour","color"]},
@@ -1419,7 +1606,8 @@ function renderChain(){
     el.dataset.stage = id;
     el.innerHTML = "<span class='grip'>\u2059</span><span class='dot'></span>" + STAGE_INFO[id].name;
     el.title = isTouch ? "Tap to bypass \u00b7 use the arrows to reorder" : "Drag to reorder \u00b7 click to bypass this stage";
-    el.onclick = ()=>{ stageEnabled[id] = !stageEnabled[id]; renderChain(); };
+    el.onclick = ()=>{ stageEnabled[id] = !stageEnabled[id]; renderChain(); refreshBypassBtns();
+      toast(STAGE_INFO[id].name + (stageEnabled[id] ? " back in the chain" : " bypassed")); };
     if(isTouch){
       /* HTML5 drag doesn't exist on touch — give each pill move arrows */
       const mk = (txt, dir, disabled)=>{
@@ -1487,10 +1675,12 @@ function resetSection(id){
 
 /* ---- section toggle rows ---- */
 const toggleRefs = {};
-function mkToggle(parent, id, labelFn, onClick, tip){
+function mkToggle(parent, id, labelFn, onClick, tip, options){
   const b = document.createElement("button");
   b.textContent = labelFn();
-  if(tip) attachTip(b, labelFn().split(":")[0].trim(), tip);
+  /* these cycle through a set you could not see. Now the set is in the tip. */
+  if(tip) attachTip(b, labelFn().split(":")[0].trim(), tip,
+    options && options.length ? "Cycles through: " + options.join(" \u00b7 ") : "Click to cycle");
   b.onclick = ()=>{ onClick(); b.textContent = labelFn(); };
   parent.appendChild(b);
   toggleRefs[id] = {btn:b, labelFn};
@@ -1614,17 +1804,8 @@ function buildPerformDock(){
   refreshSnapUI(); refreshPerfUI();
 }
 
-function sectionExtras(id, d){
-  if(id==="mixer" || id==="mixer2" || id==="mixerM"){
-    const which = id==="mixer" ? 1 : (id==="mixer2" ? 2 : 3);
-    const note = document.createElement("div");
-    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
-    note.textContent =
-      which===1 ? "The detail behind bus 1's three mixer stages. SOFT feathers the wipe edge, DETAIL sets blind and bar counts, CTR X/Y moves the wipe origin. KEY THRESH, SOFT, INVERT and HUE shape whichever key is selected, and the PIP controls place the subscreen. The transition, mix type and key selectors are on the strip under the picture."
-    : which===2 ? "The same for bus 2. It only renders while the master fader is above zero, so leaving it alone costs nothing."
-    : "The same again for the master crossfade between the two buses.";
-    d.appendChild(note);
-  }
+/* anything that reads better underneath the section's own controls */
+function sectionExtrasAfter(id, d){
   if(id==="morph"){
     const tr2 = document.createElement("div"); tr2.className="trow";
     const sa = document.createElement("button"); sa.textContent="STORE A"; sa.id="morphBtnA";
@@ -1641,6 +1822,18 @@ function sectionExtras(id, d){
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
     note.textContent = "Snapshot two whole panel states, then MORPH blends every slider between them. Moving any slider takes that control back.";
+    d.appendChild(note);
+  }
+}
+function sectionExtras(id, d){
+  if(id==="mixer" || id==="mixer2" || id==="mixerM"){
+    const which = id==="mixer" ? 1 : (id==="mixer2" ? 2 : 3);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent =
+      which===1 ? "The detail behind bus 1's three mixer stages. SOFT feathers the wipe edge, DETAIL sets blind and bar counts, CTR X/Y moves the wipe origin. KEY THRESH, SOFT, INVERT and HUE shape whichever key is selected, and the PIP controls place the subscreen. The transition, mix type and key selectors are on the strip under the picture."
+    : which===2 ? "The same for bus 2. It only renders while the master fader is above zero, so leaving it alone costs nothing."
+    : "The same again for the master crossfade between the two buses.";
     d.appendChild(note);
   }
   if(id==="feedback"){
@@ -1679,7 +1872,7 @@ function sectionExtras(id, d){
   if(id==="crt"){
     const tr = document.createElement("div"); tr.className="trow";
     const MODELS=["FLAT / RAW","APERTURE GRILLE","SLOT MASK","SHADOW MASK","LCD STRIPE","MONO MONITOR","GREEN SCREEN"];
-    mkToggle(tr, "outModel", ()=>"DISPLAY: "+MODELS[outModel], ()=>{ outModel=(outModel+1)%7; }, "Which display the output is drawn on. Each model has its own phosphor mask geometry, so the same picture reads as an aperture-grille tube, a shadow mask, an LCD panel or a mono monitor.");
+    mkToggle(tr, "outModel", ()=>"DISPLAY: "+MODELS[outModel], ()=>{ outModel=(outModel+1)%7; }, "Which display the output is drawn on. Each model has its own phosphor mask geometry, so the same picture reads as an aperture-grille tube, a shadow mask, an LCD panel or a mono monitor.", MODELS);
     d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
@@ -1691,9 +1884,9 @@ function sectionExtras(id, d){
     const TM = ["REC","PLAY","PAUSE","STOP","F FWD","REWIND"];
     const DM = ["NO DATE","DATE","DATE + TIME"];
     mkToggle(tr, "osdMode", ()=>"DECK: "+TM[osdMode], ()=>{ osdMode=(osdMode+1)%6; osdLast=""; },
-      "Which transport the burnt-in display is showing. REC blinks the way it did, and the counter only runs on the transports that would actually move the tape - forward on PLAY and REC, seven times as fast on the shuttles, and backwards on rewind.");
+      "Which transport the burnt-in display is showing. REC blinks the way it did, and the counter only runs on the transports that would actually move the tape - forward on PLAY and REC, seven times as fast on the shuttles, and backwards on rewind.", TM);
     mkToggle(tr, "osdDate", ()=>DM[osdDate], ()=>{ osdDate=(osdDate+1)%3; osdLast=""; },
-      "The date stamp in the corner. Today's date, taken from this machine.");
+      "The date stamp in the corner. Today's date, taken from this machine.", DM);
     mkToggle(tr, "osdZero", ()=>"COUNTER 0", ()=>{ osdCounter=0; osdLast=""; },
       "Resets the tape counter to zero, the way the button on the front of the deck did.");
     d.appendChild(tr);
@@ -2192,6 +2385,7 @@ function onMidi(e){
   const key = (st&0x0f)+":"+d1;
   if(midiLearnMode && midiLearnTarget){
     midiMap[key] = midiLearnTarget;
+    renderMidiMap();
     uiRefs[midiLearnTarget].label.classList.remove("learn");
     uiRefs[midiLearnTarget].label.classList.add("mapped");
     toast("Mapped CC"+d1+" → "+P[midiLearnTarget].name);

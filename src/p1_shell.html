@@ -128,8 +128,21 @@ select{appearance:none; -webkit-appearance:none; padding-right:16px;
 .sec.cyan h3{color:var(--cyan);} .sec.cyan h3 .led{background:var(--cyan); box-shadow:0 0 5px var(--cyan);}
 .sec.mag h3{color:var(--mag);} .sec.mag h3 .led{background:var(--mag); box-shadow:0 0 5px var(--mag);}
 .prow{display:flex; align-items:center; gap:8px; padding:2px 0; position:relative;}
+/* Hit areas without extra height. A 349-row column cannot afford 24px rows -
+   scanning it would get worse, not better - so the targets grow into padding
+   that costs no layout: a 24px transparent hit area over a thin visible track,
+   and invisible padding on the small buttons. */
+.prow .sldwrap{min-height:24px;}
+.prow input[type=range]{height:24px;}
+.prow .prst{min-width:24px; min-height:24px; padding:0; display:inline-flex; align-items:center; justify-content:center;}
+.secreset, .sechelp, .secbypass{min-height:22px;}
+#dockTabs button, .menubtn, .chantools button, .trow button{min-height:24px;}
+/* there were two :focus rules in the entire stylesheet, both on a textarea */
+:focus-visible{outline:2px solid var(--cyan); outline-offset:1px;}
+button:focus-visible, select:focus-visible, input:focus-visible{outline:2px solid var(--cyan); outline-offset:1px;}
+/* nine of these were clipped at 76px, including PRINT-THROUGH and STREAK COLOUR */
 .prow label{
-  width:76px; flex:0 0 76px; color:var(--dim); font-size:9.5px; letter-spacing:0.5px;
+  width:92px; flex:0 0 92px; color:var(--dim); font-size:9.5px; letter-spacing:0.5px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;
 }
 .prow label:hover{color:var(--txt);}
@@ -463,6 +476,11 @@ body.multi #mvlabels{display:grid;}
 #seek{flex:1;}
 #tcode{color:var(--dim); min-width:100px; text-align:right; font-size:9.5px;}
 /* bends + matrix */
+#dockFold{padding:3px 9px; font-size:10px; line-height:1; margin-left:4px;}
+/* folded: keep the tab strip so it can be brought back */
+body.nodock #lower{height:auto !important; min-height:0;}
+body.nodock #dockBody{display:none;}
+body.nodock #dragbar{opacity:.35;}
 #dragbar{
   height:6px; cursor:ns-resize; background:var(--panel2); border-top:1px solid var(--line);
   flex:0 0 6px; position:relative;
@@ -510,6 +528,16 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 #pfmain{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;}
 #dockBody > #mixdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
 #dockBody > #audiodock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
+#dockBody > #outdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
+#outdock .sec{flex:1 1 0; min-width:250px; border-bottom:none; padding:0;}
+#outdock .sec h3{padding-top:0;}
+.secbypass{
+  margin-left:6px; padding:2px 6px; font-size:7.5px; letter-spacing:1px;
+  color:var(--dim); border-color:var(--line);
+}
+.secbypass.off{color:#0b0b0e; background:var(--amber); border-color:var(--amber);}
+.sec.bypassed > h3{opacity:.55;}
+.sec.bypassed .secbody{opacity:.4;}
 #audiodock .sec{flex:1 1 0; min-width:250px; border-bottom:none; padding:0;}
 #audiodock .sec h3{padding-top:0;}
 #performdock .sec{border-bottom:none; padding:0;}
@@ -517,6 +545,21 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 #tempobox{display:flex; align-items:center; gap:5px; margin-left:4px;}
 #tempobox button{padding:4px 9px; font-size:9px; letter-spacing:1.5px;}
 #tempobox #bpmVal{font-size:10px; color:var(--amber); min-width:52px; letter-spacing:1px;}
+#beatLed{
+  width:7px; height:7px; border-radius:50%; background:#2a2a34;
+  box-shadow:inset 0 0 0 1px var(--line); flex:0 0 auto;
+}
+#beatLed.hit{animation:beatflash .18s ease-out;}
+#beatLed.bar{animation:beatflashbar .26s ease-out;}
+@keyframes beatflash{ from{background:var(--cyan); box-shadow:0 0 7px var(--cyan);} to{background:#2a2a34; box-shadow:inset 0 0 0 1px var(--line);} }
+@keyframes beatflashbar{ from{background:var(--amber); box-shadow:0 0 10px var(--amber);} to{background:#2a2a34; box-shadow:inset 0 0 0 1px var(--line);} }
+.mmaprow{display:flex; align-items:center; gap:7px; padding:3px 0; font-size:9px;}
+.mmapcc{color:var(--cyan); letter-spacing:1px; min-width:96px;}
+.mmapdst{flex:1; color:var(--txt); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.chanbtn canvas{
+  display:block; width:100%; height:26px; margin:3px 0 2px;
+  background:#000; border-radius:2px; image-rendering:pixelated;
+}
 
 #mixdock .sec{flex:1 1 0; min-width:230px; border-bottom:none; padding:0;}
 #mixdock .sec h3{padding-top:0;}
@@ -570,6 +613,41 @@ body.nobend #bendCollapse .mixhint{display:inline;}
   border:1px solid var(--amber); border-radius:6px; padding:22px 26px; font-size:11px; line-height:1.65;
 }
 #helpBox h2{color:var(--amber); letter-spacing:2px; font-size:14px; padding-bottom:8px;}
+#firstrun{
+  position:fixed; inset:0; background:rgba(6,6,10,.94); z-index:60;
+  display:flex; align-items:center; justify-content:center;
+}
+#firstrun .frbox{
+  width:520px; max-width:92vw; background:var(--panel); border:1px solid var(--amber);
+  border-radius:6px; padding:22px 26px; font-size:11px; line-height:1.7;
+}
+#firstrun h3{color:var(--amber); letter-spacing:2px; font-size:12px; padding-bottom:8px;}
+#firstrun p{color:var(--txt); padding:4px 0;}
+#firstrun b{color:var(--amber);}
+#firstrun button{margin-top:14px; padding:9px 18px; font-size:10px; letter-spacing:2px;}
+#helpBar{
+  position:sticky; top:-22px; z-index:2; display:flex; gap:8px; align-items:center;
+  background:var(--panel); padding:6px 0 8px; margin:-4px 0 4px;
+  border-bottom:1px solid var(--line);
+}
+#helpSearch{
+  flex:1; padding:6px 8px; font-family:inherit; font-size:10px; letter-spacing:1px;
+  background:#0b0b0e; color:var(--txt); border:1px solid var(--line); border-radius:3px;
+}
+#helpSearch:focus{border-color:var(--cyan); outline:none;}
+#helpClose{padding:5px 10px; font-size:11px; line-height:1;}
+#helpToc{display:flex; flex-wrap:wrap; gap:5px; padding:6px 0 10px;}
+#helpToc button{padding:3px 7px; font-size:8px; letter-spacing:1px;}
+#helpSection{display:none;}
+#helpSection.on{display:block;}
+#helpSection .hsparam{display:flex; gap:10px; padding:4px 0; border-top:1px solid var(--line);}
+#helpSection .hsname{flex:0 0 130px; color:var(--amber); font-size:9.5px; letter-spacing:1px;}
+#helpSection .hsbody{flex:1; color:var(--txt); font-size:10.5px; line-height:1.55;}
+#helpBody .nomatch{display:none;}
+.sechelp{
+  margin-left:5px; padding:1px 6px; font-size:8px; line-height:1.4;
+  color:var(--dim); border-color:var(--line);
+}
 #helpBox h3{color:var(--cyan); letter-spacing:1px; font-size:11px; padding:10px 0 3px;}
 #helpBox kbd{background:#22222c; border:1px solid var(--line); border-radius:3px; padding:1px 5px; font-size:10px;}
 #helpBox p{color:var(--txt); padding:2px 0;}
@@ -731,10 +809,10 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v32.0</span>
+  <span id="ver" title="Build version">v33.0</span>
   <button id="btnHelpTop" data-tip="The manual: what everything is, why it behaves the way it does, and every keyboard shortcut. Also on the H key.">?</button>
   <div id="tempobox" data-tip="Tap four times in time and the tempo follows. Any modulator with a sync division locks to it, and incoming MIDI clock overrides it automatically.">
-    <button id="btnTap">TAP</button><span id="bpmVal">120.0</span>
+    <button id="btnTap">TAP</button><span id="beatLed"></span><span id="bpmVal">120.0</span>
   </div>
 
   <div class="menu" id="mnuPatch">
@@ -900,20 +978,25 @@ body.nomix #mixbuses{display:none;}
           <button data-dock="mod" data-tip="Every modulation source drawn live, with editable rates and shapes and a list of what each one is driving.">MOD</button>
           <button data-dock="text" data-tip="The text and shape generator for this channel. Typing here never triggers keyboard shortcuts.">TEXT</button>
           <button data-dock="mix" data-tip="The detail behind each transition: wipe softness and geometry, and the key settings. The faders themselves are on the strip under the picture.">MIX</button>
+          <button data-dock="out" data-tip="The master output stage: the display model and everything the picture is watched through. Shared by all four channels.">OUT</button>
           <button data-dock="audio" data-tip="Where the audio-reactive modulators listen: the input, the three band ranges, and the response speed.">AUDIO</button>
           <button data-dock="perform" data-tip="Everything you play with while it is running: eight whole-rig snapshots with a glide time, the performance recorder, preset morph and the six bend pads.">PERFORM</button>
           <span style="flex:1;"></span>
           <span id="dockHint"></span>
+          <button id="dockFold" data-tip="Folds the dock away so the picture gets the height. Double-clicking the bar above it does the same, and the height you drag it to is remembered.">&#9662;</button>
         </div>
         <div id="dockBody">
       <div id="mixdock"></div>
       <div id="audiodock"></div>
+      <div id="outdock"></div>
       <div id="performdock">
         <div id="pfmain"></div>
       </div>
       <div id="matrix">
         <h4>MOD MATRIX — PATCH SOURCES INTO ANY PARAMETER <button id="btnAddRoute" style="margin-left:8px; padding:2px 8px;" data-tip="Add a modulation route: pick a source, a channel, a destination parameter and an amount. Right-clicking a parameter does the same thing faster.">+ ROUTE</button></h4>
         <div id="routes"></div>
+        <h4 style="padding-top:12px;">MIDI CONTROL — WHAT IS MAPPED</h4>
+        <div id="midimap"></div>
       </div>
       <div id="modgrid"></div>
       <div id="textdock"><div id="textNeedsSrc" style="display:none; color:var(--dim); font-size:9.5px; padding:6px 0 10px;">This channel is not a text source. Pick <b style="color:var(--amber)">TEXT</b> under SOURCE to switch it, and these controls come alive.</div><textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
@@ -1006,7 +1089,14 @@ body.nomix #mixbuses{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v32.0</span></h2>
+  <div id="helpBar">
+    <input type="text" id="helpSearch" placeholder="SEARCH THE MANUAL" spellcheck="false">
+    <button id="helpClose" title="Close">&#10005;</button>
+  </div>
+  <div id="helpToc"></div>
+  <div id="helpSection"></div>
+  <div id="helpBody">
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v33.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once; the small selector next to it picks a target, and <b>COPY</b> writes this channel's effects onto it while <b>SWAP</b> exchanges the two outright, sources included. Any channel can reach any other, so D can be copied onto A as easily as A onto B, and shift-clicking COPY sends it to all three at once.</p>
@@ -1088,7 +1178,8 @@ body.nomix #mixbuses{display:none;}
   <p>Your patch, your snapshots and your take are saved to this browser every few seconds, so a reload or a crash picks up where you left off. Press <kbd>Z</kbd> straight after opening if you would rather start clean.</p>
   <h3>OUTPUT</h3>
   <p><b>STORE</b> under PATCH saves everything you have set up as a named preset, kept on this machine and listed under SAVED alongside the built-in ones; DELETE removes one. SAVE FILE and OPEN FILE move a patch between machines. <b>REC</b> captures the live output (with source audio when AUDIO=SOURCE) — MP4 where the browser supports it, WebM otherwise. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
-  <p style="padding-top:10px; color:var(--dim);">Click anywhere to close.</p>
+  </div>
+  <p style="padding-top:10px; color:var(--dim);">Escape, the cross, or a click outside this panel closes it.</p>
 </div></div>
 <div id="mtabs">
   <button data-mtab="controls" class="on">CONTROLS</button>

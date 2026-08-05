@@ -128,8 +128,21 @@ select{appearance:none; -webkit-appearance:none; padding-right:16px;
 .sec.cyan h3{color:var(--cyan);} .sec.cyan h3 .led{background:var(--cyan); box-shadow:0 0 5px var(--cyan);}
 .sec.mag h3{color:var(--mag);} .sec.mag h3 .led{background:var(--mag); box-shadow:0 0 5px var(--mag);}
 .prow{display:flex; align-items:center; gap:8px; padding:2px 0; position:relative;}
+/* Hit areas without extra height. A 349-row column cannot afford 24px rows -
+   scanning it would get worse, not better - so the targets grow into padding
+   that costs no layout: a 24px transparent hit area over a thin visible track,
+   and invisible padding on the small buttons. */
+.prow .sldwrap{min-height:24px;}
+.prow input[type=range]{height:24px;}
+.prow .prst{min-width:24px; min-height:24px; padding:0; display:inline-flex; align-items:center; justify-content:center;}
+.secreset, .sechelp, .secbypass{min-height:22px;}
+#dockTabs button, .menubtn, .chantools button, .trow button{min-height:24px;}
+/* there were two :focus rules in the entire stylesheet, both on a textarea */
+:focus-visible{outline:2px solid var(--cyan); outline-offset:1px;}
+button:focus-visible, select:focus-visible, input:focus-visible{outline:2px solid var(--cyan); outline-offset:1px;}
+/* nine of these were clipped at 76px, including PRINT-THROUGH and STREAK COLOUR */
 .prow label{
-  width:76px; flex:0 0 76px; color:var(--dim); font-size:9.5px; letter-spacing:0.5px;
+  width:92px; flex:0 0 92px; color:var(--dim); font-size:9.5px; letter-spacing:0.5px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;
 }
 .prow label:hover{color:var(--txt);}
@@ -463,6 +476,11 @@ body.multi #mvlabels{display:grid;}
 #seek{flex:1;}
 #tcode{color:var(--dim); min-width:100px; text-align:right; font-size:9.5px;}
 /* bends + matrix */
+#dockFold{padding:3px 9px; font-size:10px; line-height:1; margin-left:4px;}
+/* folded: keep the tab strip so it can be brought back */
+body.nodock #lower{height:auto !important; min-height:0;}
+body.nodock #dockBody{display:none;}
+body.nodock #dragbar{opacity:.35;}
 #dragbar{
   height:6px; cursor:ns-resize; background:var(--panel2); border-top:1px solid var(--line);
   flex:0 0 6px; position:relative;
@@ -510,6 +528,16 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 #pfmain{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;}
 #dockBody > #mixdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
 #dockBody > #audiodock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
+#dockBody > #outdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
+#outdock .sec{flex:1 1 0; min-width:250px; border-bottom:none; padding:0;}
+#outdock .sec h3{padding-top:0;}
+.secbypass{
+  margin-left:6px; padding:2px 6px; font-size:7.5px; letter-spacing:1px;
+  color:var(--dim); border-color:var(--line);
+}
+.secbypass.off{color:#0b0b0e; background:var(--amber); border-color:var(--amber);}
+.sec.bypassed > h3{opacity:.55;}
+.sec.bypassed .secbody{opacity:.4;}
 #audiodock .sec{flex:1 1 0; min-width:250px; border-bottom:none; padding:0;}
 #audiodock .sec h3{padding-top:0;}
 #performdock .sec{border-bottom:none; padding:0;}
@@ -517,6 +545,21 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 #tempobox{display:flex; align-items:center; gap:5px; margin-left:4px;}
 #tempobox button{padding:4px 9px; font-size:9px; letter-spacing:1.5px;}
 #tempobox #bpmVal{font-size:10px; color:var(--amber); min-width:52px; letter-spacing:1px;}
+#beatLed{
+  width:7px; height:7px; border-radius:50%; background:#2a2a34;
+  box-shadow:inset 0 0 0 1px var(--line); flex:0 0 auto;
+}
+#beatLed.hit{animation:beatflash .18s ease-out;}
+#beatLed.bar{animation:beatflashbar .26s ease-out;}
+@keyframes beatflash{ from{background:var(--cyan); box-shadow:0 0 7px var(--cyan);} to{background:#2a2a34; box-shadow:inset 0 0 0 1px var(--line);} }
+@keyframes beatflashbar{ from{background:var(--amber); box-shadow:0 0 10px var(--amber);} to{background:#2a2a34; box-shadow:inset 0 0 0 1px var(--line);} }
+.mmaprow{display:flex; align-items:center; gap:7px; padding:3px 0; font-size:9px;}
+.mmapcc{color:var(--cyan); letter-spacing:1px; min-width:96px;}
+.mmapdst{flex:1; color:var(--txt); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.chanbtn canvas{
+  display:block; width:100%; height:26px; margin:3px 0 2px;
+  background:#000; border-radius:2px; image-rendering:pixelated;
+}
 
 #mixdock .sec{flex:1 1 0; min-width:230px; border-bottom:none; padding:0;}
 #mixdock .sec h3{padding-top:0;}
@@ -570,6 +613,41 @@ body.nobend #bendCollapse .mixhint{display:inline;}
   border:1px solid var(--amber); border-radius:6px; padding:22px 26px; font-size:11px; line-height:1.65;
 }
 #helpBox h2{color:var(--amber); letter-spacing:2px; font-size:14px; padding-bottom:8px;}
+#firstrun{
+  position:fixed; inset:0; background:rgba(6,6,10,.94); z-index:60;
+  display:flex; align-items:center; justify-content:center;
+}
+#firstrun .frbox{
+  width:520px; max-width:92vw; background:var(--panel); border:1px solid var(--amber);
+  border-radius:6px; padding:22px 26px; font-size:11px; line-height:1.7;
+}
+#firstrun h3{color:var(--amber); letter-spacing:2px; font-size:12px; padding-bottom:8px;}
+#firstrun p{color:var(--txt); padding:4px 0;}
+#firstrun b{color:var(--amber);}
+#firstrun button{margin-top:14px; padding:9px 18px; font-size:10px; letter-spacing:2px;}
+#helpBar{
+  position:sticky; top:-22px; z-index:2; display:flex; gap:8px; align-items:center;
+  background:var(--panel); padding:6px 0 8px; margin:-4px 0 4px;
+  border-bottom:1px solid var(--line);
+}
+#helpSearch{
+  flex:1; padding:6px 8px; font-family:inherit; font-size:10px; letter-spacing:1px;
+  background:#0b0b0e; color:var(--txt); border:1px solid var(--line); border-radius:3px;
+}
+#helpSearch:focus{border-color:var(--cyan); outline:none;}
+#helpClose{padding:5px 10px; font-size:11px; line-height:1;}
+#helpToc{display:flex; flex-wrap:wrap; gap:5px; padding:6px 0 10px;}
+#helpToc button{padding:3px 7px; font-size:8px; letter-spacing:1px;}
+#helpSection{display:none;}
+#helpSection.on{display:block;}
+#helpSection .hsparam{display:flex; gap:10px; padding:4px 0; border-top:1px solid var(--line);}
+#helpSection .hsname{flex:0 0 130px; color:var(--amber); font-size:9.5px; letter-spacing:1px;}
+#helpSection .hsbody{flex:1; color:var(--txt); font-size:10.5px; line-height:1.55;}
+#helpBody .nomatch{display:none;}
+.sechelp{
+  margin-left:5px; padding:1px 6px; font-size:8px; line-height:1.4;
+  color:var(--dim); border-color:var(--line);
+}
 #helpBox h3{color:var(--cyan); letter-spacing:1px; font-size:11px; padding:10px 0 3px;}
 #helpBox kbd{background:#22222c; border:1px solid var(--line); border-radius:3px; padding:1px 5px; font-size:10px;}
 #helpBox p{color:var(--txt); padding:2px 0;}
@@ -731,10 +809,10 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v32.0</span>
+  <span id="ver" title="Build version">v33.0</span>
   <button id="btnHelpTop" data-tip="The manual: what everything is, why it behaves the way it does, and every keyboard shortcut. Also on the H key.">?</button>
   <div id="tempobox" data-tip="Tap four times in time and the tempo follows. Any modulator with a sync division locks to it, and incoming MIDI clock overrides it automatically.">
-    <button id="btnTap">TAP</button><span id="bpmVal">120.0</span>
+    <button id="btnTap">TAP</button><span id="beatLed"></span><span id="bpmVal">120.0</span>
   </div>
 
   <div class="menu" id="mnuPatch">
@@ -900,20 +978,25 @@ body.nomix #mixbuses{display:none;}
           <button data-dock="mod" data-tip="Every modulation source drawn live, with editable rates and shapes and a list of what each one is driving.">MOD</button>
           <button data-dock="text" data-tip="The text and shape generator for this channel. Typing here never triggers keyboard shortcuts.">TEXT</button>
           <button data-dock="mix" data-tip="The detail behind each transition: wipe softness and geometry, and the key settings. The faders themselves are on the strip under the picture.">MIX</button>
+          <button data-dock="out" data-tip="The master output stage: the display model and everything the picture is watched through. Shared by all four channels.">OUT</button>
           <button data-dock="audio" data-tip="Where the audio-reactive modulators listen: the input, the three band ranges, and the response speed.">AUDIO</button>
           <button data-dock="perform" data-tip="Everything you play with while it is running: eight whole-rig snapshots with a glide time, the performance recorder, preset morph and the six bend pads.">PERFORM</button>
           <span style="flex:1;"></span>
           <span id="dockHint"></span>
+          <button id="dockFold" data-tip="Folds the dock away so the picture gets the height. Double-clicking the bar above it does the same, and the height you drag it to is remembered.">&#9662;</button>
         </div>
         <div id="dockBody">
       <div id="mixdock"></div>
       <div id="audiodock"></div>
+      <div id="outdock"></div>
       <div id="performdock">
         <div id="pfmain"></div>
       </div>
       <div id="matrix">
         <h4>MOD MATRIX — PATCH SOURCES INTO ANY PARAMETER <button id="btnAddRoute" style="margin-left:8px; padding:2px 8px;" data-tip="Add a modulation route: pick a source, a channel, a destination parameter and an amount. Right-clicking a parameter does the same thing faster.">+ ROUTE</button></h4>
         <div id="routes"></div>
+        <h4 style="padding-top:12px;">MIDI CONTROL — WHAT IS MAPPED</h4>
+        <div id="midimap"></div>
       </div>
       <div id="modgrid"></div>
       <div id="textdock"><div id="textNeedsSrc" style="display:none; color:var(--dim); font-size:9.5px; padding:6px 0 10px;">This channel is not a text source. Pick <b style="color:var(--amber)">TEXT</b> under SOURCE to switch it, and these controls come alive.</div><textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
@@ -1006,7 +1089,14 @@ body.nomix #mixbuses{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v32.0</span></h2>
+  <div id="helpBar">
+    <input type="text" id="helpSearch" placeholder="SEARCH THE MANUAL" spellcheck="false">
+    <button id="helpClose" title="Close">&#10005;</button>
+  </div>
+  <div id="helpToc"></div>
+  <div id="helpSection"></div>
+  <div id="helpBody">
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v33.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once; the small selector next to it picks a target, and <b>COPY</b> writes this channel's effects onto it while <b>SWAP</b> exchanges the two outright, sources included. Any channel can reach any other, so D can be copied onto A as easily as A onto B, and shift-clicking COPY sends it to all three at once.</p>
@@ -1088,7 +1178,8 @@ body.nomix #mixbuses{display:none;}
   <p>Your patch, your snapshots and your take are saved to this browser every few seconds, so a reload or a crash picks up where you left off. Press <kbd>Z</kbd> straight after opening if you would rather start clean.</p>
   <h3>OUTPUT</h3>
   <p><b>STORE</b> under PATCH saves everything you have set up as a named preset, kept on this machine and listed under SAVED alongside the built-in ones; DELETE removes one. SAVE FILE and OPEN FILE move a patch between machines. <b>REC</b> captures the live output (with source audio when AUDIO=SOURCE) — MP4 where the browser supports it, WebM otherwise. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
-  <p style="padding-top:10px; color:var(--dim);">Click anywhere to close.</p>
+  </div>
+  <p style="padding-top:10px; color:var(--dim);">Escape, the cross, or a click outside this panel closes it.</p>
 </div></div>
 <div id="mtabs">
   <button data-mtab="controls" class="on">CONTROLS</button>
@@ -2679,8 +2770,11 @@ const SECTIONS = [
   {id:"flow",     name:"FLOW / MOSH",       cls:"mag",  zone:"chain"},
   {id:"keyer",    name:"KEYER",             cls:"cyan", zone:"chain"},
 
-  {id:"crt",      name:"CRT DISPLAY",       cls:"cyan", zone:"out"},
-  {id:"overlay",  name:"OUTPUT OVERLAY",    cls:"cyan", zone:"out"},
+  /* the display and the overlay are master, shared by every channel, so they
+     belong beside the other master controls in the dock rather than at the
+     bottom of a column that is otherwise entirely per-channel */
+  {id:"crt",      name:"CRT DISPLAY",       cls:"cyan", zone:"outdock"},
+  {id:"overlay",  name:"OUTPUT OVERLAY",    cls:"cyan", zone:"outdock"},
 
   /* morph lives on the PERFORM tab with the snapshots and the recorder,
      because it is the same job: recalling states while it runs */
@@ -2688,7 +2782,6 @@ const SECTIONS = [
 ];
 const ZONES = [
   {id:"chain", label:"CHANNEL \u00b7 SIGNAL PATH", note:"Everything belonging to the channel selected above, in the order the signal actually travels: source, framing, frame store, feedback, then the reorderable stages, then the keyer. Drag by the handle to rearrange."},
-  {id:"out",   label:"MASTER OUT",          note:"The shared display stage, after the mixer. Every channel ends up here."},
 ];
 const PDEF = [
   ["abMix","BUS 1 FADER","mixer",0,1,0],
@@ -3948,8 +4041,24 @@ const modVal = {};
 
 /* tempo: tap or MIDI clock; synced LFOs derive their rate from it */
 let bpm = 120, extClockAt = -1e9, clockEma = 0;   // no external clock until one arrives
+/* A number is not something you can check against music at a glance. */
+let beatPhase = 0, beatCount = 0;
+function advanceBeat(dt){
+  beatPhase += dt*(bpm/60);
+  if(beatPhase >= 1){
+    beatPhase -= Math.floor(beatPhase);
+    beatCount = (beatCount + 1) % 4;
+    const led = document.getElementById("beatLed");
+    if(led){
+      led.classList.remove("hit", "bar");
+      void led.offsetWidth;                 /* restart the animation */
+      led.classList.add(beatCount === 0 ? "bar" : "hit");
+    }
+  }
+}
 const tapTimes = [];
 function tapTempo(){
+  beatPhase = 0; beatCount = 3;   /* the tap you just made is the beat */
   const now = performance.now();
   if(tapTimes.length && now-tapTimes[tapTimes.length-1] > 2200) tapTimes.length = 0;
   tapTimes.push(now);
@@ -4049,6 +4158,7 @@ function envFired(m, dt){
   return false;
 }
 function updateMod(dt, t){
+  advanceBeat(dt);
   for(const m of mods){
     if(m.type === "lfo"){
       if(m.sync > 0) m.rate = (bpm/60)/m.sync;
@@ -4371,8 +4481,51 @@ const panel = document.getElementById("panel");
 const uiRefs = {};   // id -> {slider, val, tick, row, label}
 let midiLearnMode = false, midiLearnTarget = null;
 const midiMap = {};  // "ch:cc" -> paramId
+/* Mapping worked; knowing what you had mapped did not. The only trace was a
+   dot appended to a label somewhere in a seven-screen column. */
+function renderMidiMap(){
+  const host = document.getElementById("midimap");
+  if(!host) return;
+  host.innerHTML = "";
+  const keys = Object.keys(midiMap);
+  if(!keys.length){
+    const d = document.createElement("div");
+    d.style.cssText = "color:var(--dim); font-size:8.5px; padding:3px 0;";
+    d.textContent = "Nothing mapped yet. Turn on MIDI LEARN under ENGINE, click a parameter name, then move a control.";
+    host.appendChild(d);
+    return;
+  }
+  keys.sort((a,b)=>{
+    const [ac,an] = a.split(":").map(Number), [bc,bn] = b.split(":").map(Number);
+    return ac-bc || an-bn;
+  });
+  for(const k of keys){
+    const [ch, cc] = k.split(":");
+    const pid = midiMap[k], p = P[pid];
+    const row = document.createElement("div"); row.className = "mmaprow";
+    const src = document.createElement("span"); src.className = "mmapcc";
+    src.textContent = "CH " + (parseInt(ch,10)+1) + "  CC " + cc;
+    const arrow = document.createElement("span"); arrow.className = "arrow"; arrow.textContent = "\u2192";
+    const dst = document.createElement("span"); dst.className = "mmapdst";
+    dst.textContent = p ? p.name + "  (" + p.sec + ")" : pid;
+    const go = document.createElement("button"); go.className = "rgo"; go.textContent = "\u25ce";
+    attachTip(go, "SHOW THIS PARAMETER", "Scrolls to the control this is mapped onto and flashes it.");
+    go.onclick = ()=>{ if(typeof focusParam === "function") focusParam(pid); };
+    const rm = document.createElement("button"); rm.textContent = "\u2715";
+    attachTip(rm, "UNMAP", "Forgets this mapping. The control itself is untouched.");
+    rm.onclick = ()=>{
+      delete midiMap[k];
+      const r = uiRefs[pid];
+      if(r && !Object.values(midiMap).includes(pid)) r.label.classList.remove("mapped");
+      renderMidiMap();
+    };
+    row.appendChild(src); row.appendChild(arrow); row.appendChild(dst); row.appendChild(go); row.appendChild(rm);
+    host.appendChild(row);
+  }
+}
 
 function fmt(p, v){ return (Math.abs(v)<10 ? v.toFixed(2) : v.toFixed(1)); }
+const chanThumbs = {};
 function buildChanBar(){
   const bar = document.createElement("div");
   bar.id = "chanbar";
@@ -4380,7 +4533,16 @@ function buildChanBar(){
     const b = document.createElement("button");
     b.className = "chanbtn ch"+ch;
     b.dataset.chan = ch;
-    b.innerHTML = "<b>"+ch+"</b><small>\u2014</small>";
+    /* the four buttons all said BARS and nothing else, so you could not tell
+       what was loaded where without opening a menu per channel */
+    b.innerHTML = "<b>"+ch+"</b>";
+    const cv = document.createElement("canvas");
+    cv.width = 48; cv.height = 27;
+    cv.className = "chanthumb";
+    b.appendChild(cv);
+    const sm = document.createElement("small"); sm.textContent = "\u2014";
+    b.appendChild(sm);
+    chanThumbs[ch] = cv.getContext("2d", {willReadFrequently:false});
     attachTip(b, "CHANNEL "+ch, "Everything below this bar - the source, the framing, the whole effect chain and the bend pads - belongs to the channel selected here. Channels A and B feed mixer bus 1; C and D feed bus 2.", "Sections tagged MASTER are shared across all four.");
     b.onclick = ()=>{ setActiveChan(ch); };
     return b;
@@ -4603,6 +4765,86 @@ const stripMelt = [];
    it. The two chips answer the other two questions you actually have live:
    what is moving, and what have I changed. */
 let filterOn = false;
+/* the manual, opened at one section and laid out as reference */
+function openSectionHelp(id){
+  const box = document.getElementById("helpSection");
+  const body = document.getElementById("helpBody");
+  const toc = document.getElementById("helpToc");
+  if(!box) return;
+  const sec = SECTIONS.find(x=>x.id===id);
+  box.innerHTML = "";
+  const h = document.createElement("h3");
+  h.textContent = sec ? sec.name : id.toUpperCase();
+  box.appendChild(h);
+  if(SECHELP[id]){
+    const p0 = document.createElement("p");
+    p0.textContent = SECHELP[id];
+    box.appendChild(p0);
+  }
+  for(const p of PLIST){
+    if(p.sec !== id) continue;
+    const row = document.createElement("div"); row.className = "hsparam";
+    const nm = document.createElement("div"); nm.className = "hsname"; nm.textContent = p.name;
+    const bd = document.createElement("div"); bd.className = "hsbody";
+    bd.textContent = PHELP[p.id] || "";
+    row.appendChild(nm); row.appendChild(bd);
+    box.appendChild(row);
+  }
+  const back = document.createElement("button");
+  back.textContent = "\u2039 THE WHOLE MANUAL";
+  back.style.marginTop = "12px";
+  back.onclick = ()=>{ box.classList.remove("on"); body.style.display = ""; if(toc) toc.style.display = ""; };
+  box.appendChild(back);
+  box.classList.add("on");
+  body.style.display = "none";
+  if(toc) toc.style.display = "none";
+  document.getElementById("help").classList.add("show");
+  document.getElementById("helpBox").scrollTop = 0;
+}
+/* contents, search, and a close that is not "any click anywhere" */
+function initHelpUI(){
+  const help = document.getElementById("help");
+  const box = document.getElementById("helpBox");
+  const body = document.getElementById("helpBody");
+  const toc = document.getElementById("helpToc");
+  const sec = document.getElementById("helpSection");
+  const search = document.getElementById("helpSearch");
+  if(!help || !body) return;
+  const close = ()=>{ help.classList.remove("show"); };
+  document.getElementById("helpClose").onclick = close;
+  /* clicking the backdrop closes; clicking inside the panel does not, so you
+     can keep it open beside the control you are setting up */
+  help.addEventListener("click", e=>{ if(e.target === help) close(); });
+  const heads = Array.prototype.slice.call(body.querySelectorAll("h3"));
+  for(const h of heads){
+    const b = document.createElement("button");
+    b.textContent = h.textContent;
+    b.onclick = ()=>{ h.scrollIntoView({block:"start"}); };
+    toc.appendChild(b);
+  }
+  search.addEventListener("keydown", e=>e.stopPropagation());
+  search.addEventListener("input", ()=>{
+    const q = search.value.trim().toLowerCase();
+    let group = null, groupHit = false;
+    const groups = [];
+    for(const node of Array.prototype.slice.call(body.children)){
+      if(node.tagName === "H3"){ group = [node]; groups.push(group); groupHit = false; }
+      else if(group) group.push(node);
+      else groups.push([node]);
+    }
+    for(const g of groups){
+      const text = g.map(n=>n.textContent).join(" ").toLowerCase();
+      const hit = !q || text.indexOf(q) >= 0;
+      for(const n of g) n.classList.toggle("nomatch", !hit);
+    }
+    toc.style.display = q ? "none" : "";
+  });
+  window.__openHelp = ()=>{
+    sec.classList.remove("on"); body.style.display = ""; toc.style.display = "";
+    search.value = ""; search.dispatchEvent(new Event("input"));
+    help.classList.add("show"); box.scrollTop = 0;
+  };
+}
 function buildFilterBar(){
   const bar = document.createElement("div"); bar.id = "pfilter";
   const inp = document.createElement("input");
@@ -4670,6 +4912,26 @@ function buildPanel(){
     const tag = MASTER_SECS.has(sec.id) ? "<span class='sectag master'>MASTER</span>"
                                         : "<span class='sectag chan'></span>";
     h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+sec.name+tag;
+    /* Sections that belong to a bypassable stage get the bypass here as well as
+       on the rail above the picture, wired to the same state. Clicking a rail
+       pill used to be the only way, it was silent, and a bypassed pill looked
+       almost exactly like the three that are not controls at all. */
+    const stg = stageOfSection(sec.id);
+    if(stg){
+      const by = document.createElement("button");
+      by.className = "secbypass";
+      by.dataset.stage = stg;
+      attachTip(by, "BYPASS STAGE", "Switches the whole "+STAGE_INFO[stg].name+" stage out of the signal path, on every channel. The same control as the pill on the rail above the picture, and it turns amber when the stage is off.");
+      by.onclick = e=>{ e.stopPropagation(); stageEnabled[stg] = !stageEnabled[stg]; renderChain(); refreshBypassBtns(); };
+      h.appendChild(by);
+    }
+    /* the manual is an essay; this is the reference. Same words, but arranged
+       as "what is in front of me right now" rather than as prose. */
+    const hb = document.createElement("button");
+    hb.className = "sechelp"; hb.textContent = "?";
+    attachTip(hb, "SECTION REFERENCE", "Opens the manual at this section, with every control in it and what each one does.");
+    hb.onclick = e=>{ e.stopPropagation(); openSectionHelp(sec.id); };
+    h.appendChild(hb);
     const rb = document.createElement("button");
     rb.className = "secreset"; rb.textContent = "RESET";
     attachTip(rb, "RESET SECTION", "Returns every control in this section to its default, on the channel you are editing.", "Individual controls reset with a double-click, or the \u21ba that appears when you hover the row.");
@@ -4691,6 +4953,7 @@ function buildPanel(){
     for(const p of PLIST.filter(p=>p.sec===sec.id && !STRIP_PARAMS.has(p.id))){
       const row = document.createElement("div"); row.className="prow";
       const lab = document.createElement("label"); lab.textContent = p.name;
+      lab.htmlFor = "prm_" + p.id;
       attachTip(lab, p.name, PHELP[p.id] || "",
         "Double-click the slider or press \u21ba to reset \u00b7 right-click to patch a modulator \u00b7 click while MIDI learn is on to map a controller");
       lab.onclick = ()=>{ if(midiLearnMode){ setLearnTarget(p.id); } };
@@ -4699,6 +4962,8 @@ function buildPanel(){
       const wrap = document.createElement("div"); wrap.className="sldwrap";
       const s = document.createElement("input");
       s.type="range"; s.min=p.min; s.max=p.max; s.step=(p.max-p.min)/400; s.value=getBase(p.id);
+      s.id = "prm_" + p.id;
+      s.setAttribute("aria-label", p.name + " (" + p.sec + ")");
       s.addEventListener("pointerdown", armGesture);
       s.addEventListener("input", ()=>{
         const v = parseFloat(s.value);
@@ -4725,9 +4990,10 @@ function buildPanel(){
       d2.appendChild(row);
       uiRefs[p.id] = {slider:s, val, tick, row, label:lab};
     }
+    sectionExtrasAfter(sec.id, body);
     /* the transition sections live on the dock's MIX tab and preset morph on
        PERFORM; only the channel path and the master out are in the sidebar */
-    const DOCKZONE = {mix:"mixdock", perform:"performdock"};
+    const DOCKZONE = {mix:"mixdock", perform:"performdock", outdock:"outdock"};
     const host = DOCKZONE[sec.zone] ? document.getElementById(DOCKZONE[sec.zone])
                                     : (zoneEls[sec.zone] || zoneEls.chain);
     host.appendChild(d);
@@ -5187,6 +5453,20 @@ function collapseAll(v){
 }
 
 /* ---- signal chain rail: drag to reorder, click to bypass ---- */
+/* which bypassable stage a panel section belongs to, if any */
+function stageOfSection(id){
+  for(const k in STAGE_INFO) if(STAGE_INFO[k].sec.indexOf(id) >= 0) return k;
+  return null;
+}
+function refreshBypassBtns(){
+  for(const b of document.querySelectorAll(".secbypass")){
+    const off = !stageEnabled[b.dataset.stage];
+    b.classList.toggle("off", off);
+    b.textContent = off ? "BYPASSED" : "ON";
+    const sec = b.closest(".sec");
+    if(sec) sec.classList.toggle("bypassed", off);
+  }
+}
 const STAGE_INFO = {
   sig:    {name:"TAPE / SYNC",  sec:["signal","sync","vhs"]},
   col:    {name:"COLOUR / ENH", sec:["enhancer","contour","color"]},
@@ -5217,7 +5497,8 @@ function renderChain(){
     el.dataset.stage = id;
     el.innerHTML = "<span class='grip'>\u2059</span><span class='dot'></span>" + STAGE_INFO[id].name;
     el.title = isTouch ? "Tap to bypass \u00b7 use the arrows to reorder" : "Drag to reorder \u00b7 click to bypass this stage";
-    el.onclick = ()=>{ stageEnabled[id] = !stageEnabled[id]; renderChain(); };
+    el.onclick = ()=>{ stageEnabled[id] = !stageEnabled[id]; renderChain(); refreshBypassBtns();
+      toast(STAGE_INFO[id].name + (stageEnabled[id] ? " back in the chain" : " bypassed")); };
     if(isTouch){
       /* HTML5 drag doesn't exist on touch — give each pill move arrows */
       const mk = (txt, dir, disabled)=>{
@@ -5285,10 +5566,12 @@ function resetSection(id){
 
 /* ---- section toggle rows ---- */
 const toggleRefs = {};
-function mkToggle(parent, id, labelFn, onClick, tip){
+function mkToggle(parent, id, labelFn, onClick, tip, options){
   const b = document.createElement("button");
   b.textContent = labelFn();
-  if(tip) attachTip(b, labelFn().split(":")[0].trim(), tip);
+  /* these cycle through a set you could not see. Now the set is in the tip. */
+  if(tip) attachTip(b, labelFn().split(":")[0].trim(), tip,
+    options && options.length ? "Cycles through: " + options.join(" \u00b7 ") : "Click to cycle");
   b.onclick = ()=>{ onClick(); b.textContent = labelFn(); };
   parent.appendChild(b);
   toggleRefs[id] = {btn:b, labelFn};
@@ -5412,17 +5695,8 @@ function buildPerformDock(){
   refreshSnapUI(); refreshPerfUI();
 }
 
-function sectionExtras(id, d){
-  if(id==="mixer" || id==="mixer2" || id==="mixerM"){
-    const which = id==="mixer" ? 1 : (id==="mixer2" ? 2 : 3);
-    const note = document.createElement("div");
-    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
-    note.textContent =
-      which===1 ? "The detail behind bus 1's three mixer stages. SOFT feathers the wipe edge, DETAIL sets blind and bar counts, CTR X/Y moves the wipe origin. KEY THRESH, SOFT, INVERT and HUE shape whichever key is selected, and the PIP controls place the subscreen. The transition, mix type and key selectors are on the strip under the picture."
-    : which===2 ? "The same for bus 2. It only renders while the master fader is above zero, so leaving it alone costs nothing."
-    : "The same again for the master crossfade between the two buses.";
-    d.appendChild(note);
-  }
+/* anything that reads better underneath the section's own controls */
+function sectionExtrasAfter(id, d){
   if(id==="morph"){
     const tr2 = document.createElement("div"); tr2.className="trow";
     const sa = document.createElement("button"); sa.textContent="STORE A"; sa.id="morphBtnA";
@@ -5439,6 +5713,18 @@ function sectionExtras(id, d){
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
     note.textContent = "Snapshot two whole panel states, then MORPH blends every slider between them. Moving any slider takes that control back.";
+    d.appendChild(note);
+  }
+}
+function sectionExtras(id, d){
+  if(id==="mixer" || id==="mixer2" || id==="mixerM"){
+    const which = id==="mixer" ? 1 : (id==="mixer2" ? 2 : 3);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent =
+      which===1 ? "The detail behind bus 1's three mixer stages. SOFT feathers the wipe edge, DETAIL sets blind and bar counts, CTR X/Y moves the wipe origin. KEY THRESH, SOFT, INVERT and HUE shape whichever key is selected, and the PIP controls place the subscreen. The transition, mix type and key selectors are on the strip under the picture."
+    : which===2 ? "The same for bus 2. It only renders while the master fader is above zero, so leaving it alone costs nothing."
+    : "The same again for the master crossfade between the two buses.";
     d.appendChild(note);
   }
   if(id==="feedback"){
@@ -5477,7 +5763,7 @@ function sectionExtras(id, d){
   if(id==="crt"){
     const tr = document.createElement("div"); tr.className="trow";
     const MODELS=["FLAT / RAW","APERTURE GRILLE","SLOT MASK","SHADOW MASK","LCD STRIPE","MONO MONITOR","GREEN SCREEN"];
-    mkToggle(tr, "outModel", ()=>"DISPLAY: "+MODELS[outModel], ()=>{ outModel=(outModel+1)%7; }, "Which display the output is drawn on. Each model has its own phosphor mask geometry, so the same picture reads as an aperture-grille tube, a shadow mask, an LCD panel or a mono monitor.");
+    mkToggle(tr, "outModel", ()=>"DISPLAY: "+MODELS[outModel], ()=>{ outModel=(outModel+1)%7; }, "Which display the output is drawn on. Each model has its own phosphor mask geometry, so the same picture reads as an aperture-grille tube, a shadow mask, an LCD panel or a mono monitor.", MODELS);
     d.appendChild(tr);
     const note = document.createElement("div");
     note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
@@ -5489,9 +5775,9 @@ function sectionExtras(id, d){
     const TM = ["REC","PLAY","PAUSE","STOP","F FWD","REWIND"];
     const DM = ["NO DATE","DATE","DATE + TIME"];
     mkToggle(tr, "osdMode", ()=>"DECK: "+TM[osdMode], ()=>{ osdMode=(osdMode+1)%6; osdLast=""; },
-      "Which transport the burnt-in display is showing. REC blinks the way it did, and the counter only runs on the transports that would actually move the tape - forward on PLAY and REC, seven times as fast on the shuttles, and backwards on rewind.");
+      "Which transport the burnt-in display is showing. REC blinks the way it did, and the counter only runs on the transports that would actually move the tape - forward on PLAY and REC, seven times as fast on the shuttles, and backwards on rewind.", TM);
     mkToggle(tr, "osdDate", ()=>DM[osdDate], ()=>{ osdDate=(osdDate+1)%3; osdLast=""; },
-      "The date stamp in the corner. Today's date, taken from this machine.");
+      "The date stamp in the corner. Today's date, taken from this machine.", DM);
     mkToggle(tr, "osdZero", ()=>"COUNTER 0", ()=>{ osdCounter=0; osdLast=""; },
       "Resets the tape counter to zero, the way the button on the front of the deck did.");
     d.appendChild(tr);
@@ -5990,6 +6276,7 @@ function onMidi(e){
   const key = (st&0x0f)+":"+d1;
   if(midiLearnMode && midiLearnTarget){
     midiMap[key] = midiLearnTarget;
+    renderMidiMap();
     uiRefs[midiLearnTarget].label.classList.remove("learn");
     uiRefs[midiLearnTarget].label.classList.add("mapped");
     toast("Mapped CC"+d1+" → "+P[midiLearnTarget].name);
@@ -6971,18 +7258,19 @@ function setDock(t){
     t = dockTab === "text" ? "matrix" : dockTab;
   }
   dockTab = t;
-  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", audio:"audiodock", perform:"performdock"};
+  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", out:"outdock", audio:"audiodock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);
     if(el) el.classList.toggle("on", k===t);
   }
-  document.querySelectorAll("#dockTabs button").forEach(b=>b.classList.toggle("on", b.dataset.dock===t));
+  document.querySelectorAll("#dockTabs button[data-dock]").forEach(b=>b.classList.toggle("on", b.dataset.dock===t));
   const hint = document.getElementById("dockHint");
   if(hint) hint.textContent = t==="mod" ? "right-click any parameter to patch it"
                             : t==="text" ? "typing here never triggers shortcuts"
                             : t==="perform" ? "shift and a number recalls a snapshot \u00b7 Q W E R T Y hold the pads"
                             : t==="mix" ? "the faders themselves are on the strip under the picture"
                             : t==="audio" ? "band ranges decide what each modulator is listening for"
+                            : t==="out" ? "the display and the glass in front of it, shared by every channel"
                             : "patch sources into any parameter";
   if(t==="text") syncTextEditor();
   refreshDockTabs();
@@ -7284,12 +7572,26 @@ function fmtT(s){ if(!isFinite(s)) return "--:--"; s=Math.floor(s); return Math.
 let recorder=null, recChunks=[], recStart=0, recTimer=null;
 const btnRec = document.getElementById("btnRec"), recTime = document.getElementById("recTime");
 btnRec.onclick = toggleRec;
-let recStream = null;
+let recStream = null, recSize = null, recLocked = false;
+/* about a quarter of a bit per pixel, which is generous for normal footage and
+   merely adequate for this, bounded so a 4K recording does not ask for a gigabit */
+function bitrateFor(w, h, fps){
+  return Math.max(8_000_000, Math.min(160_000_000, Math.round(w*h*fps*0.25)));
+}
 function toggleRec(){
   if(recorder){ recorder.stop(); return; }
   /* each recording used to add another live capture stream to the canvas and
      never let go of it */
   if(recStream){ try{ recStream.getTracks().forEach(t=>t.stop()); }catch(e){} }
+  /* The canvas backing store is normally sized to the window, so recording
+     captured whatever the pane happened to be - about 900 x 500 with the panel
+     open - and upscaled it. That is the softness. Pin it to the processing
+     raster for the duration, the way the offline render already does, so 1080p
+     processing records 1080p and 4K records 4K. The CSS size does not change,
+     so nothing moves on screen. */
+  recSize = {w: canvas.width, h: canvas.height};
+  canvas.width = procW; canvas.height = procH;
+  recLocked = true;
   const stream = recStream = canvas.captureStream(60);
   if(audioCtx && recDest && audioMode==="source"){
     for(const tr of recDest.stream.getAudioTracks()) stream.addTrack(tr);
@@ -7302,15 +7604,20 @@ function toggleRec(){
   }
   const isMp4 = mime.indexOf("mp4") >= 0;
   recChunks = [];
-  recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: 16_000_000});
+  /* Glitch material is about the worst case an encoder ever sees: every frame
+     is high-entropy and almost nothing survives between frames. A flat 16 Mbit
+     was thin at 1080p and meaningless at 4K, so scale it with the pixel rate. */
+  recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: bitrateFor(procW, procH, 60)});
   recorder.ondataavailable = e=>{ if(e.data.size) recChunks.push(e.data); };
   recorder.onstop = ()=>{
     const blob = new Blob(recChunks, {type: isMp4 ? "video/mp4" : "video/webm"});
     dl(URL.createObjectURL(blob), "bendr-"+stamp()+(isMp4?".mp4":".webm"));
     recorder=null; btnRec.classList.remove("rec-on"); btnRec.textContent="● REC";
     if(recStream){ try{ recStream.getTracks().forEach(t=>t.stop()); }catch(e){} recStream=null; }
+    recLocked = false;
+    if(recSize){ canvas.width = recSize.w; canvas.height = recSize.h; recSize = null; markSizeDirty(); }
     recTime.style.display="none"; clearInterval(recTimer);
-    toast("Recording saved ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
+    toast("Recording saved, "+procW+"\u00d7"+procH+" ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
   };
   recorder.start(250);
   recStart = performance.now();
@@ -7664,7 +7971,8 @@ window.addEventListener("keydown", e=>{
   if(k==="z"){ if(e.shiftKey) redo(); else undo(); return; }
   if(k==="f"){ document.getElementById("btnFull").click(); return; }
   if(k==="s"){ document.getElementById("btnSnap").click(); return; }
-  if(k==="h"){ help.classList.toggle("show"); return; }
+  if(k==="h"){ if(help.classList.contains("show")) help.classList.remove("show"); else window.__openHelp(); return; }
+  if(e.key === "Escape" && help.classList.contains("show")){ help.classList.remove("show"); return; }
   if(k==="/"){ e.preventDefault(); if(window.__focusFilter) window.__focusFilter(); return; }
   if(k==="d"){ setDock(dockTab==="mod" ? "matrix" : "mod"); return; }
   if(k==="p"){ btnPlay.click(); return; }
@@ -7917,7 +8225,8 @@ function sizeCanvas(){
     mv.style.left = canvas.style.left; mv.style.top = canvas.style.top;
   }
   const w = Math.max(2, Math.floor(dw*dpr)), h = Math.max(2, Math.floor(dh*dpr));
-  if(canvas.width!==w || canvas.height!==h){ canvas.width=w; canvas.height=h; }
+  /* while recording the backing store is pinned to the processing raster */
+  if(!recLocked && (canvas.width!==w || canvas.height!==h)){ canvas.width=w; canvas.height=h; }
 }
 window.addEventListener("resize", sizeCanvas);
 
@@ -8406,8 +8715,41 @@ canvas.addEventListener("webglcontextrestored", ()=>{
   ctxLost = false;
   toast("Graphics context restored \u2014 reload if the picture does not come back", true);
 }, false);
+/* Live thumbnails on the channel buttons. A readback stalls the pipeline, so
+   this happens twice a second at 48x27 - about five kilobytes a second in
+   total - rather than every frame. */
+const THUMB_W = 48, THUMB_H = 27;
+const thumbPix = new Uint8Array(THUMB_W*THUMB_H*4);
+let thumbAt = 0, thumbRT = null, thumbImg = null;
+function updateThumbs(now){
+  if(now - thumbAt < 0.5) return;
+  thumbAt = now;
+  if(typeof chanThumbs === "undefined") return;
+  if(!thumbRT) thumbRT = makeRT(THUMB_W, THUMB_H);
+  if(!thumbRT) return;
+  for(const ch of CHANNELS){
+    const g = chanThumbs[ch];
+    if(!g) continue;
+    const c = chanRT[ch];
+    if(!c.allocated || !c.out){ g.clearRect(0,0,THUMB_W,THUMB_H); continue; }
+    /* scale down on the GPU first: reading a full raster back would be absurd */
+    runPass(progCOPY, c.out.tex, thumbRT.fbo, THUMB_W, THUMB_H, null, ch);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, thumbRT.fbo);
+    gl.readPixels(0,0,THUMB_W,THUMB_H, gl.RGBA, gl.UNSIGNED_BYTE, thumbPix);
+    if(!thumbImg) thumbImg = g.createImageData(THUMB_W, THUMB_H);
+    const d = thumbImg.data;
+    /* readPixels is bottom-up */
+    for(let y=0;y<THUMB_H;y++){
+      const src = (THUMB_H-1-y)*THUMB_W*4, dst = y*THUMB_W*4;
+      for(let i=0;i<THUMB_W*4;i++) d[dst+i] = thumbPix[src+i];
+    }
+    g.putImageData(thumbImg, 0, 0);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
 function frameEnd(now, dt){
   serviceGrabs();
+  updateThumbs(now);
   if(offline) return;
   const S = cur();
   if(S.mode==="file" && S.video.duration && !seeking){
@@ -8456,7 +8798,7 @@ async function offlineRender(){
   let codec=null, mcodec=null;
   for(const [c,m] of candidates){
     try{
-      const s = await VideoEncoder.isConfigSupported({codec:c, width:W, height:H, bitrate:14_000_000, framerate:fps});
+      const s = await VideoEncoder.isConfigSupported({codec:c, width:W, height:H, bitrate:bitrateFor(W,H,fps), framerate:fps});
       if(s.supported){ codec=c; mcodec=m; break; }
     }catch(e){}
   }
@@ -8502,7 +8844,7 @@ async function offlineRender(){
     output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
     error: e => { console.error(e); toast("Encoder error: "+e.message, true); renderCancel = true; },
   });
-  enc.configure({codec, width:W, height:H, bitrate:14_000_000, framerate:fps});
+  enc.configure({codec, width:W, height:H, bitrate:bitrateFor(W,H,fps), framerate:fps});
   const total = Math.max(1, Math.floor(video.duration*fps));
   const seekTo = (v,t)=>new Promise(res=>{
     const h = ()=>{ v.removeEventListener("seeked", h); res(); };
@@ -8557,6 +8899,46 @@ async function offlineRender(){
 }
 
 /* ---------------- init ---------------- */
+/* Shown once, and it earns its interruption: this thing can produce full-frame
+   flashing at any rate you ask it for, and it is meant to be projected in a
+   room with other people in it. */
+function firstRunNotice(){
+  let seen = false;
+  try{ seen = localStorage.getItem("bendr.seen") === "1"; }catch(e){}
+  if(seen) return;
+  const wrap = document.createElement("div");
+  wrap.id = "firstrun";
+  wrap.innerHTML =
+    "<div class='frbox'>" +
+    "<h3>BEFORE YOU START</h3>" +
+    "<p><b>This tool can produce rapid full-frame flashing.</b> STROBE, INV FLICKER and the feedback " +
+    "presets can all be driven to rates that are unsafe for people with photosensitive epilepsy, and " +
+    "there is no rate ceiling because a ceiling would make some of it useless. If you are projecting " +
+    "to a room, treat that as your responsibility: check the material before you show it, and warn " +
+    "people at the door.</p>" +
+    "<p>Four things worth knowing:</p>" +
+    "<p>Drop a video anywhere on the picture to load it. Press <b>/</b> to search the panel. Hold " +
+    "<b>Q W E R T Y</b> for the bend pads. Press <b>H</b> for the manual, which explains not just what " +
+    "each control does but why it behaves the way it does.</p>" +
+    "<p>Your patch saves itself as you work, so a reload picks up where you left off.</p>" +
+    "<button id='frOk'>UNDERSTOOD</button>" +
+    "</div>";
+  document.body.appendChild(wrap);
+  document.getElementById("frOk").onclick = ()=>{
+    wrap.remove();
+    try{ localStorage.setItem("bendr.seen", "1"); }catch(e){}
+  };
+}
+
+/* the state a new session opens in */
+function openingPatch(){
+  initPatch();
+  routes = [];
+  for(const ch of CHANNELS){ SRC[ch].mode = "pattern"; SRC[ch].pattern = "testcard"; SRC[ch].name = "pattern"; }
+  setBase("scanlines", 0.22); setBase("curvature", 0.18); setBase("vignette", 0.28);
+  refreshUI(); renderRoutes(); refreshToggles(); syncChanInputUI();
+  if(typeof selPreset !== "undefined") selPreset.value = "";
+}
 window.__pcur = (id,ch)=>getCur(id,ch);
 window.__dbg = ()=>({chan:activeChan,
   ...Object.fromEntries(CHANNELS.map(ch=>[ch,
@@ -8638,10 +9020,45 @@ if(OUTPUT_MODE){
     bar.addEventListener("touchstart", ()=>{ dragging = true; }, {passive:true});
     window.addEventListener("mousemove", move);
     window.addEventListener("touchmove", move, {passive:true});
-    window.addEventListener("mouseup", ()=>{ dragging=false; document.body.style.cursor=""; });
-    window.addEventListener("touchend", ()=>{ dragging=false; });
+    const stop = ()=>{
+      if(!dragging) return;
+      dragging=false; document.body.style.cursor="";
+      /* the height you chose used to be forgotten the moment you reloaded */
+      try{ localStorage.setItem("bendr.dockh", parseInt(low.style.height,10)||0); }catch(e){}
+    };
+    window.addEventListener("mouseup", stop);
+    window.addEventListener("touchend", stop);
+    /* double-clicking the bar folds the dock away entirely, so the picture can
+       have the height when you are not patching */
+    bar.addEventListener("dblclick", ()=>toggleDock());
+    let stashed = 0;
+    window.__toggleDock = toggleDock;
+    function toggleDock(force){
+      const open = force !== undefined ? force : document.body.classList.contains("nodock");
+      if(open){
+        document.body.classList.remove("nodock");
+        low.style.height = (stashed || 250) + "px";
+      } else {
+        stashed = parseInt(low.style.height,10) || low.getBoundingClientRect().height || 250;
+        document.body.classList.add("nodock");
+      }
+      try{ localStorage.setItem("bendr.dockopen", open ? "1" : "0"); }catch(e){}
+      markSizeDirty();
+      const db = document.getElementById("dockFold");
+      if(db) db.innerHTML = open ? "&#9662;" : "&#9656;";
+    }
+    { let h = 0, wasOpen = true;
+      try{ h = parseInt(localStorage.getItem("bendr.dockh"),10)||0;
+           wasOpen = (localStorage.getItem("bendr.dockopen") || "1") === "1"; }catch(e){}
+      if(h > 110) low.style.height = h + "px";
+      if(!wasOpen) toggleDock(false);
+    }
+    { const db = document.getElementById("dockFold");
+      if(db) db.onclick = ()=>toggleDock(); }
   }
-  document.querySelectorAll("#dockTabs button").forEach(b=>{ b.onclick = ()=>setDock(b.dataset.dock); });
+  /* [data-dock] only: the fold button lives in this strip too and was having
+     its own handler overwritten by this loop */
+  document.querySelectorAll("#dockTabs button[data-dock]").forEach(b=>{ b.onclick = ()=>setDock(b.dataset.dock); });
   {
     const rs = document.getElementById("selRes");
     rs.onchange = ()=>{
@@ -8660,7 +9077,34 @@ if(OUTPUT_MODE){
     window.addEventListener("resize", markSizeDirty);
     window.addEventListener("orientationchange", markSizeDirty);
   }
-  { const hb = document.getElementById("btnHelpTop"); if(hb) hb.onclick = ()=>help.classList.toggle("show"); }
+  /* Two tooltip systems were running side by side - the custom panel and the
+     browser's own title attribute - on controls sitting twenty pixels apart,
+     with different delays and different appearance. Convert whatever is left. */
+  {
+    let n = 0;
+    for(const el of document.querySelectorAll("[title]")){
+      const t = el.getAttribute("title");
+      if(!t) continue;
+      el.removeAttribute("title");
+      attachTip(el, "", t);
+      n++;
+    }
+    /* and anything built later goes through the same door */
+    window.__adoptTitles = ()=>{
+      for(const el of document.querySelectorAll("[title]")){
+        const t = el.getAttribute("title");
+        if(!t) continue;
+        el.removeAttribute("title");
+        attachTip(el, "", t);
+      }
+    };
+  }
+  /* the pills, the route rows and the mod cards are rebuilt as you work, so
+     sweep up anything they bring with them */
+  setInterval(()=>window.__adoptTitles(), 2000);
+  initHelpUI();
+  { const hb = document.getElementById("btnHelpTop"); if(hb) hb.onclick = ()=>window.__openHelp(); }
+  { const hb = document.getElementById("btnHelp"); if(hb) hb.onclick = ()=>window.__openHelp(); }
   setActiveChan("A");
   syncChanInputUI();
   renderChain();
@@ -8708,12 +9152,16 @@ if(OUTPUT_MODE){
     if(bb) bb.onclick = ()=>{ bopen = !bopen; bapply(); try{ localStorage.setItem("bendr.bendstrip", bopen?"1":"0"); }catch(e){} };
     bapply();
   }
-  loadPreset(1);   /* RAINBOW RITE so it looks alive immediately */
+  /* A new session opens on a bare test card: no routes, no effects, nothing
+     modulating. Somewhere to start from rather than something to undo. The
+     presets are one keypress away when you want them. */
+  openingPatch();
   histStack.length = 0;
   const resumed = restoreAutosave();
   sizeCanvas();
   requestAnimationFrame(frame);
   if(!resumed) toast("BENDR ready — drop a video anywhere, press / to search the panel, H for help");
+  firstRunNotice();
 }
 </script>
 </body>

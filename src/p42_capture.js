@@ -2,12 +2,26 @@
 let recorder=null, recChunks=[], recStart=0, recTimer=null;
 const btnRec = document.getElementById("btnRec"), recTime = document.getElementById("recTime");
 btnRec.onclick = toggleRec;
-let recStream = null;
+let recStream = null, recSize = null, recLocked = false;
+/* about a quarter of a bit per pixel, which is generous for normal footage and
+   merely adequate for this, bounded so a 4K recording does not ask for a gigabit */
+function bitrateFor(w, h, fps){
+  return Math.max(8_000_000, Math.min(160_000_000, Math.round(w*h*fps*0.25)));
+}
 function toggleRec(){
   if(recorder){ recorder.stop(); return; }
   /* each recording used to add another live capture stream to the canvas and
      never let go of it */
   if(recStream){ try{ recStream.getTracks().forEach(t=>t.stop()); }catch(e){} }
+  /* The canvas backing store is normally sized to the window, so recording
+     captured whatever the pane happened to be - about 900 x 500 with the panel
+     open - and upscaled it. That is the softness. Pin it to the processing
+     raster for the duration, the way the offline render already does, so 1080p
+     processing records 1080p and 4K records 4K. The CSS size does not change,
+     so nothing moves on screen. */
+  recSize = {w: canvas.width, h: canvas.height};
+  canvas.width = procW; canvas.height = procH;
+  recLocked = true;
   const stream = recStream = canvas.captureStream(60);
   if(audioCtx && recDest && audioMode==="source"){
     for(const tr of recDest.stream.getAudioTracks()) stream.addTrack(tr);
@@ -20,15 +34,20 @@ function toggleRec(){
   }
   const isMp4 = mime.indexOf("mp4") >= 0;
   recChunks = [];
-  recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: 16_000_000});
+  /* Glitch material is about the worst case an encoder ever sees: every frame
+     is high-entropy and almost nothing survives between frames. A flat 16 Mbit
+     was thin at 1080p and meaningless at 4K, so scale it with the pixel rate. */
+  recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: bitrateFor(procW, procH, 60)});
   recorder.ondataavailable = e=>{ if(e.data.size) recChunks.push(e.data); };
   recorder.onstop = ()=>{
     const blob = new Blob(recChunks, {type: isMp4 ? "video/mp4" : "video/webm"});
     dl(URL.createObjectURL(blob), "bendr-"+stamp()+(isMp4?".mp4":".webm"));
     recorder=null; btnRec.classList.remove("rec-on"); btnRec.textContent="● REC";
     if(recStream){ try{ recStream.getTracks().forEach(t=>t.stop()); }catch(e){} recStream=null; }
+    recLocked = false;
+    if(recSize){ canvas.width = recSize.w; canvas.height = recSize.h; recSize = null; markSizeDirty(); }
     recTime.style.display="none"; clearInterval(recTimer);
-    toast("Recording saved ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
+    toast("Recording saved, "+procW+"\u00d7"+procH+" ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
   };
   recorder.start(250);
   recStart = performance.now();
@@ -382,7 +401,8 @@ window.addEventListener("keydown", e=>{
   if(k==="z"){ if(e.shiftKey) redo(); else undo(); return; }
   if(k==="f"){ document.getElementById("btnFull").click(); return; }
   if(k==="s"){ document.getElementById("btnSnap").click(); return; }
-  if(k==="h"){ help.classList.toggle("show"); return; }
+  if(k==="h"){ if(help.classList.contains("show")) help.classList.remove("show"); else window.__openHelp(); return; }
+  if(e.key === "Escape" && help.classList.contains("show")){ help.classList.remove("show"); return; }
   if(k==="/"){ e.preventDefault(); if(window.__focusFilter) window.__focusFilter(); return; }
   if(k==="d"){ setDock(dockTab==="mod" ? "matrix" : "mod"); return; }
   if(k==="p"){ btnPlay.click(); return; }

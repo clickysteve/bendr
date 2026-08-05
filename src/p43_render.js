@@ -203,7 +203,8 @@ function sizeCanvas(){
     mv.style.left = canvas.style.left; mv.style.top = canvas.style.top;
   }
   const w = Math.max(2, Math.floor(dw*dpr)), h = Math.max(2, Math.floor(dh*dpr));
-  if(canvas.width!==w || canvas.height!==h){ canvas.width=w; canvas.height=h; }
+  /* while recording the backing store is pinned to the processing raster */
+  if(!recLocked && (canvas.width!==w || canvas.height!==h)){ canvas.width=w; canvas.height=h; }
 }
 window.addEventListener("resize", sizeCanvas);
 
@@ -692,8 +693,41 @@ canvas.addEventListener("webglcontextrestored", ()=>{
   ctxLost = false;
   toast("Graphics context restored \u2014 reload if the picture does not come back", true);
 }, false);
+/* Live thumbnails on the channel buttons. A readback stalls the pipeline, so
+   this happens twice a second at 48x27 - about five kilobytes a second in
+   total - rather than every frame. */
+const THUMB_W = 48, THUMB_H = 27;
+const thumbPix = new Uint8Array(THUMB_W*THUMB_H*4);
+let thumbAt = 0, thumbRT = null, thumbImg = null;
+function updateThumbs(now){
+  if(now - thumbAt < 0.5) return;
+  thumbAt = now;
+  if(typeof chanThumbs === "undefined") return;
+  if(!thumbRT) thumbRT = makeRT(THUMB_W, THUMB_H);
+  if(!thumbRT) return;
+  for(const ch of CHANNELS){
+    const g = chanThumbs[ch];
+    if(!g) continue;
+    const c = chanRT[ch];
+    if(!c.allocated || !c.out){ g.clearRect(0,0,THUMB_W,THUMB_H); continue; }
+    /* scale down on the GPU first: reading a full raster back would be absurd */
+    runPass(progCOPY, c.out.tex, thumbRT.fbo, THUMB_W, THUMB_H, null, ch);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, thumbRT.fbo);
+    gl.readPixels(0,0,THUMB_W,THUMB_H, gl.RGBA, gl.UNSIGNED_BYTE, thumbPix);
+    if(!thumbImg) thumbImg = g.createImageData(THUMB_W, THUMB_H);
+    const d = thumbImg.data;
+    /* readPixels is bottom-up */
+    for(let y=0;y<THUMB_H;y++){
+      const src = (THUMB_H-1-y)*THUMB_W*4, dst = y*THUMB_W*4;
+      for(let i=0;i<THUMB_W*4;i++) d[dst+i] = thumbPix[src+i];
+    }
+    g.putImageData(thumbImg, 0, 0);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
 function frameEnd(now, dt){
   serviceGrabs();
+  updateThumbs(now);
   if(offline) return;
   const S = cur();
   if(S.mode==="file" && S.video.duration && !seeking){

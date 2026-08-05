@@ -184,18 +184,40 @@ function stopCam(ch){
   const S = SRC[ch];
   if(S.cam){ S.cam.getTracks().forEach(t=>t.stop()); S.cam=null; }
 }
+/* What a source can actually be asked to do. A file has a timeline you can
+   scrub; a generated source has a clock but nothing to scrub; a live camera or
+   screen capture has neither, and asking a MediaStream-backed video element to
+   seek or change rate throws rather than being ignored. Every transport
+   control is gated on this, because a dead control that raises an exception is
+   worse than one that is not there. */
+function srcCaps(S){
+  const m = S ? S.mode : "";
+  if(m === "file") return {timeline:true, clock:true, audio:true, live:false};
+  if(m === "pattern" || m === "text" || m === "synth" || m === "feed")
+    return {timeline:false, clock:true, audio:false, live:false};
+  return {timeline:false, clock:false, audio:false, live:true};   /* cam, screen */
+}
+function capsOf(ch){ return srcCaps(SRC[ch||activeChan]); }
+const CAP_WHY = {
+  live: "Not available on a live camera or screen capture: there is no timeline to move around in.",
+  gen:  "Not available on a generated source: there is no file to seek, loop or mute.",
+};
 function syncChanInputUI(){
   const S = cur();
-  const gen = (S.mode === "pattern" || S.mode === "text");
-  /* a generated source has no file to seek, loop or mute — grey those out
-     rather than leaving dead controls sitting there */
-  for(const [id, off] of [["btnPlay",gen],["btnLoop",gen],["btnMute",gen],["btnVari",gen],["seek",gen]]){
+  const caps = srcCaps(S);
+  const why = caps.live ? CAP_WHY.live : CAP_WHY.gen;
+  for(const [id, need] of [["btnPlay","timeline"],["btnLoop","timeline"],["seek","timeline"],
+                           ["btnMute","audio"],["btnVari","audio"],["spd","clock"]]){
     const el = document.getElementById(id);
     if(!el) continue;
+    const off = !caps[need];
     el.disabled = off;
     el.classList.toggle("dim", off);
-    el.title = off ? "Not available on a generated source — load a file into this channel" : "";
+    el.title = off ? why : "";
   }
+  { const tc = document.getElementById("tcode");
+    if(tc && !caps.timeline) tc.textContent = caps.live ? "LIVE" : "--:-- / --:--"; }
+  refreshSourceSections();
   for(const q of document.querySelectorAll(".mchan")) q.textContent = activeChan;
   /* say what every channel is looking at, in three places, because "which
      source is this channel on" was invisible until you opened the menu */
@@ -588,7 +610,7 @@ const btnPlay = document.getElementById("btnPlay");
 const seek = document.getElementById("seek");
 const tcode = document.getElementById("tcode");
 let seeking = false, masterMuted = false, variMode = false;
-btnPlay.onclick = ()=>{ const v = cur().video; if(v.paused) v.play(); else v.pause(); };
+btnPlay.onclick = ()=>{ if(!capsOf().timeline) return; const v = cur().video; if(v.paused) v.play(); else v.pause(); };
 video.addEventListener("play", ()=> btnPlay.textContent="❚❚");
 video.addEventListener("pause", ()=> btnPlay.textContent="▶");
 document.getElementById("btnLoop").onclick = e=>{
@@ -610,7 +632,7 @@ function setSpeed(v, ch){
     spdEl.classList.toggle("hot", Math.abs(v-1) > 0.001);
   }
 }
-spdEl.addEventListener("input", e=>{ setSpeed(parseFloat(e.target.value)); });
+spdEl.addEventListener("input", e=>{ if(!capsOf().clock) return; setSpeed(parseFloat(e.target.value)); });
 spdEl.addEventListener("dblclick", ()=>{ setSpeed(1); });
 for(const ch of CHANNELS){
   const S = SRC[ch];
@@ -625,9 +647,18 @@ for(const ch of CHANNELS) transport[ch] = "play";
 const TP_RATE = {play:1, still:0, ff:4, rew:-4, jogf:0.25, jogr:-0.25};
 function setTransport(mode, ch){
   ch = ch || activeChan;
-  transport[ch] = mode;
   const S = SRC[ch];
-  if(S.mode === "pattern" || S.mode === "text"){
+  const caps = srcCaps(S);
+  /* a live stream can be held or let run, and that is the whole of it: there
+     is nothing to shuttle through */
+  if(caps.live && mode !== "play" && mode !== "still"){
+    toast("Shuttle and jog need a timeline \u2014 this channel is a live input", true);
+    return;
+  }
+  transport[ch] = mode;
+  /* a generated source has a clock rather than a tape, so the transport drives
+     the clock and never touches the video element */
+  if(caps.clock && !caps.timeline){
     S.tpRate = TP_RATE[mode];
     if(typeof refreshToggles === "function") refreshToggles();
     return;
@@ -649,9 +680,10 @@ function driveTransport(dt){
     const m = transport[ch];
     if(m === "play" || m === "still" || m === "ff") continue;
     const S = SRC[ch];
-    if(S.mode === "pattern" || S.mode === "text") continue;
+    /* scrubbing currentTime is only meaningful, and only legal, on a file */
+    if(S.mode !== "file") continue;
     const v = S.video;
-    if(!v.duration) continue;
+    if(!v.duration || !isFinite(v.duration)) continue;
     const r = TP_RATE[m] * (Math.abs(S.speed) || 1);
     let nt = v.currentTime + r*dt;
     if(nt < 0) nt += v.duration;
@@ -677,9 +709,10 @@ document.getElementById("btnVari").onclick = e=>{
   toast(variMode ? "Varispeed: pitch follows speed (tape mode)" : "Time-stretch: pitch held constant");
 };
 seek.addEventListener("input", ()=>{
+  if(!capsOf().timeline) return;
   seeking=true;
   const v = cur().video;
-  if(v.duration) v.currentTime = seek.value*v.duration;
+  if(v.duration && isFinite(v.duration)){ try{ v.currentTime = seek.value*v.duration; }catch(e){} }
 });
 seek.addEventListener("change", ()=>{ seeking=false; });
 function fmtT(s){ if(!isFinite(s)) return "--:--"; s=Math.floor(s); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }

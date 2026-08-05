@@ -151,6 +151,7 @@ window.__toggleStill = ch=>{
 };
 window.__stillOf = ch=>!!stillHeld[ch||activeChan];
 let offline = false, liveList = "A";
+let liveNow = {A:true, B:false, C:false, D:false};
 
 /* video content analysis — the picture itself as a mod source (reads channel A) */
 const anaC = document.createElement("canvas"); anaC.width=32; anaC.height=18;
@@ -562,6 +563,7 @@ function renderFrame(now, dt){
     }
   }
   liveList = CHANNELS.filter(c=>live[c]).join("+");
+  liveNow = live;      /* the thumbnails need to know who is not being rendered */
   for(const ch of CHANNELS){
     if(!live[ch]) continue;
     uploadSource(ch, dt);
@@ -915,12 +917,32 @@ function updateScopes(now){
 const THUMB_W = 48, THUMB_H = 27;
 const thumbPix = new Uint8Array(THUMB_W*THUMB_H*4);
 let thumbAt = 0, thumbRT = null, thumbImg = null;
+let thumbTurn = 0;
 function updateThumbs(now){
   if(now - thumbAt < 0.5) return;
   thumbAt = now;
   if(typeof chanThumbs === "undefined") return;
   if(!thumbRT) thumbRT = makeRT(THUMB_W, THUMB_H);
   if(!thumbRT) return;
+  /* A channel that is not in the mix is not rendered, so its thumbnail used to
+     sit on whatever it last produced — change a source on an idle channel and
+     nothing happened until you faded it up. One idle channel per tick gets its
+     source pulled and shown, which is two passes twice a second and tells you
+     what is actually loaded before you commit to it. */
+  const idle = CHANNELS.filter(c=>!liveNow[c] && srcReady(c));
+  if(idle.length){
+    const ch = idle[thumbTurn++ % idle.length];
+    ensureChanRT(ch);
+    uploadSource(ch, 0);
+    const S = SRC[ch], C = chanRT[ch];
+    const t = (S.mode === "synth") ? renderGen(ch, now)
+            : (S.mode === "feed")  ? feedTex(S.feed || "PGM")
+            : srcTex[ch];
+    if(t && C.allocated){
+      if(!C.out) C.out = makeRT(procW, procH);
+      if(C.out) runPass(progCOPY, t, C.out.fbo, procW, procH, null, ch);
+    }
+  }
   for(const ch of CHANNELS){
     const g = chanThumbs[ch];
     if(!g) continue;

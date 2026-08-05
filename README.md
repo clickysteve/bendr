@@ -162,6 +162,10 @@ Each channel takes a video file (streamed from disk, so a 4GB file is no heavier
 
 **CAM** opens whatever is selected in the device list beside it, so a built-in webcam, a USB one, an HDMI capture stick and a virtual camera from streaming software all work the same way. Device names only appear once camera access has been granted, so the list reads DEVICE 1, DEVICE 2 until the first time CAM is pressed. **SCREEN** captures a screen, a window or a browser tab, which is the general way to bring in anything that is not a camera.
 
+The interface follows what the source can actually do. A file has a timeline, so it plays, loops, seeks, mutes and shuttles. A generated source — pattern, text, synth, or a feed from another channel — has a clock but nothing to scrub, so SPD and the deck transport drive that clock while the file controls grey out. A camera or screen capture has neither: it can be held or let run and nothing else, because asking a live stream to seek does not fail quietly, it throws. The panel obeys the same rule, so PATTERN SYNTH only appears on a channel that is actually a synth.
+
+Channel thumbnails stay current whether or not the channel is in the mix. An idle channel is not rendered at all, so one of them per tick has its source pulled for the thumbnail, which is how you can see what is loaded on C and D before you fade them up.
+
 ## The panel, the dock and the picture
 
 The sidebar is per-channel, and only per-channel: everything shared by all four — the three mixers, the display stage and the output overlay — is on a tab in the dock under the picture. Each stage section carries its own bypass, wired to the same state as the rail above the picture, so switching TAPE / SYNC out of the chain reads the same in both places. The dock folds away entirely with the button on its tab strip or a double-click on the bar above it, and both the folded state and the height you drag it to are remembered.

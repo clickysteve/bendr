@@ -1082,12 +1082,43 @@ function buildFilterBar(){
     for(const id in secEls){
       const d = secEls[id];
       if(!d.closest || !d.closest("#panel")) continue;
+      /* a section that does not belong to this channel's source stays hidden
+         whatever the filter says */
+      if(d.classList.contains("srcoff")){ d.style.display = "none"; continue; }
       if(!filterOn){ d.style.display = ""; continue; }
       const any = Array.prototype.some.call(d.querySelectorAll(".prow"), x=>x.style.display !== "none");
       d.style.display = any ? "" : "none";
     }
     count.textContent = filterOn ? shown+" OF "+PLIST.length : "";
   };
+}
+/* Which sections belong to which source. The pattern synth is not a stage in
+   the chain, it is what the channel is looking at, so on a channel playing a
+   file it is a panel of controls that do nothing. It goes away. */
+const SEC_FOR_SRC = { gen: ["synth"], text: ["text"] };
+function refreshSourceSections(){
+  const mode = (typeof SRC !== "undefined" && SRC[activeChan]) ? SRC[activeChan].mode : "";
+  for(const id in SEC_FOR_SRC){
+    const d = secEls[id];
+    if(!d) continue;
+    const off = SEC_FOR_SRC[id].indexOf(mode) < 0;
+    d.classList.toggle("srcoff", off);
+    /* the filter writes an inline display, so clearing the class is not enough
+       to bring a section back */
+    if(!off) d.style.display = "";
+  }
+  /* the deck transport: a live input can be held or let run and nothing else,
+     so the shuttle and jog keys are dimmed rather than left to throw */
+  const btns = tapeBtnRefs[0];
+  if(btns && typeof srcCaps === "function"){
+    const caps = srcCaps(SRC[activeChan]);
+    for(const k in btns){
+      const off = caps.live && k !== "play" && k !== "still";
+      btns[k].disabled = off;
+      btns[k].classList.toggle("dim", off);
+    }
+  }
+  if(filterOn) applyFilter();
 }
 let applyFilter = ()=>{};
 function buildPanel(){

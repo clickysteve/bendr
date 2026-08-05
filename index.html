@@ -83,6 +83,8 @@ body{
 .snapbtn.full{border-color:var(--cyan); color:var(--cyan);}
 .snapbtn.full:hover{border-color:var(--amber); color:#fff;}
 button.dim, input.dim, select.dim{opacity:.32; cursor:not-allowed;}
+/* a section that belongs to a source this channel is not using */
+.sec.srcoff{display:none !important;}
 /* ---------- panel zones ---------- */
 .zonehead{
   display:flex; align-items:center; gap:5px;
@@ -844,7 +846,7 @@ body.nomix #mixbuses{display:none;}
     <div class="menupanel">
       <div class="mrow2">
         <button id="btnUndo" class="cy" data-tip="Step back through the last two dozen changes. Keyboard: Z.">UNDO</button>
-        <button id="btnInit" data-tip="Init patch: every control back to its default, both buses, all four channels. Undoable.">INIT</button>
+        <button id="btnInit" data-tip="Init patch: every control back to its default, on all four channels and all three buses, plus the mod routes, the chain order and every mode button. The sources you have loaded stay loaded. Undoable with Z, so it is safe to press.">INIT &middot; RESET ALL</button>
       </div>
       <div class="mrow2">
         <button id="btnSave" data-tip="Save the whole rig - every channel, every route, LFO and toggle - as a .json patch file on disk.">SAVE FILE</button>
@@ -1228,6 +1230,7 @@ body.nomix #mixbuses{display:none;}
   <h3>TEMPO &amp; MIDI</h3>
   <p>TAP sets the tempo, or click the number beside it and type one — Enter commits, Escape reverts, and the arrow keys nudge by one beat, or a tenth with shift. LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
   <h3>FINDING YOUR WAY AROUND</h3>
+  <p>What the transport can do depends on what the channel is looking at. A file has a timeline, so it plays, loops, seeks, mutes and shuttles. A generated source — pattern, text, synth or a feed from another channel — has a clock but nothing to scrub, so SPD and the deck transport drive that clock and the file controls are greyed out. A camera or a screen capture has neither, so it can be held or let run and nothing else. The panel follows the same rule: PATTERN SYNTH only appears on a channel that is actually a synth, because everywhere else it is a page of controls that do nothing.</p>
   <p>The top bar holds four menus \u2014 PATCH, SOURCE, ENGINE, OUTPUT \u2014 and everything you touch mid-performance stays out in the open: the preset list, RANDOMIZE and MUTATE, BEND and MOD to fold those panes in and out, and MULTI, BYPASS, REC, POP OUT and FULL on the right.</p>
   <p><b>RANDOMIZE</b> has a small caret beside it that decides what a roll is allowed to touch. <b>THIS CHANNEL</b> rolls only the channel you are editing and leaves the other three alone, which is how you build a mix one channel at a time; <b>ALL FOUR</b> rolls each of them separately so they come out different from each other; <b>FOLLOW LINK</b> is the old behaviour, where LINK decides. Under KEEP: <b>SOURCE</b> holds the pattern synth and the framing still, so whatever you have loaded or built survives and only the processing is rolled; <b>MODULATION</b> holds the routes and the LFOs; <b>OUTPUT + CHAIN</b> holds the mixer, the display, the overlay and the stage order. MUTATE obeys the same settings, and the choices are remembered between sessions.</p>
   <p>The panel is in two zones, with the mixers themselves on the strip under the picture rather than in the sidebar. <b>CHANNEL &middot; SIGNAL PATH</b> holds everything belonging to the selected channel, in the order the signal actually travels &mdash; source, framing, frame store, feedback, then the reorderable stages, then the keyer &mdash; and it is the only zone you can rearrange, by dragging the handle on the left of a section. <b>FOLLOW CHAIN</b> in that zone's header re-sorts it to match whatever order you have dragged the stages into on the rail above the picture, and RESET puts it back. <b>MASTER OUT</b> is pinned at the bottom. Above all of it is the filter: press <kbd>/</kbd> and type, and the panel narrows to whatever matches &mdash; the parameter name, its section, or the body of its help text, so &ldquo;roll&rdquo; finds V ROLL and a phrase from a description finds the control it describes. Two chips beside it answer the other two questions you have while playing: <b>MOVING</b> shows only what something is currently driving, <b>CHANGED</b> shows only what you have moved off its default.</p>
@@ -5605,12 +5608,43 @@ function buildFilterBar(){
     for(const id in secEls){
       const d = secEls[id];
       if(!d.closest || !d.closest("#panel")) continue;
+      /* a section that does not belong to this channel's source stays hidden
+         whatever the filter says */
+      if(d.classList.contains("srcoff")){ d.style.display = "none"; continue; }
       if(!filterOn){ d.style.display = ""; continue; }
       const any = Array.prototype.some.call(d.querySelectorAll(".prow"), x=>x.style.display !== "none");
       d.style.display = any ? "" : "none";
     }
     count.textContent = filterOn ? shown+" OF "+PLIST.length : "";
   };
+}
+/* Which sections belong to which source. The pattern synth is not a stage in
+   the chain, it is what the channel is looking at, so on a channel playing a
+   file it is a panel of controls that do nothing. It goes away. */
+const SEC_FOR_SRC = { gen: ["synth"], text: ["text"] };
+function refreshSourceSections(){
+  const mode = (typeof SRC !== "undefined" && SRC[activeChan]) ? SRC[activeChan].mode : "";
+  for(const id in SEC_FOR_SRC){
+    const d = secEls[id];
+    if(!d) continue;
+    const off = SEC_FOR_SRC[id].indexOf(mode) < 0;
+    d.classList.toggle("srcoff", off);
+    /* the filter writes an inline display, so clearing the class is not enough
+       to bring a section back */
+    if(!off) d.style.display = "";
+  }
+  /* the deck transport: a live input can be held or let run and nothing else,
+     so the shuttle and jog keys are dimmed rather than left to throw */
+  const btns = tapeBtnRefs[0];
+  if(btns && typeof srcCaps === "function"){
+    const caps = srcCaps(SRC[activeChan]);
+    for(const k in btns){
+      const off = caps.live && k !== "play" && k !== "still";
+      btns[k].disabled = off;
+      btns[k].classList.toggle("dim", off);
+    }
+  }
+  if(filterOn) applyFilter();
 }
 let applyFilter = ()=>{};
 function buildPanel(){
@@ -7968,18 +8002,40 @@ function stopCam(ch){
   const S = SRC[ch];
   if(S.cam){ S.cam.getTracks().forEach(t=>t.stop()); S.cam=null; }
 }
+/* What a source can actually be asked to do. A file has a timeline you can
+   scrub; a generated source has a clock but nothing to scrub; a live camera or
+   screen capture has neither, and asking a MediaStream-backed video element to
+   seek or change rate throws rather than being ignored. Every transport
+   control is gated on this, because a dead control that raises an exception is
+   worse than one that is not there. */
+function srcCaps(S){
+  const m = S ? S.mode : "";
+  if(m === "file") return {timeline:true, clock:true, audio:true, live:false};
+  if(m === "pattern" || m === "text" || m === "synth" || m === "feed")
+    return {timeline:false, clock:true, audio:false, live:false};
+  return {timeline:false, clock:false, audio:false, live:true};   /* cam, screen */
+}
+function capsOf(ch){ return srcCaps(SRC[ch||activeChan]); }
+const CAP_WHY = {
+  live: "Not available on a live camera or screen capture: there is no timeline to move around in.",
+  gen:  "Not available on a generated source: there is no file to seek, loop or mute.",
+};
 function syncChanInputUI(){
   const S = cur();
-  const gen = (S.mode === "pattern" || S.mode === "text");
-  /* a generated source has no file to seek, loop or mute — grey those out
-     rather than leaving dead controls sitting there */
-  for(const [id, off] of [["btnPlay",gen],["btnLoop",gen],["btnMute",gen],["btnVari",gen],["seek",gen]]){
+  const caps = srcCaps(S);
+  const why = caps.live ? CAP_WHY.live : CAP_WHY.gen;
+  for(const [id, need] of [["btnPlay","timeline"],["btnLoop","timeline"],["seek","timeline"],
+                           ["btnMute","audio"],["btnVari","audio"],["spd","clock"]]){
     const el = document.getElementById(id);
     if(!el) continue;
+    const off = !caps[need];
     el.disabled = off;
     el.classList.toggle("dim", off);
-    el.title = off ? "Not available on a generated source — load a file into this channel" : "";
+    el.title = off ? why : "";
   }
+  { const tc = document.getElementById("tcode");
+    if(tc && !caps.timeline) tc.textContent = caps.live ? "LIVE" : "--:-- / --:--"; }
+  refreshSourceSections();
   for(const q of document.querySelectorAll(".mchan")) q.textContent = activeChan;
   /* say what every channel is looking at, in three places, because "which
      source is this channel on" was invisible until you opened the menu */
@@ -8372,7 +8428,7 @@ const btnPlay = document.getElementById("btnPlay");
 const seek = document.getElementById("seek");
 const tcode = document.getElementById("tcode");
 let seeking = false, masterMuted = false, variMode = false;
-btnPlay.onclick = ()=>{ const v = cur().video; if(v.paused) v.play(); else v.pause(); };
+btnPlay.onclick = ()=>{ if(!capsOf().timeline) return; const v = cur().video; if(v.paused) v.play(); else v.pause(); };
 video.addEventListener("play", ()=> btnPlay.textContent="❚❚");
 video.addEventListener("pause", ()=> btnPlay.textContent="▶");
 document.getElementById("btnLoop").onclick = e=>{
@@ -8394,7 +8450,7 @@ function setSpeed(v, ch){
     spdEl.classList.toggle("hot", Math.abs(v-1) > 0.001);
   }
 }
-spdEl.addEventListener("input", e=>{ setSpeed(parseFloat(e.target.value)); });
+spdEl.addEventListener("input", e=>{ if(!capsOf().clock) return; setSpeed(parseFloat(e.target.value)); });
 spdEl.addEventListener("dblclick", ()=>{ setSpeed(1); });
 for(const ch of CHANNELS){
   const S = SRC[ch];
@@ -8409,9 +8465,18 @@ for(const ch of CHANNELS) transport[ch] = "play";
 const TP_RATE = {play:1, still:0, ff:4, rew:-4, jogf:0.25, jogr:-0.25};
 function setTransport(mode, ch){
   ch = ch || activeChan;
-  transport[ch] = mode;
   const S = SRC[ch];
-  if(S.mode === "pattern" || S.mode === "text"){
+  const caps = srcCaps(S);
+  /* a live stream can be held or let run, and that is the whole of it: there
+     is nothing to shuttle through */
+  if(caps.live && mode !== "play" && mode !== "still"){
+    toast("Shuttle and jog need a timeline \u2014 this channel is a live input", true);
+    return;
+  }
+  transport[ch] = mode;
+  /* a generated source has a clock rather than a tape, so the transport drives
+     the clock and never touches the video element */
+  if(caps.clock && !caps.timeline){
     S.tpRate = TP_RATE[mode];
     if(typeof refreshToggles === "function") refreshToggles();
     return;
@@ -8433,9 +8498,10 @@ function driveTransport(dt){
     const m = transport[ch];
     if(m === "play" || m === "still" || m === "ff") continue;
     const S = SRC[ch];
-    if(S.mode === "pattern" || S.mode === "text") continue;
+    /* scrubbing currentTime is only meaningful, and only legal, on a file */
+    if(S.mode !== "file") continue;
     const v = S.video;
-    if(!v.duration) continue;
+    if(!v.duration || !isFinite(v.duration)) continue;
     const r = TP_RATE[m] * (Math.abs(S.speed) || 1);
     let nt = v.currentTime + r*dt;
     if(nt < 0) nt += v.duration;
@@ -8461,9 +8527,10 @@ document.getElementById("btnVari").onclick = e=>{
   toast(variMode ? "Varispeed: pitch follows speed (tape mode)" : "Time-stretch: pitch held constant");
 };
 seek.addEventListener("input", ()=>{
+  if(!capsOf().timeline) return;
   seeking=true;
   const v = cur().video;
-  if(v.duration) v.currentTime = seek.value*v.duration;
+  if(v.duration && isFinite(v.duration)){ try{ v.currentTime = seek.value*v.duration; }catch(e){} }
 });
 seek.addEventListener("change", ()=>{ seeking=false; });
 function fmtT(s){ if(!isFinite(s)) return "--:--"; s=Math.floor(s); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
@@ -9348,6 +9415,7 @@ window.__toggleStill = ch=>{
 };
 window.__stillOf = ch=>!!stillHeld[ch||activeChan];
 let offline = false, liveList = "A";
+let liveNow = {A:true, B:false, C:false, D:false};
 
 /* video content analysis — the picture itself as a mod source (reads channel A) */
 const anaC = document.createElement("canvas"); anaC.width=32; anaC.height=18;
@@ -9759,6 +9827,7 @@ function renderFrame(now, dt){
     }
   }
   liveList = CHANNELS.filter(c=>live[c]).join("+");
+  liveNow = live;      /* the thumbnails need to know who is not being rendered */
   for(const ch of CHANNELS){
     if(!live[ch]) continue;
     uploadSource(ch, dt);
@@ -10112,12 +10181,32 @@ function updateScopes(now){
 const THUMB_W = 48, THUMB_H = 27;
 const thumbPix = new Uint8Array(THUMB_W*THUMB_H*4);
 let thumbAt = 0, thumbRT = null, thumbImg = null;
+let thumbTurn = 0;
 function updateThumbs(now){
   if(now - thumbAt < 0.5) return;
   thumbAt = now;
   if(typeof chanThumbs === "undefined") return;
   if(!thumbRT) thumbRT = makeRT(THUMB_W, THUMB_H);
   if(!thumbRT) return;
+  /* A channel that is not in the mix is not rendered, so its thumbnail used to
+     sit on whatever it last produced — change a source on an idle channel and
+     nothing happened until you faded it up. One idle channel per tick gets its
+     source pulled and shown, which is two passes twice a second and tells you
+     what is actually loaded before you commit to it. */
+  const idle = CHANNELS.filter(c=>!liveNow[c] && srcReady(c));
+  if(idle.length){
+    const ch = idle[thumbTurn++ % idle.length];
+    ensureChanRT(ch);
+    uploadSource(ch, 0);
+    const S = SRC[ch], C = chanRT[ch];
+    const t = (S.mode === "synth") ? renderGen(ch, now)
+            : (S.mode === "feed")  ? feedTex(S.feed || "PGM")
+            : srcTex[ch];
+    if(t && C.allocated){
+      if(!C.out) C.out = makeRT(procW, procH);
+      if(C.out) runPass(progCOPY, t, C.out.fbo, procW, procH, null, ch);
+    }
+  }
   for(const ch of CHANNELS){
     const g = chanThumbs[ch];
     if(!g) continue;

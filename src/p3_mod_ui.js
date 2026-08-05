@@ -149,7 +149,7 @@ const lfoState = new Proxy({}, {
 const modVal = {};
 
 /* tempo: tap or MIDI clock; synced LFOs derive their rate from it */
-let bpm = 120, extClockAt = 0, clockEma = 0;
+let bpm = 120, extClockAt = -1e9, clockEma = 0;   // no external clock until one arrives
 const tapTimes = [];
 function tapTempo(){
   const now = performance.now();
@@ -422,15 +422,72 @@ async function openMic(){
   wireMic();
   refreshAudioDeviceUI();
 }
+/* An audio file as a modulation source. The point is being able to build a
+   piece against the track it will be shown with, rather than only against
+   whatever happens to be in the room. It goes through the same analyser as
+   everything else, so the bands, the gains and the onset triggers behave
+   identically whichever input is selected. */
+let audioFileEl=null, audioFileNode=null, audioFileGain=null, audioFileName="";
+function ensureAudioFileEl(){
+  if(!audioFileEl){
+    audioFileEl = document.createElement("audio");
+    audioFileEl.loop = true;
+    audioFileEl.preload = "auto";
+    for(const ev of ["ended","play","pause","timeupdate"])
+      audioFileEl.addEventListener(ev, ()=>refreshAudioFileUI());
+  }
+  return audioFileEl;
+}
+function wireAudioFile(){
+  ensureAudioCtx();
+  const el = ensureAudioFileEl();
+  if(!audioFileNode){
+    try{
+      audioFileNode = audioCtx.createMediaElementSource(el);
+      audioFileGain = audioCtx.createGain();
+      audioFileNode.connect(audioFileGain);
+      audioFileGain.connect(audioCtx.destination);
+      if(recDest) audioFileNode.connect(recDest);
+    }catch(e){ console.warn(e); return; }
+  }
+  try{ audioFileNode.connect(analyser); }catch(e){}
+}
+async function loadAudioFile(f){
+  if(!f) return;
+  ensureAudioCtx();
+  const el = ensureAudioFileEl();
+  if(el.dataset.url) URL.revokeObjectURL(el.dataset.url);
+  const u = URL.createObjectURL(f);
+  el.dataset.url = u; el.src = u;
+  audioFileName = f.name;
+  wireAudioFile();
+  audioMode = "file";
+  const sel = document.getElementById("selAudio"); if(sel) sel.value = "file";
+  try{ await el.play(); }catch(e){}
+  refreshAudioFileUI();
+  toast("Audio-reactive: " + f.name);
+}
+let refreshAudioFileUI = ()=>{};
 async function setAudioMode(m){
   audioMode = m;
   if(m === "off"){
     if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; micNode=null; }
+    if(audioFileEl) audioFileEl.pause();
     audioBands.bass=audioBands.mid=audioBands.high=0;
     return;
   }
   ensureAudioCtx();
   if(m === "source"){ hookVideoAudio(); toast("Audio-reactive: video soundtrack"); }
+  if(m === "file"){
+    wireAudioFile();
+    if(!audioFileEl || !audioFileEl.src){
+      const fi = document.getElementById("audioFileIn");
+      if(fi) fi.click();
+    } else {
+      try{ await audioFileEl.play(); }catch(e){}
+    }
+    refreshAudioFileUI();
+  }
   if(m === "mic"){
     try{
       await openMic();
@@ -762,31 +819,22 @@ function buildPanel(){
       d2.appendChild(row);
       uiRefs[p.id] = {slider:s, val, tick, row, label:lab};
     }
-    /* the three transition sections live in the dock's MIX tab, not the sidebar */
-    const host = sec.zone === "mix" ? document.getElementById("mixdock") : (zoneEls[sec.zone] || zoneEls.chain);
-    host.appendChild(d);
+    /* the transition sections live on the dock's MIX tab and preset morph on
+       PERFORM; only the channel path and the master out are in the sidebar */
+    const DOCKZONE = {mix:"mixdock", perform:"performdock"};
+    const host = DOCKZONE[sec.zone] ? document.getElementById(DOCKZONE[sec.zone])
+                                    : (zoneEls[sec.zone] || zoneEls.chain);
+    /* on PERFORM the bend pads stay at the bottom, so anything else goes above */
+    const bendrow = (sec.zone === "perform") ? document.getElementById("bendrow") : null;
+    if(bendrow) host.insertBefore(d, bendrow); else host.appendChild(d);
   }
-  /* LFO config section */
-  const d = mkSection("lfo", "mag", "TEMPO / CLOCK");
-  /* tempo row */
+  /* The clock is a header control now. It is global, it is two widgets wide,
+     and it was taking a whole sidebar section to show one number. */
   {
-    const row = document.createElement("div"); row.className="prow";
-    const lab = document.createElement("label"); lab.textContent = "TEMPO";
-    const tap = document.createElement("button"); tap.textContent = "TAP";
-    tap.title = "Tap tempo — synced LFOs follow it. MIDI clock overrides automatically.";
-    tap.onclick = tapTempo;
-    const bv = document.createElement("span"); bv.className="val"; bv.id="bpmVal";
-    bv.style.width = "70px"; bv.textContent = bpm.toFixed(1);
-    const note = document.createElement("span");
-    note.style.cssText = "color:var(--dim); font-size:8.5px; flex:1;";
-    note.textContent = "SYNC locks an LFO to tempo";
-    row.appendChild(lab); row.appendChild(tap); row.appendChild(bv); row.appendChild(note);
-    d.appendChild(row);
+    const tap = document.getElementById("btnTap");
+    if(tap) tap.onclick = tapTempo;
+    updateTempoUI();
   }
-  const lfnote = document.createElement("div");
-  lfnote.style.cssText = "color:var(--dim); font-size:8.5px; padding:4px 0 2px;";
-  lfnote.textContent = "Tap to set the tempo; any modulator with a sync division follows it, and MIDI clock overrides it automatically. Rates, shapes, envelopes and macros live on the MOD tab of the dock, where you can also add as many more as you want.";
-  d.appendChild(lfnote);
   buildAudioSection();
 }
 
@@ -1191,7 +1239,7 @@ function loadSectionOrder(){
     for(const id of valid) zoneEls.chain.appendChild(secEls[id]);
   }catch(e){}
 }
-function mkSection(id, cls, name){
+function mkSection(id, cls, name, hostEl){
   const d = document.createElement("div"); d.className = "sec "+cls;
   const h = document.createElement("h3");
   h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+name;
@@ -1201,7 +1249,8 @@ function mkSection(id, cls, name){
   const body = document.createElement("div"); body.className = "secbody";
   d.appendChild(body);
   secEls[id] = d;
-  if(zoneEls.tools) zoneEls.tools.appendChild(d);
+  const host = hostEl || zoneEls.tools;
+  if(host) host.appendChild(d);
   /* callers append to the body */
   d.appendChild = body.appendChild.bind(body);
   return d;
@@ -1373,7 +1422,12 @@ const MIXMODES = ["MIX / DISSOLVE","WIPE H","WIPE V","DIAGONAL","BOX","CIRCLE","
   "BLINDS V","BLINDS H","CLOCK","DIAG BARS","BLOCKS",
   "SLIDE \u2192","SLIDE \u2190","SLIDE \u2191","SLIDE \u2193",
   "STRETCH \u2192","STRETCH \u2190","STRETCH \u2191","STRETCH \u2193"];
-const MIXBLENDS = ["DISSOLVE","ADDITIVE","NON-ADD","DIFFERENCE","MULTIPLY","SCREEN"];
+/* The first six keep the index they have always had, so patches saved before
+   the list grew still load with the mix type they were saved with. */
+const MIXBLENDS = ["DISSOLVE","ADDITIVE","NON-ADD","DIFFERENCE","MULTIPLY","SCREEN",
+  "DARKEN","EXCLUSION","SUBTRACT","OVERLAY","HARD LIGHT","SOFT LIGHT","VIVID LIGHT","PIN LIGHT",
+  "COLOUR DODGE","COLOUR BURN","DIVIDE","WRAP ADD","XOR BITS","AND BITS",
+  "HUE","SATURATION","COLOUR","LUMINOSITY"];
 const MIXKEYS = ["KEY OFF","LUMA WHITE","LUMA BLACK","CHROMA","PICTURE IN PICTURE"];
 
 /* ---- PERFORM dock: snapshot bank + performance recorder ---- */
@@ -1522,6 +1576,22 @@ function sectionExtras(id, d){
     note.textContent = "The master display stage: pick a tube, set the beam profile, then the output transform (gamma / levels / warmth) and persistence.";
     d.appendChild(note);
   }
+  if(id==="overlay"){
+    const tr = document.createElement("div"); tr.className="trow";
+    const TM = ["REC","PLAY","PAUSE","STOP","F FWD","REWIND"];
+    const DM = ["NO DATE","DATE","DATE + TIME"];
+    mkToggle(tr, "osdMode", ()=>"DECK: "+TM[osdMode], ()=>{ osdMode=(osdMode+1)%6; osdLast=""; },
+      "Which transport the burnt-in display is showing. REC blinks the way it did, and the counter only runs on the transports that would actually move the tape - forward on PLAY and REC, seven times as fast on the shuttles, and backwards on rewind.");
+    mkToggle(tr, "osdDate", ()=>DM[osdDate], ()=>{ osdDate=(osdDate+1)%3; osdLast=""; },
+      "The date stamp in the corner. Today's date, taken from this machine.");
+    mkToggle(tr, "osdZero", ()=>"COUNTER 0", ()=>{ osdCounter=0; osdLast=""; },
+      "Resets the tape counter to zero, the way the button on the front of the deck did.");
+    d.appendChild(tr);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Everything between the picture and the eye. The lens comes first (distortion, fringing, the anamorphic streak), then the glass in front of the screen (smears, reflections, dust, leaks), then the panel itself, then the deck's own display burnt in over the top. DECK DISPLAY has to be above zero for the readout to appear.";
+    d.appendChild(note);
+  }
   if(id==="keyer"){
     const tr = document.createElement("div"); tr.className="trow";
     mkToggle(tr, "keyMode", ()=>"KEY: "+(keyChroma?"CHROMA":"LUMA"), ()=>{ keyChroma=!keyChroma; }, "Whether the key selects by brightness or by hue.");
@@ -1630,7 +1700,82 @@ const audioUIRefs = [];
 const meterEls = {};
 function hzFmt(v){ return v>=1000 ? (v/1000).toFixed(1)+"k" : Math.round(v); }
 function buildAudioSection(){
-  const d = mkSection("audio", "cyan", "AUDIO REACT");
+  const dock = document.getElementById("audiodock");
+  const d = mkSection("audio", "cyan", "AUDIO REACT \u00b7 INPUT", dock);
+  /* the input picker belongs next to the meters, not three menus away */
+  {
+    const row = document.createElement("div"); row.className="prow";
+    const lab = document.createElement("label"); lab.textContent = "LISTEN TO";
+    const sel = document.createElement("select"); sel.id = "selAudioSrc"; sel.style.flex = "1";
+    attachTip(sel, "AUDIO SOURCE",
+      "Where the audio-reactive modulators listen. VIDEO taps the soundtrack of the clip loaded into channel A. INPUT opens a microphone, an audio interface or any capture device. FILE plays an audio file you load here, which is how you build a piece against the track it will be shown with.");
+    for(const [v,t] of [["off","OFF"],["source","VIDEO SOUNDTRACK"],["mic","LIVE INPUT"],["file","AUDIO FILE"]]){
+      const o = document.createElement("option"); o.value=v; o.textContent=t; sel.appendChild(o);
+    }
+    sel.value = audioMode;
+    sel.onchange = ()=>{ const m = document.getElementById("selAudio"); if(m) m.value = sel.value; setAudioMode(sel.value); };
+    row.appendChild(lab); row.appendChild(sel);
+    d.appendChild(row);
+  }
+  /* audio file: load, transport, position */
+  {
+    const row = document.createElement("div"); row.className="prow";
+    const lab = document.createElement("label"); lab.textContent = "FILE";
+    const ld = document.createElement("button"); ld.textContent = "LOAD";
+    attachTip(ld, "LOAD AUDIO FILE", "Any audio file your browser can decode: wav, mp3, m4a, flac, ogg. It stays on your machine and streams from disk like the video does.");
+    ld.onclick = ()=>{ const fi = document.getElementById("audioFileIn"); if(fi) fi.click(); };
+    const pp = document.createElement("button"); pp.textContent = "PLAY";
+    pp.onclick = async ()=>{
+      const el = ensureAudioFileEl();
+      if(!el.src){ const fi = document.getElementById("audioFileIn"); if(fi) fi.click(); return; }
+      ensureAudioCtx(); wireAudioFile();
+      if(el.paused){ try{ await el.play(); }catch(e){} } else el.pause();
+      refreshAudioFileUI();
+    };
+    const lp = document.createElement("button"); lp.textContent = "LOOP"; lp.classList.add("on");
+    lp.onclick = ()=>{ const el = ensureAudioFileEl(); el.loop = !el.loop; lp.classList.toggle("on", el.loop); };
+    row.appendChild(lab); row.appendChild(ld); row.appendChild(pp); row.appendChild(lp);
+    d.appendChild(row);
+    const nrow = document.createElement("div"); nrow.className="prow";
+    const nlab = document.createElement("label"); nlab.textContent = "POSITION";
+    const sk = document.createElement("input"); sk.type="range"; sk.min=0; sk.max=1; sk.step=0.0005; sk.value=0;
+    sk.style.flex = "1";
+    let scrubbing = false;
+    sk.addEventListener("pointerdown", ()=>{ scrubbing = true; });
+    sk.addEventListener("pointerup", ()=>{ scrubbing = false; });
+    sk.addEventListener("input", ()=>{
+      const el = ensureAudioFileEl();
+      if(el.duration) el.currentTime = parseFloat(sk.value)*el.duration;
+    });
+    const tc = document.createElement("span"); tc.className="val"; tc.style.width="86px"; tc.textContent="--:-- / --:--";
+    nrow.appendChild(nlab); nrow.appendChild(sk); nrow.appendChild(tc);
+    d.appendChild(nrow);
+    const nm = document.createElement("div");
+    nm.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0 6px;";
+    nm.textContent = "No audio file loaded";
+    d.appendChild(nm);
+    const mmss = t=>{
+      if(!isFinite(t)) return "--:--";
+      const m2 = Math.floor(t/60), s2 = Math.floor(t%60);
+      return (m2<10?"0":"")+m2+":"+(s2<10?"0":"")+s2;
+    };
+    refreshAudioFileUI = ()=>{
+      const el = audioFileEl;
+      pp.textContent = (el && !el.paused) ? "PAUSE" : "PLAY";
+      pp.classList.toggle("on", !!(el && !el.paused));
+      if(el) lp.classList.toggle("on", el.loop);
+      nm.textContent = audioFileName ? audioFileName : "No audio file loaded";
+      if(el && el.duration && !scrubbing){
+        sk.value = el.currentTime/el.duration;
+        tc.textContent = mmss(el.currentTime)+" / "+mmss(el.duration);
+      }
+    };
+  }
+  const sep = document.createElement("div");
+  sep.style.cssText = "border-top:1px solid var(--line); margin:6px 0 8px;";
+  d.appendChild(sep);
+  /* the band controls get their own panel so the dock reads as columns */
+  let dTarget = d;
   /* live meters */
   const mrow = document.createElement("div");
   mrow.style.cssText = "display:flex; gap:6px; padding:2px 0 8px;";
@@ -1659,10 +1804,11 @@ function buildAudioSection(){
     s.addEventListener("input", upd); upd();
     wrap.appendChild(s);
     row.appendChild(lab); row.appendChild(wrap); row.appendChild(val);
-    d.appendChild(row);
+    dTarget.appendChild(row);
     audioUIRefs.push({s, val, get, log, fmtFn,
       refresh(){ s.value = log ? Math.log10(get()) : get(); val.textContent = fmtFn(get()); }});
   }
+  dTarget = mkSection("audioband", "cyan", "AUDIO REACT \u00b7 BANDS", document.getElementById("audiodock"));
   for(const k of ["bass","mid","high"]){
     const K = k.toUpperCase();
     slider(K+" LO",  ()=>audioCfg[k].lo,  v=>{audioCfg[k].lo=Math.min(v, audioCfg[k].hi-5);},  20, 16000, hzFmt, true);

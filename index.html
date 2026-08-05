@@ -472,6 +472,14 @@ body.multi #mvlabels{display:grid;}
 #dockBody > #performdock.on{display:flex; flex-direction:column; gap:16px;}
 #pfmain{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;}
 #dockBody > #mixdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
+#dockBody > #audiodock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
+#audiodock .sec{flex:1 1 0; min-width:250px; border-bottom:none; padding:0;}
+#audiodock .sec h3{padding-top:0;}
+#performdock .sec{border-bottom:none; padding:0;}
+#tempobox{display:flex; align-items:center; gap:5px; margin-left:4px;}
+#tempobox button{padding:4px 9px; font-size:9px; letter-spacing:1.5px;}
+#tempobox #bpmVal{font-size:10px; color:var(--amber); min-width:52px; letter-spacing:1px;}
+
 #mixdock .sec{flex:1 1 0; min-width:230px; border-bottom:none; padding:0;}
 #mixdock .sec h3{padding-top:0;}
 #bendrow{border-top:1px solid var(--line); padding-top:10px;}
@@ -683,7 +691,10 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v29.0</span>
+  <span id="ver" title="Build version">v30.0</span>
+  <div id="tempobox" data-tip="Tap four times in time and the tempo follows. Any modulator with a sync division locks to it, and incoming MIDI clock overrides it automatically.">
+    <button id="btnTap">TAP</button><span id="bpmVal">120.0</span>
+  </div>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -711,6 +722,11 @@ body.nomix #mixbuses{display:none;}
       <div class="mrow2">
         <button id="btnFile" data-tip="Load a video file into this channel. Files stream from disk, so a 4GB movie is no heavier than a small one. Drag and drop onto the picture works too.">FILE</button>
         <button id="btnCam" data-tip="Use a webcam or capture device as this channel's source.">CAM</button>
+      </div>
+      <div class="mlabel">CAMERA / CAPTURE DEVICE</div>
+      <select id="selCamDev" data-tip="Which camera or capture device CAM opens. USB webcams, HDMI capture sticks and virtual cameras all appear here. Names only appear once you have granted camera access, so press CAM first if the list reads DEVICE 1, DEVICE 2."></select>
+      <div class="mrow2">
+        <button id="btnScreen" data-tip="Capture a screen, a window or a browser tab as this channel's source. This is the way to bring in anything that is not a camera - another application, a synth's editor, a video call, a whole desktop.">SCREEN</button>
       </div>
       <div class="mrow2">
         <button id="btnPat" data-tip="Use a built-in generated test signal as this channel's source. No file needed.">PATTERN</button>
@@ -747,10 +763,11 @@ body.nomix #mixbuses{display:none;}
     <button class="menubtn" data-tip="Processing resolution, audio input, modulation and MIDI.">ENGINE <i>&#9662;</i></button>
     <div class="menupanel">
       <div class="mlabel">AUDIO REACT</div>
-      <select id="selAudio" data-tip="Where the audio-reactive mod sources listen. SOURCE analyses the loaded video's own soundtrack; INPUT uses a microphone or audio interface.">
+      <select id="selAudio" data-tip="Where the audio-reactive mod sources listen. VIDEO analyses the loaded video's own soundtrack, INPUT uses a microphone or audio interface, and FILE plays an audio file you load - which is how you build a piece against the track it will be shown with. The band ranges and response are on the AUDIO tab of the dock.">
         <option value="off">AUDIO OFF</option>
-        <option value="source">AUD: SOURCE</option>
+        <option value="source">AUD: VIDEO</option>
         <option value="mic">AUD: INPUT</option>
+        <option value="file">AUD: FILE</option>
       </select>
       <div class="mlabel">PROCESS RESOLUTION</div>
       <select id="selRes" data-tip="The internal raster everything is processed at, independent of your window size. Lower is faster and coarser; the scanline and mask geometry scale with it.">
@@ -831,12 +848,14 @@ body.nomix #mixbuses{display:none;}
           <button data-dock="mod" data-tip="Every modulation source drawn live, with editable rates and shapes and a list of what each one is driving.">MOD</button>
           <button data-dock="text" data-tip="The text and shape generator for this channel. Typing here never triggers keyboard shortcuts.">TEXT</button>
           <button data-dock="mix" data-tip="The detail behind each transition: wipe softness and geometry, and the key settings. The faders themselves are on the strip under the picture.">MIX</button>
-          <button data-dock="perform" data-tip="Everything you play with while it is running: eight whole-rig snapshots with a glide time, the performance recorder, and the six bend pads.">PERFORM</button>
+          <button data-dock="audio" data-tip="Where the audio-reactive modulators listen: the input, the three band ranges, and the response speed.">AUDIO</button>
+          <button data-dock="perform" data-tip="Everything you play with while it is running: eight whole-rig snapshots with a glide time, the performance recorder, preset morph and the six bend pads.">PERFORM</button>
           <span style="flex:1;"></span>
           <span id="dockHint"></span>
         </div>
         <div id="dockBody">
       <div id="mixdock"></div>
+      <div id="audiodock"></div>
       <div id="performdock">
         <div id="pfmain"></div>
         <div id="bendrow">
@@ -946,12 +965,14 @@ body.nomix #mixbuses{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v29.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v30.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once; the small selector next to it picks a target, and <b>COPY</b> writes this channel's effects onto it while <b>SWAP</b> exchanges the two outright, sources included. Any channel can reach any other, so D can be copied onto A as easily as A onto B, and shift-clicking COPY sends it to all three at once.</p>
   <p>Each mixer is three independent stages, the way a vision mixer actually works. <b>TRANSITION</b> decides how the fader reveals the second input \u2014 a dissolve, one of twelve wipes, a slide in from an edge, or a stretch. <b>MIX TYPE</b> decides how the two combine where both are visible: dissolve, additive, non-additive (whichever is brighter, so neither picture dims the other), difference, multiply or screen. <b>KEY</b> is a separate compositing stage on top: luma white, luma black, chroma, or picture-in-picture with position, size and border. Because they are separate, a circle wipe and a luma key can run at the same time.</p>
   <p><b>MELT</b> is the fourth stage, and it is the one that stops a mix looking digital. The mixer works out where the boundary between the two pictures actually is and which way it faces, then does two things inside a narrow band along it: it drags the incoming picture out along that direction, and it dissolves the mixer's own last frame back in. Because the band feeds itself, the smear stays put and creeps a little further every frame, so the seam trails and bleeds instead of cutting. The amount sits next to each fader; <b>WIDTH</b>, <b>HOLD</b>, <b>SWIRL</b>, <b>CHROMA</b> and <b>CREEP</b> are on the MIX tab. Wind CREEP up and the melt only happens on the outgoing side, so a keyed or wiped shape bleeds into the background and the background never eats into the shape. At zero the whole stage is switched off and costs nothing.</p>
+  <p>Under the melt sits the <b>DIRTY MIXER</b>, which is the desk failing rather than the picture degrading. It runs on an event clock: DIRT decides how often it fires and RATE how fast the clock runs, then four controls decide what a firing does. DROPOUT drops bands of lines through to the other side of the crossbar or to nothing; CUT throws the whole mix to one input regardless of where the fader is; KNOCK shoves the timebase sideways so the picture shears and crawls back; NOISE sprays the switching transient across the frame. Between firings it is completely clean, which is what makes it read as a fault and not as an effect.</p>
+  <p>The <b>KEYER</b> has a full set of levels: THRESH and SOFT set where the matte turns over, GAIN how hard, DENSITY how opaque it is ever allowed to get. KEY BORDER grows the matte outward and fills the growth with one of the eight standard back colours, and KEY SHADOW offsets a darkened copy underneath - the outline and drop-shadow treatments a bench mixer offers for titles. Wipes get the same treatment: BORDER WIPE lays a coloured rule along the join, and WIPE MULTI tiles the whole pattern four or sixteen times. There are twenty-four mix types, from the usual dissolve, additive and non-additive through the photographic blends to wrap-add and bitwise XOR, which are not photographic at all.</p>
   <p>The channels meet in three mixers, laid out as a strip directly under the picture: bus 1, bus 2, and a master crossfade between them. Each strip has its own two input selectors, so the pairings are not fixed \u2014 bus 1 can mix <b>A against C</b>, bus 2 can mix <b>D against B</b>. To get all four in at once, set both bus faders part-way and put the master on ADD, SCREEN or LIGHTEN rather than FADE, so the buses sum instead of crossfading. The strip sits just under the transport bar, and folds away with <b>MIX</b> on its left when you want the height back.</p>
   <p>The faders live under the picture rather than in the sidebar because a crossfader wants to be horizontal and should never be hidden behind a tab \u2014 it is the one control you ride while looking at something else. The detail behind each transition (softness, wipe geometry, key threshold) lives on the MIX tab of the dock, where it is setup rather than performance. INV only greys in when the transition is a wipe, since a fade, a key and a blend have no direction to reverse.</p>
   <h3>MULTIVIEW</h3>
@@ -1002,6 +1023,10 @@ body.nomix #mixbuses{display:none;}
   <h3>PERFORMANCE</h3>
   <p>The dock under the picture has five tabs: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b>, <b>MIX</b> and <b>PERFORM</b>. MIX holds the detail behind each transition \u2014 wipe softness and geometry, key threshold and hue \u2014 while the faders themselves stay on the strip. PERFORM holds everything you play with while it is running \u2014 the snapshot bank, the recorder and the bend pads. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
+  <h3>SOURCES</h3>
+  <p>Each channel takes a video file (streamed from disk, so file size does not matter), a camera, a screen, a generated pattern, the pattern synth, a text page, or re-entry from elsewhere in the rig. <b>CAM</b> opens whatever is chosen in the device list above it: a built-in webcam, a USB one, an HDMI capture stick, or a virtual camera from streaming software. Device names only appear once camera access has been granted, so the list reads DEVICE 1, DEVICE 2 until the first time you press CAM. <b>SCREEN</b> captures a screen, a window or a browser tab, which is the general way to bring in anything that is not a camera.</p>
+  <p>The audio-reactive modulators listen on the <b>AUDIO</b> tab of the dock: the soundtrack of the video in channel A, a live input (with device and channel selection for interfaces), or an audio file you load there and play. Loading a file is how you build a piece against the track it will actually be shown with. The three band ranges, their gains and the response speed are on the same tab, and the tempo used by synced modulators is the TAP button in the header.</p>
+
   <h3>MIXER, MORPH, KEYER &amp; TIME BASE</h3>
   <p>Each of the three <b>MIXERS</b> gets the same twenty modes: a plain fade, twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and a movable origin, luma and chroma key transitions, and add / difference / multiply / screen / lighten blends. Run the fader like a T-bar. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor.</p>
   <h3>VIDEO-REACTIVE</h3>
@@ -1036,6 +1061,7 @@ body.nomix #mixbuses{display:none;}
   <button id="btnRenderCancel">CANCEL</button>
 </div>
 <input type="file" id="fileIn" accept="video/*,.json" style="display:none">
+<input type="file" id="audioFileIn" accept="audio/*" style="display:none">
 <script>/* mp4-muxer v5 (c) Vanilagy, MIT license — inlined for offline use */
 /**
  * Minified by jsDelivr using Terser v5.39.0.
@@ -1239,31 +1265,62 @@ const FS_FB = COMMON + KEYFN +
    which one combined dropdown could never express. */
 const FS_MIX = COMMON + KEYFN +
 "uniform sampler2D u_texA; uniform sampler2D u_texB;\n" +
-"uniform float u_mixMode,u_mixBlend,u_mixKey,u_hasB,u_abMix;\n" +
+"uniform float u_mixMode,u_mixBlend,u_mixKey,u_hasB,u_abMix,u_time;\n" +
 "uniform float u_wipeSoft,u_wipeDetail,u_wipeX,u_wipeY,u_wipeInv;\n" +
+"uniform float u_wipeBord,u_wipeBordCol,u_wipeRep;\n" +
 "uniform float u_mixKeyThresh,u_mixKeySoft,u_mixKeyInv,u_mixKeyHue;\n" +
+"uniform float u_mixKeyGain,u_mixKeyDens,u_mixKeyEdge,u_mixKeyEdgeCol,u_mixKeyShadow;\n" +
 "uniform float u_pipX,u_pipY,u_pipSize,u_pipBorder;\n" +
 "uniform sampler2D u_prev; uniform float u_hasPrev;\n" +
 "uniform float u_edgeAmt,u_edgeWidth,u_edgeHold,u_edgeSwirl,u_edgeChroma,u_edgeCreep;\n" +
+"uniform float u_mixDirt,u_mixDirtRate,u_mixDirtDrop,u_mixDirtCut,u_mixDirtKnock,u_mixDirtNoise;\n" +
+"/* the eight back colours a bench mixer offers, in the order they are always\n" +
+"   listed: white, yellow, cyan, green, magenta, red, blue, black */\n" +
+"vec3 backCol(float i){\n" +
+"  int k = int(clamp(floor(i*7.999), 0.0, 7.0));\n" +
+"  if(k==0) return vec3(1.0);\n" +
+"  if(k==1) return vec3(1.0,1.0,0.0);\n" +
+"  if(k==2) return vec3(0.0,1.0,1.0);\n" +
+"  if(k==3) return vec3(0.0,1.0,0.0);\n" +
+"  if(k==4) return vec3(1.0,0.0,1.0);\n" +
+"  if(k==5) return vec3(1.0,0.0,0.0);\n" +
+"  if(k==6) return vec3(0.0,0.0,1.0);\n" +
+"  return vec3(0.0);\n}\n" +
+"vec3 rgb2hsvM(vec3 c){\n" +
+"  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);\n" +
+"  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));\n" +
+"  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));\n" +
+"  float d = q.x - min(q.w, q.y);\n" +
+"  return vec3(abs(q.z + (q.w - q.y)/(6.0*d + 1e-10)), d/(q.x + 1e-10), q.x);\n}\n" +
+"vec3 hsv2rgbM(vec3 c){\n" +
+"  vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0))*6.0 - 3.0);\n" +
+"  return c.z * mix(vec3(1.0), clamp(p-1.0, 0.0, 1.0), c.y);\n}\n" +
+"float bits(float x, float y, float mode){\n" +
+"  int ix = int(clamp(x,0.0,1.0)*255.0), iy = int(clamp(y,0.0,1.0)*255.0);\n" +
+"  int r = (mode<0.5) ? (ix ^ iy) : (ix & iy);\n" +
+"  return float(r)/255.0;\n}\n" +
 "float wipeField(vec2 uv, float mode, float outA){\n" +
+"  /* MULTI tiles the whole pattern, the way a bench mixer's x4 / x16 does */\n" +
+"  float rep = max(1.0, floor(u_wipeRep + 0.5));\n" +
+"  vec2 tu = (rep > 1.5) ? fract(uv*rep) : uv;\n" +
 "  vec2 off = vec2(u_wipeX, u_wipeY)*0.5;\n" +
-"  vec2 c = uv - 0.5 - off;\n" +
+"  vec2 c = tu - 0.5 - off;\n" +
 "  /* normalised against the distance to the farthest corner from wherever the\n" +
 "     origin has been moved to, so the fader travels evenly to full coverage */\n" +
 "  vec2 far = abs(off) + 0.5;\n" +
 "  float n = 2.0 + floor(u_wipeDetail*14.0);\n" +
-"  if(mode<1.5) return uv.x;\n" +
-"  if(mode<2.5) return 1.0-uv.y;\n" +
-"  if(mode<3.5) return (uv.x + (1.0-uv.y))*0.5;\n" +
+"  if(mode<1.5) return tu.x;\n" +
+"  if(mode<2.5) return 1.0-tu.y;\n" +
+"  if(mode<3.5) return (tu.x + (1.0-tu.y))*0.5;\n" +
 "  if(mode<4.5) return max(abs(c.x)/far.x, abs(c.y)/far.y);\n" +
 "  if(mode<5.5) return length(c*vec2(outA,1.0))/max(length(far*vec2(outA,1.0)), 0.0001);\n" +
 "  if(mode<6.5) return abs(c.x)/far.x;\n" +
 "  if(mode<7.5) return abs(c.y)/far.y;\n" +
-"  if(mode<8.5) return fract(uv.x*n);\n" +
-"  if(mode<9.5) return fract(uv.y*n);\n" +
+"  if(mode<8.5) return fract(tu.x*n);\n" +
+"  if(mode<9.5) return fract(tu.y*n);\n" +
 "  if(mode<10.5){ float a = atan(c.y, c.x)/6.2832 + 0.5; return fract(a); }\n" +
-"  if(mode<11.5) return fract((uv.x + uv.y)*n*0.5);\n" +
-"  return h21(floor(uv*vec2(n*2.0, n)));\n}\n" +
+"  if(mode<11.5) return fract((tu.x + tu.y)*n*0.5);\n" +
+"  return h21(floor(tu*vec2(n*2.0, n)));\n}\n" +
 "/* SLIDE moves the incoming picture in from an edge; STRETCH squashes it in.\n" +
 "   Both are transitions where B is repositioned rather than revealed. */\n" +
 "vec2 slideUV(vec2 uv, float dir, float t, out float inside){\n" +
@@ -1280,6 +1337,15 @@ const FS_MIX = COMMON + KEYFN +
 "  else { p.y = 1.0-(1.0-uv.y)/k; }\n" +
 "  inside = step(0.0,p.x)*step(p.x,1.0)*step(0.0,p.y)*step(p.y,1.0);\n" +
 "  return p;\n}\n" +
+"/* the keyer proper: clip and softness set where the matte turns over, GAIN\n" +
+"   sets how hard it turns, DENSITY sets how opaque it can ever get */\n" +
+"float keyMatte(vec2 p){\n" +
+"  float k = keyOf(texture(u_texB, clamp(p,0.0,1.0)).rgb,\n" +
+"                  u_mixKey > 2.5 ? 1.0 : 0.0,\n" +
+"                  u_mixKeyHue, u_mixKeyThresh, u_mixKeySoft,\n" +
+"                  (u_mixKey < 1.5) ? 1.0-u_mixKeyInv : u_mixKeyInv);\n" +
+"  k = pow(clamp(k,0.0,1.0), mix(3.2, 0.3, clamp(u_mixKeyGain,0.0,1.0)));\n" +
+"  return k * clamp(u_mixKeyDens, 0.0, 1.0);\n}\n" +
 "/* The same coverage calculation the mixer uses, evaluated anywhere on the\n" +
 "   frame. The melt stage needs it at neighbouring points to find the boundary\n" +
 "   and which way it faces, which is cheap here because the wipe is analytic. */\n" +
@@ -1298,10 +1364,7 @@ const FS_MIX = COMMON + KEYFN +
 "  }\n" +
 "  if(u_mixKey > 0.5){\n" +
 "    if(u_mixKey < 3.5){\n" +
-"      m *= keyOf(texture(u_texB, clamp(buv,0.0,1.0)).rgb,\n" +
-"                 u_mixKey > 2.5 ? 1.0 : 0.0,\n" +
-"                 u_mixKeyHue, u_mixKeyThresh, u_mixKeySoft,\n" +
-"                 (u_mixKey < 1.5) ? 1.0-u_mixKeyInv : u_mixKeyInv);\n" +
+"      m *= keyMatte(buv);\n" +
 "    } else {\n" +
 "      float sz = 0.08 + u_pipSize*0.62;\n" +
 "      vec2 ctr = vec2(0.5,0.5) + vec2(u_pipX, u_pipY)*0.42;\n" +
@@ -1311,52 +1374,130 @@ const FS_MIX = COMMON + KEYFN +
 "    }\n" +
 "  }\n" +
 "  return clamp(m, 0.0, 1.0);\n}\n" +
+"/* Twenty-four ways for two pictures to meet. The first six keep the indices\n" +
+"   they have always had so old patches still load. */\n" +
 "vec3 combine(vec3 a, vec3 b, float m, float blend){\n" +
 "  if(blend<0.5) return mix(a, b, m);\n" +                 /* DISSOLVE */
 "  if(blend<1.5) return a + b*m;\n" +                      /* ADDITIVE  (FAM) */
 "  if(blend<2.5) return mix(a, max(a,b), m);\n" +          /* NON-ADD   (NAM) */
 "  if(blend<3.5) return mix(a, abs(a-b), m);\n" +          /* DIFFERENCE */
 "  if(blend<4.5) return mix(a, a*b*1.6, m);\n" +           /* MULTIPLY */
-"  return mix(a, 1.0-(1.0-a)*(1.0-b), m);\n}\n" +          /* SCREEN */
+"  if(blend<5.5) return mix(a, 1.0-(1.0-a)*(1.0-b), m);\n" +   /* SCREEN */
+"  if(blend<6.5) return mix(a, min(a,b), m);\n" +          /* DARKEN */
+"  if(blend<7.5) return mix(a, a+b-2.0*a*b, m);\n" +       /* EXCLUSION */
+"  if(blend<8.5) return mix(a, a-b, m);\n" +              /* SUBTRACT */
+"  if(blend<9.5){                                     \n" +   /* OVERLAY */
+"    vec3 r = mix(2.0*a*b, 1.0-2.0*(1.0-a)*(1.0-b), step(0.5,a));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<10.5){                                    \n" +   /* HARD LIGHT */
+"    vec3 r = mix(2.0*a*b, 1.0-2.0*(1.0-a)*(1.0-b), step(0.5,b));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<11.5){                                    \n" +   /* SOFT LIGHT */
+"    vec3 r = mix(2.0*a*b + a*a*(1.0-2.0*b), sqrt(max(a,0.0))*(2.0*b-1.0) + 2.0*a*(1.0-b), step(0.5,b));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<12.5){                                    \n" +   /* VIVID LIGHT */
+"    vec3 r = mix(1.0 - (1.0-a)/max(2.0*b, 0.001), a/max(1.0-2.0*(b-0.5), 0.001), step(0.5,b));\n" +
+"    return mix(a, clamp(r,0.0,1.6), m); }\n" +
+"  if(blend<13.5){                                    \n" +   /* PIN LIGHT */
+"    vec3 r = mix(min(a, 2.0*b), max(a, 2.0*(b-0.5)), step(0.5,b));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<14.5) return mix(a, clamp(a/max(1.0-b, 0.004), 0.0, 1.6), m);\n" +   /* COLOUR DODGE */
+"  if(blend<15.5) return mix(a, 1.0-clamp((1.0-a)/max(b, 0.004), 0.0, 1.6), m);\n" + /* COLOUR BURN */
+"  if(blend<16.5) return mix(a, clamp(a/max(b, 0.004), 0.0, 1.6), m);\n" +      /* DIVIDE */
+"  if(blend<17.5) return mix(a, fract(a + b*1.5), m);\n" +   /* WRAP ADD: the analogue overflow */
+"  if(blend<18.5) return mix(a, vec3(bits(a.r,b.r,0.0), bits(a.g,b.g,0.0), bits(a.b,b.b,0.0)), m);\n" +
+"  if(blend<19.5) return mix(a, vec3(bits(a.r,b.r,1.0), bits(a.g,b.g,1.0), bits(a.b,b.b,1.0)), m);\n" +
+"  vec3 ha = rgb2hsvM(clamp(a,0.0,1.0)), hb = rgb2hsvM(clamp(b,0.0,1.0));\n" +
+"  if(blend<20.5) return mix(a, hsv2rgbM(vec3(hb.x, ha.y, ha.z)), m);\n" +   /* HUE */
+"  if(blend<21.5) return mix(a, hsv2rgbM(vec3(ha.x, hb.y, ha.z)), m);\n" +   /* SATURATION */
+"  if(blend<22.5) return mix(a, hsv2rgbM(vec3(hb.x, hb.y, ha.z)), m);\n" +   /* COLOUR */
+"  return mix(a, hsv2rgbM(vec3(ha.x, ha.y, hb.z)), m);\n}\n" +               /* LUMINOSITY */
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  float outA = u_res.x/u_res.y;\n" +
-"  vec3 a = texture(u_texA, uv).rgb;\n" +
-"  if(u_hasB<0.5 || u_abMix<0.0005){ O = vec4(a,1.0); return; }\n" +
+"  if(u_hasB<0.5 || u_abMix<0.0005){ O = vec4(texture(u_texA, uv).rgb,1.0); return; }\n" +
 "  float t = u_abMix;\n" +
 "  float mm = u_mixMode;\n" +
+"  /* ---- 0. the dirty mixer ----\n" +
+"     A bench mixer that has been dropped, or had its crossbar chip lifted,\n" +
+"     does not fail smoothly. It fires: the switcher jumps to the wrong input\n" +
+"     for a field, the timebase is knocked sideways and crawls back, a band of\n" +
+"     lines drops out to whatever is on the other side of the crossbar, and the\n" +
+"     switching transient sprays noise across the picture. So this runs on an\n" +
+"     event clock rather than as a continuous wobble: DIRT decides how often a\n" +
+"     tick fires at all, RATE how fast the clock runs, and the four flavours\n" +
+"     decide what a firing does. Everything decays inside its own tick. */\n" +
+"  float dirtE = 0.0, dirtSeed = 0.0;\n" +
+"  vec2 duv = uv;\n" +
+"  if(u_mixDirt > 0.002){\n" +
+"    float dr = 0.5 + u_mixDirtRate*15.0;\n" +
+"    float ph = u_time*dr;\n" +
+"    float tk = floor(ph), fr = fract(ph);\n" +
+"    dirtSeed = tk;\n" +
+"    float fire = step(h21(vec2(tk, 7.71)), clamp(u_mixDirt,0.0,1.0)*0.85);\n" +
+"    dirtE = fire * exp(-fr*mix(11.0, 1.6, u_mixDirt));\n" +
+"    /* the knock: a horizontal shove that shears down the frame and recovers */\n" +
+"    float kn = dirtE*u_mixDirtKnock;\n" +
+"    if(kn > 0.0005){\n" +
+"      float rowI = floor(uv.y*u_res.y);\n" +
+"      float shove = (h21(vec2(tk, 5.53))-0.5)*0.16*kn;\n" +
+"      shove *= mix(1.0, 1.0-uv.y, 0.6);\n" +
+"      shove += (h21(vec2(rowI, tk*0.77))-0.5)*0.05*kn;\n" +
+"      duv.x += shove;\n" +
+"      duv.y = fract(duv.y + (h21(vec2(tk, 2.19))-0.5)*0.06*kn);\n" +
+"    }\n" +
+"  }\n" +
+"  vec3 a = texture(u_texA, clamp(duv,0.0,1.0)).rgb;\n" +
 "  /* ---- 1. where does B come from, and how much of it shows ---- */\n" +
-"  vec2 buv = uv;\n" +
-"  float m = t, inside = 1.0;\n" +
+"  vec2 buv = duv;\n" +
+"  float m = t, inside = 1.0, wipeBand = 0.0;\n" +
 "  if(mm > 0.5 && mm < 12.5){\n" +
-"    float d = wipeField(uv, mm, outA);\n" +
+"    float d = wipeField(duv, mm, outA);\n" +
 "    if(u_wipeInv>0.5) d = 1.0-d;\n" +
 "    float sw = max(u_wipeSoft*0.5, 0.002);\n" +
-"    m = smoothstep(d-sw, d+sw, t*(1.0+2.0*sw)-sw);\n" +
+"    float tt = t*(1.0+2.0*sw)-sw;\n" +
+"    m = smoothstep(d-sw, d+sw, tt);\n" +
+"    /* BORDER WIPE: a coloured rule laid along the join, as on a bench mixer */\n" +
+"    if(u_wipeBord > 0.002){\n" +
+"      float bw = 0.004 + u_wipeBord*0.1;\n" +
+"      wipeBand = (1.0 - smoothstep(bw*0.45, bw, abs(d - tt))) * step(0.004, t) * step(t, 0.996);\n" +
+"    }\n" +
 "  } else if(mm > 12.5 && mm < 16.5){\n" +
-"    buv = slideUV(uv, mm-13.0, t, inside);\n" +
+"    buv = slideUV(duv, mm-13.0, t, inside);\n" +
 "    m = inside;\n" +
 "  } else if(mm > 16.5 && mm < 20.5){\n" +
-"    buv = stretchUV(uv, mm-17.0, t, inside);\n" +
+"    buv = stretchUV(duv, mm-17.0, t, inside);\n" +
 "    m = inside;\n" +
 "  }\n" +
 "  /* ---- 2. the key stage, independent of the transition ---- */\n" +
-"  float border = 0.0;\n" +
+"  float border = 0.0, keyEdge = 0.0, keyShad = 0.0;\n" +
 "  if(u_mixKey > 0.5){\n" +
 "    if(u_mixKey < 3.5){\n" +
 "      /* 1 = white luma, 2 = black luma, 3 = chroma. The key is taken from the\n" +
 "         incoming picture, so its bright, dark or coloured parts drop out. */\n" +
-"      float km = keyOf(texture(u_texB, clamp(buv,0.0,1.0)).rgb,\n" +
-"                       u_mixKey > 2.5 ? 1.0 : 0.0,\n" +
-"                       u_mixKeyHue, u_mixKeyThresh, u_mixKeySoft,\n" +
-"                       (u_mixKey < 1.5) ? 1.0-u_mixKeyInv : u_mixKeyInv);\n" +
+"      float km = keyMatte(buv);\n" +
+"      /* BORDER and SHADOW are the title-edge treatments a bench mixer offers:\n" +
+"         the matte is grown outward for an outline, and offset down-right and\n" +
+"         darkened for a drop shadow. Both read from the same matte. */\n" +
+"      if(u_mixKeyEdge > 0.002){\n" +
+"        float r = (0.002 + u_mixKeyEdge*0.02);\n" +
+"        vec2 rx = vec2(r/outA, 0.0), ry = vec2(0.0, r);\n" +
+"        float g = max(max(keyMatte(buv-rx), keyMatte(buv+rx)),\n" +
+"                      max(keyMatte(buv-ry), keyMatte(buv+ry)));\n" +
+"        g = max(g, max(keyMatte(buv-rx-ry), keyMatte(buv+rx+ry)));\n" +
+"        keyEdge = clamp(g - km, 0.0, 1.0);\n" +
+"      }\n" +
+"      if(u_mixKeyShadow > 0.002){\n" +
+"        float sh = u_mixKeyShadow*0.035;\n" +
+"        keyShad = clamp(keyMatte(buv - vec2(sh/outA, -sh)) - km, 0.0, 1.0);\n" +
+"      }\n" +
 "      m *= km;\n" +
 "    } else {\n" +
 "      /* picture in picture: B is scaled into a subscreen with a border */\n" +
 "      float sz = 0.08 + u_pipSize*0.62;\n" +
 "      vec2 ctr = vec2(0.5,0.5) + vec2(u_pipX, u_pipY)*0.42;\n" +
 "      vec2 hw = vec2(sz*0.5, sz*0.5*outA);\n" +
-"      vec2 q = (uv - ctr)/hw;\n" +
+"      vec2 q = (duv - ctr)/hw;\n" +
 "      buv = q*0.5 + 0.5;\n" +
 "      float bw = u_pipBorder*0.16;\n" +
 "      float inBox = step(max(abs(q.x),abs(q.y)), 1.0);\n" +
@@ -1377,8 +1518,8 @@ const FS_MIX = COMMON + KEYFN +
 "  if(u_edgeAmt > 0.002){\n" +
 "    float r = 0.004 + u_edgeWidth*0.085;\n" +
 "    vec2 rx = vec2(r/outA, 0.0), ry = vec2(0.0, r);\n" +
-"    float mL = matteAt(uv-rx, mm, t, outA), mR = matteAt(uv+rx, mm, t, outA);\n" +
-"    float mD = matteAt(uv-ry, mm, t, outA), mU = matteAt(uv+ry, mm, t, outA);\n" +
+"    float mL = matteAt(duv-rx, mm, t, outA), mR = matteAt(duv+rx, mm, t, outA);\n" +
+"    float mD = matteAt(duv-ry, mm, t, outA), mU = matteAt(duv+ry, mm, t, outA);\n" +
 "    float mn = min(min(mL,mR),min(mD,mU)), mx = max(max(mL,mR),max(mD,mU));\n" +
 "    band = clamp((mx-mn)*1.25, 0.0, 1.0);\n" +
 "    vec2 g = vec2(mR-mL, mU-mD);\n" +
@@ -1392,7 +1533,16 @@ const FS_MIX = COMMON + KEYFN +
 "  }\n" +
 "  vec2 bd = en * band * u_edgeAmt * 0.055;\n" +
 "  vec3 b = texture(u_texB, clamp(buv + bd, 0.0, 1.0)).rgb;\n" +
+"  /* a firing can throw the crossbar to the wrong input for a moment */\n" +
+"  if(dirtE > 0.001 && u_mixDirtCut > 0.002){\n" +
+"    float want = step(0.5, h21(vec2(dirtSeed, 3.17)));\n" +
+"    m = mix(m, want, clamp(dirtE*u_mixDirtCut*1.4, 0.0, 1.0));\n" +
+"  }\n" +
 "  vec3 src = combine(a, b, clamp(m,0.0,1.0), u_mixBlend);\n" +
+"  /* the keyed edge treatments sit on top of the composite */\n" +
+"  if(keyShad > 0.001) src = mix(src, src*(1.0 - 0.8*u_mixKeyShadow), keyShad);\n" +
+"  if(keyEdge > 0.001) src = mix(src, backCol(u_mixKeyEdgeCol), keyEdge*clamp(u_mixKeyEdge*3.0,0.0,1.0));\n" +
+"  if(wipeBand > 0.001) src = mix(src, backCol(u_wipeBordCol), wipeBand*clamp(u_wipeBord*2.5,0.0,1.0));\n" +
 "  if(u_hasPrev > 0.5 && band > 0.001 && u_edgeHold > 0.002){\n" +
 "    vec2 pd = en * (0.0015 + u_edgeAmt*0.04);\n" +
 "    vec3 pv = texture(u_prev, clamp(uv + pd, 0.0, 1.0)).rgb;\n" +
@@ -1405,6 +1555,33 @@ const FS_MIX = COMMON + KEYFN +
 "    src = mix(src, pv, clamp(band*u_edgeHold, 0.0, 0.94));\n" +
 "  }\n" +
 "  if(border > 0.5) src = mix(src, vec3(1.0), t);\n" +
+"  /* ---- 4. what is left of a firing: dropped lines and switching noise ---- */\n" +
+"  if(dirtE > 0.001){\n" +
+"    if(u_mixDirtDrop > 0.002){\n" +
+"      float bandH = 2.0 + 26.0*h21(vec2(dirtSeed, 1.31));\n" +
+"      float rowb = floor(uv.y*u_res.y/bandH);\n" +
+"      float dh = h21(vec2(rowb, dirtSeed*0.77));\n" +
+"      float drop = step(1.0 - clamp(u_mixDirtDrop*dirtE*1.3, 0.0, 0.95), dh);\n" +
+"      if(drop > 0.5){\n" +
+"        /* half the time the line drops through to the other side of the\n" +
+"           crossbar, half the time to nothing at all */\n" +
+"        float toOther = step(0.5, h21(vec2(rowb*1.7, dirtSeed)));\n" +
+"        float sk = (h21(vec2(rowb, dirtSeed*2.3))-0.5)*0.09;\n" +
+"        vec3 alt = mix(texture(u_texA, clamp(vec2(uv.x+sk, uv.y),0.0,1.0)).rgb,\n" +
+"                       texture(u_texB, clamp(vec2(uv.x+sk, uv.y),0.0,1.0)).rgb, toOther);\n" +
+"        float dead = step(0.82, h21(vec2(rowb*3.1, dirtSeed)));\n" +
+"        alt = mix(alt, vec3(h21(vec2(floor(uv.x*u_res.x/2.5), rowb+dirtSeed))*0.5), dead);\n" +
+"        src = mix(src, alt, clamp(u_mixDirtDrop*1.2, 0.0, 1.0));\n" +
+"      }\n" +
+"    }\n" +
+"    if(u_mixDirtNoise > 0.002){\n" +
+"      float nx = floor(uv.x*u_res.x/3.0);\n" +
+"      float ny = floor(uv.y*u_res.y);\n" +
+"      float nz = h21(vec2(nx + ny*13.7, dirtSeed*7.3)) - 0.5;\n" +
+"      src += nz*u_mixDirtNoise*dirtE*1.6;\n" +
+"      src = mix(src, vec3(dot(src, vec3(0.299,0.587,0.114))), u_mixDirtNoise*dirtE*0.5);\n" +
+"    }\n" +
+"  }\n" +
 "  O = vec4(clamp(src,0.0,1.6),1.0);\n}\n";
 
 /* pass 2: the bent signal path — physical sync model + NTSC + tape */
@@ -1419,7 +1596,12 @@ const FS_SIG = COMMON + KEYFN +
 "uniform float u_tapeSpeed,u_edgeDmg,u_printThru,u_hiss,u_stillNoise,u_shuttleNz;\n" +
 "uniform float u_chanIdx,u_tpStill,u_tpShuttle;\n" +
 "uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx;\n" +
-"float lum(vec2 p){ return dot(texture(u_tex, fract(p)).rgb, vec3(0.299,0.587,0.114)); }\n" +
+/* Horizontal taps must not wrap. The picture genuinely rolls vertically, so
+   Y still wraps, but a tap that runs off the left of the line has to read
+   the edge rather than the far side of the frame - otherwise the peaking
+   filter, the dot crawl and the aperture correction all compare the first
+   pixel of a line against the last one and ring hard down both edges. */
+"float lum(vec2 p){ return dot(texture(u_tex, vec2(clamp(p.x,0.0,1.0), fract(p.y))).rgb, vec3(0.299,0.587,0.114)); }\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  if(u_bypass>0.5){ O = texture(u_tex,uv); return; }\n" +
@@ -1723,6 +1905,22 @@ const FS_CRT = COMMON +
 "uniform float u_outGamma,u_outBright,u_outContrast,u_outSat,u_outWarmth,u_blackLevel,u_whiteClip;\n" +
 "uniform float u_phosphor,u_hvSag;\n" +
 "uniform float u_letterbox,u_pillarbox,u_bezel,u_glassRefl,u_dust,u_scratches,u_ovMoire,u_rollShutter,u_safeArea;\n" +
+"uniform sampler2D u_osd;\n" +
+"uniform float u_lensDist,u_lensCA,u_lensStreak,u_streakHue,u_lensSmudge;\n" +
+"uniform float u_lightLeak,u_leakHue,u_gateWeave,u_gateHair,u_stuckPix,u_lcdGrid;\n" +
+"uniform float u_osdShow,u_osdGlow;\n" +
+"vec3 hsvOut(vec3 c){\n" +
+"  vec3 q = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0))*6.0 - 3.0);\n" +
+"  return c.z * mix(vec3(1.0), clamp(q-1.0, 0.0, 1.0), c.y);\n}\n" +
+"/* value noise: four hashed corners, smoothstep between them. Used for the\n" +
+"   smears on the glass and for the gate weave, both of which need something\n" +
+"   that drifts rather than fizzes. */\n" +
+"float vnoise(vec2 p){\n" +
+"  vec2 i = floor(p), f = fract(p);\n" +
+"  f = f*f*(3.0-2.0*f);\n" +
+"  float a = h21(i), b = h21(i+vec2(1.0,0.0)), c2 = h21(i+vec2(0.0,1.0)), d2 = h21(i+vec2(1.0,1.0));\n" +
+"  return mix(mix(a,b,f.x), mix(c2,d2,f.x), f.y);\n}\n" +
+"float fbm2(vec2 p){ return vnoise(p)*0.6 + vnoise(p*2.1+7.3)*0.3 + vnoise(p*4.3+13.1)*0.1; }\n" +
 "float lum3(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }\n" +
 /* --- shadow-mask families --- */
 "vec3 maskAt(vec2 fc, float model){\n" +
@@ -1751,6 +1949,20 @@ const FS_CRT = COMMON +
 "  if(u_hvSag>0.003){ sag = u_hvSag*0.035*(lum3(texture(u_tex, vec2(0.5)).rgb)+0.35); }\n" +
 "  p *= 1.0 + u_curvature*0.09*dot(p,p) - sag;\n" +
 "  vec2 cuv = p*0.5+0.5;\n" +
+"  /* the lens, as distinct from the tube: a real barrel or pincushion term\n" +
+"     applied to the whole picture, plus the gate weave of a projector whose\n" +
+"     registration pins have worn. Both happen before anything is sampled, so\n" +
+"     the picture genuinely moves rather than being smeared. */\n" +
+"  if(abs(u_lensDist)>0.003){\n" +
+"    vec2 dl = cuv-0.5; float r2 = dot(dl,dl);\n" +
+"    cuv = 0.5 + dl*(1.0 + u_lensDist*0.9*r2);\n" +
+"  }\n" +
+"  if(u_gateWeave>0.003){\n" +
+"    float tw = u_time*1.7;\n" +
+"    vec2 wv = vec2(vnoise(vec2(tw, 3.1))-0.5, vnoise(vec2(tw*0.8+11.0, 7.9))-0.5);\n" +
+"    wv += vec2(0.0, (h21(vec2(floor(u_time*24.0), 5.0))-0.5)*0.35);\n" +
+"    cuv += wv*u_gateWeave*0.03;\n" +
+"  }\n" +
 "  /* rounded corners / tube edge */\n" +
 "  vec2 ab = abs(p) - vec2(1.0 - u_cornerRound*0.18);\n" +
 "  float corner = length(max(ab,0.0)) - u_cornerRound*0.18;\n" +
@@ -1758,6 +1970,14 @@ const FS_CRT = COMMON +
 "  /* rolling shutter beat against the field rate */\n" +
 "  if(u_rollShutter>0.003){ cuv.y += sin((uv.y*3.0 + u_time*0.7)*3.14159)*u_rollShutter*0.004; }\n" +
 "  vec3 c = texture(u_tex, clamp(cuv,0.0,1.0)).rgb;\n" +
+"  /* transverse chromatic aberration: the three primaries focus at slightly\n" +
+"     different scales, so colour fringes grow towards the corners */\n" +
+"  if(u_lensCA>0.003){\n" +
+"    vec2 dc = cuv-0.5;\n" +
+"    float kr = 1.0 + u_lensCA*0.012, kb = 1.0 - u_lensCA*0.012;\n" +
+"    c.r = texture(u_tex, clamp(0.5+dc*kr, 0.0, 1.0)).r;\n" +
+"    c.b = texture(u_tex, clamp(0.5+dc*kb, 0.0, 1.0)).b;\n" +
+"  }\n" +
 "  /* phosphor persistence */\n" +
 "  if(u_phosphor>0.003 && u_hasPersist>0.5){\n" +
 "    vec3 pv = texture(u_persist, clamp(cuv,0.0,1.0)).rgb;\n" +
@@ -1772,10 +1992,14 @@ const FS_CRT = COMMON +
 "      float a = float(i)*0.5236;\n" +
 "      float r = (1.0 + mod(float(i),3.0))*0.45;\n" +
 "      vec2 off = vec2(cos(a), sin(a))*rad*r*px;\n" +
-"      float w = 1.0/(1.0+r*1.4);\n" +
-"      blur += texture(u_tex, clamp(cuv+off,0.0,1.0)).rgb*w; wsum += w;\n" +
+"      vec2 tp = cuv+off;\n" +
+"      /* a tap past the edge of the picture contributes nothing, rather than\n" +
+"         returning the edge pixel again and stacking it into a bright rim */\n" +
+"      float inb = step(0.0,tp.x)*step(tp.x,1.0)*step(0.0,tp.y)*step(tp.y,1.0);\n" +
+"      float w = inb/(1.0+r*1.4);\n" +
+"      blur += texture(u_tex, clamp(tp,0.0,1.0)).rgb*w; wsum += w;\n" +
 "    }\n" +
-"    blur /= max(wsum, 0.0001);\n" +
+"    blur = (wsum > 0.0001) ? blur/wsum : c;\n" +
 "    c = mix(c, blur, u_defocus*0.85);\n" +
 "    if(u_bloom>0.003){\n" +
 "      vec3 hot = max(blur - 0.42, 0.0)*1.9;\n" +
@@ -1834,6 +2058,73 @@ const FS_CRT = COMMON +
 "    float gn = h21(gl_FragCoord.xy + fract(u_time)*vec2(37.7,71.3));\n" +
 "    c += (gn-0.5)*u_grain*0.16*(0.35+0.65*(1.0-lum3(c)));\n" +
 "  }\n" +
+"  /* ---- the lens and the room in front of the screen ---- */\n" +
+"  if(u_lensStreak>0.003){\n" +
+"    /* anamorphic streak: a horizontal flare off anything hot enough to bloom,\n" +
+"       which is the one artefact that reads instantly as a lens rather than a\n" +
+"       filter, and it is blue because the coatings that cause it are */\n" +
+"    vec3 st = vec3(0.0); float sw = 0.0;\n" +
+"    for(int i=1;i<=10;i++){\n" +
+"      float o = float(i)*(0.006 + u_bloomRad*0.02);\n" +
+"      float ww = 1.0/float(i);\n" +
+"      vec2 lp = cuv+vec2(o,0.0), rp = cuv-vec2(o,0.0);\n" +
+"      float li = step(0.0,lp.x)*step(lp.x,1.0), ri = step(0.0,rp.x)*step(rp.x,1.0);\n" +
+"      st += max(texture(u_tex, clamp(lp,0.0,1.0)).rgb-0.62, 0.0)*ww*li;\n" +
+"      st += max(texture(u_tex, clamp(rp,0.0,1.0)).rgb-0.62, 0.0)*ww*ri;\n" +
+"      sw += ww*2.0;\n" +
+"    }\n" +
+"    st /= max(sw, 0.0001);\n" +
+"    c += st*u_lensStreak*6.0*mix(vec3(1.0), vec3(0.3,0.55,1.7), u_streakHue);\n" +
+"  }\n" +
+"  if(u_lensSmudge>0.003){\n" +
+"    /* dirty glass. A smear is only visible where something bright is behind\n" +
+"       it, which is why this is gated on the highlights rather than laid over\n" +
+"       the picture like a texture. */\n" +
+"    float sm = fbm2(uv*vec2(5.0,3.0)) * fbm2(uv*vec2(11.0,7.0)+4.4);\n" +
+"    sm = smoothstep(0.18, 0.62, sm);\n" +
+"    float hl = max(lum3(c)-0.35, 0.0);\n" +
+"    c += sm*hl*u_lensSmudge*1.6;\n" +
+"    c = mix(c, c*(1.0-sm*0.35), u_lensSmudge*0.4);\n" +
+"  }\n" +
+"  if(u_lightLeak>0.003){\n" +
+"    /* film edge fog: light getting past the felt and fogging one side of the\n" +
+"       frame, wandering slowly and breathing */\n" +
+"    float ang = u_time*0.043;\n" +
+"    vec2 dir = vec2(cos(ang), sin(ang));\n" +
+"    float g = clamp(dot(uv-0.5, dir)*1.6 + 0.55, 0.0, 1.0);\n" +
+"    g = pow(g, 2.4) * (0.55 + 0.45*sin(u_time*0.61) * 0.5 + 0.225);\n" +
+"    g *= 0.75 + 0.25*fbm2(uv*3.0 + u_time*0.05);\n" +
+"    c += g*u_lightLeak*1.1*hsvOut(vec3(fract(u_leakHue), 0.75, 1.0));\n" +
+"  }\n" +
+"  if(u_gateHair>0.003){\n" +
+"    /* a hair caught in the gate, hanging from the top and twitching */\n" +
+"    float sway = (vnoise(vec2(u_time*1.3, 2.0))-0.5)*0.05;\n" +
+"    float hx = 0.26 + sway + sin(uv.y*9.0 + u_time*0.4)*0.02;\n" +
+"    float hair = 1.0 - smoothstep(0.0008, 0.0026, abs(uv.x-hx));\n" +
+"    hair *= smoothstep(1.0, 0.72, uv.y);\n" +
+"    c = mix(c, c*0.12, hair*u_gateHair);\n" +
+"  }\n" +
+"  if(u_lcdGrid>0.003){\n" +
+"    /* a flat panel rather than a tube: a subpixel lattice with a black grid */\n" +
+"    vec2 g = fract(gl_FragCoord.xy/3.0);\n" +
+"    float gx = smoothstep(0.0,0.16,g.x)*smoothstep(1.0,0.84,g.x);\n" +
+"    float gy = smoothstep(0.0,0.22,g.y)*smoothstep(1.0,0.78,g.y);\n" +
+"    c *= mix(1.0, gx*gy*1.22, u_lcdGrid);\n" +
+"  }\n" +
+"  if(u_stuckPix>0.003){\n" +
+"    /* dead and stuck pixels. They never move, which is exactly what makes\n" +
+"       them read as a fault in the panel and not as noise in the signal. */\n" +
+"    vec2 pc = floor(gl_FragCoord.xy);\n" +
+"    float r = h21(pc*0.371 + 3.7);\n" +
+"    if(r > 1.0 - u_stuckPix*0.0035){\n" +
+"      float kind = h21(pc*1.73 + 9.1);\n" +
+"      if(kind < 0.42) c = vec3(0.0);\n" +
+"      else if(kind < 0.66) c = vec3(1.0);\n" +
+"      else if(kind < 0.78) c = vec3(1.0,0.0,0.0);\n" +
+"      else if(kind < 0.9) c = vec3(0.0,1.0,0.0);\n" +
+"      else c = vec3(0.0,0.0,1.0);\n" +
+"    }\n" +
+"  }\n" +
 "  /* mattes and guides last */\n" +
 "  if(u_letterbox>0.001 && (uv.y < u_letterbox || uv.y > 1.0-u_letterbox)) c = vec3(0.0);\n" +
 "  if(u_pillarbox>0.001 && (uv.x < u_pillarbox || uv.x > 1.0-u_pillarbox)) c = vec3(0.0);\n" +
@@ -1843,6 +2134,21 @@ const FS_CRT = COMMON +
 "    float g1 = step(-0.002, max(d90.x,d90.y))*step(max(d90.x,d90.y), 0.002);\n" +
 "    float g2 = step(-0.002, max(d80.x,d80.y))*step(max(d80.x,d80.y), 0.002);\n" +
 "    c = mix(c, vec3(0.2,1.0,0.9), (g1+g2)*u_safeArea*0.8);\n" +
+"  }\n" +
+"  /* the deck's own display, drawn last because on the machine it is burnt in\n" +
+"     after everything else and never obeys the picture's geometry */\n" +
+"  if(u_osdShow>0.003){\n" +
+"    vec4 od = texture(u_osd, vec2(uv.x, 1.0-uv.y));\n" +
+"    if(u_osdGlow>0.003){\n" +
+"      vec2 gp = 1.6/u_res;\n" +
+"      float ga = 0.0;\n" +
+"      for(int i=0;i<8;i++){\n" +
+"        float an = float(i)*0.7854;\n" +
+"        ga += texture(u_osd, vec2(uv.x,1.0-uv.y) + vec2(cos(an),sin(an))*gp*3.0).a;\n" +
+"      }\n" +
+"      c += od.rgb*(ga/8.0)*u_osdGlow*0.7*u_osdShow;\n" +
+"    }\n" +
+"    c = mix(c, od.rgb, od.a*u_osdShow);\n" +
 "  }\n" +
 "  O = vec4(max(c,0.0),1.0);\n}\n";
 
@@ -2326,12 +2632,13 @@ const SECTIONS = [
   {id:"crt",      name:"CRT DISPLAY",       cls:"cyan", zone:"out"},
   {id:"overlay",  name:"OUTPUT OVERLAY",    cls:"cyan", zone:"out"},
 
-  {id:"morph",    name:"PRESET MORPH",      cls:"mag",  zone:"tools"},
+  /* morph lives on the PERFORM tab with the snapshots and the recorder,
+     because it is the same job: recalling states while it runs */
+  {id:"morph",    name:"PRESET MORPH",      cls:"mag",  zone:"perform"},
 ];
 const ZONES = [
   {id:"chain", label:"CHANNEL \u00b7 SIGNAL PATH", note:"Everything belonging to the channel selected above, in the order the signal actually travels: source, framing, frame store, feedback, then the reorderable stages, then the keyer. Drag by the handle to rearrange."},
   {id:"out",   label:"MASTER OUT",          note:"The shared display stage, after the mixer. Every channel ends up here."},
-  {id:"tools", label:"TOOLS",               note:"Performance and modulation tools that do not belong to any one channel."},
 ];
 const PDEF = [
   ["abMix","BUS 1 FADER","mixer",0,1,0],
@@ -2353,6 +2660,20 @@ const PDEF = [
   ["edgeSwirl","EDGE SWIRL","mixer",-1,1,0],
   ["edgeChroma","EDGE CHROMA","mixer",0,1,0.5],
   ["edgeCreep","EDGE CREEP","mixer",0,1,0.35],
+  ["wipeBord","BORDER WIPE","mixer",0,1,0],
+  ["wipeBordCol","BORDER COLOUR","mixer",0,1,0],
+  ["wipeRep","WIPE MULTI","mixer",1,4,1],
+  ["mixKeyGain","KEY GAIN","mixer",0,1,0.5],
+  ["mixKeyDens","KEY DENSITY","mixer",0,1,1],
+  ["mixKeyEdge","KEY BORDER","mixer",0,1,0],
+  ["mixKeyEdgeCol","KEY BORDER COL","mixer",0,1,0],
+  ["mixKeyShadow","KEY SHADOW","mixer",0,1,0],
+  ["mixDirt","DIRT","mixer",0,1,0],
+  ["mixDirtRate","DIRT RATE","mixer",0,1,0.3],
+  ["mixDirtDrop","DIRT DROPOUT","mixer",0,1,0.5],
+  ["mixDirtCut","DIRT CUT","mixer",0,1,0.4],
+  ["mixDirtKnock","DIRT KNOCK","mixer",0,1,0.5],
+  ["mixDirtNoise","DIRT NOISE","mixer",0,1,0.35],
 
   ["cdMix","BUS 2 FADER","mixer2",0,1,0],
   ["wipeSoft2","WIPE SOFT","mixer2",0,1,0.03],
@@ -2373,6 +2694,20 @@ const PDEF = [
   ["edgeSwirl2","EDGE SWIRL","mixer2",-1,1,0],
   ["edgeChroma2","EDGE CHROMA","mixer2",0,1,0.5],
   ["edgeCreep2","EDGE CREEP","mixer2",0,1,0.35],
+  ["wipeBord2","BORDER WIPE","mixer2",0,1,0],
+  ["wipeBordCol2","BORDER COLOUR","mixer2",0,1,0],
+  ["wipeRep2","WIPE MULTI","mixer2",1,4,1],
+  ["mixKeyGain2","KEY GAIN","mixer2",0,1,0.5],
+  ["mixKeyDens2","KEY DENSITY","mixer2",0,1,1],
+  ["mixKeyEdge2","KEY BORDER","mixer2",0,1,0],
+  ["mixKeyEdgeCol2","KEY BORDER COL","mixer2",0,1,0],
+  ["mixKeyShadow2","KEY SHADOW","mixer2",0,1,0],
+  ["mixDirt2","DIRT","mixer2",0,1,0],
+  ["mixDirtRate2","DIRT RATE","mixer2",0,1,0.3],
+  ["mixDirtDrop2","DIRT DROPOUT","mixer2",0,1,0.5],
+  ["mixDirtCut2","DIRT CUT","mixer2",0,1,0.4],
+  ["mixDirtKnock2","DIRT KNOCK","mixer2",0,1,0.5],
+  ["mixDirtNoise2","DIRT NOISE","mixer2",0,1,0.35],
 
   ["busMix","MASTER FADER","mixerM",0,1,0],
   ["wipeSoftM","WIPE SOFT","mixerM",0,1,0.03],
@@ -2393,6 +2728,20 @@ const PDEF = [
   ["edgeSwirlM","EDGE SWIRL","mixerM",-1,1,0],
   ["edgeChromaM","EDGE CHROMA","mixerM",0,1,0.5],
   ["edgeCreepM","EDGE CREEP","mixerM",0,1,0.35],
+  ["wipeBordM","BORDER WIPE","mixerM",0,1,0],
+  ["wipeBordColM","BORDER COLOUR","mixerM",0,1,0],
+  ["wipeRepM","WIPE MULTI","mixerM",1,4,1],
+  ["mixKeyGainM","KEY GAIN","mixerM",0,1,0.5],
+  ["mixKeyDensM","KEY DENSITY","mixerM",0,1,1],
+  ["mixKeyEdgeM","KEY BORDER","mixerM",0,1,0],
+  ["mixKeyEdgeColM","KEY BORDER COL","mixerM",0,1,0],
+  ["mixKeyShadowM","KEY SHADOW","mixerM",0,1,0],
+  ["mixDirtM","DIRT","mixerM",0,1,0],
+  ["mixDirtRateM","DIRT RATE","mixerM",0,1,0.3],
+  ["mixDirtDropM","DIRT DROPOUT","mixerM",0,1,0.5],
+  ["mixDirtCutM","DIRT CUT","mixerM",0,1,0.4],
+  ["mixDirtKnockM","DIRT KNOCK","mixerM",0,1,0.5],
+  ["mixDirtNoiseM","DIRT NOISE","mixerM",0,1,0.35],
 
   ["morph","MORPH A>B","morph",0,1,0],
 
@@ -2646,6 +2995,20 @@ const PDEF = [
   ["ovMoire","SCREEN MOIRE","overlay",0,1,0],
   ["rollShutter","ROLL SHUTTER","overlay",0,1,0],
   ["safeArea","SAFE GUIDES","overlay",0,1,0],
+  ["lensDist","LENS DISTORT","overlay",-1,1,0],
+  ["lensCA","LENS FRINGE","overlay",0,1,0],
+  ["lensStreak","ANAMORPHIC","overlay",0,1,0],
+  ["streakHue","STREAK COLOUR","overlay",0,1,1],
+  ["lensSmudge","DIRTY GLASS","overlay",0,1,0],
+  ["lightLeak","LIGHT LEAK","overlay",0,1,0],
+  ["leakHue","LEAK COLOUR","overlay",0,1,0.05],
+  ["gateWeave","GATE WEAVE","overlay",0,1,0],
+  ["gateHair","GATE HAIR","overlay",0,1,0],
+  ["lcdGrid","LCD GRID","overlay",0,1,0],
+  ["stuckPix","STUCK PIXELS","overlay",0,1,0],
+  ["osdShow","DECK DISPLAY","overlay",0,1,0],
+  ["osdSize","DISPLAY SIZE","overlay",0.4,2,1],
+  ["osdGlow","DISPLAY GLOW","overlay",0,1,0.5],
 ];
 
 /* ---------------- per-parameter help ----------------
@@ -2673,6 +3036,20 @@ const PHELP = {
   edgeHold:"How much of the last frame survives inside the band. This is the persistence that turns a smear into a trail. Above about 0.8 it stops settling and keeps building, which is where it starts to look properly bent.",
   edgeSwirl:"Turns the drag direction. At zero the melt runs straight out across the boundary; wound fully either way it runs along it instead, so the edge stirs rather than bleeds.",
   edgeChroma:"Lets colour run further than brightness, the way it does off a composite edge. This is what makes the melt read as analogue rather than as a blur.",
+  wipeBord:"Lays a coloured rule along the join, the way a bench mixer's border wipe does. It follows the wipe wherever it goes and disappears when the fader reaches either end.",
+  wipeBordCol:"Which of the eight standard back colours the border is drawn in: white, yellow, cyan, green, magenta, red, blue, black, in that order.",
+  wipeRep:"Tiles the whole wipe pattern. Two gives four copies, four gives sixteen - the multi-wipe a bench mixer offers, and it works on every pattern rather than a chosen few.",
+  mixKeyGain:"How hard the key turns over between transparent and opaque. Low is a long soft ramp, high snaps. Threshold decides where the turn happens, this decides how abrupt it is.",
+  mixKeyDens:"The most opaque the key is ever allowed to get. Pulling it back leaves the keyed picture semi-transparent everywhere, which is how a title sits in the picture rather than on top of it.",
+  mixKeyEdge:"Grows the key matte outward and fills the growth with a colour, so the keyed shape gets an outline. Small values read as a rule around a title; large ones as a halo.",
+  mixKeyEdgeCol:"The colour of that outline, from the same eight back colours.",
+  mixKeyShadow:"Offsets a copy of the matte down and to the right and darkens the picture underneath it. A drop shadow, which is what stops a title disappearing into a busy background.",
+  mixDirt:"The master control for the dirty mixer, and an event clock rather than a continuous wobble. At zero the whole stage is off. Turned up, the mixer starts firing: the crossbar jumps to the wrong input, the timebase gets knocked sideways, bands of lines drop out and the switching transient sprays noise. This decides how often a firing happens; the five controls under it decide what a firing does.",
+  mixDirtRate:"How fast the event clock runs, so how closely spaced the firings are. Slow is an intermittent fault; fast is a mixer that has completely lost the plot.",
+  mixDirtDrop:"How much of a firing shows up as dropped lines. Bands of scanlines fall through to the other side of the crossbar, or to nothing at all.",
+  mixDirtCut:"How much of a firing throws the whole mix to one input or the other, regardless of where the fader is. This is the switcher glitching rather than the picture degrading.",
+  mixDirtKnock:"How hard a firing knocks the timebase. The picture shoves sideways, shears down the frame and crawls back, exactly as it does when a mixer is switched without genlock.",
+  mixDirtNoise:"The switching transient: a burst of bandwidth-limited noise across the picture, with the colour dropping out as it hits.",
   edgeCreep:"Which side of the boundary the melt lives on. At zero it sits evenly across the seam. Wound up, it only happens on the outgoing side, so the incoming shape bleeds into the background and the background never eats into the shape.",
   morph:"Blends every slider on the panel between the two snapshots stored with STORE A and STORE B. Put an LFO on this and the whole rig evolves on its own. Touching any individual slider takes that one control back out of the morph.",
 
@@ -2940,11 +3317,26 @@ const PHELP = {
   ovMoire:"The interference pattern a camera picks up when it photographs a screen.",
   rollShutter:"The horizontal banding a CMOS sensor produces when it photographs a display, from the sensor and the raster running at slightly different rates.",
   safeArea:"Broadcast safe-area guides, for framing. Not an effect — it draws over the picture and is not recorded.",
+  lensDist:"Barrel one way, pincushion the other. This is the lens rather than the tube: it bends the whole picture before anything is sampled, so what leaves the frame genuinely leaves rather than being stretched along the edge.",
+  lensCA:"Transverse chromatic aberration. Red and blue focus at slightly different scales, so colour fringes appear and grow towards the corners, the way they do on a cheap zoom wide open.",
+  lensStreak:"The horizontal flare an anamorphic lens throws off a highlight. Of everything in this section it is the one artefact that reads instantly as a lens and not as a filter.",
+  streakHue:"How blue the streak is. All the way up is the coated-glass blue everybody recognises; all the way down leaves it white.",
+  lensSmudge:"Smears on the glass. A smudge is only visible where something bright is behind it, so this is driven by the highlights rather than laid over the picture as a texture, which is why it moves with the shot instead of sitting on top of it.",
+  lightLeak:"Light getting past the felt and fogging one side of the frame. The direction wanders slowly and the intensity breathes, so it never sits still.",
+  leakHue:"The colour of the leak. Low is the orange of daylight through a film can; higher takes it through magenta and into cyan.",
+  gateWeave:"Registration weave. The picture drifts and twitches in the gate the way it does on a projector whose pins have worn, with a little per-frame jump on top of the slow drift.",
+  gateHair:"A hair caught in the gate, hanging from the top of the frame and twitching. One of those details that does more for believability than any amount of grain.",
+  lcdGrid:"A flat panel instead of a tube: a subpixel lattice with a black grid between the cells. Use it with the CRT display model off, or the two masks fight each other.",
+  stuckPix:"Dead and stuck pixels. They never move, which is what makes them read as a fault in the panel rather than noise in the signal.",
+  osdShow:"The deck\u2019s own on-screen display, burnt in over everything: the transport symbol, a running tape counter and an optional date stamp, in the dot-matrix yellow every camcorder used. Mode and date format are the buttons at the top of this section.",
+  osdSize:"How large the display is drawn, relative to the frame.",
+  osdGlow:"How much the display blooms. Real burnt-in characters were bright enough to flare slightly against a dark picture.",
 };
 /* the bus 2 and master mixer controls reuse bus 1's descriptions */
 for(const [suffix, note] of [["2"," (bus 2: channels C and D)"], ["M"," (master: bus 1 against bus 2)"]]){
   for(const id of ["wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue","pipX","pipY","pipSize","pipBorder",
-                   "edgeAmt","edgeWidth","edgeHold","edgeSwirl","edgeChroma","edgeCreep"]){
+                   "edgeAmt","edgeWidth","edgeHold","edgeSwirl","edgeChroma","edgeCreep",
+                   "wipeBord","wipeBordCol","wipeRep","mixKeyGain","mixKeyDens","mixKeyEdge","mixKeyEdgeCol","mixKeyShadow","mixDirt","mixDirtRate","mixDirtDrop","mixDirtCut","mixDirtKnock","mixDirtNoise"]){
     PHELP[id+suffix] = PHELP[id] + note;
   }
 }
@@ -2971,7 +3363,7 @@ const SECHELP = {
   vhs:"A whole tape deck, per channel: transport, tracking servo, head switching, physical tape damage and generation loss.",
   color:"A straightforward colour corrector at the end of the per-channel chain — levels, saturation, hue, and the graphic operations.",
   crt:"The master display stage, shared by everything. Not a filter but a model of a screen: mask geometry, beam profile, persistence, and the output transform.",
-  overlay:"Drawn over the finished picture: mattes, bezel, glass, dirt and framing guides.",
+  overlay:"Everything between the picture and the eye: the lens, the glass in front of the screen, the panel itself, and the deck's own burnt-in display. Not effects on the signal, but artefacts of whatever it is being watched through.",
   lab:"Techniques from the open-source glitch canon, rebuilt: sparse line jitter, NTSC crosstalk, slitscan, bit crush, moire, and video-rate field modulation.",
   audio:"Sets what the audio-reactive mod sources listen to: each band's frequency range and gain, the input device, and the response time.",
   lfo:"Rates and shapes for the four LFOs, plus tempo and the sync divisions.",
@@ -3035,7 +3427,8 @@ let mixBlend = 0, mixBlend2 = 0, mixBlendM = 0;
 let mixKey = 0,   mixKey2 = 0,   mixKeyM = 0;
 /* the mixer shader has one set of uniform names; each bus feeds it its own params */
 const MIXP = ["abMix","wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue","pipX","pipY","pipSize","pipBorder",
-              "edgeAmt","edgeWidth","edgeHold","edgeSwirl","edgeChroma","edgeCreep"];
+              "edgeAmt","edgeWidth","edgeHold","edgeSwirl","edgeChroma","edgeCreep",
+              "wipeBord","wipeBordCol","wipeRep","mixKeyGain","mixKeyDens","mixKeyEdge","mixKeyEdgeCol","mixKeyShadow","mixDirt","mixDirtRate","mixDirtDrop","mixDirtCut","mixDirtKnock","mixDirtNoise"];
 const MIXP_EDGE = 13;   /* index of edgeAmt inside a bus's parameter list */
 /* which channel feeds each side of each bus — any channel can meet any other */
 const busSrc = {b1:["A","B"], b2:["C","D"]};
@@ -3048,9 +3441,11 @@ let multiView = false;
 const MIXBUS = {
   b1: MIXP,
   b2: ["cdMix","wipeSoft2","wipeDetail2","wipeX2","wipeY2","mixKeyThresh2","mixKeySoft2","mixKeyInv2","mixKeyHue2","pipX2","pipY2","pipSize2","pipBorder2",
-       "edgeAmt2","edgeWidth2","edgeHold2","edgeSwirl2","edgeChroma2","edgeCreep2"],
+       "edgeAmt2","edgeWidth2","edgeHold2","edgeSwirl2","edgeChroma2","edgeCreep2",
+       "wipeBord2","wipeBordCol2","wipeRep2","mixKeyGain2","mixKeyDens2","mixKeyEdge2","mixKeyEdgeCol2","mixKeyShadow2","mixDirt2","mixDirtRate2","mixDirtDrop2","mixDirtCut2","mixDirtKnock2","mixDirtNoise2"],
   bM: ["busMix","wipeSoftM","wipeDetailM","wipeXM","wipeYM","mixKeyThreshM","mixKeySoftM","mixKeyInvM","mixKeyHueM","pipXM","pipYM","pipSizeM","pipBorderM",
-       "edgeAmtM","edgeWidthM","edgeHoldM","edgeSwirlM","edgeChromaM","edgeCreepM"]
+       "edgeAmtM","edgeWidthM","edgeHoldM","edgeSwirlM","edgeChromaM","edgeCreepM",
+       "wipeBordM","wipeBordColM","wipeRepM","mixKeyGainM","mixKeyDensM","mixKeyEdgeM","mixKeyEdgeColM","mixKeyShadowM","mixDirtM","mixDirtRateM","mixDirtDropM","mixDirtCutM","mixDirtKnockM","mixDirtNoiseM"]
 };
 let fbWrap = 0;        // 0 clamp 1 repeat 2 mirror
 let fbMirror = 0;      // 0 none 1 H 2 V 3 quad
@@ -3061,6 +3456,11 @@ let fbTap = 0;         // 0 pre-display  1 post-display (rescan)
 let flowField = 0;     // FLOW field: 0 motion 1 contour 2 curl-noise 3 radial 4 spiral 5 chroma 6 weave
 let flowEdge = 0;      // FLOW edge: 0 clamp 1 repeat 2 mirror
 let outModel = 0;      // display model index
+/* the deck's burnt-in display: which transport symbol, and whether a date
+   stamp is drawn with it */
+let osdMode = 1;       // 0 REC  1 PLAY  2 PAUSE  3 STOP  4 FF  5 REW
+let osdDate = 0;       // 0 none 1 date 2 date + time
+let osdCounter = 0;    // running tape counter, seconds
 let edgeMode = 0;          // frame edge: 0=black 1=tile 2=mirror
 let showKeyMatte = false;  // keyer matte viewer
 
@@ -3412,7 +3812,7 @@ const lfoState = new Proxy({}, {
 const modVal = {};
 
 /* tempo: tap or MIDI clock; synced LFOs derive their rate from it */
-let bpm = 120, extClockAt = 0, clockEma = 0;
+let bpm = 120, extClockAt = -1e9, clockEma = 0;   // no external clock until one arrives
 const tapTimes = [];
 function tapTempo(){
   const now = performance.now();
@@ -3685,15 +4085,72 @@ async function openMic(){
   wireMic();
   refreshAudioDeviceUI();
 }
+/* An audio file as a modulation source. The point is being able to build a
+   piece against the track it will be shown with, rather than only against
+   whatever happens to be in the room. It goes through the same analyser as
+   everything else, so the bands, the gains and the onset triggers behave
+   identically whichever input is selected. */
+let audioFileEl=null, audioFileNode=null, audioFileGain=null, audioFileName="";
+function ensureAudioFileEl(){
+  if(!audioFileEl){
+    audioFileEl = document.createElement("audio");
+    audioFileEl.loop = true;
+    audioFileEl.preload = "auto";
+    for(const ev of ["ended","play","pause","timeupdate"])
+      audioFileEl.addEventListener(ev, ()=>refreshAudioFileUI());
+  }
+  return audioFileEl;
+}
+function wireAudioFile(){
+  ensureAudioCtx();
+  const el = ensureAudioFileEl();
+  if(!audioFileNode){
+    try{
+      audioFileNode = audioCtx.createMediaElementSource(el);
+      audioFileGain = audioCtx.createGain();
+      audioFileNode.connect(audioFileGain);
+      audioFileGain.connect(audioCtx.destination);
+      if(recDest) audioFileNode.connect(recDest);
+    }catch(e){ console.warn(e); return; }
+  }
+  try{ audioFileNode.connect(analyser); }catch(e){}
+}
+async function loadAudioFile(f){
+  if(!f) return;
+  ensureAudioCtx();
+  const el = ensureAudioFileEl();
+  if(el.dataset.url) URL.revokeObjectURL(el.dataset.url);
+  const u = URL.createObjectURL(f);
+  el.dataset.url = u; el.src = u;
+  audioFileName = f.name;
+  wireAudioFile();
+  audioMode = "file";
+  const sel = document.getElementById("selAudio"); if(sel) sel.value = "file";
+  try{ await el.play(); }catch(e){}
+  refreshAudioFileUI();
+  toast("Audio-reactive: " + f.name);
+}
+let refreshAudioFileUI = ()=>{};
 async function setAudioMode(m){
   audioMode = m;
   if(m === "off"){
     if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; micNode=null; }
+    if(audioFileEl) audioFileEl.pause();
     audioBands.bass=audioBands.mid=audioBands.high=0;
     return;
   }
   ensureAudioCtx();
   if(m === "source"){ hookVideoAudio(); toast("Audio-reactive: video soundtrack"); }
+  if(m === "file"){
+    wireAudioFile();
+    if(!audioFileEl || !audioFileEl.src){
+      const fi = document.getElementById("audioFileIn");
+      if(fi) fi.click();
+    } else {
+      try{ await audioFileEl.play(); }catch(e){}
+    }
+    refreshAudioFileUI();
+  }
   if(m === "mic"){
     try{
       await openMic();
@@ -4025,31 +4482,22 @@ function buildPanel(){
       d2.appendChild(row);
       uiRefs[p.id] = {slider:s, val, tick, row, label:lab};
     }
-    /* the three transition sections live in the dock's MIX tab, not the sidebar */
-    const host = sec.zone === "mix" ? document.getElementById("mixdock") : (zoneEls[sec.zone] || zoneEls.chain);
-    host.appendChild(d);
+    /* the transition sections live on the dock's MIX tab and preset morph on
+       PERFORM; only the channel path and the master out are in the sidebar */
+    const DOCKZONE = {mix:"mixdock", perform:"performdock"};
+    const host = DOCKZONE[sec.zone] ? document.getElementById(DOCKZONE[sec.zone])
+                                    : (zoneEls[sec.zone] || zoneEls.chain);
+    /* on PERFORM the bend pads stay at the bottom, so anything else goes above */
+    const bendrow = (sec.zone === "perform") ? document.getElementById("bendrow") : null;
+    if(bendrow) host.insertBefore(d, bendrow); else host.appendChild(d);
   }
-  /* LFO config section */
-  const d = mkSection("lfo", "mag", "TEMPO / CLOCK");
-  /* tempo row */
+  /* The clock is a header control now. It is global, it is two widgets wide,
+     and it was taking a whole sidebar section to show one number. */
   {
-    const row = document.createElement("div"); row.className="prow";
-    const lab = document.createElement("label"); lab.textContent = "TEMPO";
-    const tap = document.createElement("button"); tap.textContent = "TAP";
-    tap.title = "Tap tempo — synced LFOs follow it. MIDI clock overrides automatically.";
-    tap.onclick = tapTempo;
-    const bv = document.createElement("span"); bv.className="val"; bv.id="bpmVal";
-    bv.style.width = "70px"; bv.textContent = bpm.toFixed(1);
-    const note = document.createElement("span");
-    note.style.cssText = "color:var(--dim); font-size:8.5px; flex:1;";
-    note.textContent = "SYNC locks an LFO to tempo";
-    row.appendChild(lab); row.appendChild(tap); row.appendChild(bv); row.appendChild(note);
-    d.appendChild(row);
+    const tap = document.getElementById("btnTap");
+    if(tap) tap.onclick = tapTempo;
+    updateTempoUI();
   }
-  const lfnote = document.createElement("div");
-  lfnote.style.cssText = "color:var(--dim); font-size:8.5px; padding:4px 0 2px;";
-  lfnote.textContent = "Tap to set the tempo; any modulator with a sync division follows it, and MIDI clock overrides it automatically. Rates, shapes, envelopes and macros live on the MOD tab of the dock, where you can also add as many more as you want.";
-  d.appendChild(lfnote);
   buildAudioSection();
 }
 
@@ -4454,7 +4902,7 @@ function loadSectionOrder(){
     for(const id of valid) zoneEls.chain.appendChild(secEls[id]);
   }catch(e){}
 }
-function mkSection(id, cls, name){
+function mkSection(id, cls, name, hostEl){
   const d = document.createElement("div"); d.className = "sec "+cls;
   const h = document.createElement("h3");
   h.innerHTML = "<span class='caret'>\u25be</span><span class='led'></span>"+name;
@@ -4464,7 +4912,8 @@ function mkSection(id, cls, name){
   const body = document.createElement("div"); body.className = "secbody";
   d.appendChild(body);
   secEls[id] = d;
-  if(zoneEls.tools) zoneEls.tools.appendChild(d);
+  const host = hostEl || zoneEls.tools;
+  if(host) host.appendChild(d);
   /* callers append to the body */
   d.appendChild = body.appendChild.bind(body);
   return d;
@@ -4636,7 +5085,12 @@ const MIXMODES = ["MIX / DISSOLVE","WIPE H","WIPE V","DIAGONAL","BOX","CIRCLE","
   "BLINDS V","BLINDS H","CLOCK","DIAG BARS","BLOCKS",
   "SLIDE \u2192","SLIDE \u2190","SLIDE \u2191","SLIDE \u2193",
   "STRETCH \u2192","STRETCH \u2190","STRETCH \u2191","STRETCH \u2193"];
-const MIXBLENDS = ["DISSOLVE","ADDITIVE","NON-ADD","DIFFERENCE","MULTIPLY","SCREEN"];
+/* The first six keep the index they have always had, so patches saved before
+   the list grew still load with the mix type they were saved with. */
+const MIXBLENDS = ["DISSOLVE","ADDITIVE","NON-ADD","DIFFERENCE","MULTIPLY","SCREEN",
+  "DARKEN","EXCLUSION","SUBTRACT","OVERLAY","HARD LIGHT","SOFT LIGHT","VIVID LIGHT","PIN LIGHT",
+  "COLOUR DODGE","COLOUR BURN","DIVIDE","WRAP ADD","XOR BITS","AND BITS",
+  "HUE","SATURATION","COLOUR","LUMINOSITY"];
 const MIXKEYS = ["KEY OFF","LUMA WHITE","LUMA BLACK","CHROMA","PICTURE IN PICTURE"];
 
 /* ---- PERFORM dock: snapshot bank + performance recorder ---- */
@@ -4785,6 +5239,22 @@ function sectionExtras(id, d){
     note.textContent = "The master display stage: pick a tube, set the beam profile, then the output transform (gamma / levels / warmth) and persistence.";
     d.appendChild(note);
   }
+  if(id==="overlay"){
+    const tr = document.createElement("div"); tr.className="trow";
+    const TM = ["REC","PLAY","PAUSE","STOP","F FWD","REWIND"];
+    const DM = ["NO DATE","DATE","DATE + TIME"];
+    mkToggle(tr, "osdMode", ()=>"DECK: "+TM[osdMode], ()=>{ osdMode=(osdMode+1)%6; osdLast=""; },
+      "Which transport the burnt-in display is showing. REC blinks the way it did, and the counter only runs on the transports that would actually move the tape - forward on PLAY and REC, seven times as fast on the shuttles, and backwards on rewind.");
+    mkToggle(tr, "osdDate", ()=>DM[osdDate], ()=>{ osdDate=(osdDate+1)%3; osdLast=""; },
+      "The date stamp in the corner. Today's date, taken from this machine.");
+    mkToggle(tr, "osdZero", ()=>"COUNTER 0", ()=>{ osdCounter=0; osdLast=""; },
+      "Resets the tape counter to zero, the way the button on the front of the deck did.");
+    d.appendChild(tr);
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Everything between the picture and the eye. The lens comes first (distortion, fringing, the anamorphic streak), then the glass in front of the screen (smears, reflections, dust, leaks), then the panel itself, then the deck's own display burnt in over the top. DECK DISPLAY has to be above zero for the readout to appear.";
+    d.appendChild(note);
+  }
   if(id==="keyer"){
     const tr = document.createElement("div"); tr.className="trow";
     mkToggle(tr, "keyMode", ()=>"KEY: "+(keyChroma?"CHROMA":"LUMA"), ()=>{ keyChroma=!keyChroma; }, "Whether the key selects by brightness or by hue.");
@@ -4893,7 +5363,82 @@ const audioUIRefs = [];
 const meterEls = {};
 function hzFmt(v){ return v>=1000 ? (v/1000).toFixed(1)+"k" : Math.round(v); }
 function buildAudioSection(){
-  const d = mkSection("audio", "cyan", "AUDIO REACT");
+  const dock = document.getElementById("audiodock");
+  const d = mkSection("audio", "cyan", "AUDIO REACT \u00b7 INPUT", dock);
+  /* the input picker belongs next to the meters, not three menus away */
+  {
+    const row = document.createElement("div"); row.className="prow";
+    const lab = document.createElement("label"); lab.textContent = "LISTEN TO";
+    const sel = document.createElement("select"); sel.id = "selAudioSrc"; sel.style.flex = "1";
+    attachTip(sel, "AUDIO SOURCE",
+      "Where the audio-reactive modulators listen. VIDEO taps the soundtrack of the clip loaded into channel A. INPUT opens a microphone, an audio interface or any capture device. FILE plays an audio file you load here, which is how you build a piece against the track it will be shown with.");
+    for(const [v,t] of [["off","OFF"],["source","VIDEO SOUNDTRACK"],["mic","LIVE INPUT"],["file","AUDIO FILE"]]){
+      const o = document.createElement("option"); o.value=v; o.textContent=t; sel.appendChild(o);
+    }
+    sel.value = audioMode;
+    sel.onchange = ()=>{ const m = document.getElementById("selAudio"); if(m) m.value = sel.value; setAudioMode(sel.value); };
+    row.appendChild(lab); row.appendChild(sel);
+    d.appendChild(row);
+  }
+  /* audio file: load, transport, position */
+  {
+    const row = document.createElement("div"); row.className="prow";
+    const lab = document.createElement("label"); lab.textContent = "FILE";
+    const ld = document.createElement("button"); ld.textContent = "LOAD";
+    attachTip(ld, "LOAD AUDIO FILE", "Any audio file your browser can decode: wav, mp3, m4a, flac, ogg. It stays on your machine and streams from disk like the video does.");
+    ld.onclick = ()=>{ const fi = document.getElementById("audioFileIn"); if(fi) fi.click(); };
+    const pp = document.createElement("button"); pp.textContent = "PLAY";
+    pp.onclick = async ()=>{
+      const el = ensureAudioFileEl();
+      if(!el.src){ const fi = document.getElementById("audioFileIn"); if(fi) fi.click(); return; }
+      ensureAudioCtx(); wireAudioFile();
+      if(el.paused){ try{ await el.play(); }catch(e){} } else el.pause();
+      refreshAudioFileUI();
+    };
+    const lp = document.createElement("button"); lp.textContent = "LOOP"; lp.classList.add("on");
+    lp.onclick = ()=>{ const el = ensureAudioFileEl(); el.loop = !el.loop; lp.classList.toggle("on", el.loop); };
+    row.appendChild(lab); row.appendChild(ld); row.appendChild(pp); row.appendChild(lp);
+    d.appendChild(row);
+    const nrow = document.createElement("div"); nrow.className="prow";
+    const nlab = document.createElement("label"); nlab.textContent = "POSITION";
+    const sk = document.createElement("input"); sk.type="range"; sk.min=0; sk.max=1; sk.step=0.0005; sk.value=0;
+    sk.style.flex = "1";
+    let scrubbing = false;
+    sk.addEventListener("pointerdown", ()=>{ scrubbing = true; });
+    sk.addEventListener("pointerup", ()=>{ scrubbing = false; });
+    sk.addEventListener("input", ()=>{
+      const el = ensureAudioFileEl();
+      if(el.duration) el.currentTime = parseFloat(sk.value)*el.duration;
+    });
+    const tc = document.createElement("span"); tc.className="val"; tc.style.width="86px"; tc.textContent="--:-- / --:--";
+    nrow.appendChild(nlab); nrow.appendChild(sk); nrow.appendChild(tc);
+    d.appendChild(nrow);
+    const nm = document.createElement("div");
+    nm.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0 6px;";
+    nm.textContent = "No audio file loaded";
+    d.appendChild(nm);
+    const mmss = t=>{
+      if(!isFinite(t)) return "--:--";
+      const m2 = Math.floor(t/60), s2 = Math.floor(t%60);
+      return (m2<10?"0":"")+m2+":"+(s2<10?"0":"")+s2;
+    };
+    refreshAudioFileUI = ()=>{
+      const el = audioFileEl;
+      pp.textContent = (el && !el.paused) ? "PAUSE" : "PLAY";
+      pp.classList.toggle("on", !!(el && !el.paused));
+      if(el) lp.classList.toggle("on", el.loop);
+      nm.textContent = audioFileName ? audioFileName : "No audio file loaded";
+      if(el && el.duration && !scrubbing){
+        sk.value = el.currentTime/el.duration;
+        tc.textContent = mmss(el.currentTime)+" / "+mmss(el.duration);
+      }
+    };
+  }
+  const sep = document.createElement("div");
+  sep.style.cssText = "border-top:1px solid var(--line); margin:6px 0 8px;";
+  d.appendChild(sep);
+  /* the band controls get their own panel so the dock reads as columns */
+  let dTarget = d;
   /* live meters */
   const mrow = document.createElement("div");
   mrow.style.cssText = "display:flex; gap:6px; padding:2px 0 8px;";
@@ -4922,10 +5467,11 @@ function buildAudioSection(){
     s.addEventListener("input", upd); upd();
     wrap.appendChild(s);
     row.appendChild(lab); row.appendChild(wrap); row.appendChild(val);
-    d.appendChild(row);
+    dTarget.appendChild(row);
     audioUIRefs.push({s, val, get, log, fmtFn,
       refresh(){ s.value = log ? Math.log10(get()) : get(); val.textContent = fmtFn(get()); }});
   }
+  dTarget = mkSection("audioband", "cyan", "AUDIO REACT \u00b7 BANDS", document.getElementById("audiodock"));
   for(const k of ["bass","mid","high"]){
     const K = k.toUpperCase();
     slider(K+" LO",  ()=>audioCfg[k].lo,  v=>{audioCfg[k].lo=Math.min(v, audioCfg[k].hi-5);},  20, 16000, hzFmt, true);
@@ -5300,6 +5846,8 @@ for(const [name, base, tog] of FBK){
 
 PRESETS.push(["MELT \u00b7 CIRCLE BLEED", {"chan": {"A": {"genFreqX": 0.09, "genFreqY": 0.06, "genPhase": 0, "genRate": 0.05, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.08, "genSpread": 1.2, "genSat": 0.85, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.35, "chromaDelay": 0, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1.15, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.35, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}, "B": {"genFreqX": 0.34, "genFreqY": 0.2, "genPhase": 0, "genRate": 0.09, "genFM": 0.55, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.62, "genSpread": 1.5, "genSat": 0.9, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0.35, "contourBands": 8, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.5, "chromaDelay": 0.2, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1.3, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.4, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}, "C": {"genFreqX": 0.18, "genFreqY": 0.12, "genPhase": 0, "genRate": 0.08, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.55, "genSpread": 1, "genSat": 0.9, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.25, "chromaDelay": 0, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.15, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}, "D": {"genFreqX": 0.18, "genFreqY": 0.12, "genPhase": 0, "genRate": 0.08, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.55, "genSpread": 1, "genSat": 0.9, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.25, "chromaDelay": 0, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.15, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}}, "master": {"abMix": 0.52, "wipeSoft": 0.06, "wipeDetail": 0.3, "wipeX": 0, "wipeY": 0, "mixKeyThresh": 0.5, "mixKeySoft": 0.2, "mixKeyInv": 0, "mixKeyHue": 0.33, "pipX": 0.45, "pipY": -0.45, "pipSize": 0.35, "pipBorder": 0.12, "edgeAmt": 0.62, "edgeWidth": 0.3, "edgeHold": 0.86, "edgeSwirl": 0.25, "edgeChroma": 0.65, "edgeCreep": 0.7, "cdMix": 0, "wipeSoft2": 0.03, "wipeDetail2": 0.3, "wipeX2": 0, "wipeY2": 0, "mixKeyThresh2": 0.5, "mixKeySoft2": 0.2, "mixKeyInv2": 0, "mixKeyHue2": 0.33, "pipX2": 0.45, "pipY2": -0.45, "pipSize2": 0.35, "pipBorder2": 0.12, "edgeAmt2": 0, "edgeWidth2": 0.3, "edgeHold2": 0.6, "edgeSwirl2": 0, "edgeChroma2": 0.5, "edgeCreep2": 0.35, "busMix": 0, "wipeSoftM": 0.03, "wipeDetailM": 0.3, "wipeXM": 0, "wipeYM": 0, "mixKeyThreshM": 0.5, "mixKeySoftM": 0.2, "mixKeyInvM": 0, "mixKeyHueM": 0.33, "pipXM": 0.45, "pipYM": -0.45, "pipSizeM": 0.35, "pipBorderM": 0.12, "edgeAmtM": 0, "edgeWidthM": 0.3, "edgeHoldM": 0.6, "edgeSwirlM": 0, "edgeChromaM": 0.5, "edgeCreepM": 0.35, "morph": 0, "scanlines": 0.28, "beamWidth": 1, "beamShape": 0.5, "aperture": 0.12, "maskDark": 0.5, "curvature": 0.28, "cornerRound": 0.2, "vignette": 0.35, "bloom": 0.25, "bloomRad": 0.4, "halation": 0.2, "defocus": 0, "grain": 0, "outGamma": 1, "outBright": 0, "outContrast": 1, "outSat": 1, "outWarmth": 0, "blackLevel": 0, "whiteClip": 1, "phosphor": 0, "hvSag": 0, "letterbox": 0, "pillarbox": 0, "bezel": 0, "glassRefl": 0, "dust": 0, "scratches": 0, "ovMoire": 0, "rollShutter": 0, "safeArea": 0}, "routes": [{"ch": "A", "src": "lfo1", "dst": "wipeX", "amt": 0.35}, {"ch": "A", "src": "lfo3", "dst": "edgeSwirl", "amt": 0.5}, {"ch": "A", "src": "lfo2", "dst": "abMix", "amt": 0.12}], "audioCfg": {"bass": {"lo": 30, "hi": 150, "gain": 1}, "mid": {"lo": 300, "hi": 2200, "gain": 1}, "high": {"lo": 4000, "hi": 11000, "gain": 1}, "response": 0.5}, "fbTrailMode": false, "rescanMode": false, "keyChroma": false, "mixMode": 5, "edgeMode": 0, "wipeInv": false, "activeChan": "A", "linkChans": false, "mixMode2": 0, "wipeInv2": false, "mixModeM": 0, "wipeInvM": false, "mixBlend": 0, "mixBlend2": 0, "mixBlendM": 0, "mixKey": 0, "mixKey2": 0, "mixKeyM": 0, "fbWrap": 0, "fbMirror": 0, "fbBlend": 0, "fbNL": 0, "fbInvert": false, "fbTap": 0, "outModel": 0, "fieldSrc": 0, "flowField": 0, "flowEdge": 0, "chainOrder": ["sig", "col", "glitch", "lab", "flow"], "stageEnabled": {"sig": true, "col": true, "glitch": true, "lab": true, "flow": true}, "busSrc": {"b1": ["A", "B"], "b2": ["C", "D"]}, "genMode": {"A": {"shape": 1, "wave": 0, "col": 2}, "B": {"shape": 2, "wave": 2, "col": 1}, "C": {"shape": 0, "wave": 0, "col": 1}, "D": {"shape": 0, "wave": 0, "col": 1}}, "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "C": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}, "D": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}}, "srcText": {"A": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "B": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "C": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "D": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}}, "mods": [{"id": "lfo1", "type": "lfo", "name": "LFO 1", "rate": 0.05, "shape": "sine", "phase": 0.46354626282197164, "snh": 0, "sync": 0}, {"id": "lfo2", "type": "lfo", "name": "LFO 2", "rate": 0.11, "shape": "tri", "phase": 0.9169826661389351, "snh": 0, "sync": 0}, {"id": "lfo3", "type": "lfo", "name": "LFO 3", "rate": 0.037, "shape": "sine2", "phase": 0.4304286177016956, "snh": 0, "sync": 0}, {"id": "lfo4", "type": "lfo", "name": "LFO 4", "rate": 5.495408738576246, "shape": "sine", "phase": 0.055445735688429365, "snh": 0, "sync": 0}, {"id": "lfo5", "type": "lfo", "name": "LFO 5", "rate": 0.016982436524617443, "shape": "tri", "phase": 0.0670557549083246, "snh": 0, "sync": 0}, {"id": "lfo6", "type": "lfo", "name": "LFO 6", "rate": 0.8912509381337456, "shape": "saw", "phase": 0.5590496733908549, "snh": 0, "sync": 0}, {"id": "lfo7", "type": "lfo", "name": "LFO 7", "rate": 3.0902954325135905, "shape": "sqr", "phase": 0.08658904215108909, "snh": 0, "sync": 0}, {"id": "lfo8", "type": "lfo", "name": "LFO 8", "rate": 0.1288249551693134, "shape": "drift", "phase": 0.38726246081341276, "snh": 0, "sync": 0}]}, null]);
 
+PRESETS.push(["DIRTY MIXER \u00b7 CROSSBAR FAULT", {"chan": {"A": {"genFreqX": 0.14, "genFreqY": 0.07, "genPhase": 0, "genRate": 0.08, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.12, "genSpread": 1.25, "genSat": 0.9, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.55, "chromaDelay": 0.3, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.25, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1.2, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.3, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}, "B": {"genFreqX": 0.3, "genFreqY": 0.22, "genPhase": 0, "genRate": 0.08, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.62, "genSpread": 1, "genSat": 0.9, "genBright": 1, "genBands": 7, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0.3, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.25, "chromaDelay": 0, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1.25, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.15, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}, "C": {"genFreqX": 0.18, "genFreqY": 0.12, "genPhase": 0, "genRate": 0.08, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.55, "genSpread": 1, "genSat": 0.9, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.25, "chromaDelay": 0, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.15, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}, "D": {"genFreqX": 0.18, "genFreqY": 0.12, "genPhase": 0, "genRate": 0.08, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.55, "genSpread": 1, "genSat": 0.9, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.25, "chromaDelay": 0, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.15, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}}, "master": {"abMix": 0.5, "wipeSoft": 0.05, "wipeDetail": 0.3, "wipeX": 0, "wipeY": 0, "mixKeyThresh": 0.5, "mixKeySoft": 0.2, "mixKeyInv": 0, "mixKeyHue": 0.33, "pipX": 0.45, "pipY": -0.45, "pipSize": 0.35, "pipBorder": 0.12, "edgeAmt": 0.3, "edgeWidth": 0.22, "edgeHold": 0.7, "edgeSwirl": 0, "edgeChroma": 0.5, "edgeCreep": 0.5, "wipeBord": 0.3, "wipeBordCol": 0.14, "wipeRep": 1, "mixKeyGain": 0.5, "mixKeyDens": 1, "mixKeyEdge": 0, "mixKeyEdgeCol": 0, "mixKeyShadow": 0, "mixDirt": 0.7, "mixDirtRate": 0.45, "mixDirtDrop": 0.8, "mixDirtCut": 0.55, "mixDirtKnock": 0.7, "mixDirtNoise": 0.5, "cdMix": 0, "wipeSoft2": 0.03, "wipeDetail2": 0.3, "wipeX2": 0, "wipeY2": 0, "mixKeyThresh2": 0.5, "mixKeySoft2": 0.2, "mixKeyInv2": 0, "mixKeyHue2": 0.33, "pipX2": 0.45, "pipY2": -0.45, "pipSize2": 0.35, "pipBorder2": 0.12, "edgeAmt2": 0, "edgeWidth2": 0.3, "edgeHold2": 0.6, "edgeSwirl2": 0, "edgeChroma2": 0.5, "edgeCreep2": 0.35, "wipeBord2": 0, "wipeBordCol2": 0, "wipeRep2": 1, "mixKeyGain2": 0.5, "mixKeyDens2": 1, "mixKeyEdge2": 0, "mixKeyEdgeCol2": 0, "mixKeyShadow2": 0, "mixDirt2": 0, "mixDirtRate2": 0.3, "mixDirtDrop2": 0.5, "mixDirtCut2": 0.4, "mixDirtKnock2": 0.5, "mixDirtNoise2": 0.35, "busMix": 0, "wipeSoftM": 0.03, "wipeDetailM": 0.3, "wipeXM": 0, "wipeYM": 0, "mixKeyThreshM": 0.5, "mixKeySoftM": 0.2, "mixKeyInvM": 0, "mixKeyHueM": 0.33, "pipXM": 0.45, "pipYM": -0.45, "pipSizeM": 0.35, "pipBorderM": 0.12, "edgeAmtM": 0, "edgeWidthM": 0.3, "edgeHoldM": 0.6, "edgeSwirlM": 0, "edgeChromaM": 0.5, "edgeCreepM": 0.35, "wipeBordM": 0, "wipeBordColM": 0, "wipeRepM": 1, "mixKeyGainM": 0.5, "mixKeyDensM": 1, "mixKeyEdgeM": 0, "mixKeyEdgeColM": 0, "mixKeyShadowM": 0, "mixDirtM": 0, "mixDirtRateM": 0.3, "mixDirtDropM": 0.5, "mixDirtCutM": 0.4, "mixDirtKnockM": 0.5, "mixDirtNoiseM": 0.35, "morph": 0, "scanlines": 0.32, "beamWidth": 1, "beamShape": 0.5, "aperture": 0.12, "maskDark": 0.5, "curvature": 0.3, "cornerRound": 0.2, "vignette": 0.4, "bloom": 0.3, "bloomRad": 0.4, "halation": 0.25, "defocus": 0, "grain": 0.2, "outGamma": 1, "outBright": 0, "outContrast": 1, "outSat": 1, "outWarmth": 0, "blackLevel": 0, "whiteClip": 1, "phosphor": 0, "hvSag": 0, "letterbox": 0, "pillarbox": 0, "bezel": 0, "glassRefl": 0, "dust": 0, "scratches": 0, "ovMoire": 0, "rollShutter": 0, "safeArea": 0, "lensDist": 0, "lensCA": 0.3, "lensStreak": 0, "streakHue": 1, "lensSmudge": 0, "lightLeak": 0.2, "leakHue": 0.05, "gateWeave": 0, "gateHair": 0, "lcdGrid": 0, "stuckPix": 0, "osdShow": 0.9, "osdSize": 1, "osdGlow": 0.6}, "routes": [{"ch": "A", "src": "lfo1", "dst": "abMix", "amt": 0.45}, {"ch": "A", "src": "lfo4", "dst": "mixDirt", "amt": 0.3}], "audioCfg": {"bass": {"lo": 30, "hi": 150, "gain": 1}, "mid": {"lo": 300, "hi": 2200, "gain": 1}, "high": {"lo": 4000, "hi": 11000, "gain": 1}, "response": 0.5}, "fbTrailMode": false, "rescanMode": false, "keyChroma": false, "mixMode": 1, "edgeMode": 0, "wipeInv": false, "activeChan": "A", "linkChans": false, "mixMode2": 0, "wipeInv2": false, "mixModeM": 0, "wipeInvM": false, "mixBlend": 2, "mixBlend2": 0, "mixBlendM": 0, "mixKey": 0, "mixKey2": 0, "mixKeyM": 0, "fbWrap": 0, "fbMirror": 0, "fbBlend": 0, "fbNL": 0, "fbInvert": false, "fbTap": 0, "outModel": 0, "osdMode": 0, "osdDate": 2, "fieldSrc": 0, "flowField": 0, "flowEdge": 0, "chainOrder": ["sig", "col", "glitch", "lab", "flow"], "stageEnabled": {"sig": true, "col": true, "glitch": true, "lab": true, "flow": true}, "busSrc": {"b1": ["A", "B"], "b2": ["C", "D"]}, "genMode": {"A": {"shape": 0, "wave": 0, "col": 2}, "B": {"shape": 7, "wave": 3, "col": 4}, "C": {"shape": 0, "wave": 0, "col": 1}, "D": {"shape": 0, "wave": 0, "col": 1}}, "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "C": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}, "D": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}}, "srcText": {"A": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "B": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "C": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "D": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}}, "mods": [{"id": "lfo1", "type": "lfo", "name": "LFO 1", "rate": 0.06, "shape": "tri", "phase": 0.8253412995992825, "snh": 0, "sync": 0}, {"id": "lfo2", "type": "lfo", "name": "LFO 2", "rate": 1.6982436524617444, "shape": "snh", "phase": 0.12453162469815826, "snh": 0, "sync": 0}, {"id": "lfo3", "type": "lfo", "name": "LFO 3", "rate": 0.0707945784384138, "shape": "tri", "phase": 0.9578821927416256, "snh": 0, "sync": 0}, {"id": "lfo4", "type": "lfo", "name": "LFO 4", "rate": 0.13, "shape": "snh", "phase": 0.32377943033823176, "snh": 0, "sync": 0}, {"id": "lfo5", "type": "lfo", "name": "LFO 5", "rate": 0.016982436524617443, "shape": "tri", "phase": 0.6386992951546443, "snh": 0, "sync": 0}, {"id": "lfo6", "type": "lfo", "name": "LFO 6", "rate": 0.8912509381337456, "shape": "saw", "phase": 0.27703329526621123, "snh": 0, "sync": 0}, {"id": "lfo7", "type": "lfo", "name": "LFO 7", "rate": 3.0902954325135905, "shape": "sqr", "phase": 0.18160376469231443, "snh": 0, "sync": 0}, {"id": "lfo8", "type": "lfo", "name": "LFO 8", "rate": 0.1288249551693134, "shape": "drift", "phase": 0.2055807543055579, "snh": 0, "sync": 0}]}, null]);
+
 function applyState(bases, rts, extra, chOnly){
   if(typeof cancelGlide === "function") cancelGlide();
   /* a preset's flat value map loads into the target channel (default: active) plus master */
@@ -5490,7 +6038,7 @@ function captureState(){
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
     mixMode2, wipeInv2, mixModeM, wipeInvM,
     mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
-    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc, flowField, flowEdge,
+    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
@@ -5527,7 +6075,7 @@ function restoreState(st){
   if(st.wipeInv !== undefined) wipeInv = st.wipeInv;
   if(st.wipeInv2 !== undefined) wipeInv2 = st.wipeInv2;
   if(st.wipeInvM !== undefined) wipeInvM = st.wipeInvM;
-  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","fieldSrc","flowField","flowEdge","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM","mixKey","mixKey2","mixKeyM"]){
+  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","osdMode","osdDate","fieldSrc","flowField","flowEdge","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM","mixKey","mixKey2","mixKeyM"]){
     if(st[k] !== undefined) eval(k+" = st."+k);
   }
   if(st.fbInvert !== undefined) fbInvert = st.fbInvert;
@@ -5603,6 +6151,7 @@ function initPatch(){
   fbTrailMode=false; rescanMode=false; keyChroma=false;
   mixMode=0; edgeMode=0; showKeyMatte=false; wipeInv=false; linkChans=false;
   fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbTap=0; outModel=0; fieldSrc=0; flowField=0; flowEdge=0;
+  osdMode=1; osdDate=0;
   mixMode2=0; wipeInv2=false; mixModeM=0; wipeInvM=false;
   mixBlend=mixBlend2=mixBlendM=0; mixKey=mixKey2=mixKeyM=0;
   { const lb=document.getElementById("btnLinkChans"); if(lb) lb.classList.remove("on"); }
@@ -5636,7 +6185,7 @@ document.getElementById("btnSave").onclick = ()=>{
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
     mixMode2, wipeInv2, mixModeM, wipeInvM,
     mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
-    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc, flowField, flowEdge,
+    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
@@ -5697,6 +6246,10 @@ function cur(){ return SRC[activeChan]; }
 const fileIn = document.getElementById("fileIn");
 document.getElementById("btnFile").onclick = ()=>{ fileIn.accept="video/*"; fileIn.dataset.chan = activeChan; fileIn.click(); };
 fileIn.onchange = ()=>{ if(fileIn.files[0]) handleFile(fileIn.files[0], fileIn.dataset.chan || activeChan); fileIn.value=""; };
+{
+  const afi = document.getElementById("audioFileIn");
+  if(afi) afi.onchange = ()=>{ if(afi.files[0]) loadAudioFile(afi.files[0]); afi.value=""; };
+}
 
 function handleFile(f, ch){
   ch = ch || activeChan;
@@ -5720,17 +6273,98 @@ function handleFile(f, ch){
       toast("This browser can't decode that codec — try Chrome, or convert to H.264/WebM", true);
   }, 3500);
 }
+/* Camera and capture inputs. Anything the operating system presents as a
+   camera turns up here: a built-in webcam, a USB one, an HDMI capture stick,
+   and virtual cameras from streaming software. The browser withholds device
+   names until camera access has been granted once, which is why the list
+   reads DEVICE 1 / DEVICE 2 the first time and properly after that. */
+let camDeviceId = "";
+async function listCamDevices(){
+  try{
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    return devs.filter(d=>d.kind==="videoinput");
+  }catch(e){ return []; }
+}
+async function refreshCamDevUI(){
+  const sel = document.getElementById("selCamDev");
+  if(!sel) return;
+  const devs = await listCamDevices();
+  const cur = sel.value;
+  sel.innerHTML = "";
+  const o0 = document.createElement("option"); o0.value=""; o0.textContent="DEFAULT CAMERA"; sel.appendChild(o0);
+  devs.forEach((dv,i)=>{
+    const o = document.createElement("option"); o.value = dv.deviceId;
+    o.textContent = (dv.label || ("DEVICE "+(i+1))).toUpperCase().slice(0,32);
+    sel.appendChild(o);
+  });
+  sel.value = (cur && [...sel.options].some(o=>o.value===cur)) ? cur : camDeviceId;
+}
+async function openCam(ch){
+  const S = SRC[ch];
+  stopCam(ch);
+  const vc = camDeviceId ? {deviceId:{exact:camDeviceId}, width:{ideal:1920}, height:{ideal:1080}}
+                         : {width:{ideal:1920}, height:{ideal:1080}};
+  S.cam = await navigator.mediaDevices.getUserMedia({video:vc, audio:false});
+  S.video.srcObject = S.cam; S.video.muted = true;
+  await S.video.play();
+  S.mode = "cam";
+  const tr = S.cam.getVideoTracks()[0];
+  S.name = (tr && tr.label) ? tr.label.slice(0,18) : "camera";
+  syncChanInputUI();
+  refreshCamDevUI();
+}
 document.getElementById("btnCam").onclick = async ()=>{
+  const ch = activeChan;
+  try{
+    await openCam(ch);
+    toast("Channel "+ch+": "+SRC[ch].name+" live");
+  }catch(e){ toast("Camera unavailable: "+e.message, true); }
+};
+{
+  const sel = document.getElementById("selCamDev");
+  if(sel){
+    sel.onmousedown = ()=>refreshCamDevUI();
+    sel.onchange = async ()=>{
+      camDeviceId = sel.value;
+      if(cur().mode === "cam"){
+        try{ await openCam(activeChan); toast("Switched capture device"); }
+        catch(e){ toast("Could not open that device: "+e.message, true); }
+      }
+    };
+    refreshCamDevUI();
+    if(navigator.mediaDevices && navigator.mediaDevices.addEventListener)
+      navigator.mediaDevices.addEventListener("devicechange", refreshCamDevUI);
+  }
+}
+/* Screen, window or tab capture. This is the general-purpose way in: anything
+   running on the machine that is not a camera - another application, a browser
+   tab, a whole desktop - arrives through here. */
+document.getElementById("btnScreen").onclick = async ()=>{
   const ch = activeChan, S = SRC[ch];
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
+    toast("This browser cannot capture the screen", true); return;
+  }
   try{
     stopCam(ch);
-    S.cam = await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280}, height:{ideal:720}}, audio:false});
+    S.cam = await navigator.mediaDevices.getDisplayMedia({
+      video:{frameRate:{ideal:60}}, audio:false});
     S.video.srcObject = S.cam; S.video.muted = true;
     await S.video.play();
-    S.mode = "cam"; S.name = "webcam";
+    S.mode = "cam";
+    const tr = S.cam.getVideoTracks()[0];
+    S.name = "screen";
+    if(tr) tr.addEventListener("ended", ()=>{
+      if(SRC[ch].mode === "cam" && SRC[ch].name === "screen"){
+        SRC[ch].mode = "pattern"; SRC[ch].name = "pattern"; syncChanInputUI();
+        toast("Channel "+ch+": screen capture stopped");
+      }
+    });
     syncChanInputUI();
-    toast("Channel "+ch+": webcam live");
-  }catch(e){ toast("Webcam unavailable: "+e.message, true); }
+    toast("Channel "+ch+": screen capture live");
+  }catch(e){
+    if(e && e.name === "NotAllowedError") toast("Screen capture cancelled");
+    else toast("Screen capture failed: "+(e && e.message), true);
+  }
 };
 document.getElementById("btnPat").onclick = ()=>{
   const ch = activeChan;
@@ -5788,7 +6422,7 @@ function syncChanInputUI(){
   const label = ch2=>{
     const T = SRC[ch2];
     if(T.mode === "file")    return T.name ? T.name.slice(0,14).toUpperCase() : "FILE";
-    if(T.mode === "cam")     return "CAM";
+    if(T.mode === "cam")     return (T.name === "screen") ? "SCREEN" : (T.name ? T.name.slice(0,12).toUpperCase() : "CAM");
     if(T.mode === "pattern") return (T.pattern||"pattern").toUpperCase();
     if(T.mode === "text")    return "TEXT";
     if(T.mode === "synth")   return "SYNTH "+GEN_SHAPES[genMode[ch2].shape];
@@ -5959,7 +6593,7 @@ function setDock(t){
     t = dockTab === "text" ? "matrix" : dockTab;
   }
   dockTab = t;
-  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", perform:"performdock"};
+  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", audio:"audiodock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);
     if(el) el.classList.toggle("on", k===t);
@@ -5970,6 +6604,7 @@ function setDock(t){
                             : t==="text" ? "typing here never triggers shortcuts"
                             : t==="perform" ? "shift and a number recalls a snapshot \u00b7 Q W E R T Y hold the pads"
                             : t==="mix" ? "the faders themselves are on the strip under the picture"
+                            : t==="audio" ? "band ranges decide what each modulator is listening for"
                             : "patch sources into any parameter";
   if(t==="text") syncTextEditor();
   refreshDockTabs();
@@ -7135,6 +7770,7 @@ function renderFrame(now, dt){
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, prevTex || blackTex);
     gl.uniform1i(U(progMIX,"u_prev"), 2);
     gl.uniform1f(U(progMIX,"u_hasPrev"), prevTex?1:0);
+    gl.uniform1f(U(progMIX,"u_time"), now);
     setParamUniforms(progMIX, "A");
     for(let i=0;i<MIXP.length;i++) gl.uniform1f(U(progMIX,"u_"+MIXP[i]), mCur[ids[i]]);
     draw();
@@ -7174,6 +7810,7 @@ function renderFrame(now, dt){
     return;
   }
 
+  if(mCur.osdShow > 0.003) updateOSD(now, dt);
   /* CRT -> screen */
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0,0,canvas.width,canvas.height);
@@ -7186,6 +7823,8 @@ function renderFrame(now, dt){
   gl.uniform1f(U(progCRT,"u_outModel"), outModel);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, persistA.tex);
   gl.uniform1i(U(progCRT,"u_persist"), 1);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, osdTex);
+  gl.uniform1i(U(progCRT,"u_osd"), 2);
   gl.uniform1f(U(progCRT,"u_hasPersist"), mCur.phosphor>0.003?1:0);
   setParamUniforms(progCRT, "A");
   draw();
@@ -7215,6 +7854,95 @@ function renderFrame(now, dt){
 
   frameEnd(now, dt);
 }
+/* ---------------- the deck's on-screen display ----------------
+   Every consumer machine burnt its own state into the picture: a transport
+   symbol, a counter that ran whether or not anything was recorded, and on the
+   camcorders a date stamp that half the world forgot to set. It is drawn on a
+   2D canvas rather than in the shader because it is type, and type wants a
+   font. The canvas only redraws when what it says changes. */
+const OSD_W = 960, OSD_H = 540;
+const osdCanvas = document.createElement("canvas");
+osdCanvas.width = OSD_W; osdCanvas.height = OSD_H;
+const osdCtx = osdCanvas.getContext("2d");
+const osdTex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, osdTex);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,0]));
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+const OSD_MODES = ["REC", "PLAY", "PAUSE", "STOP", "FF", "REW"];
+let osdLast = "", osdBlink = 0;
+function osdCount(t){
+  const h = Math.floor(t/3600), m = Math.floor(t/60)%60, sec = Math.floor(t)%60;
+  const p2 = n=>(n<10?"0":"")+n;
+  return p2(h)+":"+p2(m)+":"+p2(sec);
+}
+let osdPrevNow = -1;
+function updateOSD(now, dt){
+  /* wall time, not the render delta: a tape counter that slows down because the
+     machine is busy is a counter nobody can trust */
+  const rdt = (osdPrevNow >= 0) ? Math.max(0, Math.min(1, now - osdPrevNow)) : 0;
+  osdPrevNow = now;
+  /* the counter only runs on the transports that would move the tape */
+  if(osdMode === 0 || osdMode === 1) osdCounter += rdt;
+  else if(osdMode === 4) osdCounter += rdt*7;
+  else if(osdMode === 5) osdCounter = Math.max(0, osdCounter - rdt*7);
+  osdBlink = Math.floor(now*1.4) % 2;
+  const mode = OSD_MODES[osdMode] || "PLAY";
+  const d = new Date();
+  const p2 = n=>(n<10?"0":"")+n;
+  const datestr = osdDate === 0 ? ""
+    : osdDate === 1 ? (p2(d.getDate())+"." + p2(d.getMonth()+1) + "." + d.getFullYear())
+    : (p2(d.getDate())+"." + p2(d.getMonth()+1) + "." + d.getFullYear() + "  " + p2(d.getHours())+":"+p2(d.getMinutes()));
+  const key = mode+"|"+osdCount(osdCounter)+"|"+datestr+"|"+mCur.osdSize.toFixed(2)+"|"+osdBlink;
+  if(key === osdLast) return;
+  osdLast = key;
+  const g = osdCtx;
+  g.clearRect(0,0,OSD_W,OSD_H);
+  const sc = mCur.osdSize;
+  const fs = Math.round(30*sc);
+  g.font = "700 "+fs+"px ui-monospace, 'SF Mono', Menlo, Consolas, monospace";
+  g.textBaseline = "top";
+  const ink = "#f3e14a";
+  const pad = Math.round(34*sc);
+  g.shadowColor = "rgba(0,0,0,0.85)";
+  g.shadowBlur = 0; g.shadowOffsetX = Math.round(2*sc); g.shadowOffsetY = Math.round(2*sc);
+  g.fillStyle = ink;
+  /* transport symbol, drawn rather than typed so it reads as a machine glyph */
+  let x = pad;
+  const y = pad, sz = fs*0.72;
+  const tri = (ox, flip)=>{
+    g.beginPath();
+    if(flip){ g.moveTo(ox+sz,y+fs*0.16); g.lineTo(ox+sz,y+fs*0.16+sz); g.lineTo(ox,y+fs*0.16+sz*0.5); }
+    else { g.moveTo(ox,y+fs*0.16); g.lineTo(ox,y+fs*0.16+sz); g.lineTo(ox+sz,y+fs*0.16+sz*0.5); }
+    g.closePath(); g.fill();
+  };
+  if(osdMode === 0){
+    if(osdBlink){
+      g.beginPath(); g.arc(x+sz*0.5, y+fs*0.16+sz*0.5, sz*0.5, 0, 6.2832); g.fill();
+    }
+    x += sz*1.5;
+  } else if(osdMode === 1){ tri(x,false); x += sz*1.5; }
+  else if(osdMode === 2){
+    g.fillRect(x, y+fs*0.16, sz*0.3, sz);
+    g.fillRect(x+sz*0.55, y+fs*0.16, sz*0.3, sz);
+    x += sz*1.5;
+  } else if(osdMode === 3){ g.fillRect(x, y+fs*0.16, sz, sz); x += sz*1.5; }
+  else if(osdMode === 4){ tri(x,false); tri(x+sz*0.75,false); x += sz*2.2; }
+  else { tri(x,true); tri(x+sz*0.75,true); x += sz*2.2; }
+  const label = (osdMode === 0 && !osdBlink) ? "" : mode;
+  g.fillText(label, x, y);
+  g.fillText(osdCount(osdCounter), OSD_W - pad - g.measureText("00:00:00").width, y);
+  if(datestr){
+    g.fillText(datestr, OSD_W - pad - g.measureText(datestr).width, OSD_H - pad - fs);
+  }
+  g.shadowOffsetX = 0; g.shadowOffsetY = 0;
+  gl.bindTexture(gl.TEXTURE_2D, osdTex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,osdCanvas);
+}
+
 function frameEnd(now, dt){
   if(offline) return;
   const S = cur();

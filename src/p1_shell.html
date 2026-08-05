@@ -472,6 +472,14 @@ body.multi #mvlabels{display:grid;}
 #dockBody > #performdock.on{display:flex; flex-direction:column; gap:16px;}
 #pfmain{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;}
 #dockBody > #mixdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
+#dockBody > #audiodock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
+#audiodock .sec{flex:1 1 0; min-width:250px; border-bottom:none; padding:0;}
+#audiodock .sec h3{padding-top:0;}
+#performdock .sec{border-bottom:none; padding:0;}
+#tempobox{display:flex; align-items:center; gap:5px; margin-left:4px;}
+#tempobox button{padding:4px 9px; font-size:9px; letter-spacing:1.5px;}
+#tempobox #bpmVal{font-size:10px; color:var(--amber); min-width:52px; letter-spacing:1px;}
+
 #mixdock .sec{flex:1 1 0; min-width:230px; border-bottom:none; padding:0;}
 #mixdock .sec h3{padding-top:0;}
 #bendrow{border-top:1px solid var(--line); padding-top:10px;}
@@ -683,7 +691,10 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v29.0</span>
+  <span id="ver" title="Build version">v30.0</span>
+  <div id="tempobox" data-tip="Tap four times in time and the tempo follows. Any modulator with a sync division locks to it, and incoming MIDI clock overrides it automatically.">
+    <button id="btnTap">TAP</button><span id="bpmVal">120.0</span>
+  </div>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -711,6 +722,11 @@ body.nomix #mixbuses{display:none;}
       <div class="mrow2">
         <button id="btnFile" data-tip="Load a video file into this channel. Files stream from disk, so a 4GB movie is no heavier than a small one. Drag and drop onto the picture works too.">FILE</button>
         <button id="btnCam" data-tip="Use a webcam or capture device as this channel's source.">CAM</button>
+      </div>
+      <div class="mlabel">CAMERA / CAPTURE DEVICE</div>
+      <select id="selCamDev" data-tip="Which camera or capture device CAM opens. USB webcams, HDMI capture sticks and virtual cameras all appear here. Names only appear once you have granted camera access, so press CAM first if the list reads DEVICE 1, DEVICE 2."></select>
+      <div class="mrow2">
+        <button id="btnScreen" data-tip="Capture a screen, a window or a browser tab as this channel's source. This is the way to bring in anything that is not a camera - another application, a synth's editor, a video call, a whole desktop.">SCREEN</button>
       </div>
       <div class="mrow2">
         <button id="btnPat" data-tip="Use a built-in generated test signal as this channel's source. No file needed.">PATTERN</button>
@@ -747,10 +763,11 @@ body.nomix #mixbuses{display:none;}
     <button class="menubtn" data-tip="Processing resolution, audio input, modulation and MIDI.">ENGINE <i>&#9662;</i></button>
     <div class="menupanel">
       <div class="mlabel">AUDIO REACT</div>
-      <select id="selAudio" data-tip="Where the audio-reactive mod sources listen. SOURCE analyses the loaded video's own soundtrack; INPUT uses a microphone or audio interface.">
+      <select id="selAudio" data-tip="Where the audio-reactive mod sources listen. VIDEO analyses the loaded video's own soundtrack, INPUT uses a microphone or audio interface, and FILE plays an audio file you load - which is how you build a piece against the track it will be shown with. The band ranges and response are on the AUDIO tab of the dock.">
         <option value="off">AUDIO OFF</option>
-        <option value="source">AUD: SOURCE</option>
+        <option value="source">AUD: VIDEO</option>
         <option value="mic">AUD: INPUT</option>
+        <option value="file">AUD: FILE</option>
       </select>
       <div class="mlabel">PROCESS RESOLUTION</div>
       <select id="selRes" data-tip="The internal raster everything is processed at, independent of your window size. Lower is faster and coarser; the scanline and mask geometry scale with it.">
@@ -831,12 +848,14 @@ body.nomix #mixbuses{display:none;}
           <button data-dock="mod" data-tip="Every modulation source drawn live, with editable rates and shapes and a list of what each one is driving.">MOD</button>
           <button data-dock="text" data-tip="The text and shape generator for this channel. Typing here never triggers keyboard shortcuts.">TEXT</button>
           <button data-dock="mix" data-tip="The detail behind each transition: wipe softness and geometry, and the key settings. The faders themselves are on the strip under the picture.">MIX</button>
-          <button data-dock="perform" data-tip="Everything you play with while it is running: eight whole-rig snapshots with a glide time, the performance recorder, and the six bend pads.">PERFORM</button>
+          <button data-dock="audio" data-tip="Where the audio-reactive modulators listen: the input, the three band ranges, and the response speed.">AUDIO</button>
+          <button data-dock="perform" data-tip="Everything you play with while it is running: eight whole-rig snapshots with a glide time, the performance recorder, preset morph and the six bend pads.">PERFORM</button>
           <span style="flex:1;"></span>
           <span id="dockHint"></span>
         </div>
         <div id="dockBody">
       <div id="mixdock"></div>
+      <div id="audiodock"></div>
       <div id="performdock">
         <div id="pfmain"></div>
         <div id="bendrow">
@@ -946,12 +965,14 @@ body.nomix #mixbuses{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v29.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v30.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once; the small selector next to it picks a target, and <b>COPY</b> writes this channel's effects onto it while <b>SWAP</b> exchanges the two outright, sources included. Any channel can reach any other, so D can be copied onto A as easily as A onto B, and shift-clicking COPY sends it to all three at once.</p>
   <p>Each mixer is three independent stages, the way a vision mixer actually works. <b>TRANSITION</b> decides how the fader reveals the second input \u2014 a dissolve, one of twelve wipes, a slide in from an edge, or a stretch. <b>MIX TYPE</b> decides how the two combine where both are visible: dissolve, additive, non-additive (whichever is brighter, so neither picture dims the other), difference, multiply or screen. <b>KEY</b> is a separate compositing stage on top: luma white, luma black, chroma, or picture-in-picture with position, size and border. Because they are separate, a circle wipe and a luma key can run at the same time.</p>
   <p><b>MELT</b> is the fourth stage, and it is the one that stops a mix looking digital. The mixer works out where the boundary between the two pictures actually is and which way it faces, then does two things inside a narrow band along it: it drags the incoming picture out along that direction, and it dissolves the mixer's own last frame back in. Because the band feeds itself, the smear stays put and creeps a little further every frame, so the seam trails and bleeds instead of cutting. The amount sits next to each fader; <b>WIDTH</b>, <b>HOLD</b>, <b>SWIRL</b>, <b>CHROMA</b> and <b>CREEP</b> are on the MIX tab. Wind CREEP up and the melt only happens on the outgoing side, so a keyed or wiped shape bleeds into the background and the background never eats into the shape. At zero the whole stage is switched off and costs nothing.</p>
+  <p>Under the melt sits the <b>DIRTY MIXER</b>, which is the desk failing rather than the picture degrading. It runs on an event clock: DIRT decides how often it fires and RATE how fast the clock runs, then four controls decide what a firing does. DROPOUT drops bands of lines through to the other side of the crossbar or to nothing; CUT throws the whole mix to one input regardless of where the fader is; KNOCK shoves the timebase sideways so the picture shears and crawls back; NOISE sprays the switching transient across the frame. Between firings it is completely clean, which is what makes it read as a fault and not as an effect.</p>
+  <p>The <b>KEYER</b> has a full set of levels: THRESH and SOFT set where the matte turns over, GAIN how hard, DENSITY how opaque it is ever allowed to get. KEY BORDER grows the matte outward and fills the growth with one of the eight standard back colours, and KEY SHADOW offsets a darkened copy underneath - the outline and drop-shadow treatments a bench mixer offers for titles. Wipes get the same treatment: BORDER WIPE lays a coloured rule along the join, and WIPE MULTI tiles the whole pattern four or sixteen times. There are twenty-four mix types, from the usual dissolve, additive and non-additive through the photographic blends to wrap-add and bitwise XOR, which are not photographic at all.</p>
   <p>The channels meet in three mixers, laid out as a strip directly under the picture: bus 1, bus 2, and a master crossfade between them. Each strip has its own two input selectors, so the pairings are not fixed \u2014 bus 1 can mix <b>A against C</b>, bus 2 can mix <b>D against B</b>. To get all four in at once, set both bus faders part-way and put the master on ADD, SCREEN or LIGHTEN rather than FADE, so the buses sum instead of crossfading. The strip sits just under the transport bar, and folds away with <b>MIX</b> on its left when you want the height back.</p>
   <p>The faders live under the picture rather than in the sidebar because a crossfader wants to be horizontal and should never be hidden behind a tab \u2014 it is the one control you ride while looking at something else. The detail behind each transition (softness, wipe geometry, key threshold) lives on the MIX tab of the dock, where it is setup rather than performance. INV only greys in when the transition is a wipe, since a fade, a key and a blend have no direction to reverse.</p>
   <h3>MULTIVIEW</h3>
@@ -1002,6 +1023,10 @@ body.nomix #mixbuses{display:none;}
   <h3>PERFORMANCE</h3>
   <p>The dock under the picture has five tabs: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b>, <b>MIX</b> and <b>PERFORM</b>. MIX holds the detail behind each transition \u2014 wipe softness and geometry, key threshold and hue \u2014 while the faders themselves stay on the strip. PERFORM holds everything you play with while it is running \u2014 the snapshot bank, the recorder and the bend pads. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
+  <h3>SOURCES</h3>
+  <p>Each channel takes a video file (streamed from disk, so file size does not matter), a camera, a screen, a generated pattern, the pattern synth, a text page, or re-entry from elsewhere in the rig. <b>CAM</b> opens whatever is chosen in the device list above it: a built-in webcam, a USB one, an HDMI capture stick, or a virtual camera from streaming software. Device names only appear once camera access has been granted, so the list reads DEVICE 1, DEVICE 2 until the first time you press CAM. <b>SCREEN</b> captures a screen, a window or a browser tab, which is the general way to bring in anything that is not a camera.</p>
+  <p>The audio-reactive modulators listen on the <b>AUDIO</b> tab of the dock: the soundtrack of the video in channel A, a live input (with device and channel selection for interfaces), or an audio file you load there and play. Loading a file is how you build a piece against the track it will actually be shown with. The three band ranges, their gains and the response speed are on the same tab, and the tempo used by synced modulators is the TAP button in the header.</p>
+
   <h3>MIXER, MORPH, KEYER &amp; TIME BASE</h3>
   <p>Each of the three <b>MIXERS</b> gets the same twenty modes: a plain fade, twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and a movable origin, luma and chroma key transitions, and add / difference / multiply / screen / lighten blends. Run the fader like a T-bar. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor.</p>
   <h3>VIDEO-REACTIVE</h3>
@@ -1036,6 +1061,7 @@ body.nomix #mixbuses{display:none;}
   <button id="btnRenderCancel">CANCEL</button>
 </div>
 <input type="file" id="fileIn" accept="video/*,.json" style="display:none">
+<input type="file" id="audioFileIn" accept="audio/*" style="display:none">
 <script>
 "use strict";
 /* ============================================================

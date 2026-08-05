@@ -46,6 +46,30 @@ The controls are MELT (how hard), WIDTH (how far either side), HOLD (how much of
 
 The amount rides next to each crossfader because it is a performance control; the rest sits on the MIX tab. At zero the stage is switched off and the history buffer is never touched, so it costs nothing when it is not in use. It works on all three buses independently, and on any transition or key that has an edge — a wipe, a luma or chroma key, a subscreen. A plain dissolve has no boundary, so nothing happens, which is correct.
 
+## The dirty mixer
+
+Every bus has a fault stage, and it is a fault rather than an effect. Hardware that has been dropped, or had a crossbar chip lifted, does not degrade smoothly: it fires. So this runs on an event clock. DIRT decides how often a firing happens, RATE how fast the clock runs, and four controls decide what a firing does — DROPOUT drops bands of lines through to the other side of the crossbar or to nothing at all, CUT throws the whole mix to one input regardless of where the fader is, KNOCK shoves the timebase sideways so the picture shears down the frame and crawls back, and NOISE sprays the switching transient across the picture with the colour dropping out as it hits. Between firings it is completely clean, which is the part that makes it read as a broken machine instead of a filter.
+
+![The mixer firing: dropped lines, a knocked timebase, and the crossbar jumping to the wrong input](docs/doc_dirty.png)
+
+## Keying, borders and mix types
+
+The keyer has the levels a bench mixer has: THRESH and SOFT set where the matte turns over, GAIN sets how hard it turns, DENSITY sets how opaque it is ever allowed to get. KEY BORDER grows the matte outward and fills the growth with one of the eight standard back colours; KEY SHADOW offsets a darkened copy underneath. Those are the outline and drop-shadow treatments that stop a title disappearing into a busy background, and they work on any key, not just text.
+
+Wipes get the same treatment. BORDER WIPE lays a coloured rule along the join that follows the wipe wherever it goes, and WIPE MULTI tiles the whole pattern four or sixteen times — on every pattern, not a chosen few.
+
+There are twenty-four mix types: dissolve, additive, non-additive, difference, multiply and screen, then darken, exclusion, subtract, overlay, hard/soft/vivid/pin light, colour dodge and burn, divide, wrap-add, bitwise XOR and AND, and hue, saturation, colour and luminosity. The first six keep the index they always had, so old patches load with the mix type they were saved with.
+
+![Border wipe, wipe multiply, a keyed title with border and shadow](docs/doc_keys.png)
+
+## What it is watched through
+
+The output overlay is not a set of filters on the signal; it is everything between the picture and the eye, in the order light actually meets it. First the lens: barrel or pincushion distortion applied before anything is sampled, transverse chromatic aberration that grows towards the corners, and the horizontal anamorphic streak that a coated element throws off a highlight. Then the glass in front of the screen: smears that are only visible where something bright is behind them, reflections, dust, scratches, and light leaking past the felt to fog one side of the frame. Then the panel itself — an LCD subpixel lattice, and dead or stuck pixels that never move, which is what makes them read as a fault in the display rather than noise in the signal. There is a gate weave and a hair in the gate for the projector case.
+
+Last, over everything, the deck's own display: a transport symbol, a tape counter that runs forward on play, seven times as fast on the shuttles and backwards on rewind, and an optional date stamp, in the dot-matrix yellow every camcorder used. It is drawn on a canvas rather than in the shader because it is type, and type wants a font.
+
+![The lens, the glass, the panel and the deck's burnt-in display](docs/doc_overlay.png)
+
 ## Signal chain
 
 The rail above the picture is the live signal path. **Drag the pills to reorder the stages, click one to bypass it.** Order changes everything: melting before the tape stage smears clean video and then damages it; melting after smears the damage itself.
@@ -103,13 +127,19 @@ Any channel can be a text/shape generator instead of a video source: type anythi
 
 ![Text through contour and feedback](docs/doc_text.png)
 
+## Inputs
+
+Each channel takes a video file (streamed from disk, so a 4GB file is no heavier than a small one), a camera, a screen, a generated pattern, the pattern synth, a text page, or re-entry from elsewhere in the rig.
+
+**CAM** opens whatever is selected in the device list beside it, so a built-in webcam, a USB one, an HDMI capture stick and a virtual camera from streaming software all work the same way. Device names only appear once camera access has been granted, so the list reads DEVICE 1, DEVICE 2 until the first time CAM is pressed. **SCREEN** captures a screen, a window or a browser tab, which is the general way to bring in anything that is not a camera.
+
 ## Movement
 
 Nothing sits still. The mod matrix patches any source into any parameter:
 
 - As many modulators as you want, of three kinds: **LFOs** (ten shapes, free or synced to twenty divisions including dotted and triplet), **envelopes** (fire and decay on a bend pad, an audio onset, a scene cut or the tempo) and **macros** (one knob driving as many parameters as you point it at)
 - Chaos, drift and spike generators
-- Audio bands with adjustable frequency ranges, gain, response, input device and channel selection for audio interfaces
+- Audio bands with adjustable frequency ranges, gain and response, listening to the loaded video's soundtrack, a live input (with device and channel selection for interfaces), or an audio file loaded and played on the AUDIO tab — which is how you build a piece against the track it will be shown with
 - Video-reactive sources computed from the picture itself: motion, brightness, and scene-cut detection — patch CUT into TEAR and every edit knocks the sync loose
 
 Every route has its own invert and response curve, so one source can push one parameter up while easing another down. The matrix links both ways: a route jumps to its modulator, and a modulator lists what it drives and jumps back. **Right-click any parameter** to patch a modulator onto it directly. The **MOD** page (`D`) draws every source live — four LFOs with editable rate, ten shapes and tempo sync, chaos/drift/spike generators, audio bands and video-reactive sources — and shows what each one is driving.

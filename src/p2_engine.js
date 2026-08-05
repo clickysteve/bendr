@@ -186,31 +186,62 @@ const FS_FB = COMMON + KEYFN +
    which one combined dropdown could never express. */
 const FS_MIX = COMMON + KEYFN +
 "uniform sampler2D u_texA; uniform sampler2D u_texB;\n" +
-"uniform float u_mixMode,u_mixBlend,u_mixKey,u_hasB,u_abMix;\n" +
+"uniform float u_mixMode,u_mixBlend,u_mixKey,u_hasB,u_abMix,u_time;\n" +
 "uniform float u_wipeSoft,u_wipeDetail,u_wipeX,u_wipeY,u_wipeInv;\n" +
+"uniform float u_wipeBord,u_wipeBordCol,u_wipeRep;\n" +
 "uniform float u_mixKeyThresh,u_mixKeySoft,u_mixKeyInv,u_mixKeyHue;\n" +
+"uniform float u_mixKeyGain,u_mixKeyDens,u_mixKeyEdge,u_mixKeyEdgeCol,u_mixKeyShadow;\n" +
 "uniform float u_pipX,u_pipY,u_pipSize,u_pipBorder;\n" +
 "uniform sampler2D u_prev; uniform float u_hasPrev;\n" +
 "uniform float u_edgeAmt,u_edgeWidth,u_edgeHold,u_edgeSwirl,u_edgeChroma,u_edgeCreep;\n" +
+"uniform float u_mixDirt,u_mixDirtRate,u_mixDirtDrop,u_mixDirtCut,u_mixDirtKnock,u_mixDirtNoise;\n" +
+"/* the eight back colours a bench mixer offers, in the order they are always\n" +
+"   listed: white, yellow, cyan, green, magenta, red, blue, black */\n" +
+"vec3 backCol(float i){\n" +
+"  int k = int(clamp(floor(i*7.999), 0.0, 7.0));\n" +
+"  if(k==0) return vec3(1.0);\n" +
+"  if(k==1) return vec3(1.0,1.0,0.0);\n" +
+"  if(k==2) return vec3(0.0,1.0,1.0);\n" +
+"  if(k==3) return vec3(0.0,1.0,0.0);\n" +
+"  if(k==4) return vec3(1.0,0.0,1.0);\n" +
+"  if(k==5) return vec3(1.0,0.0,0.0);\n" +
+"  if(k==6) return vec3(0.0,0.0,1.0);\n" +
+"  return vec3(0.0);\n}\n" +
+"vec3 rgb2hsvM(vec3 c){\n" +
+"  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);\n" +
+"  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));\n" +
+"  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));\n" +
+"  float d = q.x - min(q.w, q.y);\n" +
+"  return vec3(abs(q.z + (q.w - q.y)/(6.0*d + 1e-10)), d/(q.x + 1e-10), q.x);\n}\n" +
+"vec3 hsv2rgbM(vec3 c){\n" +
+"  vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0))*6.0 - 3.0);\n" +
+"  return c.z * mix(vec3(1.0), clamp(p-1.0, 0.0, 1.0), c.y);\n}\n" +
+"float bits(float x, float y, float mode){\n" +
+"  int ix = int(clamp(x,0.0,1.0)*255.0), iy = int(clamp(y,0.0,1.0)*255.0);\n" +
+"  int r = (mode<0.5) ? (ix ^ iy) : (ix & iy);\n" +
+"  return float(r)/255.0;\n}\n" +
 "float wipeField(vec2 uv, float mode, float outA){\n" +
+"  /* MULTI tiles the whole pattern, the way a bench mixer's x4 / x16 does */\n" +
+"  float rep = max(1.0, floor(u_wipeRep + 0.5));\n" +
+"  vec2 tu = (rep > 1.5) ? fract(uv*rep) : uv;\n" +
 "  vec2 off = vec2(u_wipeX, u_wipeY)*0.5;\n" +
-"  vec2 c = uv - 0.5 - off;\n" +
+"  vec2 c = tu - 0.5 - off;\n" +
 "  /* normalised against the distance to the farthest corner from wherever the\n" +
 "     origin has been moved to, so the fader travels evenly to full coverage */\n" +
 "  vec2 far = abs(off) + 0.5;\n" +
 "  float n = 2.0 + floor(u_wipeDetail*14.0);\n" +
-"  if(mode<1.5) return uv.x;\n" +
-"  if(mode<2.5) return 1.0-uv.y;\n" +
-"  if(mode<3.5) return (uv.x + (1.0-uv.y))*0.5;\n" +
+"  if(mode<1.5) return tu.x;\n" +
+"  if(mode<2.5) return 1.0-tu.y;\n" +
+"  if(mode<3.5) return (tu.x + (1.0-tu.y))*0.5;\n" +
 "  if(mode<4.5) return max(abs(c.x)/far.x, abs(c.y)/far.y);\n" +
 "  if(mode<5.5) return length(c*vec2(outA,1.0))/max(length(far*vec2(outA,1.0)), 0.0001);\n" +
 "  if(mode<6.5) return abs(c.x)/far.x;\n" +
 "  if(mode<7.5) return abs(c.y)/far.y;\n" +
-"  if(mode<8.5) return fract(uv.x*n);\n" +
-"  if(mode<9.5) return fract(uv.y*n);\n" +
+"  if(mode<8.5) return fract(tu.x*n);\n" +
+"  if(mode<9.5) return fract(tu.y*n);\n" +
 "  if(mode<10.5){ float a = atan(c.y, c.x)/6.2832 + 0.5; return fract(a); }\n" +
-"  if(mode<11.5) return fract((uv.x + uv.y)*n*0.5);\n" +
-"  return h21(floor(uv*vec2(n*2.0, n)));\n}\n" +
+"  if(mode<11.5) return fract((tu.x + tu.y)*n*0.5);\n" +
+"  return h21(floor(tu*vec2(n*2.0, n)));\n}\n" +
 "/* SLIDE moves the incoming picture in from an edge; STRETCH squashes it in.\n" +
 "   Both are transitions where B is repositioned rather than revealed. */\n" +
 "vec2 slideUV(vec2 uv, float dir, float t, out float inside){\n" +
@@ -227,6 +258,15 @@ const FS_MIX = COMMON + KEYFN +
 "  else { p.y = 1.0-(1.0-uv.y)/k; }\n" +
 "  inside = step(0.0,p.x)*step(p.x,1.0)*step(0.0,p.y)*step(p.y,1.0);\n" +
 "  return p;\n}\n" +
+"/* the keyer proper: clip and softness set where the matte turns over, GAIN\n" +
+"   sets how hard it turns, DENSITY sets how opaque it can ever get */\n" +
+"float keyMatte(vec2 p){\n" +
+"  float k = keyOf(texture(u_texB, clamp(p,0.0,1.0)).rgb,\n" +
+"                  u_mixKey > 2.5 ? 1.0 : 0.0,\n" +
+"                  u_mixKeyHue, u_mixKeyThresh, u_mixKeySoft,\n" +
+"                  (u_mixKey < 1.5) ? 1.0-u_mixKeyInv : u_mixKeyInv);\n" +
+"  k = pow(clamp(k,0.0,1.0), mix(3.2, 0.3, clamp(u_mixKeyGain,0.0,1.0)));\n" +
+"  return k * clamp(u_mixKeyDens, 0.0, 1.0);\n}\n" +
 "/* The same coverage calculation the mixer uses, evaluated anywhere on the\n" +
 "   frame. The melt stage needs it at neighbouring points to find the boundary\n" +
 "   and which way it faces, which is cheap here because the wipe is analytic. */\n" +
@@ -245,10 +285,7 @@ const FS_MIX = COMMON + KEYFN +
 "  }\n" +
 "  if(u_mixKey > 0.5){\n" +
 "    if(u_mixKey < 3.5){\n" +
-"      m *= keyOf(texture(u_texB, clamp(buv,0.0,1.0)).rgb,\n" +
-"                 u_mixKey > 2.5 ? 1.0 : 0.0,\n" +
-"                 u_mixKeyHue, u_mixKeyThresh, u_mixKeySoft,\n" +
-"                 (u_mixKey < 1.5) ? 1.0-u_mixKeyInv : u_mixKeyInv);\n" +
+"      m *= keyMatte(buv);\n" +
 "    } else {\n" +
 "      float sz = 0.08 + u_pipSize*0.62;\n" +
 "      vec2 ctr = vec2(0.5,0.5) + vec2(u_pipX, u_pipY)*0.42;\n" +
@@ -258,52 +295,130 @@ const FS_MIX = COMMON + KEYFN +
 "    }\n" +
 "  }\n" +
 "  return clamp(m, 0.0, 1.0);\n}\n" +
+"/* Twenty-four ways for two pictures to meet. The first six keep the indices\n" +
+"   they have always had so old patches still load. */\n" +
 "vec3 combine(vec3 a, vec3 b, float m, float blend){\n" +
 "  if(blend<0.5) return mix(a, b, m);\n" +                 /* DISSOLVE */
 "  if(blend<1.5) return a + b*m;\n" +                      /* ADDITIVE  (FAM) */
 "  if(blend<2.5) return mix(a, max(a,b), m);\n" +          /* NON-ADD   (NAM) */
 "  if(blend<3.5) return mix(a, abs(a-b), m);\n" +          /* DIFFERENCE */
 "  if(blend<4.5) return mix(a, a*b*1.6, m);\n" +           /* MULTIPLY */
-"  return mix(a, 1.0-(1.0-a)*(1.0-b), m);\n}\n" +          /* SCREEN */
+"  if(blend<5.5) return mix(a, 1.0-(1.0-a)*(1.0-b), m);\n" +   /* SCREEN */
+"  if(blend<6.5) return mix(a, min(a,b), m);\n" +          /* DARKEN */
+"  if(blend<7.5) return mix(a, a+b-2.0*a*b, m);\n" +       /* EXCLUSION */
+"  if(blend<8.5) return mix(a, a-b, m);\n" +              /* SUBTRACT */
+"  if(blend<9.5){                                     \n" +   /* OVERLAY */
+"    vec3 r = mix(2.0*a*b, 1.0-2.0*(1.0-a)*(1.0-b), step(0.5,a));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<10.5){                                    \n" +   /* HARD LIGHT */
+"    vec3 r = mix(2.0*a*b, 1.0-2.0*(1.0-a)*(1.0-b), step(0.5,b));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<11.5){                                    \n" +   /* SOFT LIGHT */
+"    vec3 r = mix(2.0*a*b + a*a*(1.0-2.0*b), sqrt(max(a,0.0))*(2.0*b-1.0) + 2.0*a*(1.0-b), step(0.5,b));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<12.5){                                    \n" +   /* VIVID LIGHT */
+"    vec3 r = mix(1.0 - (1.0-a)/max(2.0*b, 0.001), a/max(1.0-2.0*(b-0.5), 0.001), step(0.5,b));\n" +
+"    return mix(a, clamp(r,0.0,1.6), m); }\n" +
+"  if(blend<13.5){                                    \n" +   /* PIN LIGHT */
+"    vec3 r = mix(min(a, 2.0*b), max(a, 2.0*(b-0.5)), step(0.5,b));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<14.5) return mix(a, clamp(a/max(1.0-b, 0.004), 0.0, 1.6), m);\n" +   /* COLOUR DODGE */
+"  if(blend<15.5) return mix(a, 1.0-clamp((1.0-a)/max(b, 0.004), 0.0, 1.6), m);\n" + /* COLOUR BURN */
+"  if(blend<16.5) return mix(a, clamp(a/max(b, 0.004), 0.0, 1.6), m);\n" +      /* DIVIDE */
+"  if(blend<17.5) return mix(a, fract(a + b*1.5), m);\n" +   /* WRAP ADD: the analogue overflow */
+"  if(blend<18.5) return mix(a, vec3(bits(a.r,b.r,0.0), bits(a.g,b.g,0.0), bits(a.b,b.b,0.0)), m);\n" +
+"  if(blend<19.5) return mix(a, vec3(bits(a.r,b.r,1.0), bits(a.g,b.g,1.0), bits(a.b,b.b,1.0)), m);\n" +
+"  vec3 ha = rgb2hsvM(clamp(a,0.0,1.0)), hb = rgb2hsvM(clamp(b,0.0,1.0));\n" +
+"  if(blend<20.5) return mix(a, hsv2rgbM(vec3(hb.x, ha.y, ha.z)), m);\n" +   /* HUE */
+"  if(blend<21.5) return mix(a, hsv2rgbM(vec3(ha.x, hb.y, ha.z)), m);\n" +   /* SATURATION */
+"  if(blend<22.5) return mix(a, hsv2rgbM(vec3(hb.x, hb.y, ha.z)), m);\n" +   /* COLOUR */
+"  return mix(a, hsv2rgbM(vec3(ha.x, ha.y, hb.z)), m);\n}\n" +               /* LUMINOSITY */
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  float outA = u_res.x/u_res.y;\n" +
-"  vec3 a = texture(u_texA, uv).rgb;\n" +
-"  if(u_hasB<0.5 || u_abMix<0.0005){ O = vec4(a,1.0); return; }\n" +
+"  if(u_hasB<0.5 || u_abMix<0.0005){ O = vec4(texture(u_texA, uv).rgb,1.0); return; }\n" +
 "  float t = u_abMix;\n" +
 "  float mm = u_mixMode;\n" +
+"  /* ---- 0. the dirty mixer ----\n" +
+"     A bench mixer that has been dropped, or had its crossbar chip lifted,\n" +
+"     does not fail smoothly. It fires: the switcher jumps to the wrong input\n" +
+"     for a field, the timebase is knocked sideways and crawls back, a band of\n" +
+"     lines drops out to whatever is on the other side of the crossbar, and the\n" +
+"     switching transient sprays noise across the picture. So this runs on an\n" +
+"     event clock rather than as a continuous wobble: DIRT decides how often a\n" +
+"     tick fires at all, RATE how fast the clock runs, and the four flavours\n" +
+"     decide what a firing does. Everything decays inside its own tick. */\n" +
+"  float dirtE = 0.0, dirtSeed = 0.0;\n" +
+"  vec2 duv = uv;\n" +
+"  if(u_mixDirt > 0.002){\n" +
+"    float dr = 0.5 + u_mixDirtRate*15.0;\n" +
+"    float ph = u_time*dr;\n" +
+"    float tk = floor(ph), fr = fract(ph);\n" +
+"    dirtSeed = tk;\n" +
+"    float fire = step(h21(vec2(tk, 7.71)), clamp(u_mixDirt,0.0,1.0)*0.85);\n" +
+"    dirtE = fire * exp(-fr*mix(11.0, 1.6, u_mixDirt));\n" +
+"    /* the knock: a horizontal shove that shears down the frame and recovers */\n" +
+"    float kn = dirtE*u_mixDirtKnock;\n" +
+"    if(kn > 0.0005){\n" +
+"      float rowI = floor(uv.y*u_res.y);\n" +
+"      float shove = (h21(vec2(tk, 5.53))-0.5)*0.16*kn;\n" +
+"      shove *= mix(1.0, 1.0-uv.y, 0.6);\n" +
+"      shove += (h21(vec2(rowI, tk*0.77))-0.5)*0.05*kn;\n" +
+"      duv.x += shove;\n" +
+"      duv.y = fract(duv.y + (h21(vec2(tk, 2.19))-0.5)*0.06*kn);\n" +
+"    }\n" +
+"  }\n" +
+"  vec3 a = texture(u_texA, clamp(duv,0.0,1.0)).rgb;\n" +
 "  /* ---- 1. where does B come from, and how much of it shows ---- */\n" +
-"  vec2 buv = uv;\n" +
-"  float m = t, inside = 1.0;\n" +
+"  vec2 buv = duv;\n" +
+"  float m = t, inside = 1.0, wipeBand = 0.0;\n" +
 "  if(mm > 0.5 && mm < 12.5){\n" +
-"    float d = wipeField(uv, mm, outA);\n" +
+"    float d = wipeField(duv, mm, outA);\n" +
 "    if(u_wipeInv>0.5) d = 1.0-d;\n" +
 "    float sw = max(u_wipeSoft*0.5, 0.002);\n" +
-"    m = smoothstep(d-sw, d+sw, t*(1.0+2.0*sw)-sw);\n" +
+"    float tt = t*(1.0+2.0*sw)-sw;\n" +
+"    m = smoothstep(d-sw, d+sw, tt);\n" +
+"    /* BORDER WIPE: a coloured rule laid along the join, as on a bench mixer */\n" +
+"    if(u_wipeBord > 0.002){\n" +
+"      float bw = 0.004 + u_wipeBord*0.1;\n" +
+"      wipeBand = (1.0 - smoothstep(bw*0.45, bw, abs(d - tt))) * step(0.004, t) * step(t, 0.996);\n" +
+"    }\n" +
 "  } else if(mm > 12.5 && mm < 16.5){\n" +
-"    buv = slideUV(uv, mm-13.0, t, inside);\n" +
+"    buv = slideUV(duv, mm-13.0, t, inside);\n" +
 "    m = inside;\n" +
 "  } else if(mm > 16.5 && mm < 20.5){\n" +
-"    buv = stretchUV(uv, mm-17.0, t, inside);\n" +
+"    buv = stretchUV(duv, mm-17.0, t, inside);\n" +
 "    m = inside;\n" +
 "  }\n" +
 "  /* ---- 2. the key stage, independent of the transition ---- */\n" +
-"  float border = 0.0;\n" +
+"  float border = 0.0, keyEdge = 0.0, keyShad = 0.0;\n" +
 "  if(u_mixKey > 0.5){\n" +
 "    if(u_mixKey < 3.5){\n" +
 "      /* 1 = white luma, 2 = black luma, 3 = chroma. The key is taken from the\n" +
 "         incoming picture, so its bright, dark or coloured parts drop out. */\n" +
-"      float km = keyOf(texture(u_texB, clamp(buv,0.0,1.0)).rgb,\n" +
-"                       u_mixKey > 2.5 ? 1.0 : 0.0,\n" +
-"                       u_mixKeyHue, u_mixKeyThresh, u_mixKeySoft,\n" +
-"                       (u_mixKey < 1.5) ? 1.0-u_mixKeyInv : u_mixKeyInv);\n" +
+"      float km = keyMatte(buv);\n" +
+"      /* BORDER and SHADOW are the title-edge treatments a bench mixer offers:\n" +
+"         the matte is grown outward for an outline, and offset down-right and\n" +
+"         darkened for a drop shadow. Both read from the same matte. */\n" +
+"      if(u_mixKeyEdge > 0.002){\n" +
+"        float r = (0.002 + u_mixKeyEdge*0.02);\n" +
+"        vec2 rx = vec2(r/outA, 0.0), ry = vec2(0.0, r);\n" +
+"        float g = max(max(keyMatte(buv-rx), keyMatte(buv+rx)),\n" +
+"                      max(keyMatte(buv-ry), keyMatte(buv+ry)));\n" +
+"        g = max(g, max(keyMatte(buv-rx-ry), keyMatte(buv+rx+ry)));\n" +
+"        keyEdge = clamp(g - km, 0.0, 1.0);\n" +
+"      }\n" +
+"      if(u_mixKeyShadow > 0.002){\n" +
+"        float sh = u_mixKeyShadow*0.035;\n" +
+"        keyShad = clamp(keyMatte(buv - vec2(sh/outA, -sh)) - km, 0.0, 1.0);\n" +
+"      }\n" +
 "      m *= km;\n" +
 "    } else {\n" +
 "      /* picture in picture: B is scaled into a subscreen with a border */\n" +
 "      float sz = 0.08 + u_pipSize*0.62;\n" +
 "      vec2 ctr = vec2(0.5,0.5) + vec2(u_pipX, u_pipY)*0.42;\n" +
 "      vec2 hw = vec2(sz*0.5, sz*0.5*outA);\n" +
-"      vec2 q = (uv - ctr)/hw;\n" +
+"      vec2 q = (duv - ctr)/hw;\n" +
 "      buv = q*0.5 + 0.5;\n" +
 "      float bw = u_pipBorder*0.16;\n" +
 "      float inBox = step(max(abs(q.x),abs(q.y)), 1.0);\n" +
@@ -324,8 +439,8 @@ const FS_MIX = COMMON + KEYFN +
 "  if(u_edgeAmt > 0.002){\n" +
 "    float r = 0.004 + u_edgeWidth*0.085;\n" +
 "    vec2 rx = vec2(r/outA, 0.0), ry = vec2(0.0, r);\n" +
-"    float mL = matteAt(uv-rx, mm, t, outA), mR = matteAt(uv+rx, mm, t, outA);\n" +
-"    float mD = matteAt(uv-ry, mm, t, outA), mU = matteAt(uv+ry, mm, t, outA);\n" +
+"    float mL = matteAt(duv-rx, mm, t, outA), mR = matteAt(duv+rx, mm, t, outA);\n" +
+"    float mD = matteAt(duv-ry, mm, t, outA), mU = matteAt(duv+ry, mm, t, outA);\n" +
 "    float mn = min(min(mL,mR),min(mD,mU)), mx = max(max(mL,mR),max(mD,mU));\n" +
 "    band = clamp((mx-mn)*1.25, 0.0, 1.0);\n" +
 "    vec2 g = vec2(mR-mL, mU-mD);\n" +
@@ -339,7 +454,16 @@ const FS_MIX = COMMON + KEYFN +
 "  }\n" +
 "  vec2 bd = en * band * u_edgeAmt * 0.055;\n" +
 "  vec3 b = texture(u_texB, clamp(buv + bd, 0.0, 1.0)).rgb;\n" +
+"  /* a firing can throw the crossbar to the wrong input for a moment */\n" +
+"  if(dirtE > 0.001 && u_mixDirtCut > 0.002){\n" +
+"    float want = step(0.5, h21(vec2(dirtSeed, 3.17)));\n" +
+"    m = mix(m, want, clamp(dirtE*u_mixDirtCut*1.4, 0.0, 1.0));\n" +
+"  }\n" +
 "  vec3 src = combine(a, b, clamp(m,0.0,1.0), u_mixBlend);\n" +
+"  /* the keyed edge treatments sit on top of the composite */\n" +
+"  if(keyShad > 0.001) src = mix(src, src*(1.0 - 0.8*u_mixKeyShadow), keyShad);\n" +
+"  if(keyEdge > 0.001) src = mix(src, backCol(u_mixKeyEdgeCol), keyEdge*clamp(u_mixKeyEdge*3.0,0.0,1.0));\n" +
+"  if(wipeBand > 0.001) src = mix(src, backCol(u_wipeBordCol), wipeBand*clamp(u_wipeBord*2.5,0.0,1.0));\n" +
 "  if(u_hasPrev > 0.5 && band > 0.001 && u_edgeHold > 0.002){\n" +
 "    vec2 pd = en * (0.0015 + u_edgeAmt*0.04);\n" +
 "    vec3 pv = texture(u_prev, clamp(uv + pd, 0.0, 1.0)).rgb;\n" +
@@ -352,6 +476,33 @@ const FS_MIX = COMMON + KEYFN +
 "    src = mix(src, pv, clamp(band*u_edgeHold, 0.0, 0.94));\n" +
 "  }\n" +
 "  if(border > 0.5) src = mix(src, vec3(1.0), t);\n" +
+"  /* ---- 4. what is left of a firing: dropped lines and switching noise ---- */\n" +
+"  if(dirtE > 0.001){\n" +
+"    if(u_mixDirtDrop > 0.002){\n" +
+"      float bandH = 2.0 + 26.0*h21(vec2(dirtSeed, 1.31));\n" +
+"      float rowb = floor(uv.y*u_res.y/bandH);\n" +
+"      float dh = h21(vec2(rowb, dirtSeed*0.77));\n" +
+"      float drop = step(1.0 - clamp(u_mixDirtDrop*dirtE*1.3, 0.0, 0.95), dh);\n" +
+"      if(drop > 0.5){\n" +
+"        /* half the time the line drops through to the other side of the\n" +
+"           crossbar, half the time to nothing at all */\n" +
+"        float toOther = step(0.5, h21(vec2(rowb*1.7, dirtSeed)));\n" +
+"        float sk = (h21(vec2(rowb, dirtSeed*2.3))-0.5)*0.09;\n" +
+"        vec3 alt = mix(texture(u_texA, clamp(vec2(uv.x+sk, uv.y),0.0,1.0)).rgb,\n" +
+"                       texture(u_texB, clamp(vec2(uv.x+sk, uv.y),0.0,1.0)).rgb, toOther);\n" +
+"        float dead = step(0.82, h21(vec2(rowb*3.1, dirtSeed)));\n" +
+"        alt = mix(alt, vec3(h21(vec2(floor(uv.x*u_res.x/2.5), rowb+dirtSeed))*0.5), dead);\n" +
+"        src = mix(src, alt, clamp(u_mixDirtDrop*1.2, 0.0, 1.0));\n" +
+"      }\n" +
+"    }\n" +
+"    if(u_mixDirtNoise > 0.002){\n" +
+"      float nx = floor(uv.x*u_res.x/3.0);\n" +
+"      float ny = floor(uv.y*u_res.y);\n" +
+"      float nz = h21(vec2(nx + ny*13.7, dirtSeed*7.3)) - 0.5;\n" +
+"      src += nz*u_mixDirtNoise*dirtE*1.6;\n" +
+"      src = mix(src, vec3(dot(src, vec3(0.299,0.587,0.114))), u_mixDirtNoise*dirtE*0.5);\n" +
+"    }\n" +
+"  }\n" +
 "  O = vec4(clamp(src,0.0,1.6),1.0);\n}\n";
 
 /* pass 2: the bent signal path — physical sync model + NTSC + tape */
@@ -366,7 +517,12 @@ const FS_SIG = COMMON + KEYFN +
 "uniform float u_tapeSpeed,u_edgeDmg,u_printThru,u_hiss,u_stillNoise,u_shuttleNz;\n" +
 "uniform float u_chanIdx,u_tpStill,u_tpShuttle;\n" +
 "uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx;\n" +
-"float lum(vec2 p){ return dot(texture(u_tex, fract(p)).rgb, vec3(0.299,0.587,0.114)); }\n" +
+/* Horizontal taps must not wrap. The picture genuinely rolls vertically, so
+   Y still wraps, but a tap that runs off the left of the line has to read
+   the edge rather than the far side of the frame - otherwise the peaking
+   filter, the dot crawl and the aperture correction all compare the first
+   pixel of a line against the last one and ring hard down both edges. */
+"float lum(vec2 p){ return dot(texture(u_tex, vec2(clamp(p.x,0.0,1.0), fract(p.y))).rgb, vec3(0.299,0.587,0.114)); }\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  if(u_bypass>0.5){ O = texture(u_tex,uv); return; }\n" +
@@ -670,6 +826,22 @@ const FS_CRT = COMMON +
 "uniform float u_outGamma,u_outBright,u_outContrast,u_outSat,u_outWarmth,u_blackLevel,u_whiteClip;\n" +
 "uniform float u_phosphor,u_hvSag;\n" +
 "uniform float u_letterbox,u_pillarbox,u_bezel,u_glassRefl,u_dust,u_scratches,u_ovMoire,u_rollShutter,u_safeArea;\n" +
+"uniform sampler2D u_osd;\n" +
+"uniform float u_lensDist,u_lensCA,u_lensStreak,u_streakHue,u_lensSmudge;\n" +
+"uniform float u_lightLeak,u_leakHue,u_gateWeave,u_gateHair,u_stuckPix,u_lcdGrid;\n" +
+"uniform float u_osdShow,u_osdGlow;\n" +
+"vec3 hsvOut(vec3 c){\n" +
+"  vec3 q = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0))*6.0 - 3.0);\n" +
+"  return c.z * mix(vec3(1.0), clamp(q-1.0, 0.0, 1.0), c.y);\n}\n" +
+"/* value noise: four hashed corners, smoothstep between them. Used for the\n" +
+"   smears on the glass and for the gate weave, both of which need something\n" +
+"   that drifts rather than fizzes. */\n" +
+"float vnoise(vec2 p){\n" +
+"  vec2 i = floor(p), f = fract(p);\n" +
+"  f = f*f*(3.0-2.0*f);\n" +
+"  float a = h21(i), b = h21(i+vec2(1.0,0.0)), c2 = h21(i+vec2(0.0,1.0)), d2 = h21(i+vec2(1.0,1.0));\n" +
+"  return mix(mix(a,b,f.x), mix(c2,d2,f.x), f.y);\n}\n" +
+"float fbm2(vec2 p){ return vnoise(p)*0.6 + vnoise(p*2.1+7.3)*0.3 + vnoise(p*4.3+13.1)*0.1; }\n" +
 "float lum3(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }\n" +
 /* --- shadow-mask families --- */
 "vec3 maskAt(vec2 fc, float model){\n" +
@@ -698,6 +870,20 @@ const FS_CRT = COMMON +
 "  if(u_hvSag>0.003){ sag = u_hvSag*0.035*(lum3(texture(u_tex, vec2(0.5)).rgb)+0.35); }\n" +
 "  p *= 1.0 + u_curvature*0.09*dot(p,p) - sag;\n" +
 "  vec2 cuv = p*0.5+0.5;\n" +
+"  /* the lens, as distinct from the tube: a real barrel or pincushion term\n" +
+"     applied to the whole picture, plus the gate weave of a projector whose\n" +
+"     registration pins have worn. Both happen before anything is sampled, so\n" +
+"     the picture genuinely moves rather than being smeared. */\n" +
+"  if(abs(u_lensDist)>0.003){\n" +
+"    vec2 dl = cuv-0.5; float r2 = dot(dl,dl);\n" +
+"    cuv = 0.5 + dl*(1.0 + u_lensDist*0.9*r2);\n" +
+"  }\n" +
+"  if(u_gateWeave>0.003){\n" +
+"    float tw = u_time*1.7;\n" +
+"    vec2 wv = vec2(vnoise(vec2(tw, 3.1))-0.5, vnoise(vec2(tw*0.8+11.0, 7.9))-0.5);\n" +
+"    wv += vec2(0.0, (h21(vec2(floor(u_time*24.0), 5.0))-0.5)*0.35);\n" +
+"    cuv += wv*u_gateWeave*0.03;\n" +
+"  }\n" +
 "  /* rounded corners / tube edge */\n" +
 "  vec2 ab = abs(p) - vec2(1.0 - u_cornerRound*0.18);\n" +
 "  float corner = length(max(ab,0.0)) - u_cornerRound*0.18;\n" +
@@ -705,6 +891,14 @@ const FS_CRT = COMMON +
 "  /* rolling shutter beat against the field rate */\n" +
 "  if(u_rollShutter>0.003){ cuv.y += sin((uv.y*3.0 + u_time*0.7)*3.14159)*u_rollShutter*0.004; }\n" +
 "  vec3 c = texture(u_tex, clamp(cuv,0.0,1.0)).rgb;\n" +
+"  /* transverse chromatic aberration: the three primaries focus at slightly\n" +
+"     different scales, so colour fringes grow towards the corners */\n" +
+"  if(u_lensCA>0.003){\n" +
+"    vec2 dc = cuv-0.5;\n" +
+"    float kr = 1.0 + u_lensCA*0.012, kb = 1.0 - u_lensCA*0.012;\n" +
+"    c.r = texture(u_tex, clamp(0.5+dc*kr, 0.0, 1.0)).r;\n" +
+"    c.b = texture(u_tex, clamp(0.5+dc*kb, 0.0, 1.0)).b;\n" +
+"  }\n" +
 "  /* phosphor persistence */\n" +
 "  if(u_phosphor>0.003 && u_hasPersist>0.5){\n" +
 "    vec3 pv = texture(u_persist, clamp(cuv,0.0,1.0)).rgb;\n" +
@@ -719,10 +913,14 @@ const FS_CRT = COMMON +
 "      float a = float(i)*0.5236;\n" +
 "      float r = (1.0 + mod(float(i),3.0))*0.45;\n" +
 "      vec2 off = vec2(cos(a), sin(a))*rad*r*px;\n" +
-"      float w = 1.0/(1.0+r*1.4);\n" +
-"      blur += texture(u_tex, clamp(cuv+off,0.0,1.0)).rgb*w; wsum += w;\n" +
+"      vec2 tp = cuv+off;\n" +
+"      /* a tap past the edge of the picture contributes nothing, rather than\n" +
+"         returning the edge pixel again and stacking it into a bright rim */\n" +
+"      float inb = step(0.0,tp.x)*step(tp.x,1.0)*step(0.0,tp.y)*step(tp.y,1.0);\n" +
+"      float w = inb/(1.0+r*1.4);\n" +
+"      blur += texture(u_tex, clamp(tp,0.0,1.0)).rgb*w; wsum += w;\n" +
 "    }\n" +
-"    blur /= max(wsum, 0.0001);\n" +
+"    blur = (wsum > 0.0001) ? blur/wsum : c;\n" +
 "    c = mix(c, blur, u_defocus*0.85);\n" +
 "    if(u_bloom>0.003){\n" +
 "      vec3 hot = max(blur - 0.42, 0.0)*1.9;\n" +
@@ -781,6 +979,73 @@ const FS_CRT = COMMON +
 "    float gn = h21(gl_FragCoord.xy + fract(u_time)*vec2(37.7,71.3));\n" +
 "    c += (gn-0.5)*u_grain*0.16*(0.35+0.65*(1.0-lum3(c)));\n" +
 "  }\n" +
+"  /* ---- the lens and the room in front of the screen ---- */\n" +
+"  if(u_lensStreak>0.003){\n" +
+"    /* anamorphic streak: a horizontal flare off anything hot enough to bloom,\n" +
+"       which is the one artefact that reads instantly as a lens rather than a\n" +
+"       filter, and it is blue because the coatings that cause it are */\n" +
+"    vec3 st = vec3(0.0); float sw = 0.0;\n" +
+"    for(int i=1;i<=10;i++){\n" +
+"      float o = float(i)*(0.006 + u_bloomRad*0.02);\n" +
+"      float ww = 1.0/float(i);\n" +
+"      vec2 lp = cuv+vec2(o,0.0), rp = cuv-vec2(o,0.0);\n" +
+"      float li = step(0.0,lp.x)*step(lp.x,1.0), ri = step(0.0,rp.x)*step(rp.x,1.0);\n" +
+"      st += max(texture(u_tex, clamp(lp,0.0,1.0)).rgb-0.62, 0.0)*ww*li;\n" +
+"      st += max(texture(u_tex, clamp(rp,0.0,1.0)).rgb-0.62, 0.0)*ww*ri;\n" +
+"      sw += ww*2.0;\n" +
+"    }\n" +
+"    st /= max(sw, 0.0001);\n" +
+"    c += st*u_lensStreak*6.0*mix(vec3(1.0), vec3(0.3,0.55,1.7), u_streakHue);\n" +
+"  }\n" +
+"  if(u_lensSmudge>0.003){\n" +
+"    /* dirty glass. A smear is only visible where something bright is behind\n" +
+"       it, which is why this is gated on the highlights rather than laid over\n" +
+"       the picture like a texture. */\n" +
+"    float sm = fbm2(uv*vec2(5.0,3.0)) * fbm2(uv*vec2(11.0,7.0)+4.4);\n" +
+"    sm = smoothstep(0.18, 0.62, sm);\n" +
+"    float hl = max(lum3(c)-0.35, 0.0);\n" +
+"    c += sm*hl*u_lensSmudge*1.6;\n" +
+"    c = mix(c, c*(1.0-sm*0.35), u_lensSmudge*0.4);\n" +
+"  }\n" +
+"  if(u_lightLeak>0.003){\n" +
+"    /* film edge fog: light getting past the felt and fogging one side of the\n" +
+"       frame, wandering slowly and breathing */\n" +
+"    float ang = u_time*0.043;\n" +
+"    vec2 dir = vec2(cos(ang), sin(ang));\n" +
+"    float g = clamp(dot(uv-0.5, dir)*1.6 + 0.55, 0.0, 1.0);\n" +
+"    g = pow(g, 2.4) * (0.55 + 0.45*sin(u_time*0.61) * 0.5 + 0.225);\n" +
+"    g *= 0.75 + 0.25*fbm2(uv*3.0 + u_time*0.05);\n" +
+"    c += g*u_lightLeak*1.1*hsvOut(vec3(fract(u_leakHue), 0.75, 1.0));\n" +
+"  }\n" +
+"  if(u_gateHair>0.003){\n" +
+"    /* a hair caught in the gate, hanging from the top and twitching */\n" +
+"    float sway = (vnoise(vec2(u_time*1.3, 2.0))-0.5)*0.05;\n" +
+"    float hx = 0.26 + sway + sin(uv.y*9.0 + u_time*0.4)*0.02;\n" +
+"    float hair = 1.0 - smoothstep(0.0008, 0.0026, abs(uv.x-hx));\n" +
+"    hair *= smoothstep(1.0, 0.72, uv.y);\n" +
+"    c = mix(c, c*0.12, hair*u_gateHair);\n" +
+"  }\n" +
+"  if(u_lcdGrid>0.003){\n" +
+"    /* a flat panel rather than a tube: a subpixel lattice with a black grid */\n" +
+"    vec2 g = fract(gl_FragCoord.xy/3.0);\n" +
+"    float gx = smoothstep(0.0,0.16,g.x)*smoothstep(1.0,0.84,g.x);\n" +
+"    float gy = smoothstep(0.0,0.22,g.y)*smoothstep(1.0,0.78,g.y);\n" +
+"    c *= mix(1.0, gx*gy*1.22, u_lcdGrid);\n" +
+"  }\n" +
+"  if(u_stuckPix>0.003){\n" +
+"    /* dead and stuck pixels. They never move, which is exactly what makes\n" +
+"       them read as a fault in the panel and not as noise in the signal. */\n" +
+"    vec2 pc = floor(gl_FragCoord.xy);\n" +
+"    float r = h21(pc*0.371 + 3.7);\n" +
+"    if(r > 1.0 - u_stuckPix*0.0035){\n" +
+"      float kind = h21(pc*1.73 + 9.1);\n" +
+"      if(kind < 0.42) c = vec3(0.0);\n" +
+"      else if(kind < 0.66) c = vec3(1.0);\n" +
+"      else if(kind < 0.78) c = vec3(1.0,0.0,0.0);\n" +
+"      else if(kind < 0.9) c = vec3(0.0,1.0,0.0);\n" +
+"      else c = vec3(0.0,0.0,1.0);\n" +
+"    }\n" +
+"  }\n" +
 "  /* mattes and guides last */\n" +
 "  if(u_letterbox>0.001 && (uv.y < u_letterbox || uv.y > 1.0-u_letterbox)) c = vec3(0.0);\n" +
 "  if(u_pillarbox>0.001 && (uv.x < u_pillarbox || uv.x > 1.0-u_pillarbox)) c = vec3(0.0);\n" +
@@ -790,6 +1055,21 @@ const FS_CRT = COMMON +
 "    float g1 = step(-0.002, max(d90.x,d90.y))*step(max(d90.x,d90.y), 0.002);\n" +
 "    float g2 = step(-0.002, max(d80.x,d80.y))*step(max(d80.x,d80.y), 0.002);\n" +
 "    c = mix(c, vec3(0.2,1.0,0.9), (g1+g2)*u_safeArea*0.8);\n" +
+"  }\n" +
+"  /* the deck's own display, drawn last because on the machine it is burnt in\n" +
+"     after everything else and never obeys the picture's geometry */\n" +
+"  if(u_osdShow>0.003){\n" +
+"    vec4 od = texture(u_osd, vec2(uv.x, 1.0-uv.y));\n" +
+"    if(u_osdGlow>0.003){\n" +
+"      vec2 gp = 1.6/u_res;\n" +
+"      float ga = 0.0;\n" +
+"      for(int i=0;i<8;i++){\n" +
+"        float an = float(i)*0.7854;\n" +
+"        ga += texture(u_osd, vec2(uv.x,1.0-uv.y) + vec2(cos(an),sin(an))*gp*3.0).a;\n" +
+"      }\n" +
+"      c += od.rgb*(ga/8.0)*u_osdGlow*0.7*u_osdShow;\n" +
+"    }\n" +
+"    c = mix(c, od.rgb, od.a*u_osdShow);\n" +
 "  }\n" +
 "  O = vec4(max(c,0.0),1.0);\n}\n";
 
@@ -1273,12 +1553,13 @@ const SECTIONS = [
   {id:"crt",      name:"CRT DISPLAY",       cls:"cyan", zone:"out"},
   {id:"overlay",  name:"OUTPUT OVERLAY",    cls:"cyan", zone:"out"},
 
-  {id:"morph",    name:"PRESET MORPH",      cls:"mag",  zone:"tools"},
+  /* morph lives on the PERFORM tab with the snapshots and the recorder,
+     because it is the same job: recalling states while it runs */
+  {id:"morph",    name:"PRESET MORPH",      cls:"mag",  zone:"perform"},
 ];
 const ZONES = [
   {id:"chain", label:"CHANNEL \u00b7 SIGNAL PATH", note:"Everything belonging to the channel selected above, in the order the signal actually travels: source, framing, frame store, feedback, then the reorderable stages, then the keyer. Drag by the handle to rearrange."},
   {id:"out",   label:"MASTER OUT",          note:"The shared display stage, after the mixer. Every channel ends up here."},
-  {id:"tools", label:"TOOLS",               note:"Performance and modulation tools that do not belong to any one channel."},
 ];
 const PDEF = [
   ["abMix","BUS 1 FADER","mixer",0,1,0],
@@ -1300,6 +1581,20 @@ const PDEF = [
   ["edgeSwirl","EDGE SWIRL","mixer",-1,1,0],
   ["edgeChroma","EDGE CHROMA","mixer",0,1,0.5],
   ["edgeCreep","EDGE CREEP","mixer",0,1,0.35],
+  ["wipeBord","BORDER WIPE","mixer",0,1,0],
+  ["wipeBordCol","BORDER COLOUR","mixer",0,1,0],
+  ["wipeRep","WIPE MULTI","mixer",1,4,1],
+  ["mixKeyGain","KEY GAIN","mixer",0,1,0.5],
+  ["mixKeyDens","KEY DENSITY","mixer",0,1,1],
+  ["mixKeyEdge","KEY BORDER","mixer",0,1,0],
+  ["mixKeyEdgeCol","KEY BORDER COL","mixer",0,1,0],
+  ["mixKeyShadow","KEY SHADOW","mixer",0,1,0],
+  ["mixDirt","DIRT","mixer",0,1,0],
+  ["mixDirtRate","DIRT RATE","mixer",0,1,0.3],
+  ["mixDirtDrop","DIRT DROPOUT","mixer",0,1,0.5],
+  ["mixDirtCut","DIRT CUT","mixer",0,1,0.4],
+  ["mixDirtKnock","DIRT KNOCK","mixer",0,1,0.5],
+  ["mixDirtNoise","DIRT NOISE","mixer",0,1,0.35],
 
   ["cdMix","BUS 2 FADER","mixer2",0,1,0],
   ["wipeSoft2","WIPE SOFT","mixer2",0,1,0.03],
@@ -1320,6 +1615,20 @@ const PDEF = [
   ["edgeSwirl2","EDGE SWIRL","mixer2",-1,1,0],
   ["edgeChroma2","EDGE CHROMA","mixer2",0,1,0.5],
   ["edgeCreep2","EDGE CREEP","mixer2",0,1,0.35],
+  ["wipeBord2","BORDER WIPE","mixer2",0,1,0],
+  ["wipeBordCol2","BORDER COLOUR","mixer2",0,1,0],
+  ["wipeRep2","WIPE MULTI","mixer2",1,4,1],
+  ["mixKeyGain2","KEY GAIN","mixer2",0,1,0.5],
+  ["mixKeyDens2","KEY DENSITY","mixer2",0,1,1],
+  ["mixKeyEdge2","KEY BORDER","mixer2",0,1,0],
+  ["mixKeyEdgeCol2","KEY BORDER COL","mixer2",0,1,0],
+  ["mixKeyShadow2","KEY SHADOW","mixer2",0,1,0],
+  ["mixDirt2","DIRT","mixer2",0,1,0],
+  ["mixDirtRate2","DIRT RATE","mixer2",0,1,0.3],
+  ["mixDirtDrop2","DIRT DROPOUT","mixer2",0,1,0.5],
+  ["mixDirtCut2","DIRT CUT","mixer2",0,1,0.4],
+  ["mixDirtKnock2","DIRT KNOCK","mixer2",0,1,0.5],
+  ["mixDirtNoise2","DIRT NOISE","mixer2",0,1,0.35],
 
   ["busMix","MASTER FADER","mixerM",0,1,0],
   ["wipeSoftM","WIPE SOFT","mixerM",0,1,0.03],
@@ -1340,6 +1649,20 @@ const PDEF = [
   ["edgeSwirlM","EDGE SWIRL","mixerM",-1,1,0],
   ["edgeChromaM","EDGE CHROMA","mixerM",0,1,0.5],
   ["edgeCreepM","EDGE CREEP","mixerM",0,1,0.35],
+  ["wipeBordM","BORDER WIPE","mixerM",0,1,0],
+  ["wipeBordColM","BORDER COLOUR","mixerM",0,1,0],
+  ["wipeRepM","WIPE MULTI","mixerM",1,4,1],
+  ["mixKeyGainM","KEY GAIN","mixerM",0,1,0.5],
+  ["mixKeyDensM","KEY DENSITY","mixerM",0,1,1],
+  ["mixKeyEdgeM","KEY BORDER","mixerM",0,1,0],
+  ["mixKeyEdgeColM","KEY BORDER COL","mixerM",0,1,0],
+  ["mixKeyShadowM","KEY SHADOW","mixerM",0,1,0],
+  ["mixDirtM","DIRT","mixerM",0,1,0],
+  ["mixDirtRateM","DIRT RATE","mixerM",0,1,0.3],
+  ["mixDirtDropM","DIRT DROPOUT","mixerM",0,1,0.5],
+  ["mixDirtCutM","DIRT CUT","mixerM",0,1,0.4],
+  ["mixDirtKnockM","DIRT KNOCK","mixerM",0,1,0.5],
+  ["mixDirtNoiseM","DIRT NOISE","mixerM",0,1,0.35],
 
   ["morph","MORPH A>B","morph",0,1,0],
 
@@ -1593,6 +1916,20 @@ const PDEF = [
   ["ovMoire","SCREEN MOIRE","overlay",0,1,0],
   ["rollShutter","ROLL SHUTTER","overlay",0,1,0],
   ["safeArea","SAFE GUIDES","overlay",0,1,0],
+  ["lensDist","LENS DISTORT","overlay",-1,1,0],
+  ["lensCA","LENS FRINGE","overlay",0,1,0],
+  ["lensStreak","ANAMORPHIC","overlay",0,1,0],
+  ["streakHue","STREAK COLOUR","overlay",0,1,1],
+  ["lensSmudge","DIRTY GLASS","overlay",0,1,0],
+  ["lightLeak","LIGHT LEAK","overlay",0,1,0],
+  ["leakHue","LEAK COLOUR","overlay",0,1,0.05],
+  ["gateWeave","GATE WEAVE","overlay",0,1,0],
+  ["gateHair","GATE HAIR","overlay",0,1,0],
+  ["lcdGrid","LCD GRID","overlay",0,1,0],
+  ["stuckPix","STUCK PIXELS","overlay",0,1,0],
+  ["osdShow","DECK DISPLAY","overlay",0,1,0],
+  ["osdSize","DISPLAY SIZE","overlay",0.4,2,1],
+  ["osdGlow","DISPLAY GLOW","overlay",0,1,0.5],
 ];
 
 /* ---------------- per-parameter help ----------------
@@ -1620,6 +1957,20 @@ const PHELP = {
   edgeHold:"How much of the last frame survives inside the band. This is the persistence that turns a smear into a trail. Above about 0.8 it stops settling and keeps building, which is where it starts to look properly bent.",
   edgeSwirl:"Turns the drag direction. At zero the melt runs straight out across the boundary; wound fully either way it runs along it instead, so the edge stirs rather than bleeds.",
   edgeChroma:"Lets colour run further than brightness, the way it does off a composite edge. This is what makes the melt read as analogue rather than as a blur.",
+  wipeBord:"Lays a coloured rule along the join, the way a bench mixer's border wipe does. It follows the wipe wherever it goes and disappears when the fader reaches either end.",
+  wipeBordCol:"Which of the eight standard back colours the border is drawn in: white, yellow, cyan, green, magenta, red, blue, black, in that order.",
+  wipeRep:"Tiles the whole wipe pattern. Two gives four copies, four gives sixteen - the multi-wipe a bench mixer offers, and it works on every pattern rather than a chosen few.",
+  mixKeyGain:"How hard the key turns over between transparent and opaque. Low is a long soft ramp, high snaps. Threshold decides where the turn happens, this decides how abrupt it is.",
+  mixKeyDens:"The most opaque the key is ever allowed to get. Pulling it back leaves the keyed picture semi-transparent everywhere, which is how a title sits in the picture rather than on top of it.",
+  mixKeyEdge:"Grows the key matte outward and fills the growth with a colour, so the keyed shape gets an outline. Small values read as a rule around a title; large ones as a halo.",
+  mixKeyEdgeCol:"The colour of that outline, from the same eight back colours.",
+  mixKeyShadow:"Offsets a copy of the matte down and to the right and darkens the picture underneath it. A drop shadow, which is what stops a title disappearing into a busy background.",
+  mixDirt:"The master control for the dirty mixer, and an event clock rather than a continuous wobble. At zero the whole stage is off. Turned up, the mixer starts firing: the crossbar jumps to the wrong input, the timebase gets knocked sideways, bands of lines drop out and the switching transient sprays noise. This decides how often a firing happens; the five controls under it decide what a firing does.",
+  mixDirtRate:"How fast the event clock runs, so how closely spaced the firings are. Slow is an intermittent fault; fast is a mixer that has completely lost the plot.",
+  mixDirtDrop:"How much of a firing shows up as dropped lines. Bands of scanlines fall through to the other side of the crossbar, or to nothing at all.",
+  mixDirtCut:"How much of a firing throws the whole mix to one input or the other, regardless of where the fader is. This is the switcher glitching rather than the picture degrading.",
+  mixDirtKnock:"How hard a firing knocks the timebase. The picture shoves sideways, shears down the frame and crawls back, exactly as it does when a mixer is switched without genlock.",
+  mixDirtNoise:"The switching transient: a burst of bandwidth-limited noise across the picture, with the colour dropping out as it hits.",
   edgeCreep:"Which side of the boundary the melt lives on. At zero it sits evenly across the seam. Wound up, it only happens on the outgoing side, so the incoming shape bleeds into the background and the background never eats into the shape.",
   morph:"Blends every slider on the panel between the two snapshots stored with STORE A and STORE B. Put an LFO on this and the whole rig evolves on its own. Touching any individual slider takes that one control back out of the morph.",
 
@@ -1887,11 +2238,26 @@ const PHELP = {
   ovMoire:"The interference pattern a camera picks up when it photographs a screen.",
   rollShutter:"The horizontal banding a CMOS sensor produces when it photographs a display, from the sensor and the raster running at slightly different rates.",
   safeArea:"Broadcast safe-area guides, for framing. Not an effect — it draws over the picture and is not recorded.",
+  lensDist:"Barrel one way, pincushion the other. This is the lens rather than the tube: it bends the whole picture before anything is sampled, so what leaves the frame genuinely leaves rather than being stretched along the edge.",
+  lensCA:"Transverse chromatic aberration. Red and blue focus at slightly different scales, so colour fringes appear and grow towards the corners, the way they do on a cheap zoom wide open.",
+  lensStreak:"The horizontal flare an anamorphic lens throws off a highlight. Of everything in this section it is the one artefact that reads instantly as a lens and not as a filter.",
+  streakHue:"How blue the streak is. All the way up is the coated-glass blue everybody recognises; all the way down leaves it white.",
+  lensSmudge:"Smears on the glass. A smudge is only visible where something bright is behind it, so this is driven by the highlights rather than laid over the picture as a texture, which is why it moves with the shot instead of sitting on top of it.",
+  lightLeak:"Light getting past the felt and fogging one side of the frame. The direction wanders slowly and the intensity breathes, so it never sits still.",
+  leakHue:"The colour of the leak. Low is the orange of daylight through a film can; higher takes it through magenta and into cyan.",
+  gateWeave:"Registration weave. The picture drifts and twitches in the gate the way it does on a projector whose pins have worn, with a little per-frame jump on top of the slow drift.",
+  gateHair:"A hair caught in the gate, hanging from the top of the frame and twitching. One of those details that does more for believability than any amount of grain.",
+  lcdGrid:"A flat panel instead of a tube: a subpixel lattice with a black grid between the cells. Use it with the CRT display model off, or the two masks fight each other.",
+  stuckPix:"Dead and stuck pixels. They never move, which is what makes them read as a fault in the panel rather than noise in the signal.",
+  osdShow:"The deck\u2019s own on-screen display, burnt in over everything: the transport symbol, a running tape counter and an optional date stamp, in the dot-matrix yellow every camcorder used. Mode and date format are the buttons at the top of this section.",
+  osdSize:"How large the display is drawn, relative to the frame.",
+  osdGlow:"How much the display blooms. Real burnt-in characters were bright enough to flare slightly against a dark picture.",
 };
 /* the bus 2 and master mixer controls reuse bus 1's descriptions */
 for(const [suffix, note] of [["2"," (bus 2: channels C and D)"], ["M"," (master: bus 1 against bus 2)"]]){
   for(const id of ["wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue","pipX","pipY","pipSize","pipBorder",
-                   "edgeAmt","edgeWidth","edgeHold","edgeSwirl","edgeChroma","edgeCreep"]){
+                   "edgeAmt","edgeWidth","edgeHold","edgeSwirl","edgeChroma","edgeCreep",
+                   "wipeBord","wipeBordCol","wipeRep","mixKeyGain","mixKeyDens","mixKeyEdge","mixKeyEdgeCol","mixKeyShadow","mixDirt","mixDirtRate","mixDirtDrop","mixDirtCut","mixDirtKnock","mixDirtNoise"]){
     PHELP[id+suffix] = PHELP[id] + note;
   }
 }
@@ -1918,7 +2284,7 @@ const SECHELP = {
   vhs:"A whole tape deck, per channel: transport, tracking servo, head switching, physical tape damage and generation loss.",
   color:"A straightforward colour corrector at the end of the per-channel chain — levels, saturation, hue, and the graphic operations.",
   crt:"The master display stage, shared by everything. Not a filter but a model of a screen: mask geometry, beam profile, persistence, and the output transform.",
-  overlay:"Drawn over the finished picture: mattes, bezel, glass, dirt and framing guides.",
+  overlay:"Everything between the picture and the eye: the lens, the glass in front of the screen, the panel itself, and the deck's own burnt-in display. Not effects on the signal, but artefacts of whatever it is being watched through.",
   lab:"Techniques from the open-source glitch canon, rebuilt: sparse line jitter, NTSC crosstalk, slitscan, bit crush, moire, and video-rate field modulation.",
   audio:"Sets what the audio-reactive mod sources listen to: each band's frequency range and gain, the input device, and the response time.",
   lfo:"Rates and shapes for the four LFOs, plus tempo and the sync divisions.",
@@ -1982,7 +2348,8 @@ let mixBlend = 0, mixBlend2 = 0, mixBlendM = 0;
 let mixKey = 0,   mixKey2 = 0,   mixKeyM = 0;
 /* the mixer shader has one set of uniform names; each bus feeds it its own params */
 const MIXP = ["abMix","wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue","pipX","pipY","pipSize","pipBorder",
-              "edgeAmt","edgeWidth","edgeHold","edgeSwirl","edgeChroma","edgeCreep"];
+              "edgeAmt","edgeWidth","edgeHold","edgeSwirl","edgeChroma","edgeCreep",
+              "wipeBord","wipeBordCol","wipeRep","mixKeyGain","mixKeyDens","mixKeyEdge","mixKeyEdgeCol","mixKeyShadow","mixDirt","mixDirtRate","mixDirtDrop","mixDirtCut","mixDirtKnock","mixDirtNoise"];
 const MIXP_EDGE = 13;   /* index of edgeAmt inside a bus's parameter list */
 /* which channel feeds each side of each bus — any channel can meet any other */
 const busSrc = {b1:["A","B"], b2:["C","D"]};
@@ -1995,9 +2362,11 @@ let multiView = false;
 const MIXBUS = {
   b1: MIXP,
   b2: ["cdMix","wipeSoft2","wipeDetail2","wipeX2","wipeY2","mixKeyThresh2","mixKeySoft2","mixKeyInv2","mixKeyHue2","pipX2","pipY2","pipSize2","pipBorder2",
-       "edgeAmt2","edgeWidth2","edgeHold2","edgeSwirl2","edgeChroma2","edgeCreep2"],
+       "edgeAmt2","edgeWidth2","edgeHold2","edgeSwirl2","edgeChroma2","edgeCreep2",
+       "wipeBord2","wipeBordCol2","wipeRep2","mixKeyGain2","mixKeyDens2","mixKeyEdge2","mixKeyEdgeCol2","mixKeyShadow2","mixDirt2","mixDirtRate2","mixDirtDrop2","mixDirtCut2","mixDirtKnock2","mixDirtNoise2"],
   bM: ["busMix","wipeSoftM","wipeDetailM","wipeXM","wipeYM","mixKeyThreshM","mixKeySoftM","mixKeyInvM","mixKeyHueM","pipXM","pipYM","pipSizeM","pipBorderM",
-       "edgeAmtM","edgeWidthM","edgeHoldM","edgeSwirlM","edgeChromaM","edgeCreepM"]
+       "edgeAmtM","edgeWidthM","edgeHoldM","edgeSwirlM","edgeChromaM","edgeCreepM",
+       "wipeBordM","wipeBordColM","wipeRepM","mixKeyGainM","mixKeyDensM","mixKeyEdgeM","mixKeyEdgeColM","mixKeyShadowM","mixDirtM","mixDirtRateM","mixDirtDropM","mixDirtCutM","mixDirtKnockM","mixDirtNoiseM"]
 };
 let fbWrap = 0;        // 0 clamp 1 repeat 2 mirror
 let fbMirror = 0;      // 0 none 1 H 2 V 3 quad
@@ -2008,6 +2377,11 @@ let fbTap = 0;         // 0 pre-display  1 post-display (rescan)
 let flowField = 0;     // FLOW field: 0 motion 1 contour 2 curl-noise 3 radial 4 spiral 5 chroma 6 weave
 let flowEdge = 0;      // FLOW edge: 0 clamp 1 repeat 2 mirror
 let outModel = 0;      // display model index
+/* the deck's burnt-in display: which transport symbol, and whether a date
+   stamp is drawn with it */
+let osdMode = 1;       // 0 REC  1 PLAY  2 PAUSE  3 STOP  4 FF  5 REW
+let osdDate = 0;       // 0 none 1 date 2 date + time
+let osdCounter = 0;    // running tape counter, seconds
 let edgeMode = 0;          // frame edge: 0=black 1=tile 2=mirror
 let showKeyMatte = false;  // keyer matte viewer
 

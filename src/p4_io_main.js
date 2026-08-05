@@ -130,6 +130,8 @@ for(const [name, base, tog] of FBK){
 
 PRESETS.push(["MELT \u00b7 CIRCLE BLEED", {"chan": {"A": {"genFreqX": 0.09, "genFreqY": 0.06, "genPhase": 0, "genRate": 0.05, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.08, "genSpread": 1.2, "genSat": 0.85, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.35, "chromaDelay": 0, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1.15, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.35, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}, "B": {"genFreqX": 0.34, "genFreqY": 0.2, "genPhase": 0, "genRate": 0.09, "genFM": 0.55, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.62, "genSpread": 1.5, "genSat": 0.9, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0.35, "contourBands": 8, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.5, "chromaDelay": 0.2, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1.3, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.4, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}, "C": {"genFreqX": 0.18, "genFreqY": 0.12, "genPhase": 0, "genRate": 0.08, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.55, "genSpread": 1, "genSat": 0.9, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.25, "chromaDelay": 0, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.15, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}, "D": {"genFreqX": 0.18, "genFreqY": 0.12, "genPhase": 0, "genRate": 0.08, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.55, "genSpread": 1, "genSat": 0.9, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.25, "chromaDelay": 0, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.15, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}}, "master": {"abMix": 0.52, "wipeSoft": 0.06, "wipeDetail": 0.3, "wipeX": 0, "wipeY": 0, "mixKeyThresh": 0.5, "mixKeySoft": 0.2, "mixKeyInv": 0, "mixKeyHue": 0.33, "pipX": 0.45, "pipY": -0.45, "pipSize": 0.35, "pipBorder": 0.12, "edgeAmt": 0.62, "edgeWidth": 0.3, "edgeHold": 0.86, "edgeSwirl": 0.25, "edgeChroma": 0.65, "edgeCreep": 0.7, "cdMix": 0, "wipeSoft2": 0.03, "wipeDetail2": 0.3, "wipeX2": 0, "wipeY2": 0, "mixKeyThresh2": 0.5, "mixKeySoft2": 0.2, "mixKeyInv2": 0, "mixKeyHue2": 0.33, "pipX2": 0.45, "pipY2": -0.45, "pipSize2": 0.35, "pipBorder2": 0.12, "edgeAmt2": 0, "edgeWidth2": 0.3, "edgeHold2": 0.6, "edgeSwirl2": 0, "edgeChroma2": 0.5, "edgeCreep2": 0.35, "busMix": 0, "wipeSoftM": 0.03, "wipeDetailM": 0.3, "wipeXM": 0, "wipeYM": 0, "mixKeyThreshM": 0.5, "mixKeySoftM": 0.2, "mixKeyInvM": 0, "mixKeyHueM": 0.33, "pipXM": 0.45, "pipYM": -0.45, "pipSizeM": 0.35, "pipBorderM": 0.12, "edgeAmtM": 0, "edgeWidthM": 0.3, "edgeHoldM": 0.6, "edgeSwirlM": 0, "edgeChromaM": 0.5, "edgeCreepM": 0.35, "morph": 0, "scanlines": 0.28, "beamWidth": 1, "beamShape": 0.5, "aperture": 0.12, "maskDark": 0.5, "curvature": 0.28, "cornerRound": 0.2, "vignette": 0.35, "bloom": 0.25, "bloomRad": 0.4, "halation": 0.2, "defocus": 0, "grain": 0, "outGamma": 1, "outBright": 0, "outContrast": 1, "outSat": 1, "outWarmth": 0, "blackLevel": 0, "whiteClip": 1, "phosphor": 0, "hvSag": 0, "letterbox": 0, "pillarbox": 0, "bezel": 0, "glassRefl": 0, "dust": 0, "scratches": 0, "ovMoire": 0, "rollShutter": 0, "safeArea": 0}, "routes": [{"ch": "A", "src": "lfo1", "dst": "wipeX", "amt": 0.35}, {"ch": "A", "src": "lfo3", "dst": "edgeSwirl", "amt": 0.5}, {"ch": "A", "src": "lfo2", "dst": "abMix", "amt": 0.12}], "audioCfg": {"bass": {"lo": 30, "hi": 150, "gain": 1}, "mid": {"lo": 300, "hi": 2200, "gain": 1}, "high": {"lo": 4000, "hi": 11000, "gain": 1}, "response": 0.5}, "fbTrailMode": false, "rescanMode": false, "keyChroma": false, "mixMode": 5, "edgeMode": 0, "wipeInv": false, "activeChan": "A", "linkChans": false, "mixMode2": 0, "wipeInv2": false, "mixModeM": 0, "wipeInvM": false, "mixBlend": 0, "mixBlend2": 0, "mixBlendM": 0, "mixKey": 0, "mixKey2": 0, "mixKeyM": 0, "fbWrap": 0, "fbMirror": 0, "fbBlend": 0, "fbNL": 0, "fbInvert": false, "fbTap": 0, "outModel": 0, "fieldSrc": 0, "flowField": 0, "flowEdge": 0, "chainOrder": ["sig", "col", "glitch", "lab", "flow"], "stageEnabled": {"sig": true, "col": true, "glitch": true, "lab": true, "flow": true}, "busSrc": {"b1": ["A", "B"], "b2": ["C", "D"]}, "genMode": {"A": {"shape": 1, "wave": 0, "col": 2}, "B": {"shape": 2, "wave": 2, "col": 1}, "C": {"shape": 0, "wave": 0, "col": 1}, "D": {"shape": 0, "wave": 0, "col": 1}}, "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "C": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}, "D": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}}, "srcText": {"A": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "B": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "C": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "D": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}}, "mods": [{"id": "lfo1", "type": "lfo", "name": "LFO 1", "rate": 0.05, "shape": "sine", "phase": 0.46354626282197164, "snh": 0, "sync": 0}, {"id": "lfo2", "type": "lfo", "name": "LFO 2", "rate": 0.11, "shape": "tri", "phase": 0.9169826661389351, "snh": 0, "sync": 0}, {"id": "lfo3", "type": "lfo", "name": "LFO 3", "rate": 0.037, "shape": "sine2", "phase": 0.4304286177016956, "snh": 0, "sync": 0}, {"id": "lfo4", "type": "lfo", "name": "LFO 4", "rate": 5.495408738576246, "shape": "sine", "phase": 0.055445735688429365, "snh": 0, "sync": 0}, {"id": "lfo5", "type": "lfo", "name": "LFO 5", "rate": 0.016982436524617443, "shape": "tri", "phase": 0.0670557549083246, "snh": 0, "sync": 0}, {"id": "lfo6", "type": "lfo", "name": "LFO 6", "rate": 0.8912509381337456, "shape": "saw", "phase": 0.5590496733908549, "snh": 0, "sync": 0}, {"id": "lfo7", "type": "lfo", "name": "LFO 7", "rate": 3.0902954325135905, "shape": "sqr", "phase": 0.08658904215108909, "snh": 0, "sync": 0}, {"id": "lfo8", "type": "lfo", "name": "LFO 8", "rate": 0.1288249551693134, "shape": "drift", "phase": 0.38726246081341276, "snh": 0, "sync": 0}]}, null]);
 
+PRESETS.push(["DIRTY MIXER \u00b7 CROSSBAR FAULT", {"chan": {"A": {"genFreqX": 0.14, "genFreqY": 0.07, "genPhase": 0, "genRate": 0.08, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.12, "genSpread": 1.25, "genSat": 0.9, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.55, "chromaDelay": 0.3, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.25, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1.2, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.3, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}, "B": {"genFreqX": 0.3, "genFreqY": 0.22, "genPhase": 0, "genRate": 0.08, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.62, "genSpread": 1, "genSat": 0.9, "genBright": 1, "genBands": 7, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0.3, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.25, "chromaDelay": 0, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1.25, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.15, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}, "C": {"genFreqX": 0.18, "genFreqY": 0.12, "genPhase": 0, "genRate": 0.08, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.55, "genSpread": 1, "genSat": 0.9, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.25, "chromaDelay": 0, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.15, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}, "D": {"genFreqX": 0.18, "genFreqY": 0.12, "genPhase": 0, "genRate": 0.08, "genFM": 0, "genFold": 0, "genPulse": 0.5, "genComp": 0, "genThresh": 0.5, "genSoft": 0.12, "genFoldN": 4, "genZoom": 0, "genRot": 0, "genSkew": 0, "genCX": 0, "genCY": 0, "genWarp": 0, "genHue": 0.55, "genSpread": 1, "genSat": 0.9, "genBright": 1, "genBands": 6, "flipMode": 0, "mirrorMode": 0, "multiN": 1, "srcZoom": 0, "srcX": 0, "srcY": 0, "srcRot": 0, "kaleido": 0, "kaleidoN": 3, "kaleidoRot": 0, "kaleidoX": 0, "kaleidoY": 0, "echo": 0, "delayF": 3, "stutter": 0, "strobe": 0, "shake": 0, "shakeRate": 0.5, "contour": 0, "contourBands": 10, "contourWidth": 1.2, "contourHue": 0, "contourFill": 0.25, "lumaSteps": 0, "stepCount": 5, "dither": 0, "sparseJit": 0, "jitThresh": 0.7, "ntscArt": 0, "ntscFringe": 0, "snow": 0, "snowAniso": 0.4, "fmAmt": 0, "fmCarrier": 0.35, "slitscan": 0, "slitDir": 0, "bitCrush": 0, "bitScale": 0.4, "bandKey": 0, "bandN": 5, "bandHue": 0.3, "rowSmear": 0, "moire": 0, "moireFreq": 0.4, "fieldMod": 0, "fieldHue": 0, "fieldWarp": 0, "pixelSort": 0, "sortThresh": 0.45, "blockShift": 0, "blockSize": 0.35, "dotify": 0, "dotSize": 0.4, "driftWarp": 0, "fmWarp": 0, "mosh": 0, "moshGate": 0, "moshVec": 0, "flowGain": 1, "flowCurl": 0, "melt": 0, "meltDir": 0, "meltGate": 0, "swirl": 0, "swirlScale": 0.18, "swirlSpeed": 0.08, "moshBlock": 0, "moshBlockSize": 0.68, "moshRate": 0.13, "flowStretch": 0, "flowRepel": 0, "flowNoise": 0, "flowSharp": 0, "flowHue": 0, "flowFade": 0, "timeGrad": 0, "shearAxis": 0, "keyThresh": 0.5, "keySoft": 0.2, "keyInv": 0, "keyHue": 0.33, "keyFx": 0, "keyFb": 0, "colorize": 0, "colorBands": 1.5, "colorSweep": 0.15, "lumaHue": 0, "sharpEcho": 0, "echoSpace": 0.3, "rgbSep": 0, "invFlick": 0, "fbAmount": 0, "fbZoom": 0, "fbRotate": 0, "fbHue": 0, "fbShiftX": 0, "fbShiftY": 0, "fbShearX": 0, "fbShearY": 0, "fbGainR": 1, "fbGainG": 1, "fbGainB": 1, "fbSat": 1, "fbVal": 1, "fbPost": 0, "fbChromOff": 0, "fbBlur": 0, "fbBlur2": 0, "fbSharp": 0, "fbDrive": 1, "fbPivot": 0.5, "fbThresh": 0, "fbThreshSoft": 0.05, "fbNoise": 0, "fbNoiseScale": 0.5, "fbRoll": 0, "fbJitter": 0, "fbAuto": 0, "chromaBleed": 0.25, "chromaDelay": 0, "lumaBleed": 0, "bleedDir": 0.5, "vBleed": 0, "rainbow": 0.1, "dotCrawl": 0.1, "ringing": 0.15, "signalNoise": 0.05, "chromaNoise": 0.05, "hWobble": 0.05, "wobbleFreq": 0.2, "tear": 0, "tearSize": 0.4, "vRoll": 0, "jitter": 0.1, "humBar": 0.1, "tapeSpeed": 0, "tracking": 0, "trackPhase": 0, "trackHunt": 0, "dropout": 0, "dropoutLen": 0.35, "chromaLoss": 0, "crease": 0, "creasePos": 0.5, "headClog": 0, "azimuth": 0, "headSwitch": 0.3, "tapeWow": 0.15, "wowRate": 0.25, "flutter": 0, "tapeStretch": 0, "edgeDmg": 0, "printThru": 0, "hiss": 0, "stillNoise": 0, "shuttleNz": 0, "genLoss": 0.1, "genCount": 1, "rGain": 1, "gGain": 1, "bGain": 1, "saturation": 1, "hue": 0, "brightness": 0, "contrast": 1, "posterize": 0, "solarize": 0, "glow": 0.15, "negative": 0, "negMode": 0, "monoCol": 0, "monoHue": 0.55, "colorPass": 0, "passHue": 0, "passWidth": 0.25, "silhouette": 0, "silThresh": 0.45, "silHue": 0.08, "findEdge": 0, "edgeHue": 0.45, "emboss": 0, "embossDir": 0.12}}, "master": {"abMix": 0.5, "wipeSoft": 0.05, "wipeDetail": 0.3, "wipeX": 0, "wipeY": 0, "mixKeyThresh": 0.5, "mixKeySoft": 0.2, "mixKeyInv": 0, "mixKeyHue": 0.33, "pipX": 0.45, "pipY": -0.45, "pipSize": 0.35, "pipBorder": 0.12, "edgeAmt": 0.3, "edgeWidth": 0.22, "edgeHold": 0.7, "edgeSwirl": 0, "edgeChroma": 0.5, "edgeCreep": 0.5, "wipeBord": 0.3, "wipeBordCol": 0.14, "wipeRep": 1, "mixKeyGain": 0.5, "mixKeyDens": 1, "mixKeyEdge": 0, "mixKeyEdgeCol": 0, "mixKeyShadow": 0, "mixDirt": 0.7, "mixDirtRate": 0.45, "mixDirtDrop": 0.8, "mixDirtCut": 0.55, "mixDirtKnock": 0.7, "mixDirtNoise": 0.5, "cdMix": 0, "wipeSoft2": 0.03, "wipeDetail2": 0.3, "wipeX2": 0, "wipeY2": 0, "mixKeyThresh2": 0.5, "mixKeySoft2": 0.2, "mixKeyInv2": 0, "mixKeyHue2": 0.33, "pipX2": 0.45, "pipY2": -0.45, "pipSize2": 0.35, "pipBorder2": 0.12, "edgeAmt2": 0, "edgeWidth2": 0.3, "edgeHold2": 0.6, "edgeSwirl2": 0, "edgeChroma2": 0.5, "edgeCreep2": 0.35, "wipeBord2": 0, "wipeBordCol2": 0, "wipeRep2": 1, "mixKeyGain2": 0.5, "mixKeyDens2": 1, "mixKeyEdge2": 0, "mixKeyEdgeCol2": 0, "mixKeyShadow2": 0, "mixDirt2": 0, "mixDirtRate2": 0.3, "mixDirtDrop2": 0.5, "mixDirtCut2": 0.4, "mixDirtKnock2": 0.5, "mixDirtNoise2": 0.35, "busMix": 0, "wipeSoftM": 0.03, "wipeDetailM": 0.3, "wipeXM": 0, "wipeYM": 0, "mixKeyThreshM": 0.5, "mixKeySoftM": 0.2, "mixKeyInvM": 0, "mixKeyHueM": 0.33, "pipXM": 0.45, "pipYM": -0.45, "pipSizeM": 0.35, "pipBorderM": 0.12, "edgeAmtM": 0, "edgeWidthM": 0.3, "edgeHoldM": 0.6, "edgeSwirlM": 0, "edgeChromaM": 0.5, "edgeCreepM": 0.35, "wipeBordM": 0, "wipeBordColM": 0, "wipeRepM": 1, "mixKeyGainM": 0.5, "mixKeyDensM": 1, "mixKeyEdgeM": 0, "mixKeyEdgeColM": 0, "mixKeyShadowM": 0, "mixDirtM": 0, "mixDirtRateM": 0.3, "mixDirtDropM": 0.5, "mixDirtCutM": 0.4, "mixDirtKnockM": 0.5, "mixDirtNoiseM": 0.35, "morph": 0, "scanlines": 0.32, "beamWidth": 1, "beamShape": 0.5, "aperture": 0.12, "maskDark": 0.5, "curvature": 0.3, "cornerRound": 0.2, "vignette": 0.4, "bloom": 0.3, "bloomRad": 0.4, "halation": 0.25, "defocus": 0, "grain": 0.2, "outGamma": 1, "outBright": 0, "outContrast": 1, "outSat": 1, "outWarmth": 0, "blackLevel": 0, "whiteClip": 1, "phosphor": 0, "hvSag": 0, "letterbox": 0, "pillarbox": 0, "bezel": 0, "glassRefl": 0, "dust": 0, "scratches": 0, "ovMoire": 0, "rollShutter": 0, "safeArea": 0, "lensDist": 0, "lensCA": 0.3, "lensStreak": 0, "streakHue": 1, "lensSmudge": 0, "lightLeak": 0.2, "leakHue": 0.05, "gateWeave": 0, "gateHair": 0, "lcdGrid": 0, "stuckPix": 0, "osdShow": 0.9, "osdSize": 1, "osdGlow": 0.6}, "routes": [{"ch": "A", "src": "lfo1", "dst": "abMix", "amt": 0.45}, {"ch": "A", "src": "lfo4", "dst": "mixDirt", "amt": 0.3}], "audioCfg": {"bass": {"lo": 30, "hi": 150, "gain": 1}, "mid": {"lo": 300, "hi": 2200, "gain": 1}, "high": {"lo": 4000, "hi": 11000, "gain": 1}, "response": 0.5}, "fbTrailMode": false, "rescanMode": false, "keyChroma": false, "mixMode": 1, "edgeMode": 0, "wipeInv": false, "activeChan": "A", "linkChans": false, "mixMode2": 0, "wipeInv2": false, "mixModeM": 0, "wipeInvM": false, "mixBlend": 2, "mixBlend2": 0, "mixBlendM": 0, "mixKey": 0, "mixKey2": 0, "mixKeyM": 0, "fbWrap": 0, "fbMirror": 0, "fbBlend": 0, "fbNL": 0, "fbInvert": false, "fbTap": 0, "outModel": 0, "osdMode": 0, "osdDate": 2, "fieldSrc": 0, "flowField": 0, "flowEdge": 0, "chainOrder": ["sig", "col", "glitch", "lab", "flow"], "stageEnabled": {"sig": true, "col": true, "glitch": true, "lab": true, "flow": true}, "busSrc": {"b1": ["A", "B"], "b2": ["C", "D"]}, "genMode": {"A": {"shape": 0, "wave": 0, "col": 2}, "B": {"shape": 7, "wave": 3, "col": 4}, "C": {"shape": 0, "wave": 0, "col": 1}, "D": {"shape": 0, "wave": 0, "col": 1}}, "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "C": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}, "D": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}}, "srcText": {"A": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "B": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "C": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "D": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}}, "mods": [{"id": "lfo1", "type": "lfo", "name": "LFO 1", "rate": 0.06, "shape": "tri", "phase": 0.8253412995992825, "snh": 0, "sync": 0}, {"id": "lfo2", "type": "lfo", "name": "LFO 2", "rate": 1.6982436524617444, "shape": "snh", "phase": 0.12453162469815826, "snh": 0, "sync": 0}, {"id": "lfo3", "type": "lfo", "name": "LFO 3", "rate": 0.0707945784384138, "shape": "tri", "phase": 0.9578821927416256, "snh": 0, "sync": 0}, {"id": "lfo4", "type": "lfo", "name": "LFO 4", "rate": 0.13, "shape": "snh", "phase": 0.32377943033823176, "snh": 0, "sync": 0}, {"id": "lfo5", "type": "lfo", "name": "LFO 5", "rate": 0.016982436524617443, "shape": "tri", "phase": 0.6386992951546443, "snh": 0, "sync": 0}, {"id": "lfo6", "type": "lfo", "name": "LFO 6", "rate": 0.8912509381337456, "shape": "saw", "phase": 0.27703329526621123, "snh": 0, "sync": 0}, {"id": "lfo7", "type": "lfo", "name": "LFO 7", "rate": 3.0902954325135905, "shape": "sqr", "phase": 0.18160376469231443, "snh": 0, "sync": 0}, {"id": "lfo8", "type": "lfo", "name": "LFO 8", "rate": 0.1288249551693134, "shape": "drift", "phase": 0.2055807543055579, "snh": 0, "sync": 0}]}, null]);
+
 function applyState(bases, rts, extra, chOnly){
   if(typeof cancelGlide === "function") cancelGlide();
   /* a preset's flat value map loads into the target channel (default: active) plus master */
@@ -320,7 +322,7 @@ function captureState(){
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
     mixMode2, wipeInv2, mixModeM, wipeInvM,
     mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
-    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc, flowField, flowEdge,
+    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
@@ -357,7 +359,7 @@ function restoreState(st){
   if(st.wipeInv !== undefined) wipeInv = st.wipeInv;
   if(st.wipeInv2 !== undefined) wipeInv2 = st.wipeInv2;
   if(st.wipeInvM !== undefined) wipeInvM = st.wipeInvM;
-  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","fieldSrc","flowField","flowEdge","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM","mixKey","mixKey2","mixKeyM"]){
+  for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbTap","outModel","osdMode","osdDate","fieldSrc","flowField","flowEdge","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM","mixKey","mixKey2","mixKeyM"]){
     if(st[k] !== undefined) eval(k+" = st."+k);
   }
   if(st.fbInvert !== undefined) fbInvert = st.fbInvert;
@@ -433,6 +435,7 @@ function initPatch(){
   fbTrailMode=false; rescanMode=false; keyChroma=false;
   mixMode=0; edgeMode=0; showKeyMatte=false; wipeInv=false; linkChans=false;
   fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbTap=0; outModel=0; fieldSrc=0; flowField=0; flowEdge=0;
+  osdMode=1; osdDate=0;
   mixMode2=0; wipeInv2=false; mixModeM=0; wipeInvM=false;
   mixBlend=mixBlend2=mixBlendM=0; mixKey=mixKey2=mixKeyM=0;
   { const lb=document.getElementById("btnLinkChans"); if(lb) lb.classList.remove("on"); }
@@ -466,7 +469,7 @@ document.getElementById("btnSave").onclick = ()=>{
     fbTrailMode, rescanMode, keyChroma, mixMode, edgeMode, wipeInv, activeChan, linkChans,
     mixMode2, wipeInv2, mixModeM, wipeInvM,
     mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
-    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, fieldSrc, flowField, flowEdge,
+    fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
@@ -527,6 +530,10 @@ function cur(){ return SRC[activeChan]; }
 const fileIn = document.getElementById("fileIn");
 document.getElementById("btnFile").onclick = ()=>{ fileIn.accept="video/*"; fileIn.dataset.chan = activeChan; fileIn.click(); };
 fileIn.onchange = ()=>{ if(fileIn.files[0]) handleFile(fileIn.files[0], fileIn.dataset.chan || activeChan); fileIn.value=""; };
+{
+  const afi = document.getElementById("audioFileIn");
+  if(afi) afi.onchange = ()=>{ if(afi.files[0]) loadAudioFile(afi.files[0]); afi.value=""; };
+}
 
 function handleFile(f, ch){
   ch = ch || activeChan;
@@ -550,17 +557,98 @@ function handleFile(f, ch){
       toast("This browser can't decode that codec — try Chrome, or convert to H.264/WebM", true);
   }, 3500);
 }
+/* Camera and capture inputs. Anything the operating system presents as a
+   camera turns up here: a built-in webcam, a USB one, an HDMI capture stick,
+   and virtual cameras from streaming software. The browser withholds device
+   names until camera access has been granted once, which is why the list
+   reads DEVICE 1 / DEVICE 2 the first time and properly after that. */
+let camDeviceId = "";
+async function listCamDevices(){
+  try{
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    return devs.filter(d=>d.kind==="videoinput");
+  }catch(e){ return []; }
+}
+async function refreshCamDevUI(){
+  const sel = document.getElementById("selCamDev");
+  if(!sel) return;
+  const devs = await listCamDevices();
+  const cur = sel.value;
+  sel.innerHTML = "";
+  const o0 = document.createElement("option"); o0.value=""; o0.textContent="DEFAULT CAMERA"; sel.appendChild(o0);
+  devs.forEach((dv,i)=>{
+    const o = document.createElement("option"); o.value = dv.deviceId;
+    o.textContent = (dv.label || ("DEVICE "+(i+1))).toUpperCase().slice(0,32);
+    sel.appendChild(o);
+  });
+  sel.value = (cur && [...sel.options].some(o=>o.value===cur)) ? cur : camDeviceId;
+}
+async function openCam(ch){
+  const S = SRC[ch];
+  stopCam(ch);
+  const vc = camDeviceId ? {deviceId:{exact:camDeviceId}, width:{ideal:1920}, height:{ideal:1080}}
+                         : {width:{ideal:1920}, height:{ideal:1080}};
+  S.cam = await navigator.mediaDevices.getUserMedia({video:vc, audio:false});
+  S.video.srcObject = S.cam; S.video.muted = true;
+  await S.video.play();
+  S.mode = "cam";
+  const tr = S.cam.getVideoTracks()[0];
+  S.name = (tr && tr.label) ? tr.label.slice(0,18) : "camera";
+  syncChanInputUI();
+  refreshCamDevUI();
+}
 document.getElementById("btnCam").onclick = async ()=>{
+  const ch = activeChan;
+  try{
+    await openCam(ch);
+    toast("Channel "+ch+": "+SRC[ch].name+" live");
+  }catch(e){ toast("Camera unavailable: "+e.message, true); }
+};
+{
+  const sel = document.getElementById("selCamDev");
+  if(sel){
+    sel.onmousedown = ()=>refreshCamDevUI();
+    sel.onchange = async ()=>{
+      camDeviceId = sel.value;
+      if(cur().mode === "cam"){
+        try{ await openCam(activeChan); toast("Switched capture device"); }
+        catch(e){ toast("Could not open that device: "+e.message, true); }
+      }
+    };
+    refreshCamDevUI();
+    if(navigator.mediaDevices && navigator.mediaDevices.addEventListener)
+      navigator.mediaDevices.addEventListener("devicechange", refreshCamDevUI);
+  }
+}
+/* Screen, window or tab capture. This is the general-purpose way in: anything
+   running on the machine that is not a camera - another application, a browser
+   tab, a whole desktop - arrives through here. */
+document.getElementById("btnScreen").onclick = async ()=>{
   const ch = activeChan, S = SRC[ch];
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
+    toast("This browser cannot capture the screen", true); return;
+  }
   try{
     stopCam(ch);
-    S.cam = await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280}, height:{ideal:720}}, audio:false});
+    S.cam = await navigator.mediaDevices.getDisplayMedia({
+      video:{frameRate:{ideal:60}}, audio:false});
     S.video.srcObject = S.cam; S.video.muted = true;
     await S.video.play();
-    S.mode = "cam"; S.name = "webcam";
+    S.mode = "cam";
+    const tr = S.cam.getVideoTracks()[0];
+    S.name = "screen";
+    if(tr) tr.addEventListener("ended", ()=>{
+      if(SRC[ch].mode === "cam" && SRC[ch].name === "screen"){
+        SRC[ch].mode = "pattern"; SRC[ch].name = "pattern"; syncChanInputUI();
+        toast("Channel "+ch+": screen capture stopped");
+      }
+    });
     syncChanInputUI();
-    toast("Channel "+ch+": webcam live");
-  }catch(e){ toast("Webcam unavailable: "+e.message, true); }
+    toast("Channel "+ch+": screen capture live");
+  }catch(e){
+    if(e && e.name === "NotAllowedError") toast("Screen capture cancelled");
+    else toast("Screen capture failed: "+(e && e.message), true);
+  }
 };
 document.getElementById("btnPat").onclick = ()=>{
   const ch = activeChan;
@@ -618,7 +706,7 @@ function syncChanInputUI(){
   const label = ch2=>{
     const T = SRC[ch2];
     if(T.mode === "file")    return T.name ? T.name.slice(0,14).toUpperCase() : "FILE";
-    if(T.mode === "cam")     return "CAM";
+    if(T.mode === "cam")     return (T.name === "screen") ? "SCREEN" : (T.name ? T.name.slice(0,12).toUpperCase() : "CAM");
     if(T.mode === "pattern") return (T.pattern||"pattern").toUpperCase();
     if(T.mode === "text")    return "TEXT";
     if(T.mode === "synth")   return "SYNTH "+GEN_SHAPES[genMode[ch2].shape];
@@ -789,7 +877,7 @@ function setDock(t){
     t = dockTab === "text" ? "matrix" : dockTab;
   }
   dockTab = t;
-  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", perform:"performdock"};
+  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", audio:"audiodock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);
     if(el) el.classList.toggle("on", k===t);
@@ -800,6 +888,7 @@ function setDock(t){
                             : t==="text" ? "typing here never triggers shortcuts"
                             : t==="perform" ? "shift and a number recalls a snapshot \u00b7 Q W E R T Y hold the pads"
                             : t==="mix" ? "the faders themselves are on the strip under the picture"
+                            : t==="audio" ? "band ranges decide what each modulator is listening for"
                             : "patch sources into any parameter";
   if(t==="text") syncTextEditor();
   refreshDockTabs();
@@ -1965,6 +2054,7 @@ function renderFrame(now, dt){
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, prevTex || blackTex);
     gl.uniform1i(U(progMIX,"u_prev"), 2);
     gl.uniform1f(U(progMIX,"u_hasPrev"), prevTex?1:0);
+    gl.uniform1f(U(progMIX,"u_time"), now);
     setParamUniforms(progMIX, "A");
     for(let i=0;i<MIXP.length;i++) gl.uniform1f(U(progMIX,"u_"+MIXP[i]), mCur[ids[i]]);
     draw();
@@ -2004,6 +2094,7 @@ function renderFrame(now, dt){
     return;
   }
 
+  if(mCur.osdShow > 0.003) updateOSD(now, dt);
   /* CRT -> screen */
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0,0,canvas.width,canvas.height);
@@ -2016,6 +2107,8 @@ function renderFrame(now, dt){
   gl.uniform1f(U(progCRT,"u_outModel"), outModel);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, persistA.tex);
   gl.uniform1i(U(progCRT,"u_persist"), 1);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, osdTex);
+  gl.uniform1i(U(progCRT,"u_osd"), 2);
   gl.uniform1f(U(progCRT,"u_hasPersist"), mCur.phosphor>0.003?1:0);
   setParamUniforms(progCRT, "A");
   draw();
@@ -2045,6 +2138,95 @@ function renderFrame(now, dt){
 
   frameEnd(now, dt);
 }
+/* ---------------- the deck's on-screen display ----------------
+   Every consumer machine burnt its own state into the picture: a transport
+   symbol, a counter that ran whether or not anything was recorded, and on the
+   camcorders a date stamp that half the world forgot to set. It is drawn on a
+   2D canvas rather than in the shader because it is type, and type wants a
+   font. The canvas only redraws when what it says changes. */
+const OSD_W = 960, OSD_H = 540;
+const osdCanvas = document.createElement("canvas");
+osdCanvas.width = OSD_W; osdCanvas.height = OSD_H;
+const osdCtx = osdCanvas.getContext("2d");
+const osdTex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, osdTex);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,0]));
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+const OSD_MODES = ["REC", "PLAY", "PAUSE", "STOP", "FF", "REW"];
+let osdLast = "", osdBlink = 0;
+function osdCount(t){
+  const h = Math.floor(t/3600), m = Math.floor(t/60)%60, sec = Math.floor(t)%60;
+  const p2 = n=>(n<10?"0":"")+n;
+  return p2(h)+":"+p2(m)+":"+p2(sec);
+}
+let osdPrevNow = -1;
+function updateOSD(now, dt){
+  /* wall time, not the render delta: a tape counter that slows down because the
+     machine is busy is a counter nobody can trust */
+  const rdt = (osdPrevNow >= 0) ? Math.max(0, Math.min(1, now - osdPrevNow)) : 0;
+  osdPrevNow = now;
+  /* the counter only runs on the transports that would move the tape */
+  if(osdMode === 0 || osdMode === 1) osdCounter += rdt;
+  else if(osdMode === 4) osdCounter += rdt*7;
+  else if(osdMode === 5) osdCounter = Math.max(0, osdCounter - rdt*7);
+  osdBlink = Math.floor(now*1.4) % 2;
+  const mode = OSD_MODES[osdMode] || "PLAY";
+  const d = new Date();
+  const p2 = n=>(n<10?"0":"")+n;
+  const datestr = osdDate === 0 ? ""
+    : osdDate === 1 ? (p2(d.getDate())+"." + p2(d.getMonth()+1) + "." + d.getFullYear())
+    : (p2(d.getDate())+"." + p2(d.getMonth()+1) + "." + d.getFullYear() + "  " + p2(d.getHours())+":"+p2(d.getMinutes()));
+  const key = mode+"|"+osdCount(osdCounter)+"|"+datestr+"|"+mCur.osdSize.toFixed(2)+"|"+osdBlink;
+  if(key === osdLast) return;
+  osdLast = key;
+  const g = osdCtx;
+  g.clearRect(0,0,OSD_W,OSD_H);
+  const sc = mCur.osdSize;
+  const fs = Math.round(30*sc);
+  g.font = "700 "+fs+"px ui-monospace, 'SF Mono', Menlo, Consolas, monospace";
+  g.textBaseline = "top";
+  const ink = "#f3e14a";
+  const pad = Math.round(34*sc);
+  g.shadowColor = "rgba(0,0,0,0.85)";
+  g.shadowBlur = 0; g.shadowOffsetX = Math.round(2*sc); g.shadowOffsetY = Math.round(2*sc);
+  g.fillStyle = ink;
+  /* transport symbol, drawn rather than typed so it reads as a machine glyph */
+  let x = pad;
+  const y = pad, sz = fs*0.72;
+  const tri = (ox, flip)=>{
+    g.beginPath();
+    if(flip){ g.moveTo(ox+sz,y+fs*0.16); g.lineTo(ox+sz,y+fs*0.16+sz); g.lineTo(ox,y+fs*0.16+sz*0.5); }
+    else { g.moveTo(ox,y+fs*0.16); g.lineTo(ox,y+fs*0.16+sz); g.lineTo(ox+sz,y+fs*0.16+sz*0.5); }
+    g.closePath(); g.fill();
+  };
+  if(osdMode === 0){
+    if(osdBlink){
+      g.beginPath(); g.arc(x+sz*0.5, y+fs*0.16+sz*0.5, sz*0.5, 0, 6.2832); g.fill();
+    }
+    x += sz*1.5;
+  } else if(osdMode === 1){ tri(x,false); x += sz*1.5; }
+  else if(osdMode === 2){
+    g.fillRect(x, y+fs*0.16, sz*0.3, sz);
+    g.fillRect(x+sz*0.55, y+fs*0.16, sz*0.3, sz);
+    x += sz*1.5;
+  } else if(osdMode === 3){ g.fillRect(x, y+fs*0.16, sz, sz); x += sz*1.5; }
+  else if(osdMode === 4){ tri(x,false); tri(x+sz*0.75,false); x += sz*2.2; }
+  else { tri(x,true); tri(x+sz*0.75,true); x += sz*2.2; }
+  const label = (osdMode === 0 && !osdBlink) ? "" : mode;
+  g.fillText(label, x, y);
+  g.fillText(osdCount(osdCounter), OSD_W - pad - g.measureText("00:00:00").width, y);
+  if(datestr){
+    g.fillText(datestr, OSD_W - pad - g.measureText(datestr).width, OSD_H - pad - fs);
+  }
+  g.shadowOffsetX = 0; g.shadowOffsetY = 0;
+  gl.bindTexture(gl.TEXTURE_2D, osdTex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,osdCanvas);
+}
+
 function frameEnd(now, dt){
   if(offline) return;
   const S = cur();

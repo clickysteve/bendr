@@ -314,8 +314,25 @@ document.getElementById("btnPresetDel").onclick = ()=>{
 loadUserPresets();
 rebuildPresetList();
 
-function randomizeAll(){
-  pushHistory();
+/* What a roll is allowed to touch. Randomize used to be all-or-nothing across
+   whatever LINK happened to be set to, which is the wrong granularity for
+   building a mix: most of the time you want to roll one channel against three
+   you have already settled, or roll the processing without losing the source
+   you spent five minutes finding. */
+const rndOpts = {scope:"link", keepSrc:false, keepMod:false, keepMix:false};
+/* the sections that describe what the channel is looking at, rather than what
+   is being done to it */
+const SRC_SECS = new Set(["gen","frame"]);
+
+function rndTargets(){
+  if(rndOpts.scope === "active") return [activeChan];
+  if(rndOpts.scope === "all") return CHANNELS.slice();
+  return linkChans ? CHANNELS.slice() : [activeChan];
+}
+/* One roll of the dice for one channel. Kept separate from the apply so ALL
+   FOUR can roll each channel independently and get four different patches
+   rather than four copies of one. */
+function rollChannel(ch){
   const bases = {};
   for(const p of PLIST){
     let v;
@@ -341,40 +358,79 @@ function randomizeAll(){
       if(p.min<0 && Math.random()<0.5) v = -v*0.8;
       v = Math.min(p.max, Math.max(p.min, v));
     }
+    /* KEEP SOURCE: hold the pattern synth and the framing where they are, so
+       what the channel is looking at survives the roll */
+    if(rndOpts.keepSrc && SRC_SECS.has(p.sec)) v = getBase(p.id, p.master ? undefined : ch);
     bases[p.id]=v;
   }
-  const nR = 2+Math.floor(Math.random()*4);
-  const rts = [];
-  for(let i=0;i<nR;i++){
-    rts.push({
-      src: MODSRC[Math.floor(Math.random()*7)].id,   // LFOs + chaos/drift/spike
-      dst: PLIST[Math.floor(Math.random()*PLIST.length)].id,
-      amt: (Math.random()*2-1)*0.55,
-    });
+  return bases;
+}
+function randomizeAll(){
+  pushHistory();
+  const targets = rndTargets();
+  /* ALL FOUR rolls each channel separately, so you get four different patches
+     to mix between. LINK means "these channels are the same channel", which is
+     what it means everywhere else, so it rolls once and copies. */
+  const perChannel = rndOpts.scope === "all";
+  let shared = perChannel ? null : rollChannel(targets[0]);
+  for(const ch of targets){
+    const bases = perChannel ? rollChannel(ch) : shared;
+    for(const p of CLIST) chanBase[ch][p.id] = bases[p.id];
+    /* master is shared, so it is rolled once rather than four times over the
+       top of itself */
+    if(ch === targets[0] && !rndOpts.keepMix){
+      for(const p of MLIST) if(!SRC_SECS.has(p.sec)) mBase[p.id] = bases[p.id];
+    }
   }
-  if(Math.random()<0.35){
-    const arr = chainOrder.slice();
-    for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
-    chainOrder = arr;
+  if(!rndOpts.keepMod){
+    const nR = 2+Math.floor(Math.random()*4);
+    const rts = [];
+    for(let i=0;i<nR;i++){
+      rts.push({
+        ch: targets[Math.floor(Math.random()*targets.length)],
+        src: MODSRC[Math.floor(Math.random()*7)].id,   // LFOs + chaos/drift/spike
+        dst: PLIST[Math.floor(Math.random()*PLIST.length)].id,
+        amt: (Math.random()*2-1)*0.55,
+      });
+    }
+    /* only the routes belonging to the channels being rolled are replaced,
+       so randomizing one channel cannot silently unpatch another */
+    routes = routes.filter(r=>targets.indexOf(r.ch||"A") < 0).concat(rts);
+    for(const m of mods){
+      if(m.type !== "lfo") continue;
+      m.rate = Math.pow(10, -1.5+Math.random()*2.2);
+      if(Math.random()<0.4) m.shape = ["sine","tri","saw","sqr","snh"][Math.floor(Math.random()*5)];
+    }
   }
-  if(Math.random()<0.5) flowField = Math.floor(Math.random()*7);
-  if(Math.random()<0.3) flowEdge = Math.floor(Math.random()*3);
-  for(const m of mods){
-    if(m.type !== "lfo") continue;
-    m.rate = Math.pow(10, -1.5+Math.random()*2.2);
-    if(Math.random()<0.4) m.shape = ["sine","tri","saw","sqr","snh"][Math.floor(Math.random()*5)];
+  if(!rndOpts.keepMix){
+    if(Math.random()<0.35){
+      const arr = chainOrder.slice();
+      for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+      chainOrder = arr;
+    }
+    if(Math.random()<0.5) flowField = Math.floor(Math.random()*7);
+    if(Math.random()<0.3) flowEdge = Math.floor(Math.random()*3);
   }
-  applyState(bases, rts);
+  if(typeof cancelGlide === "function") cancelGlide();
+  refreshUI(); renderRoutes(); refreshLfoUI();
   renderChain();
+  toast("Randomized "+(targets.length===1 ? "channel "+targets[0] : targets.join("+"))
+        + (rndOpts.keepSrc?" \u00b7 source kept":"") + (rndOpts.keepMod?" \u00b7 mod kept":"")
+        + (rndOpts.keepMix?" \u00b7 output kept":""));
 }
 function mutate(){
   pushHistory();
-  const targets = linkChans ? CHANNELS : [activeChan];
-  for(const p of CLIST) for(const ch of targets){
-    chanBase[ch][p.id] = Math.min(p.max, Math.max(p.min,
-      chanBase[ch][p.id] + (Math.random()*2-1)*0.09*(p.max-p.min)));
+  const targets = rndTargets();
+  for(const p of CLIST){
+    if(rndOpts.keepSrc && SRC_SECS.has(p.sec)) continue;
+    for(const ch of targets){
+      chanBase[ch][p.id] = Math.min(p.max, Math.max(p.min,
+        chanBase[ch][p.id] + (Math.random()*2-1)*0.09*(p.max-p.min)));
+    }
   }
-  for(const r of routes){ r.amt = Math.min(1, Math.max(-1, r.amt + (Math.random()*2-1)*0.15)); }
+  if(!rndOpts.keepMod){
+    for(const r of routes){ r.amt = Math.min(1, Math.max(-1, r.amt + (Math.random()*2-1)*0.15)); }
+  }
   refreshUI(); renderRoutes();
 }
 /* ---- undo history ---- */

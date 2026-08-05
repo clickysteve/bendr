@@ -133,6 +133,38 @@ btnPop.onclick = ()=>{
 document.getElementById("btnRnd").onclick = randomizeAll;
 document.getElementById("btnMut").onclick = mutate;
 
+/* what a roll is allowed to touch. A preference rather than part of the patch,
+   so it lives with the browser and survives a load. */
+function refreshRndOpts(){
+  const set = (id, on)=>{ const b=document.getElementById(id); if(b) b.classList.toggle("on", !!on); };
+  set("rndScopeActive", rndOpts.scope === "active");
+  set("rndScopeAll",    rndOpts.scope === "all");
+  set("rndScopeLink",   rndOpts.scope === "link");
+  set("rndKeepSrc", rndOpts.keepSrc);
+  set("rndKeepMod", rndOpts.keepMod);
+  set("rndKeepMix", rndOpts.keepMix);
+  try{ localStorage.setItem("bendr.rndopts", JSON.stringify(rndOpts)); }catch(e){}
+}
+try{
+  const saved = JSON.parse(localStorage.getItem("bendr.rndopts") || "null");
+  if(saved && typeof saved === "object"){
+    if(["active","all","link"].indexOf(saved.scope) >= 0) rndOpts.scope = saved.scope;
+    rndOpts.keepSrc = !!saved.keepSrc; rndOpts.keepMod = !!saved.keepMod; rndOpts.keepMix = !!saved.keepMix;
+  }
+}catch(e){}
+for(const [id, fn] of [
+  ["rndScopeActive", ()=>{ rndOpts.scope = "active"; }],
+  ["rndScopeAll",    ()=>{ rndOpts.scope = "all"; }],
+  ["rndScopeLink",   ()=>{ rndOpts.scope = "link"; }],
+  ["rndKeepSrc",     ()=>{ rndOpts.keepSrc = !rndOpts.keepSrc; }],
+  ["rndKeepMod",     ()=>{ rndOpts.keepMod = !rndOpts.keepMod; }],
+  ["rndKeepMix",     ()=>{ rndOpts.keepMix = !rndOpts.keepMix; }],
+]){
+  const b = document.getElementById(id);
+  if(b) b.onclick = ()=>{ fn(); refreshRndOpts(); };
+}
+refreshRndOpts();
+
 
 /* bend buttons: mouse + touch */
 for(const b of document.querySelectorAll(".bend[data-bend]")){

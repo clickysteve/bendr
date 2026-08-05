@@ -29,9 +29,12 @@ function wireMenus(){
     });
     const panel = m.querySelector(".menupanel");
     panel.addEventListener("click", e=>e.stopPropagation());
-    /* choosing from a dropdown, or pressing a button, is a decision — close up */
-    panel.addEventListener("change", ()=>{ closeMenus(); hideTip(); });
-    for(const btn of panel.querySelectorAll("button")){
+    /* choosing from a dropdown, or pressing a button, is a decision — close up.
+       A panel of toggles is not: you set two or three of them in one visit, so
+       it stays open until you click away. */
+    const sticky = m.classList.contains("sticky") || m.id === "mnuRnd";
+    panel.addEventListener("change", ()=>{ if(!sticky){ closeMenus(); hideTip(); } });
+    if(!sticky) for(const btn of panel.querySelectorAll("button")){
       btn.addEventListener("click", ()=>{ closeMenus(); hideTip(); });
     }
   }
@@ -182,7 +185,47 @@ function tapTempo(){
 }
 function updateTempoUI(){
   const el = document.getElementById("bpmVal");
-  if(el) el.textContent = bpm.toFixed(1) + ((performance.now()-extClockAt<2000)?" EXT":"");
+  /* never fight the person typing: a MIDI clock arriving mid-edit would
+     otherwise rewrite the field underneath them */
+  if(el && document.activeElement !== el) el.value = bpm.toFixed(1);
+  const ex = document.getElementById("bpmExt");
+  if(ex) ex.textContent = (performance.now()-extClockAt<2000) ? "EXT" : "";
+}
+/* Tap is how you find a tempo you can hear; typing is how you set one you
+   already know, and there is no reason a readout should refuse to be one. */
+function setTempo(v, fromField){
+  if(!isFinite(v)) return false;
+  bpm = Math.min(300, Math.max(30, v));
+  tapTimes.length = 0;          /* a typed tempo is not part of a tap series */
+  if(!fromField) updateTempoUI();
+  return true;
+}
+function initTempoField(){
+  const el = document.getElementById("bpmVal");
+  if(!el) return;
+  let held = "120.0";
+  el.addEventListener("focus", ()=>{ held = el.value; el.select(); });
+  el.addEventListener("keydown", e=>{
+    if(e.key === "Enter"){ commit(); el.blur(); return; }
+    if(e.key === "Escape"){ el.value = held; el.blur(); return; }
+    /* nudging matters more than it sounds: matching a record by ear is a
+       sequence of small corrections, not one typed number */
+    if(e.key === "ArrowUp" || e.key === "ArrowDown"){
+      e.preventDefault();
+      const step = e.shiftKey ? 0.1 : 1;
+      const cur = parseFloat(el.value);
+      if(setTempo((isFinite(cur)?cur:bpm) + (e.key==="ArrowUp"?step:-step))) el.value = bpm.toFixed(1);
+      return;
+    }
+    e.stopPropagation();        /* the field owns its own keys while focused */
+  });
+  el.addEventListener("blur", commit);
+  function commit(){
+    const v = parseFloat(el.value.replace(/[^0-9.\-]/g, ""));
+    if(!setTempo(v, true)) { el.value = bpm.toFixed(1); return; }
+    el.value = bpm.toFixed(1);
+    held = el.value;
+  }
 }
 let routes = [];   // {src, dst, amt}
 const chaosState = {cur:0, target:0, timer:0};
@@ -1149,6 +1192,7 @@ function buildPanel(){
   {
     const tap = document.getElementById("btnTap");
     if(tap) tap.onclick = tapTempo;
+    initTempoField();
     updateTempoUI();
   }
   buildAudioSection();

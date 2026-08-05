@@ -41,6 +41,9 @@ body{
 .menu{position:relative;}
 .menubtn{letter-spacing:1.5px;}
 .menubtn i{font-style:normal; color:var(--dim); font-size:9px;}
+#mnuRnd .menubtn{padding:4px 6px; margin-left:-4px; color:var(--dim);}
+#mnuRnd .menupanel{min-width:210px;}
+.menupanel .mrow2 button.on{background:rgba(46,230,214,.2); border-color:var(--cyan); color:var(--cyan);}
 .menu.open .menubtn{background:var(--panel2); border-color:var(--amber); color:#fff;}
 .menupanel{
   display:none; position:absolute; top:calc(100% + 7px); left:0; z-index:60;
@@ -551,7 +554,19 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 #btnHelpTop{padding:3px 9px; font-size:11px; line-height:1; margin-left:2px;}
 #tempobox{display:flex; align-items:center; gap:5px; margin-left:4px;}
 #tempobox button{padding:4px 9px; font-size:9px; letter-spacing:1.5px;}
-#tempobox #bpmVal{font-size:10px; color:var(--amber); min-width:52px; letter-spacing:1px;}
+#tempobox #bpmVal{
+  font:inherit; font-size:10px; color:var(--amber); width:44px; letter-spacing:1px;
+  background:transparent; border:1px solid transparent; border-radius:2px;
+  padding:2px 3px; text-align:right; cursor:text; -moz-appearance:textfield;
+  /* the header sets user-select:none so dragging the chrome does not select it;
+     a field you cannot select text in is not a field */
+  user-select:text; -webkit-user-select:text;
+}
+#tempobox #bpmVal:hover{border-color:var(--line);}
+#tempobox #bpmVal:focus{outline:none; border-color:var(--amber); background:rgba(255,176,46,.08); color:var(--amber);}
+#tempobox #bpmVal::-webkit-outer-spin-button,
+#tempobox #bpmVal::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
+#tempobox #bpmExt{font-size:8px; letter-spacing:1px; color:var(--cyan); min-width:20px;}
 #beatLed{
   width:7px; height:7px; border-radius:50%; background:#2a2a34;
   box-shadow:inset 0 0 0 1px var(--line); flex:0 0 auto;
@@ -820,8 +835,8 @@ body.nomix #mixbuses{display:none;}
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
   <span id="ver" title="Build version">v35.0</span>
   <button id="btnHelpTop" data-tip="The manual: what everything is, why it behaves the way it does, and every keyboard shortcut. Also on the H key.">?</button>
-  <div id="tempobox" data-tip="Tap four times in time and the tempo follows. Any modulator with a sync division locks to it, and incoming MIDI clock overrides it automatically.">
-    <button id="btnTap">TAP</button><span id="beatLed"></span><span id="bpmVal">120.0</span>
+  <div id="tempobox" data-tip="Tap four times in time and the tempo follows, or type the number straight into the readout \u2014 click it, type, press Enter. Up and down arrows nudge it by one, with shift for a tenth. Any modulator with a sync division locks to it, and incoming MIDI clock overrides it automatically.">
+    <button id="btnTap">TAP</button><span id="beatLed"></span><input id="bpmVal" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="120.0" aria-label="Tempo in beats per minute"><span id="bpmExt"></span>
   </div>
 
   <div class="menu" id="mnuPatch">
@@ -925,8 +940,29 @@ body.nomix #mixbuses{display:none;}
   <div class="hsep"></div>
   <select id="selPreset" data-tip="Sixty-six starting points. Presets load into the channel you are editing (or all of them with LINK on). Keyboard 1-9 for the first nine."></select>
 
-  <button id="btnRnd" class="cy" data-tip="Rolls a whole new patch: every parameter, a handful of new mod routes, new LFO rates, sometimes a new chain order. Weighted so the results are usable rather than uniformly random. Z undoes it. Keyboard: space.">RANDOMIZE</button>
-  <button id="btnMut" class="cy" data-tip="Nudges every control on this channel by a small random amount instead of replacing them. Press it repeatedly to drift somewhere new without losing what you have. Keyboard: M.">MUTATE</button>
+  <button id="btnRnd" class="cy" data-tip="Rolls a whole new patch: every parameter, a handful of new mod routes, new LFO rates, sometimes a new chain order. Weighted so the results are usable rather than uniformly random. What it is allowed to touch is set in the menu beside it. Z undoes it. Keyboard: space.">RANDOMIZE</button>
+  <div class="menu" id="mnuRnd">
+    <button class="menubtn" id="btnRndOpts" data-tip="What randomize and mutate are allowed to touch: which channels, and whether the source survives.">&#9662;</button>
+    <div class="menupanel">
+      <div class="mlabel">CHANNELS</div>
+      <div class="mrow2">
+        <button id="rndScopeActive" data-tip="Randomize only the channel you are editing, and leave the other three exactly as they are. This is how you build a mix one channel at a time.">THIS CHANNEL</button>
+        <button id="rndScopeAll" data-tip="Randomize all four channels at once, each with its own roll, so they come out different from each other rather than identical.">ALL FOUR</button>
+      </div>
+      <div class="mrow2">
+        <button id="rndScopeLink" data-tip="Follow the LINK button: linked, every channel gets the same roll and they come out identical; unlinked, only the channel you are editing changes. This is the behaviour randomize has always had.">FOLLOW LINK</button>
+      </div>
+      <div class="mlabel">KEEP</div>
+      <div class="mrow2">
+        <button id="rndKeepSrc" data-tip="Leave the source alone: the pattern synth, its shape and waveform, and the framing. Only the processing is rolled, so whatever you have loaded or built stays put and you hear the same picture through a new chain.">SOURCE</button>
+        <button id="rndKeepMod" data-tip="Leave the modulation alone: the mod routes and the LFO rates and shapes survive the roll, so the movement you have set up keeps running against new parameters.">MODULATION</button>
+      </div>
+      <div class="mrow2">
+        <button id="rndKeepMix" data-tip="Leave the mixer, the display and the overlay alone. These are already mostly protected; this also holds the chain order still.">OUTPUT + CHAIN</button>
+      </div>
+    </div>
+  </div>
+  <button id="btnMut" class="cy" data-tip="Nudges every control on this channel by a small random amount instead of replacing them. Press it repeatedly to drift somewhere new without losing what you have. Obeys the same CHANNELS and KEEP settings as randomize. Keyboard: M.">MUTATE</button>
 
   <div class="spacer"></div>
   <button id="btnMulti" data-tip="Multiview: all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors. The channel you are editing gets the hot border. Keyboard: V.">MULTI</button>
@@ -1181,7 +1217,7 @@ body.nomix #mixbuses{display:none;}
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
   <h3>SOURCES</h3>
   <p>Each channel takes a video file (streamed from disk, so file size does not matter), a camera, a screen, a generated pattern, the pattern synth, a text page, or re-entry from elsewhere in the rig. <b>CAM</b> opens whatever is chosen in the device list above it: a built-in webcam, a USB one, an HDMI capture stick, or a virtual camera from streaming software. Device names only appear once camera access has been granted, so the list reads DEVICE 1, DEVICE 2 until the first time you press CAM. <b>SCREEN</b> captures a screen, a window or a browser tab, which is the general way to bring in anything that is not a camera.</p>
-  <p>The audio-reactive modulators listen on the <b>AUDIO</b> tab of the dock: the soundtrack of the video in channel A, a live input (with device and channel selection for interfaces), or an audio file you load there and play. Loading a file is how you build a piece against the track it will actually be shown with. The three band ranges, their gains and the response speed are on the same tab, and the tempo used by synced modulators is the TAP button in the header.</p>
+  <p>The audio-reactive modulators listen on the <b>AUDIO</b> tab of the dock: the soundtrack of the video in channel A, a live input (with device and channel selection for interfaces), or an audio file you load there and play. Loading a file is how you build a piece against the track it will actually be shown with. The three band ranges, their gains and the response speed are on the same tab, and the tempo used by synced modulators is the TAP button in the header, whose readout can also be typed into directly.</p>
 
   <h3>MIXER, MORPH, KEYER &amp; TIME BASE</h3>
   <p>Each of the three <b>MIXERS</b> gets the same twenty modes: a plain fade, twelve wipe patterns (H, V, diagonal, box, circle, splits, blinds, clock, bars, blocks) with soft edges and a movable origin, luma and chroma key transitions, and add / difference / multiply / screen / lighten blends. Run the fader like a T-bar. <b>PRESET MORPH</b> is different: STORE A and STORE B snapshot the whole control panel, then MORPH A&gt;B blends every slider between the two snapshots (LFO it for auto-evolution; moving any slider takes that control back). The <b>KEYER</b> selects part of the image by brightness (or hue) — turn on VIEW MATTE to see the selection in white, then KEY&gt;FX applies the glitch chain only inside it, KEY&gt;FB grows feedback only inside it. <b>TIME BASE</b> is a bent frame store: ECHO blends in frames from the past (modulate DELAY for time-scrub), STUTTER freezes and repeats. <b>RESCAN: FULL</b> feeds the CRT output (scanlines, curvature and all) back through the whole chain like a camera pointed at a monitor.</p>
@@ -1190,9 +1226,10 @@ body.nomix #mixbuses{display:none;}
   <h3>MODULATION</h3>
   <p><b>Right-click any parameter</b> to patch a modulator straight onto it, adjust the amount, or remove it. The <b>MOD</b> button (or <kbd>D</kbd>) opens the modulation page: every source drawn live, LFO rate/shape/sync editable in place, and each card lists what it's driving.</p>
   <h3>TEMPO &amp; MIDI</h3>
-  <p>TAP sets the tempo; LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
+  <p>TAP sets the tempo, or click the number beside it and type one — Enter commits, Escape reverts, and the arrow keys nudge by one beat, or a tenth with shift. LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
   <h3>FINDING YOUR WAY AROUND</h3>
   <p>The top bar holds four menus \u2014 PATCH, SOURCE, ENGINE, OUTPUT \u2014 and everything you touch mid-performance stays out in the open: the preset list, RANDOMIZE and MUTATE, BEND and MOD to fold those panes in and out, and MULTI, BYPASS, REC, POP OUT and FULL on the right.</p>
+  <p><b>RANDOMIZE</b> has a small caret beside it that decides what a roll is allowed to touch. <b>THIS CHANNEL</b> rolls only the channel you are editing and leaves the other three alone, which is how you build a mix one channel at a time; <b>ALL FOUR</b> rolls each of them separately so they come out different from each other; <b>FOLLOW LINK</b> is the old behaviour, where LINK decides. Under KEEP: <b>SOURCE</b> holds the pattern synth and the framing still, so whatever you have loaded or built survives and only the processing is rolled; <b>MODULATION</b> holds the routes and the LFOs; <b>OUTPUT + CHAIN</b> holds the mixer, the display, the overlay and the stage order. MUTATE obeys the same settings, and the choices are remembered between sessions.</p>
   <p>The panel is in two zones, with the mixers themselves on the strip under the picture rather than in the sidebar. <b>CHANNEL &middot; SIGNAL PATH</b> holds everything belonging to the selected channel, in the order the signal actually travels &mdash; source, framing, frame store, feedback, then the reorderable stages, then the keyer &mdash; and it is the only zone you can rearrange, by dragging the handle on the left of a section. <b>FOLLOW CHAIN</b> in that zone's header re-sorts it to match whatever order you have dragged the stages into on the rail above the picture, and RESET puts it back. <b>MASTER OUT</b> is pinned at the bottom. Above all of it is the filter: press <kbd>/</kbd> and type, and the panel narrows to whatever matches &mdash; the parameter name, its section, or the body of its help text, so &ldquo;roll&rdquo; finds V ROLL and a phrase from a description finds the control it describes. Two chips beside it answer the other two questions you have while playing: <b>MOVING</b> shows only what something is currently driving, <b>CHANGED</b> shows only what you have moved off its default.</p>
   <p>Hover any parameter name and you get a description of what it does and enough of the mechanism to know why it behaves the way it does. The same works on section headers, mode buttons, the bend pads and the menus. To reset one control, double-click its slider or press the <b>&#8634;</b> that appears when you hover the row; shift-clicking that takes it to the bottom of its range instead. RESET at the top of a section does the whole section, INIT does everything. Sections in the channel zone drag by the handle on the left to reorder, and the order is remembered.</p>
   <h3>IF SOMETHING GETS STUCK</h3>
@@ -4515,9 +4552,12 @@ function wireMenus(){
     });
     const panel = m.querySelector(".menupanel");
     panel.addEventListener("click", e=>e.stopPropagation());
-    /* choosing from a dropdown, or pressing a button, is a decision — close up */
-    panel.addEventListener("change", ()=>{ closeMenus(); hideTip(); });
-    for(const btn of panel.querySelectorAll("button")){
+    /* choosing from a dropdown, or pressing a button, is a decision — close up.
+       A panel of toggles is not: you set two or three of them in one visit, so
+       it stays open until you click away. */
+    const sticky = m.classList.contains("sticky") || m.id === "mnuRnd";
+    panel.addEventListener("change", ()=>{ if(!sticky){ closeMenus(); hideTip(); } });
+    if(!sticky) for(const btn of panel.querySelectorAll("button")){
       btn.addEventListener("click", ()=>{ closeMenus(); hideTip(); });
     }
   }
@@ -4668,7 +4708,47 @@ function tapTempo(){
 }
 function updateTempoUI(){
   const el = document.getElementById("bpmVal");
-  if(el) el.textContent = bpm.toFixed(1) + ((performance.now()-extClockAt<2000)?" EXT":"");
+  /* never fight the person typing: a MIDI clock arriving mid-edit would
+     otherwise rewrite the field underneath them */
+  if(el && document.activeElement !== el) el.value = bpm.toFixed(1);
+  const ex = document.getElementById("bpmExt");
+  if(ex) ex.textContent = (performance.now()-extClockAt<2000) ? "EXT" : "";
+}
+/* Tap is how you find a tempo you can hear; typing is how you set one you
+   already know, and there is no reason a readout should refuse to be one. */
+function setTempo(v, fromField){
+  if(!isFinite(v)) return false;
+  bpm = Math.min(300, Math.max(30, v));
+  tapTimes.length = 0;          /* a typed tempo is not part of a tap series */
+  if(!fromField) updateTempoUI();
+  return true;
+}
+function initTempoField(){
+  const el = document.getElementById("bpmVal");
+  if(!el) return;
+  let held = "120.0";
+  el.addEventListener("focus", ()=>{ held = el.value; el.select(); });
+  el.addEventListener("keydown", e=>{
+    if(e.key === "Enter"){ commit(); el.blur(); return; }
+    if(e.key === "Escape"){ el.value = held; el.blur(); return; }
+    /* nudging matters more than it sounds: matching a record by ear is a
+       sequence of small corrections, not one typed number */
+    if(e.key === "ArrowUp" || e.key === "ArrowDown"){
+      e.preventDefault();
+      const step = e.shiftKey ? 0.1 : 1;
+      const cur = parseFloat(el.value);
+      if(setTempo((isFinite(cur)?cur:bpm) + (e.key==="ArrowUp"?step:-step))) el.value = bpm.toFixed(1);
+      return;
+    }
+    e.stopPropagation();        /* the field owns its own keys while focused */
+  });
+  el.addEventListener("blur", commit);
+  function commit(){
+    const v = parseFloat(el.value.replace(/[^0-9.\-]/g, ""));
+    if(!setTempo(v, true)) { el.value = bpm.toFixed(1); return; }
+    el.value = bpm.toFixed(1);
+    held = el.value;
+  }
 }
 let routes = [];   // {src, dst, amt}
 const chaosState = {cur:0, target:0, timer:0};
@@ -5635,6 +5715,7 @@ function buildPanel(){
   {
     const tap = document.getElementById("btnTap");
     if(tap) tap.onclick = tapTempo;
+    initTempoField();
     updateTempoUI();
   }
   buildAudioSection();
@@ -7312,8 +7393,25 @@ document.getElementById("btnPresetDel").onclick = ()=>{
 loadUserPresets();
 rebuildPresetList();
 
-function randomizeAll(){
-  pushHistory();
+/* What a roll is allowed to touch. Randomize used to be all-or-nothing across
+   whatever LINK happened to be set to, which is the wrong granularity for
+   building a mix: most of the time you want to roll one channel against three
+   you have already settled, or roll the processing without losing the source
+   you spent five minutes finding. */
+const rndOpts = {scope:"link", keepSrc:false, keepMod:false, keepMix:false};
+/* the sections that describe what the channel is looking at, rather than what
+   is being done to it */
+const SRC_SECS = new Set(["gen","frame"]);
+
+function rndTargets(){
+  if(rndOpts.scope === "active") return [activeChan];
+  if(rndOpts.scope === "all") return CHANNELS.slice();
+  return linkChans ? CHANNELS.slice() : [activeChan];
+}
+/* One roll of the dice for one channel. Kept separate from the apply so ALL
+   FOUR can roll each channel independently and get four different patches
+   rather than four copies of one. */
+function rollChannel(ch){
   const bases = {};
   for(const p of PLIST){
     let v;
@@ -7339,40 +7437,79 @@ function randomizeAll(){
       if(p.min<0 && Math.random()<0.5) v = -v*0.8;
       v = Math.min(p.max, Math.max(p.min, v));
     }
+    /* KEEP SOURCE: hold the pattern synth and the framing where they are, so
+       what the channel is looking at survives the roll */
+    if(rndOpts.keepSrc && SRC_SECS.has(p.sec)) v = getBase(p.id, p.master ? undefined : ch);
     bases[p.id]=v;
   }
-  const nR = 2+Math.floor(Math.random()*4);
-  const rts = [];
-  for(let i=0;i<nR;i++){
-    rts.push({
-      src: MODSRC[Math.floor(Math.random()*7)].id,   // LFOs + chaos/drift/spike
-      dst: PLIST[Math.floor(Math.random()*PLIST.length)].id,
-      amt: (Math.random()*2-1)*0.55,
-    });
+  return bases;
+}
+function randomizeAll(){
+  pushHistory();
+  const targets = rndTargets();
+  /* ALL FOUR rolls each channel separately, so you get four different patches
+     to mix between. LINK means "these channels are the same channel", which is
+     what it means everywhere else, so it rolls once and copies. */
+  const perChannel = rndOpts.scope === "all";
+  let shared = perChannel ? null : rollChannel(targets[0]);
+  for(const ch of targets){
+    const bases = perChannel ? rollChannel(ch) : shared;
+    for(const p of CLIST) chanBase[ch][p.id] = bases[p.id];
+    /* master is shared, so it is rolled once rather than four times over the
+       top of itself */
+    if(ch === targets[0] && !rndOpts.keepMix){
+      for(const p of MLIST) if(!SRC_SECS.has(p.sec)) mBase[p.id] = bases[p.id];
+    }
   }
-  if(Math.random()<0.35){
-    const arr = chainOrder.slice();
-    for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
-    chainOrder = arr;
+  if(!rndOpts.keepMod){
+    const nR = 2+Math.floor(Math.random()*4);
+    const rts = [];
+    for(let i=0;i<nR;i++){
+      rts.push({
+        ch: targets[Math.floor(Math.random()*targets.length)],
+        src: MODSRC[Math.floor(Math.random()*7)].id,   // LFOs + chaos/drift/spike
+        dst: PLIST[Math.floor(Math.random()*PLIST.length)].id,
+        amt: (Math.random()*2-1)*0.55,
+      });
+    }
+    /* only the routes belonging to the channels being rolled are replaced,
+       so randomizing one channel cannot silently unpatch another */
+    routes = routes.filter(r=>targets.indexOf(r.ch||"A") < 0).concat(rts);
+    for(const m of mods){
+      if(m.type !== "lfo") continue;
+      m.rate = Math.pow(10, -1.5+Math.random()*2.2);
+      if(Math.random()<0.4) m.shape = ["sine","tri","saw","sqr","snh"][Math.floor(Math.random()*5)];
+    }
   }
-  if(Math.random()<0.5) flowField = Math.floor(Math.random()*7);
-  if(Math.random()<0.3) flowEdge = Math.floor(Math.random()*3);
-  for(const m of mods){
-    if(m.type !== "lfo") continue;
-    m.rate = Math.pow(10, -1.5+Math.random()*2.2);
-    if(Math.random()<0.4) m.shape = ["sine","tri","saw","sqr","snh"][Math.floor(Math.random()*5)];
+  if(!rndOpts.keepMix){
+    if(Math.random()<0.35){
+      const arr = chainOrder.slice();
+      for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+      chainOrder = arr;
+    }
+    if(Math.random()<0.5) flowField = Math.floor(Math.random()*7);
+    if(Math.random()<0.3) flowEdge = Math.floor(Math.random()*3);
   }
-  applyState(bases, rts);
+  if(typeof cancelGlide === "function") cancelGlide();
+  refreshUI(); renderRoutes(); refreshLfoUI();
   renderChain();
+  toast("Randomized "+(targets.length===1 ? "channel "+targets[0] : targets.join("+"))
+        + (rndOpts.keepSrc?" \u00b7 source kept":"") + (rndOpts.keepMod?" \u00b7 mod kept":"")
+        + (rndOpts.keepMix?" \u00b7 output kept":""));
 }
 function mutate(){
   pushHistory();
-  const targets = linkChans ? CHANNELS : [activeChan];
-  for(const p of CLIST) for(const ch of targets){
-    chanBase[ch][p.id] = Math.min(p.max, Math.max(p.min,
-      chanBase[ch][p.id] + (Math.random()*2-1)*0.09*(p.max-p.min)));
+  const targets = rndTargets();
+  for(const p of CLIST){
+    if(rndOpts.keepSrc && SRC_SECS.has(p.sec)) continue;
+    for(const ch of targets){
+      chanBase[ch][p.id] = Math.min(p.max, Math.max(p.min,
+        chanBase[ch][p.id] + (Math.random()*2-1)*0.09*(p.max-p.min)));
+    }
   }
-  for(const r of routes){ r.amt = Math.min(1, Math.max(-1, r.amt + (Math.random()*2-1)*0.15)); }
+  if(!rndOpts.keepMod){
+    for(const r of routes){ r.amt = Math.min(1, Math.max(-1, r.amt + (Math.random()*2-1)*0.15)); }
+  }
   refreshUI(); renderRoutes();
 }
 /* ---- undo history ---- */
@@ -8465,6 +8602,38 @@ btnPop.onclick = ()=>{
 /* big performance randomize/mutate pads */
 document.getElementById("btnRnd").onclick = randomizeAll;
 document.getElementById("btnMut").onclick = mutate;
+
+/* what a roll is allowed to touch. A preference rather than part of the patch,
+   so it lives with the browser and survives a load. */
+function refreshRndOpts(){
+  const set = (id, on)=>{ const b=document.getElementById(id); if(b) b.classList.toggle("on", !!on); };
+  set("rndScopeActive", rndOpts.scope === "active");
+  set("rndScopeAll",    rndOpts.scope === "all");
+  set("rndScopeLink",   rndOpts.scope === "link");
+  set("rndKeepSrc", rndOpts.keepSrc);
+  set("rndKeepMod", rndOpts.keepMod);
+  set("rndKeepMix", rndOpts.keepMix);
+  try{ localStorage.setItem("bendr.rndopts", JSON.stringify(rndOpts)); }catch(e){}
+}
+try{
+  const saved = JSON.parse(localStorage.getItem("bendr.rndopts") || "null");
+  if(saved && typeof saved === "object"){
+    if(["active","all","link"].indexOf(saved.scope) >= 0) rndOpts.scope = saved.scope;
+    rndOpts.keepSrc = !!saved.keepSrc; rndOpts.keepMod = !!saved.keepMod; rndOpts.keepMix = !!saved.keepMix;
+  }
+}catch(e){}
+for(const [id, fn] of [
+  ["rndScopeActive", ()=>{ rndOpts.scope = "active"; }],
+  ["rndScopeAll",    ()=>{ rndOpts.scope = "all"; }],
+  ["rndScopeLink",   ()=>{ rndOpts.scope = "link"; }],
+  ["rndKeepSrc",     ()=>{ rndOpts.keepSrc = !rndOpts.keepSrc; }],
+  ["rndKeepMod",     ()=>{ rndOpts.keepMod = !rndOpts.keepMod; }],
+  ["rndKeepMix",     ()=>{ rndOpts.keepMix = !rndOpts.keepMix; }],
+]){
+  const b = document.getElementById(id);
+  if(b) b.onclick = ()=>{ fn(); refreshRndOpts(); };
+}
+refreshRndOpts();
 
 
 /* bend buttons: mouse + touch */

@@ -133,6 +133,14 @@ Each channel takes a video file (streamed from disk, so a 4GB file is no heavier
 
 **CAM** opens whatever is selected in the device list beside it, so a built-in webcam, a USB one, an HDMI capture stick and a virtual camera from streaming software all work the same way. Device names only appear once camera access has been granted, so the list reads DEVICE 1, DEVICE 2 until the first time CAM is pressed. **SCREEN** captures a screen, a window or a browser tab, which is the general way to bring in anything that is not a camera.
 
+## Finding things, and not losing them
+
+There are 349 parameters. Press `/` and type, and the panel narrows to whatever matches — the parameter's name, its section, or the body of its help text, so "roll" finds V ROLL and a phrase from a description finds the control it describes. Two chips beside the box answer the other two questions you have while playing: **MOVING** shows only what something is currently driving, and **CHANGED** shows only what you have moved off its default.
+
+The six bend pads have their own strip beside the faders rather than living on a tab, because you should never have to go looking for them mid-set.
+
+The patch, the eight snapshots and the current take are written to the browser every few seconds, so a reload, a crash or a flat battery picks up where you left off. Press `Z` straight after opening if you would rather start clean.
+
 ## Movement
 
 Nothing sits still. The mod matrix patches any source into any parameter:
@@ -160,7 +168,9 @@ Six momentary bend pads (mouse, `Q W E R T Y`, or MIDI notes C1–F1), MIDI CC l
 
 ## Keys
 
-`Space` randomize · `M` mutate · `Z` undo · `1–9` presets · `shift`+`1–8` snapshots · `Q W E R T Y` hold bends · `B` bypass · `V` multiview · `F` fullscreen · `S` snapshot · `R` record · `P` play/pause · `H` help
+`/` filter the panel · `Space` randomize · `M` mutate · `Z` undo · `shift`+`Z` redo · `1–9` presets · `shift`+`1–8` snapshots · `0` flush buffers · `Q W E R T Y` hold bends · `B` bypass · `V` multiview · `F` fullscreen · `S` still · `shift`+`R` record · `P` play/pause · `D` mod page · `H` help
+
+`0` is the panic key: it empties every buffer that feeds itself — the feedback store, the flow stage, the phosphor persistence and the frame ring — without touching a single control. That is the way out when a bad frame gets caught circulating.
 
 ## Development
 

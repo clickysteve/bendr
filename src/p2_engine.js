@@ -555,7 +555,9 @@ const FS_SIG = COMMON + KEYFN +
 "     round to the opposite edge, so the bleed fades out at the sides */\n" +
 "  float iqw = 0.0;\n" +
 "  for(int i=0;i<9;i++){\n" +
-"    float fi = float(i)-2.5;\n" +
+    /* nine taps, so the window has to be centred on -4.0. At -2.5 the centre
+       of mass sat 1.5 taps right and the chroma slid sideways as it spread. */
+"    float fi = float(i)-4.0;\n" +
 "    vec2 tp = suv + vec2(fi*spread*px - cdel, 0.0);\n" +
 "    float inb = step(0.0, tp.x)*step(tp.x, 1.0);\n" +
 "    iq += rgb2yiq(texture(u_tex, clamp(tp, 0.0, 1.0)).rgb).yz * inb;\n" +
@@ -2453,6 +2455,19 @@ const autoGain = {};
 for(const ch of CHANNELS) autoGain[ch] = 1;
 
 function freeRT(rt){ if(rt){ gl.deleteTexture(rt.tex); gl.deleteFramebuffer(rt.fbo); } }
+/* allocate a shared buffer the first time something actually needs it */
+function ensureShared(name){
+  switch(name){
+    case "busOut1":  if(!busOut1)  busOut1  = makeRT(procW,procH); return busOut1;
+    case "busOut2":  if(!busOut2)  busOut2  = makeRT(procW,procH); return busOut2;
+    case "persistA": if(!persistA) persistA = makeRT(procW,procH); return persistA;
+    case "persistB": if(!persistB) persistB = makeRT(procW,procH); return persistB;
+    case "busHist1": if(!busHist1) busHist1 = makeRT(procW,procH); return busHist1;
+    case "busHist2": if(!busHist2) busHist2 = makeRT(procW,procH); return busHist2;
+    case "mixHist":  if(!mixHist)  mixHist  = makeRT(procW,procH); return mixHist;
+  }
+  return null;
+}
 function clearRing(c){
   if(c.ring) for(const rt of c.ring) freeRT(rt);
   c.ring=null; c.ringW=0; c.ringFilled=0;
@@ -2493,8 +2508,9 @@ function flushBuffers(){
     c.flowLast = -99;
   }
   clearRT(scratch1); clearRT(scratch2); clearRT(mixOut);
-  clearRT(busOut1); clearRT(busOut2); clearRT(persistA); clearRT(persistB);
-  clearRT(busHist1); clearRT(busHist2); clearRT(mixHist);
+  if(busOut1) clearRT(busOut1); if(busOut2) clearRT(busOut2);
+  if(persistA) clearRT(persistA); if(persistB) clearRT(persistB);
+  if(busHist1) clearRT(busHist1); if(busHist2) clearRT(busHist2); if(mixHist) clearRT(mixHist);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 function allocRTs(){
@@ -2507,9 +2523,9 @@ function allocRTs(){
   freeRT(persistA); freeRT(persistB);
   freeRT(busHist1); freeRT(busHist2); freeRT(mixHist);
   scratch1 = makeRT(procW,procH); scratch2 = makeRT(procW,procH); mixOut = makeRT(procW,procH);
-  busOut1 = makeRT(procW,procH); busOut2 = makeRT(procW,procH);
-  persistA = makeRT(procW,procH); persistB = makeRT(procW,procH);
-  busHist1 = makeRT(procW,procH); busHist2 = makeRT(procW,procH); mixHist = makeRT(procW,procH);
+  /* the other six are only wanted when the feature that reads them is on. At
+     720p that hardly matters; at 2160p they are 190 MB of nothing. */
+  busOut1 = busOut2 = persistA = persistB = busHist1 = busHist2 = mixHist = null;
 }
 const MAX_TEX = gl.getParameter(gl.MAX_TEXTURE_SIZE);
 function setProcRes(h){
@@ -2569,11 +2585,27 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-function setParamUniforms(pr, ch){
-  const cc = chanCur[ch||"A"];
+/* Every pass used to walk all 349 parameters, build the string "u_"+id and
+   probe a 349-key object, to find the eight to forty-five uniforms that program
+   actually declares. That is about 110us of pure JavaScript per call and this
+   runs up to 28 times a frame. Resolve the list once, the first time a program
+   is used, and iterate that instead. */
+function paramTable(pr){
+  if(pr.ptab) return pr.ptab;
+  const t = [];
   for(const p of PLIST){
     const loc = U(pr, "u_"+p.id);
-    if(loc) gl.uniform1f(loc, p.master ? mCur[p.id] : cc[p.id]);
+    if(loc) t.push({loc, id:p.id, master:p.master});
+  }
+  pr.ptab = t;
+  return t;
+}
+function setParamUniforms(pr, ch){
+  const cc = chanCur[ch||"A"];
+  const t = pr.ptab || paramTable(pr);
+  for(let i=0;i<t.length;i++){
+    const e = t[i];
+    gl.uniform1f(e.loc, e.master ? mCur[e.id] : cc[e.id]);
   }
 }
 function draw(){ gl.drawArrays(gl.TRIANGLES, 0, 3); }

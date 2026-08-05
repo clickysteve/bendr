@@ -7,7 +7,7 @@
 <style>
 :root{
   --bg:#0a0a0e; --panel:#131318; --panel2:#191922; --line:#26262f;
-  --txt:#c9c9d4; --dim:#6d6d7c; --amber:#ff7a18; --cyan:#2ee6d6; --mag:#ff3ea5;
+  --txt:#c9c9d4; --dim:#8e8ea0; --amber:#ff7a18; --cyan:#2ee6d6; --mag:#ff3ea5;
   --red:#ff3b30; --font:"SF Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 *{box-sizing:border-box; margin:0; padding:0;}
@@ -315,6 +315,22 @@ body.nomix #mixbuses{display:none;}
   width:34px; height:22px; padding:0; border:1px solid var(--line); background:none; cursor:pointer;
 }
 /* channel selector */
+#pfilter{
+  display:flex; align-items:center; gap:5px; padding:6px 10px 7px;
+  border-bottom:1px solid var(--line); background:var(--panel2);
+  position:sticky; top:0; z-index:6;
+}
+#pfilterInput{
+  flex:1; min-width:0; padding:5px 7px; font-family:inherit; font-size:9px; letter-spacing:1px;
+  background:#0b0b0e; color:var(--txt); border:1px solid var(--line); border-radius:3px;
+}
+#pfilterInput:focus{border-color:var(--cyan); outline:none;}
+.fchip{padding:5px 7px; font-size:8px; letter-spacing:1px;}
+.fchip.on{background:rgba(46,230,214,.18); border-color:var(--cyan); color:var(--cyan);}
+#pfilterCount{font-size:8px; letter-spacing:1px; color:var(--dim); min-width:56px; text-align:right;}
+/* while filtering, a collapsed section still shows whatever matched */
+body.filtering .sec.collapsed .secbody{display:block;}
+body.filtering .sec .secbody > *:not(.prow){display:none;}
 #chanbar{
   display:flex; gap:6px; padding:8px 10px; border-bottom:1px solid var(--line);
   background:var(--panel2); position:sticky; top:0; z-index:6; flex-wrap:wrap;
@@ -454,6 +470,28 @@ body.multi #mvlabels{display:grid;}
 #dragbar::after{content:""; position:absolute; left:50%; top:2px; width:40px; height:2px; margin-left:-20px; background:#3a3a46; border-radius:1px;}
 #lower{flex:0 0 auto; display:flex; border-top:1px solid var(--line); background:var(--panel); height:250px; min-height:110px;}
 #dock{flex:1; display:flex; flex-direction:column; min-width:0;}
+/* the dock could not scroll, so anything past its height was simply unreachable */
+#dockBody{overflow-y:auto;}
+/* The six momentary pads are the most performance-critical control here and
+   they used to live at the bottom of a dock tab, off the bottom of the screen
+   at every window size. They are their own strip now, next to the faders,
+   independent of which tab is showing. */
+#bendstrip{
+  flex:0 0 auto; display:flex; align-items:stretch; gap:8px;
+  padding:5px 10px; border-top:1px solid var(--line); background:var(--panel);
+}
+#bendstrip .bendbtns{flex:1; grid-template-columns:repeat(6,1fr); max-width:none;}
+#bendstrip .bend{padding:7px 4px; font-size:9.5px;}
+#bendstrip .bend small{font-size:7.5px;}
+#bendCollapse{
+  flex:0 0 auto; display:flex; align-items:center; gap:5px;
+  padding:0 9px; font-size:8.5px; letter-spacing:1.5px; color:var(--dim);
+  background:none; border:none; cursor:pointer;
+}
+#bendCollapse i{font-style:normal; transition:transform .12s;}
+body.nobend #bendCollapse i{transform:rotate(-90deg);}
+body.nobend #bendstrip .bendbtns{display:none;}
+body.nobend #bendCollapse .mixhint{display:inline;}
 #dockTabs{
   display:flex; align-items:center; gap:5px; padding:5px 8px 4px;
   border-bottom:1px solid var(--line); background:var(--panel2);
@@ -468,7 +506,6 @@ body.multi #mvlabels{display:grid;}
   padding:8px; align-content:start; justify-content:start; overflow-y:auto;
 }
 #textdock{padding:10px 12px; overflow-y:auto;}
-#bendrow .bendbtns{grid-template-columns:repeat(6,1fr); max-width:900px;}
 #dockBody > #performdock.on{display:flex; flex-direction:column; gap:16px;}
 #pfmain{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;}
 #dockBody > #mixdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
@@ -476,14 +513,13 @@ body.multi #mvlabels{display:grid;}
 #audiodock .sec{flex:1 1 0; min-width:250px; border-bottom:none; padding:0;}
 #audiodock .sec h3{padding-top:0;}
 #performdock .sec{border-bottom:none; padding:0;}
+#btnHelpTop{padding:3px 9px; font-size:11px; line-height:1; margin-left:2px;}
 #tempobox{display:flex; align-items:center; gap:5px; margin-left:4px;}
 #tempobox button{padding:4px 9px; font-size:9px; letter-spacing:1.5px;}
 #tempobox #bpmVal{font-size:10px; color:var(--amber); min-width:52px; letter-spacing:1px;}
 
 #mixdock .sec{flex:1 1 0; min-width:230px; border-bottom:none; padding:0;}
 #mixdock .sec h3{padding-top:0;}
-#bendrow{border-top:1px solid var(--line); padding-top:10px;}
-#bendrow h4{padding-bottom:6px;}
 .pfcol{flex:0 0 auto; display:flex; flex-direction:column; gap:6px;}
 .pfcol .trow{width:100%;}
 .pfcol h4{font-size:8px; letter-spacing:2px; color:var(--dim); padding-bottom:3px;}
@@ -615,8 +651,10 @@ body.nomix #mixbuses{display:none;}
 }
 @media (max-width:900px){
   html,body{overscroll-behavior:none;}
+  /* it used to scroll sideways with no indication, hiding half the controls
+     including RANDOMIZE, BYPASS and REC off the right edge */
   #hdr{
-    height:auto; flex:0 0 auto; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden;
+    height:auto; flex:0 0 auto; flex-wrap:wrap; overflow:visible; row-gap:5px;
     gap:6px; padding:6px 8px; -webkit-overflow-scrolling:touch; scrollbar-width:none;
   }
   #hdr::-webkit-scrollbar{display:none;}
@@ -652,7 +690,9 @@ body.nomix #mixbuses{display:none;}
     order:3; flex:1 1 auto; max-height:none; flex-direction:column;
     border-top:1px solid var(--line); overflow-y:auto; padding-bottom:78px;
   }
-  #bendrow .bendbtns{grid-template-columns:repeat(3,1fr); gap:8px; max-width:none;}
+  #bendstrip{flex-wrap:wrap;}
+  #bendstrip .bendbtns{grid-template-columns:repeat(3,1fr); gap:8px; flex:1 1 100%;}
+  #bendstrip .bend{padding:14px 6px; font-size:11px;}
   #pfmain{flex-direction:column; gap:14px;}
   .bend{padding:16px 6px; font-size:11px;}
   #matrix{width:100%;}
@@ -691,7 +731,8 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v30.0</span>
+  <span id="ver" title="Build version">v31.0</span>
+  <button id="btnHelpTop" data-tip="The manual: what everything is, why it behaves the way it does, and every keyboard shortcut. Also on the H key.">?</button>
   <div id="tempobox" data-tip="Tap four times in time and the tempo follows. Any modulator with a sync division locks to it, and incoming MIDI clock overrides it automatically.">
     <button id="btnTap">TAP</button><span id="bpmVal">120.0</span>
   </div>
@@ -840,6 +881,17 @@ body.nomix #mixbuses{display:none;}
       <button id="mixCollapse" data-tip="Fold the mixer strip away when you need the height. It stays folded until you bring it back."><i>&#9662;</i>MIX<span class="mixhint">SHOW THE FADERS</span></button>
       <div id="mixbuses"></div>
     </div>
+    <div id="bendstrip">
+      <button id="bendCollapse" data-tip="Fold the bend pads away when you need the height. They stay folded until you bring them back."><i>&#9662;</i>BEND<span class="mixhint">HOLD THESE</span></button>
+      <div class="bendbtns">
+        <button class="bend" data-bend="sync" data-tip="Momentary: slams the sync circuit out of lock while held, then it recovers. Bend pads apply to the channel you are editing (all of them with LINK on).">SYNC<small>hold Q</small></button>
+        <button class="bend" data-bend="roll" data-tip="Momentary: breaks vertical hold so the picture rolls, with the blanking bar travelling through it.">ROLL<small>hold W</small></button>
+        <button class="bend" data-bend="rainbow" data-tip="Momentary: floods the picture with the enhancer's rainbow colour mapping.">RAINBOW<small>hold E</small></button>
+        <button class="bend" data-bend="drop" data-tip="Momentary: heavy tape dropout and tracking failure while held.">DROPOUT<small>hold R</small></button>
+        <button class="bend" data-bend="melt" data-tip="Momentary: the picture melts and smears through the flow stage while held.">MELT<small>hold T</small></button>
+        <button class="bend" data-bend="kill" data-tip="Momentary: total collapse - sync, tracking and vertical hold all at once.">V-HOLD<small>hold Y</small></button>
+      </div>
+    </div>
     <div id="dragbar"></div>
     <div id="lower">
       <div id="dock">
@@ -858,17 +910,6 @@ body.nomix #mixbuses{display:none;}
       <div id="audiodock"></div>
       <div id="performdock">
         <div id="pfmain"></div>
-        <div id="bendrow">
-          <h4>BEND — HOLD THESE</h4>
-          <div class="bendbtns">
-          <button class="bend" data-bend="sync" data-tip="Momentary: slams the sync circuit out of lock while held, then it recovers. Bend pads apply to the channel you are editing (all of them with LINK on).">SYNC<small>hold Q</small></button>
-          <button class="bend" data-bend="roll" data-tip="Momentary: breaks vertical hold so the picture rolls, with the blanking bar travelling through it.">ROLL<small>hold W</small></button>
-          <button class="bend" data-bend="rainbow" data-tip="Momentary: floods the picture with the enhancer's rainbow colour mapping.">RAINBOW<small>hold E</small></button>
-          <button class="bend" data-bend="drop" data-tip="Momentary: heavy tape dropout and tracking failure while held.">DROPOUT<small>hold R</small></button>
-          <button class="bend" data-bend="melt" data-tip="Momentary: the picture melts and smears through the flow stage while held.">MELT<small>hold T</small></button>
-          <button class="bend" data-bend="kill" data-tip="Momentary: total collapse - sync, tracking and vertical hold all at once.">V-HOLD<small>hold Y</small></button>
-        </div>
-        </div>
       </div>
       <div id="matrix">
         <h4>MOD MATRIX — PATCH SOURCES INTO ANY PARAMETER <button id="btnAddRoute" style="margin-left:8px; padding:2px 8px;" data-tip="Add a modulation route: pick a source, a channel, a destination parameter and an amount. Right-clicking a parameter does the same thing faster.">+ ROUTE</button></h4>
@@ -965,7 +1006,7 @@ body.nomix #mixbuses{display:none;}
   </div>
 </div>
 <div id="help"><div id="helpBox">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v30.0</span></h2>
+  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v31.0</span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once; the small selector next to it picks a target, and <b>COPY</b> writes this channel's effects onto it while <b>SWAP</b> exchanges the two outright, sources included. Any channel can reach any other, so D can be copied onto A as easily as A onto B, and shift-clicking COPY sends it to all three at once.</p>
@@ -1021,7 +1062,7 @@ body.nomix #mixbuses{display:none;}
   <p>Each route has its own <b>invert</b> and <b>response curve</b>, so one modulator can drive several parameters quite differently \u2014 one hard, one gently, one inverted, one in four steps. That is often worth more than adding another modulator.</p>
   <p><b>Right-click any parameter</b> to patch something onto it, or choose <b>ANIMATE</b> there to give it a new LFO of its own in one click. Each route in the matrix has a \u25ce that jumps to its modulator, and each modulator lists what it drives as links that jump back.</p>
   <h3>PERFORMANCE</h3>
-  <p>The dock under the picture has five tabs: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b>, <b>MIX</b> and <b>PERFORM</b>. MIX holds the detail behind each transition \u2014 wipe softness and geometry, key threshold and hue \u2014 while the faders themselves stay on the strip. PERFORM holds everything you play with while it is running \u2014 the snapshot bank, the recorder and the bend pads. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
+  <p>The dock under the picture has six tabs: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b>, <b>MIX</b>, <b>AUDIO</b> and <b>PERFORM</b>. MIX holds the detail behind each transition &mdash; wipe softness and geometry, the key levels, the melt &mdash; while the faders themselves stay on the strip. AUDIO is where the audio-reactive modulators listen: the input, an audio file with its own transport, the three band ranges and the response. PERFORM holds the snapshot bank, the performance recorder and preset morph. The six bend pads are not on a tab at all: they have their own strip beside the faders, because you should never have to go looking for them. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
   <h3>SOURCES</h3>
   <p>Each channel takes a video file (streamed from disk, so file size does not matter), a camera, a screen, a generated pattern, the pattern synth, a text page, or re-entry from elsewhere in the rig. <b>CAM</b> opens whatever is chosen in the device list above it: a built-in webcam, a USB one, an HDMI capture stick, or a virtual camera from streaming software. Device names only appear once camera access has been granted, so the list reads DEVICE 1, DEVICE 2 until the first time you press CAM. <b>SCREEN</b> captures a screen, a window or a browser tab, which is the general way to bring in anything that is not a camera.</p>
@@ -1037,12 +1078,14 @@ body.nomix #mixbuses{display:none;}
   <p>TAP sets the tempo; LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
   <h3>FINDING YOUR WAY AROUND</h3>
   <p>The top bar holds four menus \u2014 PATCH, SOURCE, ENGINE, OUTPUT \u2014 and everything you touch mid-performance stays out in the open: the preset list, RANDOMIZE and MUTATE, BEND and MOD to fold those panes in and out, and MULTI, BYPASS, REC, POP OUT and FULL on the right.</p>
-  <p>The panel is in four zones. <b>MIX</b> sits under the channel buttons and does not move: the three mixers, which are the last thing in the signal path and the first thing you reach for. <b>CHANNEL &middot; SIGNAL PATH</b> holds everything belonging to the selected channel, in the order the signal actually travels &mdash; source, framing, frame store, feedback, then the reorderable stages, then the keyer &mdash; and it is the only zone you can rearrange, by dragging the handle on the left of a section. <b>FOLLOW CHAIN</b> in that zone's header re-sorts it to match whatever order you have dragged the stages into on the rail above the picture, and RESET puts it back. <b>MASTER OUT</b> and <b>TOOLS</b> are pinned at the bottom.</p>
+  <p>The panel is in two zones, with the mixers themselves on the strip under the picture rather than in the sidebar. <b>CHANNEL &middot; SIGNAL PATH</b> holds everything belonging to the selected channel, in the order the signal actually travels &mdash; source, framing, frame store, feedback, then the reorderable stages, then the keyer &mdash; and it is the only zone you can rearrange, by dragging the handle on the left of a section. <b>FOLLOW CHAIN</b> in that zone's header re-sorts it to match whatever order you have dragged the stages into on the rail above the picture, and RESET puts it back. <b>MASTER OUT</b> is pinned at the bottom. Above all of it is the filter: press <kbd>/</kbd> and type, and the panel narrows to whatever matches &mdash; the parameter name, its section, or the body of its help text, so &ldquo;roll&rdquo; finds V ROLL and a phrase from a description finds the control it describes. Two chips beside it answer the other two questions you have while playing: <b>MOVING</b> shows only what something is currently driving, <b>CHANGED</b> shows only what you have moved off its default.</p>
   <p>Hover any parameter name and you get a description of what it does and enough of the mechanism to know why it behaves the way it does. The same works on section headers, mode buttons, the bend pads and the menus. To reset one control, double-click its slider or press the <b>&#8634;</b> that appears when you hover the row; shift-clicking that takes it to the bottom of its range instead. RESET at the top of a section does the whole section, INIT does everything. Sections in the channel zone drag by the handle on the left to reorder, and the order is remembered.</p>
   <h3>IF SOMETHING GETS STUCK</h3>
   <p>Four buffers feed themselves: the feedback store, the flow stage's frame store, the phosphor persistence and the thirty-frame ring behind ECHO. If a bad frame lands in one it circulates indefinitely and will sit there until you reload. <b>FLUSH BUFFERS</b> under ENGINE empties all four and restarts the sync model, without touching a single parameter.</p>
   <h3>KEYS</h3>
-  <p><kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>1</kbd>–<kbd>9</kbd> presets &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> snapshot &nbsp; <kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>V</kbd> multiview &nbsp; <kbd>shift</kbd>+<kbd>1</kbd>–<kbd>8</kbd> snapshots &nbsp; <kbd>H</kbd> this help</p>
+  <p><kbd>/</kbd> filter the panel &nbsp; <kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>shift</kbd>+<kbd>Z</kbd> redo &nbsp; <kbd>1</kbd>&ndash;<kbd>9</kbd> presets &nbsp; <kbd>shift</kbd>+<kbd>1</kbd>&ndash;<kbd>8</kbd> snapshots &nbsp; <kbd>0</kbd> flush buffers &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> still &nbsp; <kbd>shift</kbd>+<kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>V</kbd> multiview &nbsp; <kbd>D</kbd> mod page &nbsp; <kbd>H</kbd> this help</p>
+  <p>Hold <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd> for the six bend pads. <kbd>0</kbd> is the panic key: it empties every buffer that feeds itself &mdash; the feedback store, the flow stage, the phosphor and the frame ring &mdash; without touching a single control, which is the way out when a bad frame gets caught circulating.</p>
+  <p>Your patch, your snapshots and your take are saved to this browser every few seconds, so a reload or a crash picks up where you left off. Press <kbd>Z</kbd> straight after opening if you would rather start clean.</p>
   <h3>OUTPUT</h3>
   <p><b>STORE</b> under PATCH saves everything you have set up as a named preset, kept on this machine and listed under SAVED alongside the built-in ones; DELETE removes one. SAVE FILE and OPEN FILE move a patch between machines. <b>REC</b> captures the live output (with source audio when AUDIO=SOURCE) — MP4 where the browser supports it, WebM otherwise. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
   <p style="padding-top:10px; color:var(--dim);">Click anywhere to close.</p>

@@ -755,8 +755,71 @@ const stripInvBtns = {};
    so they are refreshed alongside rather than through uiRefs */
 const stripMelt = [];
 
+/* 349 controls in a seven-screen column, and until now no way to ask for one.
+   Matches the parameter name, its section, and the body of its help text - so
+   "roll" finds V ROLL, and "lose lock" finds the sync controls that describe
+   it. The two chips answer the other two questions you actually have live:
+   what is moving, and what have I changed. */
+let filterOn = false;
+function buildFilterBar(){
+  const bar = document.createElement("div"); bar.id = "pfilter";
+  const inp = document.createElement("input");
+  inp.type = "text"; inp.id = "pfilterInput"; inp.placeholder = "FILTER  \u2014  press /";
+  inp.spellcheck = false;
+  const mk = (label, tip)=>{
+    const b = document.createElement("button"); b.className = "fchip"; b.textContent = label;
+    attachTip(b, label, tip);
+    b.onclick = ()=>{ b.classList.toggle("on"); applyFilter(); };
+    return b;
+  };
+  const cMod = mk("MOVING", "Show only the parameters something is currently driving \u2014 a modulator, or a bend pad you are holding.");
+  const cChg = mk("CHANGED", "Show only the parameters that are away from their default on the channel you are editing.");
+  const clr = document.createElement("button"); clr.className = "fchip"; clr.textContent = "\u2715";
+  attachTip(clr, "CLEAR FILTER", "Back to the whole panel. Escape does the same.");
+  clr.onclick = ()=>{ inp.value = ""; cMod.classList.remove("on"); cChg.classList.remove("on"); applyFilter(); };
+  const count = document.createElement("span"); count.id = "pfilterCount";
+  inp.addEventListener("input", ()=>applyFilter());
+  inp.addEventListener("keydown", e=>{
+    e.stopPropagation();
+    if(e.key === "Escape"){ inp.value=""; cMod.classList.remove("on"); cChg.classList.remove("on"); applyFilter(); inp.blur(); }
+  });
+  bar.appendChild(inp); bar.appendChild(cMod); bar.appendChild(cChg); bar.appendChild(clr); bar.appendChild(count);
+  panel.appendChild(bar);
+  window.__focusFilter = ()=>{ inp.focus(); inp.select(); };
+  applyFilter = function(){
+    const q = (inp.value||"").trim().toLowerCase();
+    const modOnly = cMod.classList.contains("on"), chgOnly = cChg.classList.contains("on");
+    filterOn = !!(q || modOnly || chgOnly);
+    document.body.classList.toggle("filtering", filterOn);
+    const routed = new Set(routes.map(r=>r.dst));
+    for(const b in bendMix) if(bendMix[b] > 0.01) for(const pid in BENDS[b]) routed.add(pid);
+    let shown = 0;
+    for(const p of PLIST){
+      const r = uiRefs[p.id];
+      if(!r || !r.row || !r.row.closest("#panel")) continue;
+      let ok = true;
+      if(q) ok = p.name.toLowerCase().indexOf(q) >= 0
+              || p.sec.toLowerCase().indexOf(q) >= 0
+              || (PHELP[p.id]||"").toLowerCase().indexOf(q) >= 0;
+      if(ok && modOnly) ok = routed.has(p.id);
+      if(ok && chgOnly) ok = Math.abs(getBase(p.id) - p.def) > 1e-6;
+      r.row.style.display = ok ? "" : "none";
+      if(ok) shown++;
+    }
+    for(const id in secEls){
+      const d = secEls[id];
+      if(!d.closest || !d.closest("#panel")) continue;
+      if(!filterOn){ d.style.display = ""; continue; }
+      const any = Array.prototype.some.call(d.querySelectorAll(".prow"), x=>x.style.display !== "none");
+      d.style.display = any ? "" : "none";
+    }
+    count.textContent = filterOn ? shown+" OF "+PLIST.length : "";
+  };
+}
+let applyFilter = ()=>{};
 function buildPanel(){
   buildChanBar();
+  buildFilterBar();
   buildZones();
   for(const sec of SECTIONS){
     const d = document.createElement("div");
@@ -794,6 +857,7 @@ function buildPanel(){
       const wrap = document.createElement("div"); wrap.className="sldwrap";
       const s = document.createElement("input");
       s.type="range"; s.min=p.min; s.max=p.max; s.step=(p.max-p.min)/400; s.value=getBase(p.id);
+      s.addEventListener("pointerdown", armGesture);
       s.addEventListener("input", ()=>{
         const v = parseFloat(s.value);
         setBase(p.id, v); val.textContent = fmt(p,v);
@@ -824,9 +888,7 @@ function buildPanel(){
     const DOCKZONE = {mix:"mixdock", perform:"performdock"};
     const host = DOCKZONE[sec.zone] ? document.getElementById(DOCKZONE[sec.zone])
                                     : (zoneEls[sec.zone] || zoneEls.chain);
-    /* on PERFORM the bend pads stay at the bottom, so anything else goes above */
-    const bendrow = (sec.zone === "perform") ? document.getElementById("bendrow") : null;
-    if(bendrow) host.insertBefore(d, bendrow); else host.appendChild(d);
+    host.appendChild(d);
   }
   /* The clock is a header control now. It is global, it is two widgets wide,
      and it was taking a whole sidebar section to show one number. */
@@ -1009,19 +1071,7 @@ function buildModPage(){
     card.appendChild(dests);
     const pk = document.createElement("select");
     pk.className = "patchpick";
-    const ph = document.createElement("option"); ph.value = ""; ph.textContent = "PATCH TO…"; pk.appendChild(ph);
-    let lastSec = null, grp = null;
-    for(const pp of PLIST){
-      if(pp.sec !== lastSec){
-        lastSec = pp.sec;
-        grp = document.createElement("optgroup");
-        const sd = SECTIONS.find(x=>x.id===pp.sec);
-        grp.label = sd ? sd.name : pp.sec.toUpperCase();
-        pk.appendChild(grp);
-      }
-      const o = document.createElement("option"); o.value = pp.id; o.textContent = pp.name;
-      grp.appendChild(o);
-    }
+    lazyOptions(pk, fillPatchOptions, "", "PATCH TO…");
     pk.onchange = ()=>{
       if(!pk.value) return;
       addRoute(id, pk.value);
@@ -1091,7 +1141,16 @@ function openModMenu(ev, p){
       row.innerHTML = "<span>\u25cf "+(nm?nm.name:r.src)+"</span>";
       const amt = document.createElement("input");
       amt.type="range"; amt.min=-1; amt.max=1; amt.step=0.01; amt.value=r.amt;
-      amt.addEventListener("input", ()=>{ r.amt = parseFloat(amt.value); renderRoutes(); });
+      /* this used to call renderRoutes() on every pointer move, which tears
+         down and rebuilds every route row including a 349-option select - nine
+         to twenty-six milliseconds per input event. Update in place while
+         dragging; rebuild once when the drag ends. */
+      amt.addEventListener("input", ()=>{
+        r.amt = parseFloat(amt.value);
+        const live = routeAmtRefs[routes.indexOf(r)];
+        if(live){ live.slider.value = r.amt; live.val.textContent = r.amt.toFixed(2); }
+      });
+      amt.addEventListener("change", ()=>renderRoutes());
       amt.addEventListener("click", e=>e.stopPropagation());
       const del = document.createElement("button");
       del.textContent = "\u2715";
@@ -1400,6 +1459,13 @@ function refreshBusUI(){
   }
 }
 function refreshToggles(){
+  /* the nine mixer selects are state, not just widgets - nothing was putting
+     them back in step, so after a preset or an INIT they described a mixer
+     that was not there */
+  const setSel = (id, v)=>{ const e = document.getElementById(id); if(e) e.value = String(v); };
+  setSel("selMixMode", mixMode);   setSel("selMixMode2", mixMode2);  setSel("selMixModeM", mixModeM);
+  setSel("selMixBlendb1", mixBlend); setSel("selMixBlendb2", mixBlend2); setSel("selMixBlendbM", mixBlendM);
+  setSel("selMixKeyb1", mixKey);     setSel("selMixKeyb2", mixKey2);     setSel("selMixKeybM", mixKeyM);
   for(const k in stripInvBtns){
     const r = stripInvBtns[k];
     /* a wipe is the only transition with a direction to reverse */
@@ -1938,7 +2004,51 @@ function addRoute(srcId, dstId){
   renderRoutes();
   return routes.length-1;
 }
+/* A 349-option destination list per route row and per modulator card was about
+   seven thousand hidden DOM nodes doing nothing until someone opened a menu -
+   two thirds of the whole document. Show the current value, build the rest on
+   first use. */
+function lazyOptions(sel, fill, curVal, curLabel){
+  sel.innerHTML = "";
+  const o = document.createElement("option");
+  o.value = curVal === undefined ? "" : curVal;
+  o.textContent = curLabel;
+  sel.appendChild(o);
+  sel.value = o.value;
+  let filled = false;
+  const show = ()=>{
+    if(filled) return;
+    filled = true;
+    const keep = sel.value;
+    sel.innerHTML = "";
+    fill(sel);
+    sel.value = keep;
+  };
+  for(const ev of ["mousedown","focus","keydown","touchstart"]) sel.addEventListener(ev, show);
+  return show;
+}
+function destLabel(id){ const p = P[id]; return p ? p.name+" ("+p.sec+")" : "\u2014"; }
+function fillDestOptions(sel){
+  for(const p of PLIST){ const o=document.createElement("option"); o.value=p.id; o.textContent=p.name+" ("+p.sec+")"; sel.appendChild(o); }
+}
+function fillPatchOptions(sel){
+  const ph = document.createElement("option"); ph.value = ""; ph.textContent = "PATCH TO\u2026"; sel.appendChild(ph);
+  let lastSec = null, grp = null;
+  for(const pp of PLIST){
+    if(pp.sec !== lastSec){
+      lastSec = pp.sec;
+      grp = document.createElement("optgroup");
+      const sd = SECTIONS.find(x=>x.id===pp.sec);
+      grp.label = sd ? sd.name : pp.sec.toUpperCase();
+      sel.appendChild(grp);
+    }
+    const o = document.createElement("option"); o.value = pp.id; o.textContent = pp.name;
+    grp.appendChild(o);
+  }
+}
+const routeAmtRefs = {};
 function renderRoutes(){
+  for(const k in routeAmtRefs) delete routeAmtRefs[k];
   routesDiv.innerHTML = "";
   routes.forEach((r, i)=>{
     const row = document.createElement("div"); row.className="mrow";
@@ -1949,8 +2059,8 @@ function renderRoutes(){
     attachTip(go, "SHOW THIS SOURCE", "Jumps to the MOD page and flashes this modulator's card, so you can see what it is doing and what else it is driving.");
     go.onclick = ()=>focusModSource(r.src);
     const dst = document.createElement("select"); dst.className="dst";
-    for(const p of PLIST){ const o=document.createElement("option"); o.value=p.id; o.textContent=p.name+" ("+p.sec+")"; dst.appendChild(o); }
-    dst.value = r.dst; dst.onchange = ()=>{ r.dst = dst.value; syncChanSel(); };
+    lazyOptions(dst, fillDestOptions, r.dst, destLabel(r.dst));
+    dst.onchange = ()=>{ r.dst = dst.value; syncChanSel(); };
     const chSel = document.createElement("select"); chSel.className="rch";
     for(const c of CHANNELS.concat(["AB"])){ const o=document.createElement("option"); o.value=c; o.textContent=(c==="AB"?"ALL":c); chSel.appendChild(o); }
     chSel.value = r.ch || "A";
@@ -1962,6 +2072,7 @@ function renderRoutes(){
     amt.type="range"; amt.min=-1; amt.max=1; amt.step=0.01; amt.value=r.amt;
     const av = document.createElement("span"); av.className="mamt"; av.textContent = (+r.amt).toFixed(2);
     amt.addEventListener("input", ()=>{ r.amt = parseFloat(amt.value); av.textContent = r.amt.toFixed(2); });
+    routeAmtRefs[routes.indexOf(r)] = {slider:amt, val:av};
     const inv = document.createElement("button"); inv.className="rinv"; inv.textContent="INV";
     inv.classList.toggle("on", !!r.inv);
     attachTip(inv, "INVERT", "Flips this route only. The same source can push one parameter up while pulling another down.");

@@ -1,0 +1,48 @@
+# Deploy the site with the Actions Pages pipeline rather than the legacy
+# branch builder.
+#
+# The branch-based "pages build and deployment" job uploads fine and then sits
+# in deployment_queued until it times out, which is a queue on GitHub's side
+# that nothing in this repository can influence. This path uses
+# upload-pages-artifact + deploy-pages instead, which is the supported route
+# now and does not go through that queue.
+#
+# To use it: Settings -> Pages -> Build and deployment -> Source: GitHub Actions.
+# With the source set to Actions, this workflow is the only thing that deploys,
+# so it has to stay in the repository.
+name: pages
+
+# Manual only. With the Pages source set back to "Deploy from a branch", this
+# workflow's deploy step cannot succeed - deploy-pages only works when the
+# source is Actions - so leaving it on push would put a red X on every commit
+# for no reason. It stays here, dormant, for the next time the branch builder
+# jams: set the source to Actions and run it from the Actions tab.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# never let two deploys race; let a newer push supersede one that is waiting
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # the site is the repository as it stands: one self-contained index.html,
+      # the CNAME, and the images the README points at
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deploy
+        uses: actions/deploy-pages@v4

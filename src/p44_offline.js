@@ -267,8 +267,8 @@ if(OUTPUT_MODE){
       }
       try{ localStorage.setItem("bendr.dockopen", open ? "1" : "0"); }catch(e){}
       markSizeDirty();
-      const db = document.getElementById("dockFold");
-      if(db) db.innerHTML = open ? "&#9662;" : "&#9656;";
+      /* the caret rotates in CSS with every other fold control now, so the
+         markup stays put and only the body class changes */
     }
     { let h = 0, wasOpen = true;
       try{ h = parseInt(localStorage.getItem("bendr.dockh"),10)||0;
@@ -365,6 +365,35 @@ if(OUTPUT_MODE){
   renderRoutes();
   wireMenus();
   wireDataTips();
+  /* ---- VIEW: show or hide any region of the interface ----
+     Six parts, one mechanism, and the choice is remembered. Hiding the whole
+     interface and leaving the picture is one press, and reversible from the
+     same place, which is what makes it safe to use mid-set. */
+  {
+    const VIEWS = ["panel","chain","transport","mix","bend","dock"];
+    const hidden = {};
+    try{ Object.assign(hidden, JSON.parse(localStorage.getItem("bendr.view") || "{}")); }catch(e){}
+    function applyView(){
+      for(const v of VIEWS) document.body.classList.toggle("hide-"+v, !!hidden[v]);
+      for(const b of document.querySelectorAll("#mnuView [data-view]"))
+        b.classList.toggle("on", !hidden[b.dataset.view]);
+      try{ localStorage.setItem("bendr.view", JSON.stringify(hidden)); }catch(e){}
+      markSizeDirty();
+    }
+    for(const b of document.querySelectorAll("#mnuView [data-view]")){
+      b.onclick = ()=>{ hidden[b.dataset.view] = !hidden[b.dataset.view]; applyView(); };
+    }
+    { const a = document.getElementById("viewAll");
+      if(a) a.onclick = ()=>{ for(const v of VIEWS) hidden[v] = false; applyView(); toast("Everything showing"); }; }
+    { const so = document.getElementById("viewSolo");
+      if(so) so.onclick = ()=>{
+        const anyShown = VIEWS.some(v=>!hidden[v]);
+        for(const v of VIEWS) hidden[v] = anyShown;
+        applyView();
+        toast(anyShown ? "Picture only \u2014 VIEW brings it back" : "Everything showing");
+      }; }
+    applyView();
+  }
   {
     const mb = document.getElementById("mixCollapse");
     /* on a phone the expanded strip eats the screen and leaves the parameter

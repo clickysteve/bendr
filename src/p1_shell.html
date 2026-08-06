@@ -153,6 +153,8 @@ select{appearance:none; -webkit-appearance:none; padding-right:16px;
 .prow input[type=range]{height:24px;}
 .prow .prst{min-width:24px; min-height:24px; padding:0; display:inline-flex; align-items:center; justify-content:center;}
 .secreset, .sechelp, .secbypass{min-height:22px;}
+.copymode{font-size:7.5px; letter-spacing:1px; padding:2px 5px; color:var(--dim); min-width:52px;}
+.copymode:hover{color:var(--amber); border-color:var(--amber);}
 #dockTabs button, .menubtn, .chantools button, .trow button{min-height:24px;}
 /* there were two :focus rules in the entire stylesheet, both on a textarea */
 :focus-visible{outline:2px solid var(--cyan); outline-offset:1px;}
@@ -198,6 +200,23 @@ body.nomix #mixCollapse:hover{background:rgba(255,122,24,.14);}
 body.nomix #mixCollapse i{transform:rotate(-90deg);}
 body.nomix #mixCollapse .mixhint{display:inline; color:var(--dim); letter-spacing:2px; font-size:8px;}
 body.nomix #mixbuses{display:none;}
+/* VIEW: one class per region, so hiding is a body-level decision and every
+   part of the interface answers to the same mechanism */
+body.hide-panel #panel{display:none;}
+body.hide-chain #chain{display:none;}
+body.hide-transport #transport{display:none;}
+body.hide-mix #mixstrip{display:none;}
+body.hide-bend #bendstrip{display:none;}
+body.hide-dock #lower{display:none;}
+/* every fold control is the same control: a caret on the left that rotates */
+#mixCollapse i, #bendCollapse i, #dockFold i{
+  font-style:normal; font-size:8px; display:inline-block; transition:transform .12s; margin-right:4px;
+}
+body.nomix #mixCollapse i, body.nobend #bendCollapse i, body.nodock #dockFold i{transform:rotate(-90deg);}
+#dockFold{
+  order:-1; margin:0 6px 0 0; padding:3px 7px; font-size:8px; letter-spacing:1.5px;
+  color:var(--dim); line-height:1;
+}
 #mixbuses{flex:1; display:flex; min-width:0;}
 .mixbus{
   flex:1 1 0; min-width:0; padding:6px 12px 7px;
@@ -402,6 +421,9 @@ body.filtering .sec .secbody > *:not(.prow){display:none;}
 .sectag{
   margin-left:6px; font-size:7px; letter-spacing:1.5px; padding:1px 4px; border-radius:2px;
   border:1px solid var(--line); color:var(--dim);
+  /* two characters and a space, and it was breaking across two lines in a
+     narrow panel, which read as a fault rather than a label */
+  white-space:nowrap; flex:0 0 auto;
 }
 .sectag.master{color:var(--dim);}
 .sectag.chan::after{content:"CH A"; }
@@ -554,6 +576,9 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 #glsldock{padding:10px 12px; overflow-y:auto;}
 #glsldock.notext > *:not(#glslNeedsSrc){opacity:.3; pointer-events:none;}
 #glsldock .edrow{display:flex; align-items:center; gap:8px; padding:5px 0; flex-wrap:wrap;}
+/* the controls stay put while the code scrolls: hunting for COMPILE by
+   scrolling back up is the wrong way round */
+#glslBar{position:sticky; top:0; z-index:2; background:var(--bg); padding:6px 0; margin:-6px 0 0;}
 #glsldock label{font-size:8.5px; letter-spacing:1.5px; color:var(--dim); white-space:nowrap;}
 #glsldock textarea{
   width:100%; min-height:170px; resize:vertical; background:#08080b; color:#cfe9e6;
@@ -582,8 +607,11 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 #outdock .sec{flex:1 1 0; min-width:250px; border-bottom:none; padding:0;}
 #outdock .sec h3{padding-top:0;}
 .secbypass{
-  margin-left:6px; padding:2px 6px; font-size:7.5px; letter-spacing:1px;
-  color:var(--dim); border-color:var(--line);
+  /* fixed geometry, because the label used to be ON or BYPASSED and the button
+     changed width every time it was pressed */
+  margin-left:6px; padding:0; width:22px; min-width:22px; height:20px; min-height:20px;
+  font-size:11px; line-height:1; letter-spacing:0; text-align:center;
+  color:var(--dim); border-color:var(--line); flex:0 0 auto;
 }
 .secbypass.off{color:#0b0b0e; background:var(--amber); border-color:var(--amber);}
 .sec.bypassed > h3{opacity:.55;}
@@ -592,6 +620,10 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 #audiodock .sec h3{padding-top:0;}
 #performdock .sec{border-bottom:none; padding:0;}
 #btnHelpTop{padding:3px 9px; font-size:11px; line-height:1; margin-left:2px;}
+/* the logo and the version are links now; neither should look like one */
+#logo, #ver{text-decoration:none;}
+#logo:hover b{color:var(--amber);}
+#ver:hover{border-color:var(--amber); color:var(--amber);}
 #tempobox{display:flex; align-items:center; gap:5px; margin-left:4px;}
 #tempobox button{padding:4px 9px; font-size:9px; letter-spacing:1.5px;}
 #tempobox #bpmVal{
@@ -872,8 +904,10 @@ body.nomix #mixbuses{display:none;}
 </head>
 <body>
 <div id="hdr">
-  <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version"></span>
+  <a id="logo" href="https://bendr.allmyfriendsaresynths.com/" target="_blank" rel="noopener"
+     data-tip="The live build at bendr.allmyfriendsaresynths.com. Opens in a new tab, so whatever you have running here stays running.">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></a>
+  <a id="ver" href="https://github.com/clickysteve/bendr" target="_blank" rel="noopener"
+     data-tip="Build version. Opens the source repository in a new tab \u2014 the whole thing is one readable file plus the parts it is built from."></a>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -989,7 +1023,37 @@ body.nomix #mixbuses{display:none;}
         <button id="btnSnap" data-tip="Save the current frame as a PNG at the processing resolution. Keyboard: S.">SNAP</button>
         <button id="btnRender" data-tip="Offline render: steps channel A through the file frame by frame and encodes every frame at full quality regardless of realtime speed. Video only - use REC if you need the audio.">RENDER</button>
       </div>
+      <div class="mlabel">WHERE IT GOES</div>
+      <div class="mrow2">
+        <button id="btnPop" data-tip="Open a second window showing only the output, no interface. Point OBS at it or drag it to a projector. Double-click it for fullscreen.">POP OUT</button>
+        <button id="btnFull" data-tip="Fullscreen the picture. Keyboard: F.">FULL</button>
+      </div>
       <button id="btnHelp" data-tip="The full manual. Keyboard: H.">HELP</button>
+    </div>
+  </div>
+
+  <div class="menu sticky" id="mnuView">
+    <button class="menubtn" data-tip="Show or hide any part of the interface. Everything here is reversible and remembered, so you can strip the window down to the picture for a set and put it back afterwards.">VIEW <i>&#9662;</i></button>
+    <div class="menupanel">
+      <div class="mlabel">SHOW</div>
+      <div class="mrow2">
+        <button data-view="panel" data-tip="The parameter panel down the left. Hiding it gives the picture the whole width; the dock still has the mixer, the modulation and the output stage.">SIDEBAR</button>
+        <button data-view="chain" data-tip="The signal-chain rail above the picture, where the stages are reordered and bypassed.">CHAIN RAIL</button>
+      </div>
+      <div class="mrow2">
+        <button data-view="transport" data-tip="The transport bar under the picture: play, loop, speed, seek and timecode.">TRANSPORT</button>
+        <button data-view="mix" data-tip="The mixer strip: the three faders and their transition selectors.">MIXER</button>
+      </div>
+      <div class="mrow2">
+        <button data-view="bend" data-tip="The six momentary bend pads.">BEND PADS</button>
+        <button data-view="dock" data-tip="The dock under the picture, with the mod matrix, the mixer detail, the scopes, the output stage and the rest.">DOCK</button>
+      </div>
+      <div class="mrow2">
+        <button id="viewAll" data-tip="Everything back on.">SHOW EVERYTHING</button>
+      </div>
+      <div class="mrow2">
+        <button id="viewSolo" data-tip="Hide all of it and leave the picture. The menus stay, so this is reversible from here or with the same button again.">PICTURE ONLY</button>
+      </div>
     </div>
   </div>
 
@@ -1028,8 +1092,6 @@ body.nomix #mixbuses{display:none;}
   <button id="btnBypass" data-tip="Hold to hear the clean signal - shows the source with the whole chain switched out, so you can see what you have actually done. Keyboard: hold B.">BYPASS</button>
   <button id="btnRec" data-tip="Record the live output to a file, with the source audio when AUDIO is set to SOURCE. MP4 where the browser allows it, WebM otherwise. Keyboard: R.">&#9679; REC</button>
   <span id="recTime">0:00</span>
-  <button id="btnPop" data-tip="Open a second window showing only the output, no interface. Point OBS at it or drag it to a projector. Double-click it for fullscreen.">POP OUT</button>
-  <button id="btnFull" data-tip="Fullscreen the picture. Keyboard: F.">FULL</button>
   <button id="btnHelpTop" data-tip="The manual: what everything is, why it behaves the way it does, and every keyboard shortcut. Also on the H key.">?</button>
 </div>
 <div id="main">
@@ -1091,7 +1153,7 @@ body.nomix #mixbuses{display:none;}
           <button data-dock="perform" data-tip="Everything you play with while it is running: eight whole-rig snapshots with a glide time, the performance recorder, preset morph and the six bend pads.">PERFORM</button>
           <span style="flex:1;"></span>
           <span id="dockHint"></span>
-          <button id="dockFold" data-tip="Folds the dock away so the picture gets the height. Double-clicking the bar above it does the same, and the height you drag it to is remembered.">&#9662;</button>
+          <button id="dockFold" data-tip="Folds the dock away so the picture gets the height. Double-clicking the bar above it does the same, and the height you drag it to is remembered."><i>&#9662;</i>DOCK</button>
         </div>
         <div id="dockBody">
       <div id="mixdock"></div>
@@ -1124,8 +1186,9 @@ body.nomix #mixbuses{display:none;}
       <div id="modgrid"></div>
       <div id="glsldock">
         <div id="glslNeedsSrc" style="display:none; color:var(--dim); font-size:9.5px; padding:6px 0 10px;">This channel is not a shader source. Pick <b style="color:var(--amber)">SHADER</b> under SOURCE to switch it, and this comes alive.</div>
-        <div class="edrow">
-          <button id="glslCompile" class="cy" data-tip="Compile what is in the box and put it on this channel. Nothing runs until you press this, so a half-typed shader cannot take the picture down.">COMPILE</button>
+        <div class="edrow" id="glslBar">
+          <button id="glslCompile" class="cy" data-tip="Compile what is in the box and put it on this channel. Pasting compiles on its own, and so does clicking away, so this is here for when you have been typing. Cmd or ctrl and Enter does the same.">COMPILE</button>
+          <span id="glslDirty" style="display:none; color:var(--amber); font-size:8px; letter-spacing:1.5px;">EDITED &middot; NOT COMPILED</span>
           <button id="glslRevert" data-tip="Back to the shader that is currently running on this channel, throwing away edits you have not compiled.">REVERT</button>
           <label>iChannel0</label>
           <select id="glslCh0" data-tip="What the shader gets on iChannel0. Point it at another channel, a bus, or the finished programme and the shader becomes a processing stage rather than only a generator. iChannel1 is always this shader's own previous frame, so a shader can feed back on itself without any of this being involved."></select>
@@ -1312,7 +1375,8 @@ body.nomix #mixbuses{display:none;}
   <p><b>BYPASS</b> is a momentary: hold the button, or hold B, to see the source with the whole chain switched out. While it is held the picture carries an amber border and a BYPASS badge, so there is never any doubt about which of the two you are looking at.</p>
   <p><b>SHADER</b> turns a channel into a fragment shader. Paste the image pass of a single-pass shader into the SHADER tab and press COMPILE, or cmd/ctrl-Enter. The uniforms the convention promises are all provided — <b>iResolution iTime iTimeDelta iFrame iMouse iDate iChannel0-3 iChannelResolution iChannelTime iFrameRate iSampleRate</b> — with <b>texture2D</b> and <b>iGlobalTime</b> accepted as aliases and a leading <b>#version</b> line ignored. iChannel0 and iChannel2 can be pointed at another channel, either bus or the finished programme, which makes a shader a processing stage rather than only a generator; iChannel1 is always the shader's own previous frame, so it can feed back on itself. Compile errors appear under the box with their line numbers and the last working shader keeps running, so nothing you type can take the picture down. Multi-pass shaders, the ones with buffer tabs, will compile but only their image pass runs. The code is saved with the patch.</p>
   <p><b>ENGINE RATE</b> decides how many times a second the processing runs, which is not how often your monitor refreshes. It matters because a feedback loop iterates once per rendered frame: on a 120Hz display a patch evolves twice as fast as it does on a 60Hz one, and so do the strobe, the field parity, the flow store and the phosphor trail. Pinning it makes a patch look the same everywhere and match the offline render. <b>CAPTURE RATE</b> sets the frame rate REC and RENDER work at.</p>
-  <p>The top bar holds four menus \u2014 PATCH, SOURCE, ENGINE, OUTPUT \u2014 and everything you touch mid-performance stays out in the open: the preset list, RANDOMIZE and MUTATE, BEND and MOD to fold those panes in and out, and MULTI, BYPASS, REC, POP OUT and FULL on the right.</p>
+  <p><b>VIEW</b> shows or hides any part of the interface — the sidebar, the chain rail, the transport bar, the mixer strip, the bend pads and the dock — with PICTURE ONLY stripping the lot in one press and the same button putting it back. What you choose is remembered. Every fold control on the layout is the same control now: a caret on the left of the thing it folds, which rotates when it is closed.</p>
+  <p>The top bar holds five menus \u2014 PATCH, SOURCE, ENGINE, OUTPUT \u2014 and everything you touch mid-performance stays out in the open: the preset list, RANDOMIZE and MUTATE, BEND and MOD to fold those panes in and out, and MULTI, BYPASS and REC on the right. POP OUT and FULL live in the OUTPUT menu with the stills and the render, since they are all the same question: where the picture goes. The logo opens the live build in a new tab and the version number opens the source.</p>
   <p><b>RANDOMIZE</b> has a small caret beside it that decides what a roll is allowed to touch. <b>THIS CHANNEL</b> rolls only the channel you are editing and leaves the other three alone, which is how you build a mix one channel at a time; <b>ALL FOUR</b> rolls each of them separately so they come out different from each other; <b>FOLLOW LINK</b> is the old behaviour, where LINK decides. Under KEEP: <b>SOURCE</b> holds the pattern synth and the framing still, so whatever you have loaded or built survives and only the processing is rolled; <b>MODULATION</b> holds the routes and the LFOs; <b>OUTPUT + CHAIN</b> holds the mixer, the display, the overlay and the stage order. MUTATE obeys the same settings, and the choices are remembered between sessions.</p>
   <p>The panel is in two zones, with the mixers themselves on the strip under the picture rather than in the sidebar. <b>CHANNEL &middot; SIGNAL PATH</b> holds everything belonging to the selected channel, in the order the signal actually travels &mdash; source, framing, frame store, feedback, then the reorderable stages, then the keyer &mdash; and it is the only zone you can rearrange, by dragging the handle on the left of a section. <b>FOLLOW CHAIN</b> in that zone's header re-sorts it to match whatever order you have dragged the stages into on the rail above the picture, and RESET puts it back. <b>MASTER OUT</b> is pinned at the bottom. Above all of it is the filter: press <kbd>/</kbd> and type, and the panel narrows to whatever matches &mdash; the parameter name, its section, or the body of its help text, so &ldquo;roll&rdquo; finds V ROLL and a phrase from a description finds the control it describes. Two chips beside it answer the other two questions you have while playing: <b>MOVING</b> shows only what something is currently driving, <b>CHANGED</b> shows only what you have moved off its default.</p>
   <p>Hover any parameter name and you get a description of what it does and enough of the mechanism to know why it behaves the way it does. The same works on section headers, mode buttons, the bend pads and the menus. To reset one control, double-click its slider or press the <b>&#8634;</b> that appears when you hover the row; shift-clicking that takes it to the bottom of its range instead. RESET at the top of a section does the whole section, INIT does everything. Sections in the channel zone drag by the handle on the left to reorder, and the order is remembered.</p>

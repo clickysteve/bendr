@@ -724,9 +724,18 @@ function buildChanBar(){
   attachTip(dst, "TARGET CHANNEL", "The channel that COPY writes to and SWAP exchanges with. Any of the other three, not just the partner on the same bus.", "It opens on the bus partner and remembers your choice while that stays valid.");
   fillChanDest(dst);
   dst.onchange = ()=>{ copyDest = dst.value; };
+  /* what COPY copies. ALL is the expectation — copying a channel copies the
+     channel — and FX ONLY is the old behaviour, which is genuinely useful when
+     you want one treatment across different footage. */
+  const cm = document.createElement("button");
+  cm.className = "copymode";
+  const setCM = ()=>{ cm.textContent = copyMode === "all" ? "ALL" : "FX ONLY"; };
+  attachTip(cm, "WHAT COPY TAKES", "ALL copies the source as well as the effects, so the target channel becomes this one. FX ONLY copies the treatment and leaves the target looking at whatever it was already looking at, which is how you put one look on four different clips.", "A live camera or screen capture cannot be on two channels at once, so that one is never copied.");
+  cm.onclick = ()=>{ copyMode = (copyMode === "all") ? "fx" : "all"; setCM(); };
+  setCM();
   const cp = document.createElement("button");
   cp.textContent = "COPY";
-  attachTip(cp, "COPY", "Copies this channel's effect settings onto the channel in the selector. Sources are left alone, so you get the same treatment on different footage.", "Shift-click copies onto all three of the others at once.");
+  attachTip(cp, "COPY", "Copies this channel onto the channel in the selector. The button beside it decides whether the source comes too.", "Shift-click copies onto all three of the others at once.");
   cp.onclick = (e)=>{
     if(e.shiftKey){
       pushHistory();
@@ -751,7 +760,7 @@ function buildChanBar(){
     if(window.__swapSources) window.__swapSources(activeChan, other);
     refreshUI(); toast("Swapped "+activeChan+" \u2194 "+other+" (effects and sources)");
   };
-  tools.appendChild(lk); tools.appendChild(dst); tools.appendChild(cp); tools.appendChild(sw);
+  tools.appendChild(lk); tools.appendChild(dst); tools.appendChild(cm); tools.appendChild(cp); tools.appendChild(sw);
   bar.appendChild(tools);
   panel.appendChild(bar);
 }
@@ -1142,7 +1151,10 @@ function buildPanel(){
       by.className = "secbypass";
       by.dataset.stage = stg;
       attachTip(by, "BYPASS STAGE", "Switches the whole "+STAGE_INFO[stg].name+" stage out of the signal path, on every channel. The same control as the pill on the rail above the picture, and it turns amber when the stage is off.");
+      /* not the title as well: clicking the header collapses the section, and
+         one target cannot mean two things */
       by.onclick = e=>{ e.stopPropagation(); stageEnabled[stg] = !stageEnabled[stg]; renderChain(); refreshBypassBtns(); };
+      by.textContent = "\u25c9";      /* until refreshBypassBtns runs */
       h.appendChild(by);
     }
     /* the manual is an essay; this is the reference. Same words, but arranged
@@ -1707,7 +1719,12 @@ function refreshBypassBtns(){
   for(const b of document.querySelectorAll(".secbypass")){
     const off = !stageEnabled[b.dataset.stage];
     b.classList.toggle("off", off);
-    b.textContent = off ? "BYPASSED" : "ON";
+    /* an eye, open or struck through. It used to say ON or BYPASSED, and the
+       two words are different lengths, so the button changed width every time
+       you pressed it and the whole header jumped. A control that moves when
+       you use it is a control you have to aim at twice. */
+    b.textContent = off ? "\u29b8" : "\u25c9";
+    b.setAttribute("aria-label", off ? "stage bypassed" : "stage on");
     const sec = b.closest(".sec");
     if(sec) sec.classList.toggle("bypassed", off);
   }

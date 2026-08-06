@@ -424,14 +424,19 @@ function setDock(t){
 }
 /* grey the TEXT tab unless this channel is a text source */
 function refreshDockTabs(){
-  const b = document.querySelector('#dockTabs button[data-dock="text"]');
-  if(!b) return;
-  const ok = cur().mode === "text";
-  b.classList.toggle("dim", !ok);
-  const td = document.getElementById("textdock");
-  if(td) td.classList.toggle("notext", !ok);
-  const note = document.getElementById("textNeedsSrc");
-  if(note) note.style.display = ok ? "none" : "block";
+  /* both of these tabs belong to a source rather than to the rig, so each one
+     reads as unavailable on a channel that is not using that source */
+  for(const [tab, mode, pane, note] of [["text","text","textdock","textNeedsSrc"],
+                                        ["glsl","glsl","glsldock","glslNeedsSrc"]]){
+    const b = document.querySelector('#dockTabs button[data-dock="'+tab+'"]');
+    if(!b) continue;
+    const ok = cur().mode === mode;
+    b.classList.toggle("dim", !ok);
+    const td = document.getElementById(pane);
+    if(td) td.classList.toggle("notext", !ok);
+    const n = document.getElementById(note);
+    if(n) n.style.display = ok ? "none" : "block";
+  }
 }
 window.__refreshDockTabs = refreshDockTabs;
 const textEd = null;
@@ -864,6 +869,8 @@ function buildGlslDock(){
     if(r.ok){
       log.className = "ok";
       log.textContent = "compiled ok · running on channel " + activeChan;
+      const dirty = document.getElementById("glslDirty");
+      if(dirty) dirty.style.display = "none";
       SRC[activeChan].glslErr = "";
       toast("Shader compiled onto channel " + activeChan);
     } else {
@@ -873,6 +880,22 @@ function buildGlslDock(){
     }
   };
   if(rev) rev.onclick = ()=>{ body.value = SRC[activeChan].glsl || GLSL_DEFAULT; log.textContent = ""; log.className = ""; };
+  /* Pasting a shader in and then having to go and find a button is the wrong
+     shape: the paste is the intent. A paste compiles on its own a moment
+     later, once the text has actually landed, and so does clicking away.
+     Typing does not, because a shader is broken for most of the time you are
+     writing one and the errors would never stop. */
+  if(body) body.addEventListener("paste", ()=>{
+    setTimeout(()=>{ if(SRC[activeChan].mode === "glsl") btn.click(); }, 30);
+  });
+  if(body) body.addEventListener("blur", ()=>{
+    if(SRC[activeChan].mode !== "glsl") return;
+    if(body.value !== (SRC[activeChan].glsl || "")) btn.click();
+  });
+  if(body) body.addEventListener("input", ()=>{
+    const d = document.getElementById("glslDirty");
+    if(d) d.style.display = (body.value !== (SRC[activeChan].glsl || "")) ? "inline" : "none";
+  });
   if(body) body.addEventListener("keydown", e=>{
     /* tab indents rather than leaving the field, which is what you want in a
        code box and nowhere else */
@@ -906,3 +929,36 @@ function syncGlslEditor(){
   if(log && S.glslErr){ log.className = ""; log.textContent = S.glslErr.trim(); }
 }
 buildGlslDock();
+
+/* Move a channel's source onto another channel: what it is looking at, plus
+   everything that defines that source. A file is shared rather than reloaded
+   (both channels point at the same object URL, and only the channel that
+   created it revokes it); a camera or screen capture cannot be duplicated, so
+   the destination is pointed at a pattern and told why. */
+function copySource(from, to){
+  const A = SRC[from], B = SRC[to];
+  if(A.mode === "cam"){
+    stopCam(to);
+    B.mode = "pattern"; B.name = "pattern";
+    toast("A live input cannot be on two channels at once — " + to + " kept its own source", true);
+    syncChanInputUI();
+    return;
+  }
+  stopCam(to);
+  B.mode = A.mode; B.name = A.name; B.pattern = A.pattern; B.feed = A.feed;
+  B.speed = A.speed; B.tpRate = A.tpRate; B.patClock = A.patClock; B.aspect = A.aspect;
+  B.text = JSON.parse(JSON.stringify(A.text));
+  B.glsl = A.glsl; B.glslF0 = A.glslF0; B.glslF2 = A.glslF2;
+  B.glslProg = null; B.glslErr = ""; B.glslFrame = 0;   /* compiled per channel */
+  if(typeof genMode !== "undefined" && genMode[from]) genMode[to] = {...genMode[from]};
+  if(A.mode === "file" && A.video.src){
+    B.video.srcObject = null;
+    B.video.src = A.video.src;          /* the same blob, not another copy of it */
+    B.video.loop = A.video.loop;
+    B.video.muted = true;
+    try{ B.video.currentTime = A.video.currentTime; }catch(e){}
+    B.video.play().catch(()=>{});
+  }
+  B.has = A.has;
+  syncChanInputUI();
+}

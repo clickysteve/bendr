@@ -456,9 +456,15 @@ function setBase(id, v, ch){
   else chanBase[activeChan][id]=v;
 }
 function getCur(id, ch){ const p=P[id]; return p.master ? mCur[id] : chanCur[ch||activeChan][id]; }
-function copyChannel(from, to){
+/* Copying a channel copies the channel. It used to copy only the effect
+   parameters, which meant "copy A onto B" gave you B's picture wearing A's
+   treatment — occasionally what you want, and never what you expect. The
+   source comes with it now unless you say otherwise. */
+let copyMode = "all";      // "all" = source and effects, "fx" = effects only
+function copyChannel(from, to, mode){
   if(from === to) return;
   for(const p of CLIST) chanBase[to][p.id] = chanBase[from][p.id];
+  if((mode || copyMode) === "all" && typeof copySource === "function") copySource(from, to);
   if(typeof bumpParams === "function") bumpParams();
 }
 function swapChannels(a, b){

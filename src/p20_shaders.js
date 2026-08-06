@@ -487,7 +487,12 @@ const FS_MIX = COMMON + KEYFN +
 "      vec3 y1 = rgb2yiq(pv), y2 = rgb2yiq(pc);\n" +
 "      pv = yiq2rgb(vec3(y1.x, mix(y1.yz, y2.yz, u_edgeChroma)));\n" +
 "    }\n" +
-"    src = mix(src, pv, clamp(band*u_edgeHold, 0.0, 0.94));\n" +
+"    /* the ceiling on how much of the last frame can survive. Unity is the\n" +
+"       old limit and still reads as a trail that settles; past it the band\n" +
+"       stops settling at all and keeps building, which is the point of the\n" +
+"       extra travel on the control. */\n" +
+"    float hcap = min(0.94 + max(u_edgeHold-1.0, 0.0)*0.11, 0.995);\n" +
+"    src = mix(src, pv, clamp(band*u_edgeHold, 0.0, hcap));\n" +
 "  }\n" +
 "  if(border > 0.5) src = mix(src, vec3(1.0), t);\n" +
 "  /* ---- 4. what is left of a firing: dropped lines and switching noise ---- */\n" +

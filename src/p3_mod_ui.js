@@ -1557,10 +1557,14 @@ function buildZones(){
       attachTip(fc, "FOLLOW CHAIN", "Reorders these sections to match the order of the stages on the rail above the picture, so the panel reads in the order the signal is actually processed.");
       fc.onclick = ()=>{ orderChainZone(true); saveSectionOrder(); toast("Panel follows the signal chain"); };
       const rs = document.createElement("button");
-      rs.textContent = "RESET";
-      attachTip(rs, "RESET LAYOUT", "Puts these sections back into the default signal-path order.");
+      rs.textContent = "RESET ORDER";
+      attachTip(rs, "RESET ORDER", "Puts these sections back into the default signal-path order. Does not touch any value.");
       rs.onclick = ()=>{ orderChainZone(false); saveSectionOrder(); toast("Panel order reset"); };
-      h.appendChild(fc); h.appendChild(rs);
+      const rf = document.createElement("button");
+      rf.textContent = "RESET FX";
+      attachTip(rf, "RESET THIS CHANNEL", "Every effect on this channel back to default in one press, without touching what the channel is looking at. The source stays loaded, the pattern synth keeps its patch, and the other three channels and the master are untouched. LINK does all four. Undoable with Z.");
+      rf.onclick = ()=>resetChannelFX();
+      h.appendChild(fc); h.appendChild(rs); h.appendChild(rf);
     }
     wrap.appendChild(h);
     const body = document.createElement("div");
@@ -1790,6 +1794,32 @@ function refreshStageLeds(){
 }
 
 /* ---- section reset ---- */
+/* "How do I clear everything I have done to this channel without losing the
+   clip I loaded" had no answer: there was a per-section RESET and a global
+   INIT and nothing between them. The pattern synth is deliberately exempt,
+   because on a synth channel that patch is the picture, not an effect. */
+function resetChannelFX(){
+  pushHistory();
+  const targets = linkChans ? CHANNELS : [activeChan];
+  for(const p of CLIST){
+    if(p.sec === "gen") continue;
+    for(const ch of targets){ chanBase[ch][p.id] = p.def; morphOverride.add(ch+":"+p.id); }
+  }
+  /* the per-channel mode switches are part of "what I have done to it" */
+  fbTrailMode=false; rescanMode=false;
+  fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbFlip=0; fbTap=0; fbNoServo=false;
+  fieldSrc=0; flowField=0; flowEdge=0;
+  scanRevH=false; scanRevV=false; syncLatch=false;
+  keyChroma=false; showKeyMatte=false;
+  for(const ch of targets){
+    if(window.__setTransport) window.__setTransport("play", ch);
+    stageEnabled && Object.keys(stageEnabled).forEach(k=>{ stageEnabled[k] = true; });
+  }
+  /* and so is anything patched into it */
+  routes = routes.filter(r=>targets.indexOf(r.ch||"A") < 0);
+  refreshUI(); renderRoutes(); refreshToggles(); refreshBypassBtns(); renderChain();
+  toast("Reset the effects on channel " + targets.join("+") + " — source untouched");
+}
 function resetSection(id){
   for(const p of PLIST) if(p.sec===id){
     if(p.master){ mBase[p.id] = p.def; morphOverride.add("M:"+p.id); }

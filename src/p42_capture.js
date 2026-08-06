@@ -130,6 +130,30 @@ btnPop.onclick = ()=>{
 };
 
 /* big performance randomize/mutate pads */
+/* BYPASS was wired to nothing. The button had no handler at all and the B key
+   called a setBypass that was never defined, so it threw on every press and
+   every release, and the one control that answers "what have I actually done
+   to this picture" had never worked. It is a momentary: held, not latched,
+   because you want to glance at the clean signal and let go. */
+function setBypass(on){
+  bypass = on ? 1 : 0;
+  const b = document.getElementById("btnBypass");
+  if(b) b.classList.toggle("on", !!on);
+  document.body.classList.toggle("bypassing", !!on);
+}
+{
+  const b = document.getElementById("btnBypass");
+  const dn = e=>{ e.preventDefault(); setBypass(true); };
+  const up = ()=>setBypass(false);
+  b.addEventListener("mousedown", dn);
+  b.addEventListener("touchstart", dn, {passive:false});
+  b.addEventListener("mouseup", up);
+  b.addEventListener("mouseleave", up);
+  b.addEventListener("touchend", up);
+  /* a window that loses focus mid-hold would otherwise stay bypassed forever */
+  window.addEventListener("blur", up);
+}
+
 document.getElementById("btnRnd").onclick = randomizeAll;
 document.getElementById("btnMut").onclick = mutate;
 
@@ -438,7 +462,7 @@ window.addEventListener("keydown", e=>{
   if(k==="/"){ e.preventDefault(); if(window.__focusFilter) window.__focusFilter(); return; }
   if(k==="d"){ setDock(dockTab==="mod" ? "matrix" : "mod"); return; }
   if(k==="p"){ btnPlay.click(); return; }
-  if(k==="b"){ setBypass(true); return; }
+  if(k==="b"){ if(!e.repeat) setBypass(true); return; }
   if(k==="q"){ bendHeld.sync=true; markBend("sync",true); }
   if(k==="w"){ bendHeld.roll=true; markBend("roll",true); }
   if(k==="e"){ bendHeld.rainbow=true; markBend("rainbow",true); }

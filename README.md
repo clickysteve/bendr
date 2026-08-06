@@ -217,7 +217,9 @@ Every route has its own invert and response curve, so one source can push one pa
 
 Presets you build yourself save to the machine and sit in the preset list beside the built-in ones; patches also save as `.json` files to move between machines.
 
-Six momentary bend pads (mouse, `Q W E R T Y`, or MIDI notes C1–F1), MIDI CC learn on every slider, per-section resets and a global init.
+Six momentary bend pads (mouse, `Q W E R T Y`, or MIDI notes C1–F1) and MIDI CC learn on every slider. Undoing yourself works at four scales: a double-click resets one control, each section has its own RESET, **RESET FX** at the top of the channel column returns every effect on the channel you are editing to default without touching what it is looking at, and **INIT · RESET ALL** in the PATCH menu does the whole rig. All of them are undoable.
+
+**BYPASS** is a momentary — hold the button, or hold `B` — and while it is held the picture carries an amber border and a BYPASS badge, so there is no doubt about whether you are looking at the processed picture or the clean one.
 
 Randomize has a caret beside it that decides what a roll is allowed to touch, because all-or-nothing is the wrong granularity for building a mix. **THIS CHANNEL** rolls only the channel you are editing and leaves the other three alone; **ALL FOUR** rolls each of them separately, so they come out different from each other rather than four copies of one; **FOLLOW LINK** is the old behaviour. Under KEEP, **SOURCE** holds the pattern synth and the framing still, so whatever you have loaded or built survives and only the processing changes; **MODULATION** holds the routes and the LFOs, so the movement you set up keeps running against new parameters; **OUTPUT + CHAIN** holds the mixer, the display, the overlay and the stage order. Randomizing one channel no longer unpatches another: only the routes belonging to the channels being rolled are replaced. MUTATE obeys the same settings, everything is undoable, and the choices are remembered between sessions.
 

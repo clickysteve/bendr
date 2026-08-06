@@ -83,6 +83,18 @@ body{
 .snapbtn.full{border-color:var(--cyan); color:var(--cyan);}
 .snapbtn.full:hover{border-color:var(--amber); color:#fff;}
 button.dim, input.dim, select.dim{opacity:.32; cursor:not-allowed;}
+/* BYPASS is a momentary, and a momentary with no indicator is a control you
+   cannot trust: you need to know at a glance whether what you are looking at
+   is the processed picture or the clean one. */
+#bypassFlag{
+  position:absolute; top:10px; left:50%; transform:translateX(-50%);
+  padding:4px 12px; border:1px solid var(--amber); border-radius:3px;
+  background:rgba(20,14,4,.86); color:var(--amber);
+  font-size:9px; letter-spacing:2.5px; pointer-events:none; display:none; z-index:6;
+}
+body.bypassing #bypassFlag{display:block;}
+body.bypassing #canvasWrap{box-shadow:inset 0 0 0 2px var(--amber);}
+#btnBypass.on{background:var(--amber); border-color:var(--amber); color:#0b0b0e;}
 /* a section that belongs to a source this channel is not using */
 .sec.srcoff{display:none !important;}
 /* ---------- panel zones ---------- */
@@ -846,10 +858,6 @@ body.nomix #mixbuses{display:none;}
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
   <span id="ver" title="Build version"></span>
-  <button id="btnHelpTop" data-tip="The manual: what everything is, why it behaves the way it does, and every keyboard shortcut. Also on the H key.">?</button>
-  <div id="tempobox" data-tip="Tap four times in time and the tempo follows, or type the number straight into the readout \u2014 click it, type, press Enter. Up and down arrows nudge it by one, with shift for a tenth. Any modulator with a sync division locks to it, and incoming MIDI clock overrides it automatically.">
-    <button id="btnTap">TAP</button><span id="beatLed"></span><input id="bpmVal" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="120.0" aria-label="Tempo in beats per minute"><span id="bpmExt"></span>
-  </div>
 
   <div class="menu" id="mnuPatch">
     <button class="menubtn" data-tip="Presets, undo, and saving or loading the whole rig as a file.">PATCH <i>&#9662;</i></button>
@@ -975,6 +983,9 @@ body.nomix #mixbuses{display:none;}
     </div>
   </div>
   <button id="btnMut" class="cy" data-tip="Nudges every control on this channel by a small random amount instead of replacing them. Press it repeatedly to drift somewhere new without losing what you have. Obeys the same CHANNELS and KEEP settings as randomize. Keyboard: M.">MUTATE</button>
+  <div id="tempobox" data-tip="Tap four times in time and the tempo follows, or type the number straight into the readout \u2014 click it, type, press Enter. Up and down arrows nudge it by one, with shift for a tenth. Any modulator with a sync division locks to it, and incoming MIDI clock overrides it automatically.">
+    <button id="btnTap">TAP</button><span id="beatLed"></span><input id="bpmVal" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="120.0" aria-label="Tempo in beats per minute"><span id="bpmExt"></span>
+  </div>
 
   <div class="spacer"></div>
   <button id="btnMulti" data-tip="Multiview: all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors. The channel you are editing gets the hot border. Keyboard: V.">MULTI</button>
@@ -983,6 +994,7 @@ body.nomix #mixbuses{display:none;}
   <span id="recTime">0:00</span>
   <button id="btnPop" data-tip="Open a second window showing only the output, no interface. Point OBS at it or drag it to a projector. Double-click it for fullscreen.">POP OUT</button>
   <button id="btnFull" data-tip="Fullscreen the picture. Keyboard: F.">FULL</button>
+  <button id="btnHelpTop" data-tip="The manual: what everything is, why it behaves the way it does, and every keyboard shortcut. Also on the H key.">?</button>
 </div>
 <div id="main">
   <div id="panel"></div>
@@ -999,6 +1011,7 @@ body.nomix #mixbuses{display:none;}
       <canvas id="glcanvas"></canvas>
       <div id="osd"></div>
       <div id="osdsrc"></div>
+      <div id="bypassFlag">BYPASS &middot; CLEAN SIGNAL</div>
       <div id="dropHint">DROP VIDEO / PRESET</div>
       <div id="mvlabels"><span>A</span><span>B</span><span>BUS 1</span><span>C</span><span>D</span><span>PROGRAMME</span></div>
     </div>
@@ -1241,6 +1254,8 @@ body.nomix #mixbuses{display:none;}
   <p>TAP sets the tempo, or click the number beside it and type one — Enter commits, Escape reverts, and the arrow keys nudge by one beat, or a tenth with shift. LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
   <h3>FINDING YOUR WAY AROUND</h3>
   <p>What the transport can do depends on what the channel is looking at. A file has a timeline, so it plays, loops, seeks, mutes and shuttles. A generated source — pattern, text, synth or a feed from another channel — has a clock but nothing to scrub, so SPD and the deck transport drive that clock and the file controls are greyed out. A camera or a screen capture has neither, so it can be held or let run and nothing else. The panel follows the same rule: PATTERN SYNTH only appears on a channel that is actually a synth, because everywhere else it is a page of controls that do nothing.</p>
+  <p>Three levels of undoing yourself: any single control resets with a double-click, each section has its own RESET, and <b>RESET FX</b> at the top of the channel column returns every effect on the channel you are editing to default in one press without touching what the channel is looking at — the file stays loaded and the pattern synth keeps its patch. <b>INIT · RESET ALL</b> in the PATCH menu does the whole rig. All of them are undoable with Z.</p>
+  <p><b>BYPASS</b> is a momentary: hold the button, or hold B, to see the source with the whole chain switched out. While it is held the picture carries an amber border and a BYPASS badge, so there is never any doubt about which of the two you are looking at.</p>
   <p>The top bar holds four menus \u2014 PATCH, SOURCE, ENGINE, OUTPUT \u2014 and everything you touch mid-performance stays out in the open: the preset list, RANDOMIZE and MUTATE, BEND and MOD to fold those panes in and out, and MULTI, BYPASS, REC, POP OUT and FULL on the right.</p>
   <p><b>RANDOMIZE</b> has a small caret beside it that decides what a roll is allowed to touch. <b>THIS CHANNEL</b> rolls only the channel you are editing and leaves the other three alone, which is how you build a mix one channel at a time; <b>ALL FOUR</b> rolls each of them separately so they come out different from each other; <b>FOLLOW LINK</b> is the old behaviour, where LINK decides. Under KEEP: <b>SOURCE</b> holds the pattern synth and the framing still, so whatever you have loaded or built survives and only the processing is rolled; <b>MODULATION</b> holds the routes and the LFOs; <b>OUTPUT + CHAIN</b> holds the mixer, the display, the overlay and the stage order. MUTATE obeys the same settings, and the choices are remembered between sessions.</p>
   <p>The panel is in two zones, with the mixers themselves on the strip under the picture rather than in the sidebar. <b>CHANNEL &middot; SIGNAL PATH</b> holds everything belonging to the selected channel, in the order the signal actually travels &mdash; source, framing, frame store, feedback, then the reorderable stages, then the keyer &mdash; and it is the only zone you can rearrange, by dragging the handle on the left of a section. <b>FOLLOW CHAIN</b> in that zone's header re-sorts it to match whatever order you have dragged the stages into on the rail above the picture, and RESET puts it back. <b>MASTER OUT</b> is pinned at the bottom. Above all of it is the filter: press <kbd>/</kbd> and type, and the panel narrows to whatever matches &mdash; the parameter name, its section, or the body of its help text, so &ldquo;roll&rdquo; finds V ROLL and a phrase from a description finds the control it describes. Two chips beside it answer the other two questions you have while playing: <b>MOVING</b> shows only what something is currently driving, <b>CHANGED</b> shows only what you have moved off its default.</p>
@@ -1248,7 +1263,7 @@ body.nomix #mixbuses{display:none;}
   <h3>IF SOMETHING GETS STUCK</h3>
   <p>Four buffers feed themselves: the feedback store, the flow stage's frame store, the phosphor persistence and the thirty-frame ring behind ECHO. If a bad frame lands in one it circulates indefinitely and will sit there until you reload. <b>FLUSH BUFFERS</b> under ENGINE empties all four and restarts the sync model, without touching a single parameter.</p>
   <h3>KEYS</h3>
-  <p><kbd>/</kbd> filter the panel &nbsp; <kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>shift</kbd>+<kbd>Z</kbd> redo &nbsp; <kbd>1</kbd>&ndash;<kbd>9</kbd> presets &nbsp; <kbd>shift</kbd>+<kbd>1</kbd>&ndash;<kbd>8</kbd> snapshots &nbsp; <kbd>0</kbd> flush buffers &nbsp; <kbd>B</kbd> bypass (hold) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> still &nbsp; <kbd>shift</kbd>+<kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>V</kbd> multiview &nbsp; <kbd>D</kbd> mod page &nbsp; <kbd>H</kbd> this help</p>
+  <p><kbd>/</kbd> filter the panel &nbsp; <kbd>Space</kbd> randomize &nbsp; <kbd>M</kbd> mutate &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>shift</kbd>+<kbd>Z</kbd> redo &nbsp; <kbd>1</kbd>&ndash;<kbd>9</kbd> presets &nbsp; <kbd>shift</kbd>+<kbd>1</kbd>&ndash;<kbd>8</kbd> snapshots &nbsp; <kbd>0</kbd> flush buffers &nbsp; <kbd>B</kbd> bypass (hold, or hold the BYPASS button) &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>S</kbd> still &nbsp; <kbd>shift</kbd>+<kbd>R</kbd> record &nbsp; <kbd>P</kbd> play/pause &nbsp; <kbd>V</kbd> multiview &nbsp; <kbd>D</kbd> mod page &nbsp; <kbd>H</kbd> this help</p>
   <p>Hold <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd> for the six bend pads. <kbd>0</kbd> is the panic key: it empties every buffer that feeds itself &mdash; the feedback store, the flow stage, the phosphor and the frame ring &mdash; without touching a single control, which is the way out when a bad frame gets caught circulating.</p>
   <p>Your patch, your snapshots and your take are saved to this browser every few seconds, so a reload or a crash picks up where you left off. Press <kbd>Z</kbd> straight after opening if you would rather start clean.</p>
   <h3>OUTPUT</h3>
@@ -1775,7 +1790,12 @@ const FS_MIX = COMMON + KEYFN +
 "      vec3 y1 = rgb2yiq(pv), y2 = rgb2yiq(pc);\n" +
 "      pv = yiq2rgb(vec3(y1.x, mix(y1.yz, y2.yz, u_edgeChroma)));\n" +
 "    }\n" +
-"    src = mix(src, pv, clamp(band*u_edgeHold, 0.0, 0.94));\n" +
+"    /* the ceiling on how much of the last frame can survive. Unity is the\n" +
+"       old limit and still reads as a trail that settles; past it the band\n" +
+"       stops settling at all and keeps building, which is the point of the\n" +
+"       extra travel on the control. */\n" +
+"    float hcap = min(0.94 + max(u_edgeHold-1.0, 0.0)*0.11, 0.995);\n" +
+"    src = mix(src, pv, clamp(band*u_edgeHold, 0.0, hcap));\n" +
 "  }\n" +
 "  if(border > 0.5) src = mix(src, vec3(1.0), t);\n" +
 "  /* ---- 4. what is left of a firing: dropped lines and switching noise ---- */\n" +
@@ -3229,7 +3249,7 @@ const FS_COPY = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v35.3";
+const BENDR_VERSION = "v35.4";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -3287,9 +3307,9 @@ const PDEF = [
   ["pipY","PIP Y","mixer",-1,1,-0.45],
   ["pipSize","PIP SIZE","mixer",0,1,0.35],
   ["pipBorder","PIP BORDER","mixer",0,1,0.12],
-  ["edgeAmt","EDGE MELT","mixer",0,1,0],
-  ["edgeWidth","EDGE WIDTH","mixer",0,1,0.3],
-  ["edgeHold","EDGE HOLD","mixer",0,1,0.6],
+  ["edgeAmt","EDGE MELT","mixer",0,2,0],
+  ["edgeWidth","EDGE WIDTH","mixer",0,2,0.3],
+  ["edgeHold","EDGE HOLD","mixer",0,1.5,0.6],
   ["edgeSwirl","EDGE SWIRL","mixer",-1,1,0],
   ["edgeChroma","EDGE CHROMA","mixer",0,1,0.5],
   ["edgeCreep","EDGE CREEP","mixer",0,1,0.35],
@@ -3321,9 +3341,9 @@ const PDEF = [
   ["pipY2","PIP Y","mixer2",-1,1,-0.45],
   ["pipSize2","PIP SIZE","mixer2",0,1,0.35],
   ["pipBorder2","PIP BORDER","mixer2",0,1,0.12],
-  ["edgeAmt2","EDGE MELT","mixer2",0,1,0],
-  ["edgeWidth2","EDGE WIDTH","mixer2",0,1,0.3],
-  ["edgeHold2","EDGE HOLD","mixer2",0,1,0.6],
+  ["edgeAmt2","EDGE MELT","mixer2",0,2,0],
+  ["edgeWidth2","EDGE WIDTH","mixer2",0,2,0.3],
+  ["edgeHold2","EDGE HOLD","mixer2",0,1.5,0.6],
   ["edgeSwirl2","EDGE SWIRL","mixer2",-1,1,0],
   ["edgeChroma2","EDGE CHROMA","mixer2",0,1,0.5],
   ["edgeCreep2","EDGE CREEP","mixer2",0,1,0.35],
@@ -3355,9 +3375,9 @@ const PDEF = [
   ["pipYM","PIP Y","mixerM",-1,1,-0.45],
   ["pipSizeM","PIP SIZE","mixerM",0,1,0.35],
   ["pipBorderM","PIP BORDER","mixerM",0,1,0.12],
-  ["edgeAmtM","EDGE MELT","mixerM",0,1,0],
-  ["edgeWidthM","EDGE WIDTH","mixerM",0,1,0.3],
-  ["edgeHoldM","EDGE HOLD","mixerM",0,1,0.6],
+  ["edgeAmtM","EDGE MELT","mixerM",0,2,0],
+  ["edgeWidthM","EDGE WIDTH","mixerM",0,2,0.3],
+  ["edgeHoldM","EDGE HOLD","mixerM",0,1.5,0.6],
   ["edgeSwirlM","EDGE SWIRL","mixerM",-1,1,0],
   ["edgeChromaM","EDGE CHROMA","mixerM",0,1,0.5],
   ["edgeCreepM","EDGE CREEP","mixerM",0,1,0.35],
@@ -3730,9 +3750,9 @@ const PHELP = {
   pipY:"Vertical position of the subscreen.",
   pipSize:"How large the subscreen is, from a small inset to most of the frame.",
   pipBorder:"Width of the border drawn around the subscreen. Zero for none.",
-  edgeAmt:"How hard the seam between the two pictures melts. The mixer works out where the boundary is and which way it faces, then drags the incoming picture along that direction and feeds its own last frame back into the same narrow band. The result is a soft trailing boundary that creeps outward, instead of a clean cut. Zero switches the whole stage off and costs nothing.",
-  edgeWidth:"How far either side of the boundary the melt reaches. Small values give a wet-looking rim; large values turn the whole transition into a smear.",
-  edgeHold:"How much of the last frame survives inside the band. This is the persistence that turns a smear into a trail. Above about 0.8 it stops settling and keeps building, which is where it starts to look properly bent.",
+  edgeAmt:"How hard the seam between the two pictures melts. The travel past 1.0 is headroom rather than a different behaviour: it keeps pushing the same drag further, to where the seam stops reading as a seam at all. The mixer works out where the boundary is and which way it faces, then drags the incoming picture along that direction and feeds its own last frame back into the same narrow band. The result is a soft trailing boundary that creeps outward, instead of a clean cut. Zero switches the whole stage off and costs nothing.",
+  edgeWidth:"How far either side of the boundary the melt reaches. Past 1.0 the band is wide enough to swallow most of the frame, which is a look rather than an edge treatment. Small values give a wet-looking rim; large values turn the whole transition into a smear.",
+  edgeHold:"How much of the last frame survives inside the band. This is the persistence that turns a smear into a trail, and above about 0.8 it stops settling and keeps building, which is where it starts to look properly bent. Past 1.0 the ceiling on that survival lifts as well, so it never settles at all for as long as you leave it there.",
   edgeSwirl:"Turns the drag direction. At zero the melt runs straight out across the boundary; wound fully either way it runs along it instead, so the edge stirs rather than bleeds.",
   edgeChroma:"Lets colour run further than brightness, the way it does off a composite edge. This is what makes the melt read as analogue rather than as a blur.",
   wipeBord:"Lays a coloured rule along the join, the way a bench mixer's border wipe does. It follows the wipe wherever it goes and disappears when the fader reaches either end.",
@@ -6111,10 +6131,14 @@ function buildZones(){
       attachTip(fc, "FOLLOW CHAIN", "Reorders these sections to match the order of the stages on the rail above the picture, so the panel reads in the order the signal is actually processed.");
       fc.onclick = ()=>{ orderChainZone(true); saveSectionOrder(); toast("Panel follows the signal chain"); };
       const rs = document.createElement("button");
-      rs.textContent = "RESET";
-      attachTip(rs, "RESET LAYOUT", "Puts these sections back into the default signal-path order.");
+      rs.textContent = "RESET ORDER";
+      attachTip(rs, "RESET ORDER", "Puts these sections back into the default signal-path order. Does not touch any value.");
       rs.onclick = ()=>{ orderChainZone(false); saveSectionOrder(); toast("Panel order reset"); };
-      h.appendChild(fc); h.appendChild(rs);
+      const rf = document.createElement("button");
+      rf.textContent = "RESET FX";
+      attachTip(rf, "RESET THIS CHANNEL", "Every effect on this channel back to default in one press, without touching what the channel is looking at. The source stays loaded, the pattern synth keeps its patch, and the other three channels and the master are untouched. LINK does all four. Undoable with Z.");
+      rf.onclick = ()=>resetChannelFX();
+      h.appendChild(fc); h.appendChild(rs); h.appendChild(rf);
     }
     wrap.appendChild(h);
     const body = document.createElement("div");
@@ -6344,6 +6368,32 @@ function refreshStageLeds(){
 }
 
 /* ---- section reset ---- */
+/* "How do I clear everything I have done to this channel without losing the
+   clip I loaded" had no answer: there was a per-section RESET and a global
+   INIT and nothing between them. The pattern synth is deliberately exempt,
+   because on a synth channel that patch is the picture, not an effect. */
+function resetChannelFX(){
+  pushHistory();
+  const targets = linkChans ? CHANNELS : [activeChan];
+  for(const p of CLIST){
+    if(p.sec === "gen") continue;
+    for(const ch of targets){ chanBase[ch][p.id] = p.def; morphOverride.add(ch+":"+p.id); }
+  }
+  /* the per-channel mode switches are part of "what I have done to it" */
+  fbTrailMode=false; rescanMode=false;
+  fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbFlip=0; fbTap=0; fbNoServo=false;
+  fieldSrc=0; flowField=0; flowEdge=0;
+  scanRevH=false; scanRevV=false; syncLatch=false;
+  keyChroma=false; showKeyMatte=false;
+  for(const ch of targets){
+    if(window.__setTransport) window.__setTransport("play", ch);
+    stageEnabled && Object.keys(stageEnabled).forEach(k=>{ stageEnabled[k] = true; });
+  }
+  /* and so is anything patched into it */
+  routes = routes.filter(r=>targets.indexOf(r.ch||"A") < 0);
+  refreshUI(); renderRoutes(); refreshToggles(); refreshBypassBtns(); renderChain();
+  toast("Reset the effects on channel " + targets.join("+") + " — source untouched");
+}
 function resetSection(id){
   for(const p of PLIST) if(p.sec===id){
     if(p.master){ mBase[p.id] = p.def; morphOverride.add("M:"+p.id); }
@@ -8715,6 +8765,30 @@ btnPop.onclick = ()=>{
 };
 
 /* big performance randomize/mutate pads */
+/* BYPASS was wired to nothing. The button had no handler at all and the B key
+   called a setBypass that was never defined, so it threw on every press and
+   every release, and the one control that answers "what have I actually done
+   to this picture" had never worked. It is a momentary: held, not latched,
+   because you want to glance at the clean signal and let go. */
+function setBypass(on){
+  bypass = on ? 1 : 0;
+  const b = document.getElementById("btnBypass");
+  if(b) b.classList.toggle("on", !!on);
+  document.body.classList.toggle("bypassing", !!on);
+}
+{
+  const b = document.getElementById("btnBypass");
+  const dn = e=>{ e.preventDefault(); setBypass(true); };
+  const up = ()=>setBypass(false);
+  b.addEventListener("mousedown", dn);
+  b.addEventListener("touchstart", dn, {passive:false});
+  b.addEventListener("mouseup", up);
+  b.addEventListener("mouseleave", up);
+  b.addEventListener("touchend", up);
+  /* a window that loses focus mid-hold would otherwise stay bypassed forever */
+  window.addEventListener("blur", up);
+}
+
 document.getElementById("btnRnd").onclick = randomizeAll;
 document.getElementById("btnMut").onclick = mutate;
 
@@ -9023,7 +9097,7 @@ window.addEventListener("keydown", e=>{
   if(k==="/"){ e.preventDefault(); if(window.__focusFilter) window.__focusFilter(); return; }
   if(k==="d"){ setDock(dockTab==="mod" ? "matrix" : "mod"); return; }
   if(k==="p"){ btnPlay.click(); return; }
-  if(k==="b"){ setBypass(true); return; }
+  if(k==="b"){ if(!e.repeat) setBypass(true); return; }
   if(k==="q"){ bendHeld.sync=true; markBend("sync",true); }
   if(k==="w"){ bendHeld.roll=true; markBend("roll",true); }
   if(k==="e"){ bendHeld.rainbow=true; markBend("rainbow",true); }

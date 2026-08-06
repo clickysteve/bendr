@@ -1,7 +1,7 @@
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v35.3";
+const BENDR_VERSION = "v35.4";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -59,9 +59,9 @@ const PDEF = [
   ["pipY","PIP Y","mixer",-1,1,-0.45],
   ["pipSize","PIP SIZE","mixer",0,1,0.35],
   ["pipBorder","PIP BORDER","mixer",0,1,0.12],
-  ["edgeAmt","EDGE MELT","mixer",0,1,0],
-  ["edgeWidth","EDGE WIDTH","mixer",0,1,0.3],
-  ["edgeHold","EDGE HOLD","mixer",0,1,0.6],
+  ["edgeAmt","EDGE MELT","mixer",0,2,0],
+  ["edgeWidth","EDGE WIDTH","mixer",0,2,0.3],
+  ["edgeHold","EDGE HOLD","mixer",0,1.5,0.6],
   ["edgeSwirl","EDGE SWIRL","mixer",-1,1,0],
   ["edgeChroma","EDGE CHROMA","mixer",0,1,0.5],
   ["edgeCreep","EDGE CREEP","mixer",0,1,0.35],
@@ -93,9 +93,9 @@ const PDEF = [
   ["pipY2","PIP Y","mixer2",-1,1,-0.45],
   ["pipSize2","PIP SIZE","mixer2",0,1,0.35],
   ["pipBorder2","PIP BORDER","mixer2",0,1,0.12],
-  ["edgeAmt2","EDGE MELT","mixer2",0,1,0],
-  ["edgeWidth2","EDGE WIDTH","mixer2",0,1,0.3],
-  ["edgeHold2","EDGE HOLD","mixer2",0,1,0.6],
+  ["edgeAmt2","EDGE MELT","mixer2",0,2,0],
+  ["edgeWidth2","EDGE WIDTH","mixer2",0,2,0.3],
+  ["edgeHold2","EDGE HOLD","mixer2",0,1.5,0.6],
   ["edgeSwirl2","EDGE SWIRL","mixer2",-1,1,0],
   ["edgeChroma2","EDGE CHROMA","mixer2",0,1,0.5],
   ["edgeCreep2","EDGE CREEP","mixer2",0,1,0.35],
@@ -127,9 +127,9 @@ const PDEF = [
   ["pipYM","PIP Y","mixerM",-1,1,-0.45],
   ["pipSizeM","PIP SIZE","mixerM",0,1,0.35],
   ["pipBorderM","PIP BORDER","mixerM",0,1,0.12],
-  ["edgeAmtM","EDGE MELT","mixerM",0,1,0],
-  ["edgeWidthM","EDGE WIDTH","mixerM",0,1,0.3],
-  ["edgeHoldM","EDGE HOLD","mixerM",0,1,0.6],
+  ["edgeAmtM","EDGE MELT","mixerM",0,2,0],
+  ["edgeWidthM","EDGE WIDTH","mixerM",0,2,0.3],
+  ["edgeHoldM","EDGE HOLD","mixerM",0,1.5,0.6],
   ["edgeSwirlM","EDGE SWIRL","mixerM",-1,1,0],
   ["edgeChromaM","EDGE CHROMA","mixerM",0,1,0.5],
   ["edgeCreepM","EDGE CREEP","mixerM",0,1,0.35],

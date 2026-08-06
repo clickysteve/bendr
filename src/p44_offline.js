@@ -283,6 +283,21 @@ if(OUTPUT_MODE){
      its own handler overwritten by this loop */
   document.querySelectorAll("#dockTabs button[data-dock]").forEach(b=>{ b.onclick = ()=>setDock(b.dataset.dock); });
   {
+    /* Three controls in this menu were wired to nothing at all. FLUSH BUFFERS
+       had no handler (the 0 key worked, the button did not), MIDI LEARN had no
+       handler and nothing anywhere ever turned MIDI on, and the AUDIO REACT
+       selector had no onchange — it was a mirror of the one on the AUDIO tab
+       and changing it did nothing. */
+    { const fb = document.getElementById("btnFlush");
+      if(fb) fb.onclick = ()=>{ flushBuffers(); toast("Buffers flushed \u2014 feedback, flow, persistence and the frame ring"); }; }
+    { const mb = document.getElementById("btnMidi");
+      if(mb) mb.onclick = ()=>toggleMidiLearn(); }
+    { const ab = document.getElementById("selAudio");
+      if(ab) ab.onchange = ()=>{
+        setAudioMode(ab.value);
+        const other = document.getElementById("selAudioSrc");
+        if(other) other.value = ab.value;
+      }; }
     const rt = document.getElementById("selRate");
     if(rt) rt.onchange = ()=>{
       engineRate = parseInt(rt.value) || 0;

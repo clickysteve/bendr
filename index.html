@@ -166,6 +166,9 @@ button:focus-visible, select:focus-visible, input:focus-visible{outline:2px soli
 }
 .prow label:hover{color:var(--txt);}
 .prow label.learn{color:#000; background:var(--mag); border-radius:2px; padding:0 3px;}
+/* while learn is armed, every parameter name is a target and should look it */
+body.midilearn .prow label{cursor:crosshair; text-decoration:underline dotted var(--mag);}
+#btnMidi.on{background:var(--mag); border-color:var(--mag); color:#0b0b0e;}
 .prow label.mapped::after{content:"·"; color:var(--mag); font-weight:700;}
 .prow .val{width:38px; flex:0 0 38px; text-align:right; color:var(--txt); font-size:9.5px;}
 .sldwrap{flex:1; position:relative; height:16px; display:flex; align-items:center;}
@@ -3369,7 +3372,7 @@ const FS_COPY = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v35.6";
+const BENDR_VERSION = "v35.7";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -6936,7 +6939,6 @@ function sectionExtras(id, d){
 }
 
 /* ---- audio react section: band ranges, gains, response, live meters ---- */
-const lfoUIRefs = {};
 const audioUIRefs = [];
 const meterEls = {};
 function hzFmt(v){ return v>=1000 ? (v/1000).toFixed(1)+"k" : Math.round(v); }
@@ -7296,6 +7298,28 @@ function setLearnTarget(pid){
   for(const id in uiRefs) uiRefs[id].label.classList.toggle("learn", id===pid);
   toast("Move a MIDI control to map → "+P[pid].name);
 }
+/* MIDI was written and never switched on. initMidi existed and nothing called
+   it; midiLearnMode was declared, read in two places, and never set anywhere.
+   So none of it worked: no CC learn, no clock, no note triggers, in any build
+   — while the manual and the readme both described all three. This is the
+   button that turns it on, and it is also the arm/disarm for learn. */
+let midiReady = false;
+async function toggleMidiLearn(){
+  const b = document.getElementById("btnMidi");
+  if(!midiReady){
+    await initMidi();
+    if(!midiReady) return;              /* unavailable or refused; initMidi said so */
+  }
+  midiLearnMode = !midiLearnMode;
+  if(!midiLearnMode){
+    midiLearnTarget = null;
+    for(const id in uiRefs) uiRefs[id].label.classList.remove("learn");
+  }
+  if(b) b.classList.toggle("on", midiLearnMode);
+  document.body.classList.toggle("midilearn", midiLearnMode);
+  toast(midiLearnMode ? "MIDI learn on \u2014 click a parameter name, then move a control"
+                      : "MIDI learn off");
+}
 async function initMidi(){
   if(!navigator.requestMIDIAccess){ toast("WebMIDI not available (use Chrome)", true); return; }
   try{
@@ -7303,7 +7327,8 @@ async function initMidi(){
     const hook = inp => { inp.onmidimessage = onMidi; };
     access.inputs.forEach(hook);
     access.onstatechange = e => { if(e.port.type==="input" && e.port.state==="connected") hook(e.port); };
-    toast("MIDI connected — click a parameter name to learn");
+    midiReady = true;
+    toast("MIDI connected \u2014 click a parameter name to learn");
   }catch(e){ toast("MIDI access denied", true); }
 }
 const NOTE_BENDS = {36:"sync", 37:"roll", 38:"rainbow", 39:"drop", 40:"melt", 41:"kill"};   // C1..F1
@@ -8505,7 +8530,6 @@ function refreshDockTabs(){
   }
 }
 window.__refreshDockTabs = refreshDockTabs;
-const textEd = null;
 const TXT_CTRL = [["txtBody","body","s"],["txtFont","font","s"],["txtSize","size","f"],["txtTrack","track","f"],
   ["txtX","x","f"],["txtY","y","f"],["txtRot","rot","f"],["txtScrollX","scrollX","f"],["txtScrollY","scrollY","f"],
   ["txtRepeat","repeat","f"],["txtInk","ink","s"],["txtBg","bg","s"],["txtOutline","outline","f"],
@@ -9469,7 +9493,6 @@ function restoreAutosave(){
 }
 
 /* keyboard */
-const KEYBEND = {q:"sync", w:"roll", e:"rainbow", r_shift:null, t:"melt", y:"kill"};
 /* A select that has been used keeps focus, and typingNow then swallows every
    keyboard shortcut - so choosing a transition and then reaching for a bend pad
    did nothing at all. Hand focus back as soon as the choice is made. */
@@ -11153,6 +11176,21 @@ if(OUTPUT_MODE){
      its own handler overwritten by this loop */
   document.querySelectorAll("#dockTabs button[data-dock]").forEach(b=>{ b.onclick = ()=>setDock(b.dataset.dock); });
   {
+    /* Three controls in this menu were wired to nothing at all. FLUSH BUFFERS
+       had no handler (the 0 key worked, the button did not), MIDI LEARN had no
+       handler and nothing anywhere ever turned MIDI on, and the AUDIO REACT
+       selector had no onchange — it was a mirror of the one on the AUDIO tab
+       and changing it did nothing. */
+    { const fb = document.getElementById("btnFlush");
+      if(fb) fb.onclick = ()=>{ flushBuffers(); toast("Buffers flushed \u2014 feedback, flow, persistence and the frame ring"); }; }
+    { const mb = document.getElementById("btnMidi");
+      if(mb) mb.onclick = ()=>toggleMidiLearn(); }
+    { const ab = document.getElementById("selAudio");
+      if(ab) ab.onchange = ()=>{
+        setAudioMode(ab.value);
+        const other = document.getElementById("selAudioSrc");
+        if(other) other.value = ab.value;
+      }; }
     const rt = document.getElementById("selRate");
     if(rt) rt.onchange = ()=>{
       engineRate = parseInt(rt.value) || 0;

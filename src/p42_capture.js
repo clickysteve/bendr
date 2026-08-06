@@ -439,7 +439,6 @@ function restoreAutosave(){
 }
 
 /* keyboard */
-const KEYBEND = {q:"sync", w:"roll", e:"rainbow", r_shift:null, t:"melt", y:"kill"};
 /* A select that has been used keeps focus, and typingNow then swallows every
    keyboard shortcut - so choosing a transition and then reaching for a bend pad
    did nothing at all. Hand focus back as soon as the choice is made. */

@@ -2229,7 +2229,6 @@ function sectionExtras(id, d){
 }
 
 /* ---- audio react section: band ranges, gains, response, live meters ---- */
-const lfoUIRefs = {};
 const audioUIRefs = [];
 const meterEls = {};
 function hzFmt(v){ return v>=1000 ? (v/1000).toFixed(1)+"k" : Math.round(v); }
@@ -2589,6 +2588,28 @@ function setLearnTarget(pid){
   for(const id in uiRefs) uiRefs[id].label.classList.toggle("learn", id===pid);
   toast("Move a MIDI control to map → "+P[pid].name);
 }
+/* MIDI was written and never switched on. initMidi existed and nothing called
+   it; midiLearnMode was declared, read in two places, and never set anywhere.
+   So none of it worked: no CC learn, no clock, no note triggers, in any build
+   — while the manual and the readme both described all three. This is the
+   button that turns it on, and it is also the arm/disarm for learn. */
+let midiReady = false;
+async function toggleMidiLearn(){
+  const b = document.getElementById("btnMidi");
+  if(!midiReady){
+    await initMidi();
+    if(!midiReady) return;              /* unavailable or refused; initMidi said so */
+  }
+  midiLearnMode = !midiLearnMode;
+  if(!midiLearnMode){
+    midiLearnTarget = null;
+    for(const id in uiRefs) uiRefs[id].label.classList.remove("learn");
+  }
+  if(b) b.classList.toggle("on", midiLearnMode);
+  document.body.classList.toggle("midilearn", midiLearnMode);
+  toast(midiLearnMode ? "MIDI learn on \u2014 click a parameter name, then move a control"
+                      : "MIDI learn off");
+}
 async function initMidi(){
   if(!navigator.requestMIDIAccess){ toast("WebMIDI not available (use Chrome)", true); return; }
   try{
@@ -2596,7 +2617,8 @@ async function initMidi(){
     const hook = inp => { inp.onmidimessage = onMidi; };
     access.inputs.forEach(hook);
     access.onstatechange = e => { if(e.port.type==="input" && e.port.state==="connected") hook(e.port); };
-    toast("MIDI connected — click a parameter name to learn");
+    midiReady = true;
+    toast("MIDI connected \u2014 click a parameter name to learn");
   }catch(e){ toast("MIDI access denied", true); }
 }
 const NOTE_BENDS = {36:"sync", 37:"roll", 38:"rainbow", 39:"drop", 40:"melt", 41:"kill"};   // C1..F1

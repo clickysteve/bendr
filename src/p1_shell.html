@@ -166,6 +166,9 @@ button:focus-visible, select:focus-visible, input:focus-visible{outline:2px soli
 }
 .prow label:hover{color:var(--txt);}
 .prow label.learn{color:#000; background:var(--mag); border-radius:2px; padding:0 3px;}
+/* while learn is armed, every parameter name is a target and should look it */
+body.midilearn .prow label{cursor:crosshair; text-decoration:underline dotted var(--mag);}
+#btnMidi.on{background:var(--mag); border-color:var(--mag); color:#0b0b0e;}
 .prow label.mapped::after{content:"·"; color:var(--mag); font-weight:700;}
 .prow .val{width:38px; flex:0 0 38px; text-align:right; color:var(--txt); font-size:9.5px;}
 .sldwrap{flex:1; position:relative; height:16px; display:flex; align-items:center;}

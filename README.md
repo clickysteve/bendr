@@ -174,6 +174,12 @@ The sidebar is per-channel, and only per-channel: everything shared by all four 
 
 Each channel button carries a live thumbnail of what that channel is producing and the name of what is loaded on it, so you can tell at a glance what is where. The tempo has a beat LED beside it that flashes on the beat and accents the bar, because a number is not something you can check against music.
 
+## Blanking
+
+Where the picture does not reach, the raster is blanking, and blanking is black. Move the framing, or turn up SHAKE, and part of the frame has no source in it at all — and every stage downstream works on the whole raster with no idea where the picture ends. A rainbow colouriser maps zero luma to a colour rather than to nothing, so the uncovered strip lit up flat and read as a light leak tracing the edge.
+
+The coverage travels with the picture now, in the alpha channel, from the framing pass through every stage of the chain and the mixer to the display, which cuts it back to black. The feedback loop is deliberately allowed to carry picture out into the blanking, because a real one does; the scan processor redraws the whole raster, so it clears the matte, which is also what the hardware does.
+
 ## Letting it fail
 
 Two switches exist so the models can reach states they cannot get out of, because a model that always recovers is a model that cannot actually break.

@@ -69,6 +69,14 @@ const FS_FB = COMMON + KEYFN +
 "  q = mat2(c,-s,s,c)*q;\n" +
 "  q /= pow(8.0, zoom);\n" +
 "  return q + 0.5 - vec2(px,py)*1.5;\n}\n" +
+"/* Where the picture actually is. Move the framing, or shake it, and part of\n" +
+"   the raster has no source in it at all: that is blanking, and blanking is\n" +
+"   black. It did not stay black, because every stage downstream works on the\n" +
+"   whole raster and has no idea where the picture ends \u2014 a colouriser maps\n" +
+"   zero luma to a colour rather than to nothing, so the uncovered strip lit\n" +
+"   up flat. So the coverage travels with the picture, in the alpha channel,\n" +
+"   from here to the display. */\n" +
+"float g_cover = 1.0;\n" +
 "vec3 fitSample(sampler2D tx, vec2 uv, float srcA, float outA){\n" +
 "  vec2 p = uv-0.5;\n" +
 "  /* FLIP turns the picture over; MIRROR reflects one half onto the other;\n" +
@@ -98,7 +106,7 @@ const FS_FB = COMMON + KEYFN +
 "  p += 0.5;\n" +
 "  if(u_edgeMode>1.5){ vec2 t = fract(p*0.5)*2.0; p = 1.0-abs(t-1.0); }\n" +
 "  else if(u_edgeMode>0.5){ p = fract(p); }\n" +
-"  else if(p.x<0.0||p.x>1.0||p.y<0.0||p.y>1.0) return vec3(0.0);\n" +
+"  else if(p.x<0.0||p.x>1.0||p.y<0.0||p.y>1.0){ g_cover = 0.0; return vec3(0.0); }\n" +
 "  return texture(tx, p).rgb;\n}\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
@@ -188,7 +196,12 @@ const FS_FB = COMMON + KEYFN +
 "  else if(u_fbBlend<4.5) col = mix(src, min(src, prev), fbA);\n" +
 "  else col = mix(src, abs(src-prev), fbA);\n" +
 "  if(u_hasDelay>0.5) col = mix(col, texture(u_delayT, uv).rgb, u_echo);\n" +
-"  O = vec4(clamp(col, -0.5, 2.0),1.0);\n}\n";
+"  /* the loop legitimately carries picture out into the blanking, so the\n" +
+"     coverage is the union of what the source reaches and what the feedback\n" +
+"     is still holding there */\n" +
+"  float cover = (u_hasSrc>0.5) ? g_cover : 0.0;\n" +
+"  cover = max(cover, texture(u_prev, p).a * step(0.003, u_fbAmount));\n" +
+"  O = vec4(clamp(col, -0.5, 2.0), cover);\n}\n";
 
 /* mixer: combines the two fully-processed channels — fader, wipes, keys, blends */
 /* pass: MIXER — three independent stages, the way a vision mixer actually works.
@@ -350,7 +363,7 @@ const FS_MIX = COMMON + KEYFN +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  float outA = u_res.x/u_res.y;\n" +
-"  if(u_hasB<0.5 || u_abMix<0.0005){ O = vec4(texture(u_texA, uv).rgb,1.0); return; }\n" +
+"  if(u_hasB<0.5 || u_abMix<0.0005){ O = texture(u_texA, uv); return; }\n" +
 "  float t = u_abMix;\n" +
 "  float mm = u_mixMode;\n" +
 "  /* ---- 0. the dirty mixer ----\n" +
@@ -522,7 +535,11 @@ const FS_MIX = COMMON + KEYFN +
 "      src = mix(src, vec3(dot(src, vec3(0.299,0.587,0.114))), u_mixDirtNoise*dirtE*0.5);\n" +
 "    }\n" +
 "  }\n" +
-"  O = vec4(clamp(src,0.0,1.6),1.0);\n}\n";
+"  /* coverage crossfades with the picture: where neither input has any, the\n" +
+"     mixer has none either, and the display leaves it black */\n" +
+"  float ca = texture(u_texA, clamp(duv,0.0,1.0)).a;\n" +
+"  float cb = texture(u_texB, clamp(buv + bd, 0.0, 1.0)).a;\n" +
+"  O = vec4(clamp(src,0.0,1.6), max(ca*(1.0-clamp(m,0.0,1.0)), cb*clamp(m,0.0,1.0)));\n}\n";
 
 /* ---------------- the scan processor ----------------
    Every other stage here is a fragment shader: a full-screen triangle, one
@@ -637,7 +654,9 @@ const FS_SCAN =
 "  float y = dot(c, vec3(0.299,0.587,0.114));\n" +
 "  c = mix(c, vec3(y), u_scanMono);\n" +
 "  if(u_scanHue > 0.002) c = mix(c, hsv2s(vec3(fract(u_scanHue + y*0.35), 0.85, 1.0))*y, u_scanHue);\n" +
-"  O = vec4(c*v_gain*u_scanGain, 1.0);\n}\n";
+"  /* additive into a target cleared to alpha 1: contribute none, or the\n" +
+"     coverage would stack up past unity wherever lines bunch */\n" +
+"  O = vec4(c*v_gain*u_scanGain, 0.0);\n}\n";
 
 /* Phosphor persistence, as an accumulator rather than a one-frame echo.
    The reason a CRT trail is coloured rather than grey is that the three P22
@@ -711,7 +730,7 @@ const FS_FIELD = COMMON +
 "    float held = (ph < 2.0) ? 1.0 : 0.0;\n" +
 "    outc = mix(outc, prev, held*u_ilJudder*0.85);\n" +
 "  }\n" +
-"  O = vec4(mix(cur, outc, u_ilAmt), 1.0);\n}\n";
+"  O = vec4(mix(cur, outc, u_ilAmt), texture(u_tex, uv).a);\n}\n";
 
 /* ---------------- block transform ----------------
    The artefacts everybody recognises from a badly compressed picture are not
@@ -763,7 +782,7 @@ const FS_DCT = COMMON +
 "    co = floor(co/step + 0.5)*step;\n" +
 "    out3 += co * (u == 0 ? sqrt(1.0/N) : sqrt(2.0/N)) * cos((2.0*k+1.0)*fu*PI/(2.0*N));\n" +
 "  }\n" +
-"  O = vec4(mix(src, out3, u_dctAmt), 1.0);\n}\n";
+"  O = vec4(mix(src, out3, u_dctAmt), texture(u_tex, uv).a);\n}\n";
 
 /* ---------------- time displacement ----------------
    Every other stage here samples the current frame at a different place. This
@@ -795,7 +814,7 @@ const FS_TDISP = COMMON +
 "  vec3 a = texture(u_hist, vec3(uv, l0)).rgb;\n" +
 "  vec3 b = texture(u_hist, vec3(uv, l1)).rgb;\n" +
 "  vec3 past = mix(a, b, f*u_tdSoft);\n" +
-"  O = vec4(mix(cur, past, u_tdAmt), 1.0);\n}\n";
+"  O = vec4(mix(cur, past, u_tdAmt), texture(u_tex, uv).a);\n}\n";
 
 /* pass 2: the bent signal path — physical sync model + NTSC + tape */
 const FS_SIG = COMMON + KEYFN +
@@ -964,7 +983,7 @@ const FS_SIG = COMMON + KEYFN +
 "    float km = keyOf(dry, u_keyMode, u_keyHue, u_keyThresh, u_keySoft, u_keyInv);\n" +
 "    wet = mix(dry, wet, 1.0 - u_keyFx*(1.0-km));\n" +
 "  }\n" +
-"  O = vec4(wet, 1.0);\n}\n";
+"  O = vec4(wet, texture(u_tex, uv).a);\n}\n";
 
 /* pass 3: bent enhancer + colour stage */
 const FS_COL = COMMON + KEYFN +
@@ -1159,7 +1178,7 @@ const FS_COL = COMMON + KEYFN +
 "    float km = keyOf(dry, u_keyMode, u_keyHue, u_keyThresh, u_keySoft, u_keyInv);\n" +
 "    c = mix(dry, c, 1.0 - u_keyFx*(1.0-km));\n" +
 "  }\n" +
-"  O = vec4(clamp(c,0.0,1.4), 1.0);\n}\n";
+"  O = vec4(clamp(c,0.0,1.4), texture(u_tex, uv).a);\n}\n";
 
 /* MASTER OUTPUT — display model, phosphor, overlays, output transform */
 const FS_CRT = COMMON +
@@ -1448,7 +1467,8 @@ const FS_CRT = COMMON +
 "    c = mix(c, od.rgb, od.a*u_osdShow);\n" +
 "  }\n" +
 "  /* the raster stops here, so everything laid over the picture stops with it */\n" +
-"  O = vec4(max(c,0.0)*tube, 1.0);\n}\n";
+"  /* and blanking is black on the tube, whatever the chain painted there */\n" +
+"  O = vec4(max(c,0.0)*tube*texture(u_tex, clamp(cuv,0.0,1.0)).a, 1.0);\n}\n";
 
 /* pass: GLITCH LAB — databending, pixel sort, halftone dropout, drift/FM warp */
 const FS_GLITCH = COMMON +
@@ -1519,7 +1539,7 @@ const FS_GLITCH = COMMON +
 "    float m = smoothstep(lm*0.72+0.06, lm*0.72-0.06, r);\n" +
 "    c = mix(c, cs*m, u_dotify);\n" +
 "  }\n" +
-"  O = vec4(c,1.0);\n}\n";
+"  O = vec4(c, texture(u_tex, uv).a);\n}\n";
 
 /* pass: FLOW / MOSH — optical-flow datamosh, melt, swirl, vector trash.
    Holds its own history and advects it along a selectable vector field.
@@ -1640,7 +1660,7 @@ const FS_FLOW = COMMON +
 "  }\n" +
 "  float ax = mix(uv.y, uv.x, clamp(u_shearAxis,0.0,1.0)) - 0.5;\n" +
 "  pers = clamp(pers + u_timeGrad*ax*1.4, 0.0, 0.995);\n" +
-"  O = vec4(clamp(mix(cur, prev, pers), -0.2, 2.0), 1.0);\n}\n";
+"  O = vec4(clamp(mix(cur, prev, pers), -0.2, 2.0), texture(u_tex, uv).a);\n}\n";
 
 
 /* pass: SIGNAL LAB — techniques adapted from the open-source glitch canon */
@@ -1786,7 +1806,7 @@ const FS_LAB = COMMON +
 "    yq.yz = mat2(cc,-ss,ss,cc)*yq.yz;\n" +
 "    c = yiq2rgb(yq);\n" +
 "  }\n" +
-"  O = vec4(c,1.0);\n}\n";
+"  O = vec4(c, texture(u_tex, uv).a);\n}\n";
 
 /* pass: PATTERN SYNTH — a shape and pattern generator per channel, built like a
    video synthesiser: ramps and oscillators, cross-modulation, a wavefolder, a

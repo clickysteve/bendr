@@ -1,3 +1,8 @@
+/* The build version, in exactly one place. It used to be typed into two spots
+   in the markup, which is a guarantee that one day it will say the wrong
+   thing on a build that shipped. build.py reads this and prints it. */
+const BENDR_VERSION = "v35.3";
+
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
    never moves, because it is the desk. The CHANNEL zone follows the signal path

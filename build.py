@@ -81,8 +81,16 @@ raw = out.encode("utf-8")
 gz = len(gzip.compress(raw, 9))
 digest = hashlib.sha256(raw).hexdigest()[:12]
 
-print("built %d bytes (%d gzipped, %.1f:1)  sha %s  syntax %s"
-      % (len(raw), gz, len(raw) / float(gz), digest, status))
+# the version is shown on every build, because shipping the wrong number in the
+# header is invisible until somebody looks at the deployed page and doubts it
+import re
+m = re.search(r'const BENDR_VERSION\s*=\s*"([^"]+)"', body)
+version = m.group(1) if m else "MISSING"
+if version == "MISSING":
+    sys.exit("build: no BENDR_VERSION in the source")
+
+print("built %s  %d bytes (%d gzipped, %.1f:1)  sha %s  syntax %s"
+      % (version, len(raw), gz, len(raw) / float(gz), digest, status))
 for name, a, b in offsets:
     print("  index.html lines %5d-%5d  %s" % (a, b, name))
 if len(raw) > SIZE_BUDGET:

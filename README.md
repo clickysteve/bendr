@@ -198,6 +198,8 @@ There are 404 parameters. Press `/` and type, and the panel narrows to whatever 
 
 The six bend pads have their own strip beside the faders rather than living on a tab, because you should never have to go looking for them mid-set.
 
+Right-clicking any parameter opens the modulation menu, and the sources in it say what they are already doing. Eight LFOs, three envelopes and the audio and video followers look identical in a list, so a source that already drives something is marked with its destination count and names them on hover, and one that drives nothing says FREE. Picking an unused modulator is a glance rather than a memory test.
+
 The patch, the eight snapshots and the current take are written to the browser every few seconds, so a reload, a crash or a flat battery picks up where you left off. Press `Z` straight after opening if you would rather start clean.
 
 ## Movement
@@ -259,7 +261,7 @@ Build the single-file `index.html` with:
 python3 build.py
 ```
 
-The build syntax-checks the concatenated script, prints the gzipped size and a hash, fails on a size budget, and prints where each part landed so a line number in a stack trace can be resolved by eye.
+The build syntax-checks the concatenated script, prints the version, the gzipped size and a hash, fails on a size budget, and prints where each part landed so a line number in a stack trace can be resolved by eye. The version lives in exactly one place, `BENDR_VERSION` at the top of `p21_params.js`, and is written into the header and the manual at boot; the build fails if it is missing.
 
 Recording and the offline render both work at the **processing resolution**, not the window size, and the bitrate scales with the pixel rate — glitch material is close to the worst case an encoder ever sees.
 

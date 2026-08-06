@@ -1225,10 +1225,22 @@ const FS_CRT = COMMON +
 "    wv += vec2(0.0, (h21(vec2(floor(u_time*24.0), 5.0))-0.5)*0.35);\n" +
 "    cuv += wv*u_gateWeave*0.03;\n" +
 "  }\n" +
-"  /* rounded corners / tube edge */\n" +
+"  /* Rounded corners and the raster edge, anti-aliased.\n" +
+"     This used to be a hard discard, which put a full-brightness picture texel\n" +
+"     immediately against pure black. On bright material that reads as a lit rim\n" +
+"     tracing the tube, and every curve stair-steps. The mask is now built in\n" +
+"     screen space with fwidth, so the picture fades out across the pixel the\n" +
+"     edge actually falls on, the way a real raster does. */\n" +
 "  vec2 ab = abs(p) - vec2(1.0 - u_cornerRound*0.18);\n" +
 "  float corner = length(max(ab,0.0)) - u_cornerRound*0.18;\n" +
-"  if(cuv.x<0.0||cuv.x>1.0||cuv.y<0.0||cuv.y>1.0 || corner>0.0){ O=vec4(0.0,0.0,0.0,1.0); return; }\n" +
+"  float caa = fwidth(corner)*0.75 + 1e-6;\n" +
+"  float tube = 1.0 - smoothstep(-caa, caa, corner);\n" +
+"  /* the same for the edge of the picture itself: the last texel is not a\n" +
+"     bright line, it is where the raster stops */\n" +
+"  vec2 ed = min(cuv, 1.0-cuv);\n" +
+"  vec2 ew = fwidth(cuv)*0.75 + vec2(1e-6);\n" +
+"  tube *= smoothstep(0.0, ew.x, ed.x) * smoothstep(0.0, ew.y, ed.y);\n" +
+"  if(tube <= 0.0){ O=vec4(0.0,0.0,0.0,1.0); return; }\n" +
 "  /* rolling shutter beat against the field rate */\n" +
 "  if(u_rollShutter>0.003){ cuv.y += sin((uv.y*3.0 + u_time*0.7)*3.14159)*u_rollShutter*0.004; }\n" +
 "  vec3 c = texture(u_tex, clamp(cuv,0.0,1.0)).rgb;\n" +
@@ -1430,7 +1442,8 @@ const FS_CRT = COMMON +
 "    }\n" +
 "    c = mix(c, od.rgb, od.a*u_osdShow);\n" +
 "  }\n" +
-"  O = vec4(max(c,0.0),1.0);\n}\n";
+"  /* the raster stops here, so everything laid over the picture stops with it */\n" +
+"  O = vec4(max(c,0.0)*tube, 1.0);\n}\n";
 
 /* pass: GLITCH LAB — databending, pixel sort, halftone dropout, drift/FM warp */
 const FS_GLITCH = COMMON +

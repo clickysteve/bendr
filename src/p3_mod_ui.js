@@ -1498,10 +1498,30 @@ function openModMenu(ev, p){
     m.appendChild(b);
   }
 
+  /* Which modulators are already doing something. Eight LFOs, envelopes and
+     macros all look identical in a list, so picking an unused one meant
+     remembering what you had patched. Used ones carry a count and what they
+     drive; free ones say so. */
   for(const src of MODSRC){
+    const used = routes.filter(r=>r.src===src.id);
     const b = document.createElement("div");
-    b.className = "mmrow";
-    b.textContent = src.name;
+    b.className = "mmrow " + (used.length ? "used" : "free");
+    const nm = document.createElement("span");
+    nm.className = "mmname"; nm.textContent = src.name;
+    b.appendChild(nm);
+    const tag = document.createElement("span");
+    if(used.length){
+      tag.className = "mmuse";
+      tag.textContent = used.length === 1 ? "1 DEST" : used.length + " DESTS";
+      const names = used.map(r=>{ const q = P[r.dst]; return (q ? q.name : r.dst) + (r.ch && !P[r.dst].master ? " ("+r.ch+")" : ""); });
+      attachTip(b, src.name, "Already driving " + names.join(", ") + ".",
+                "Clicking adds another destination; a modulator can drive as many as you like.");
+    } else {
+      tag.className = "mmfree";
+      tag.textContent = "FREE";
+      attachTip(b, src.name, "Not patched to anything yet.");
+    }
+    b.appendChild(tag);
     b.onclick = e=>{
       e.stopPropagation();
       routes.push({src:src.id, dst:p.id, amt:0.3, ch:(p.master?"A":activeChan)});

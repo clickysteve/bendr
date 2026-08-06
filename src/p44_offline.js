@@ -215,6 +215,12 @@ if(OUTPUT_MODE){
     if(rs) rs.value = "360";
   }
 
+  /* one version string, written into both places it is shown */
+  for(const id of ["ver","helpVer"]){
+    const el = document.getElementById(id);
+    if(el) el.textContent = BENDR_VERSION;
+  }
+
   buildPanel();
   buildMixStrip();
   buildModPage();

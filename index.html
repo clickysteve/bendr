@@ -277,6 +277,16 @@ body.nomix #mixbuses{display:none;}
 .modmenu .mmrow.existing span{flex:0 0 auto; color:var(--mag); font-size:9px;}
 .modmenu .mmrow.existing input{flex:1; min-width:40px;}
 .modmenu .mmrow.existing button{padding:1px 5px; font-size:9px; color:var(--dim);}
+/* which modulators are already spoken for, so picking a free one is a glance
+   rather than a memory test */
+.modmenu .mmrow .mmname{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.modmenu .mmrow .mmuse{
+  flex:0 0 auto; font-size:7.5px; letter-spacing:1px; padding:1px 4px; border-radius:2px;
+  background:rgba(255,62,165,.18); color:var(--mag); border:1px solid rgba(255,62,165,.4);
+}
+.modmenu .mmrow .mmfree{flex:0 0 auto; font-size:7.5px; letter-spacing:1px; color:#3d3d4a;}
+.modmenu .mmrow.used .mmname{color:var(--mag);}
+.modmenu .mmrow.free .mmname{color:var(--txt);}
 /* modulation page */
 #modpage{
   position:fixed; inset:0; background:rgba(6,6,10,.94); z-index:56; display:none;
@@ -835,7 +845,7 @@ body.nomix #mixbuses{display:none;}
 <body>
 <div id="hdr">
   <div id="logo">BEND<b>R</b><small>CIRCUIT-BENT VIDEO PROCESSOR</small></div>
-  <span id="ver" title="Build version">v35.0</span>
+  <span id="ver" title="Build version"></span>
   <button id="btnHelpTop" data-tip="The manual: what everything is, why it behaves the way it does, and every keyboard shortcut. Also on the H key.">?</button>
   <div id="tempobox" data-tip="Tap four times in time and the tempo follows, or type the number straight into the readout \u2014 click it, type, press Enter. Up and down arrows nudge it by one, with shift for a tenth. Any modulator with a sync division locks to it, and incoming MIDI clock overrides it automatically.">
     <button id="btnTap">TAP</button><span id="beatLed"></span><input id="bpmVal" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="120.0" aria-label="Tempo in beats per minute"><span id="bpmExt"></span>
@@ -1159,7 +1169,7 @@ body.nomix #mixbuses{display:none;}
   <div id="helpToc"></div>
   <div id="helpSection"></div>
   <div id="helpBody">
-  <h2>BENDR <span style="color:var(--dim); font-size:11px; letter-spacing:1px;">v35.0</span></h2>
+  <h2>BENDR <span id="helpVer" style="color:var(--dim); font-size:11px; letter-spacing:1px;"></span></h2>
   <p>An analogue-style, circuit-bent video processor. Feed it video, then abuse the signal path the way a bent mixer or a dying VHS deck would: sync corruption, chroma smear, rainbow fringing, tracking errors, tape dropout, and video feedback.</p>
   <h3>FOUR CHANNELS, THREE BUSES</h3>
   <p>BENDR is a four-channel mixer. <b>A</b>, <b>B</b>, <b>C</b> and <b>D</b> each have their own input <i>and</i> their own complete set of effects — four sources, four glitch chains, four decks, running at once. The big A / B / C / D buttons at the top of the panel choose which channel you're editing; everything below them, and the bend pads, apply to that channel. <b>LINK</b> edits all four at once; the small selector next to it picks a target, and <b>COPY</b> writes this channel's effects onto it while <b>SWAP</b> exchanges the two outright, sources included. Any channel can reach any other, so D can be copied onto A as easily as A onto B, and shift-clicking COPY sends it to all three at once.</p>
@@ -2503,10 +2513,22 @@ const FS_CRT = COMMON +
 "    wv += vec2(0.0, (h21(vec2(floor(u_time*24.0), 5.0))-0.5)*0.35);\n" +
 "    cuv += wv*u_gateWeave*0.03;\n" +
 "  }\n" +
-"  /* rounded corners / tube edge */\n" +
+"  /* Rounded corners and the raster edge, anti-aliased.\n" +
+"     This used to be a hard discard, which put a full-brightness picture texel\n" +
+"     immediately against pure black. On bright material that reads as a lit rim\n" +
+"     tracing the tube, and every curve stair-steps. The mask is now built in\n" +
+"     screen space with fwidth, so the picture fades out across the pixel the\n" +
+"     edge actually falls on, the way a real raster does. */\n" +
 "  vec2 ab = abs(p) - vec2(1.0 - u_cornerRound*0.18);\n" +
 "  float corner = length(max(ab,0.0)) - u_cornerRound*0.18;\n" +
-"  if(cuv.x<0.0||cuv.x>1.0||cuv.y<0.0||cuv.y>1.0 || corner>0.0){ O=vec4(0.0,0.0,0.0,1.0); return; }\n" +
+"  float caa = fwidth(corner)*0.75 + 1e-6;\n" +
+"  float tube = 1.0 - smoothstep(-caa, caa, corner);\n" +
+"  /* the same for the edge of the picture itself: the last texel is not a\n" +
+"     bright line, it is where the raster stops */\n" +
+"  vec2 ed = min(cuv, 1.0-cuv);\n" +
+"  vec2 ew = fwidth(cuv)*0.75 + vec2(1e-6);\n" +
+"  tube *= smoothstep(0.0, ew.x, ed.x) * smoothstep(0.0, ew.y, ed.y);\n" +
+"  if(tube <= 0.0){ O=vec4(0.0,0.0,0.0,1.0); return; }\n" +
 "  /* rolling shutter beat against the field rate */\n" +
 "  if(u_rollShutter>0.003){ cuv.y += sin((uv.y*3.0 + u_time*0.7)*3.14159)*u_rollShutter*0.004; }\n" +
 "  vec3 c = texture(u_tex, clamp(cuv,0.0,1.0)).rgb;\n" +
@@ -2708,7 +2730,8 @@ const FS_CRT = COMMON +
 "    }\n" +
 "    c = mix(c, od.rgb, od.a*u_osdShow);\n" +
 "  }\n" +
-"  O = vec4(max(c,0.0),1.0);\n}\n";
+"  /* the raster stops here, so everything laid over the picture stops with it */\n" +
+"  O = vec4(max(c,0.0)*tube, 1.0);\n}\n";
 
 /* pass: GLITCH LAB — databending, pixel sort, halftone dropout, drift/FM warp */
 const FS_GLITCH = COMMON +
@@ -3202,6 +3225,11 @@ const FS_MULTI = COMMON +
 const FS_COPY = COMMON +
 "uniform sampler2D u_tex;\n" +
 "void main(){ O = texture(u_tex, gl_FragCoord.xy/u_res); }\n";
+
+/* The build version, in exactly one place. It used to be typed into two spots
+   in the markup, which is a guarantee that one day it will say the wrong
+   thing on a build that shipped. build.py reads this and prints it. */
+const BENDR_VERSION = "v35.3";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -6024,10 +6052,30 @@ function openModMenu(ev, p){
     m.appendChild(b);
   }
 
+  /* Which modulators are already doing something. Eight LFOs, envelopes and
+     macros all look identical in a list, so picking an unused one meant
+     remembering what you had patched. Used ones carry a count and what they
+     drive; free ones say so. */
   for(const src of MODSRC){
+    const used = routes.filter(r=>r.src===src.id);
     const b = document.createElement("div");
-    b.className = "mmrow";
-    b.textContent = src.name;
+    b.className = "mmrow " + (used.length ? "used" : "free");
+    const nm = document.createElement("span");
+    nm.className = "mmname"; nm.textContent = src.name;
+    b.appendChild(nm);
+    const tag = document.createElement("span");
+    if(used.length){
+      tag.className = "mmuse";
+      tag.textContent = used.length === 1 ? "1 DEST" : used.length + " DESTS";
+      const names = used.map(r=>{ const q = P[r.dst]; return (q ? q.name : r.dst) + (r.ch && !P[r.dst].master ? " ("+r.ch+")" : ""); });
+      attachTip(b, src.name, "Already driving " + names.join(", ") + ".",
+                "Clicking adds another destination; a modulator can drive as many as you like.");
+    } else {
+      tag.className = "mmfree";
+      tag.textContent = "FREE";
+      attachTip(b, src.name, "Not patched to anything yet.");
+    }
+    b.appendChild(tag);
     b.onclick = e=>{
       e.stopPropagation();
       routes.push({src:src.id, dst:p.id, amt:0.3, ch:(p.master?"A":activeChan)});
@@ -10479,6 +10527,12 @@ if(OUTPUT_MODE){
     setProcRes(360);
     const rs = document.getElementById("selRes");
     if(rs) rs.value = "360";
+  }
+
+  /* one version string, written into both places it is shown */
+  for(const id of ["ver","helpVer"]){
+    const el = document.getElementById(id);
+    if(el) el.textContent = BENDR_VERSION;
   }
 
   buildPanel();

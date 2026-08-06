@@ -373,7 +373,7 @@ function runStage(id, inTex, dstRT, now, ch){
 
 function srcReady(ch){
   const S = SRC[ch];
-  if(S.mode === "pattern" || S.mode === "text" || S.mode === "synth" || S.mode === "feed") return true;
+  if(S.mode === "pattern" || S.mode === "text" || S.mode === "synth" || S.mode === "feed" || S.mode === "glsl") return true;
   return S.video.readyState >= 2 && S.video.videoWidth > 0;
 }
 window.__chanHasSource = srcReady;
@@ -382,7 +382,7 @@ window.__chanHasSource = srcReady;
 function uploadSource(ch, dt){
   const S = SRC[ch];
   if(sourceFrozen(ch)) return;   /* leave the texture holding its last frame */
-  if(S.mode === "synth" || S.mode === "feed"){ S.aspect = procW/procH; S.has = 1; S.patClock += dt*S.speed; return; }
+  if(S.mode === "synth" || S.mode === "feed" || S.mode === "glsl"){ S.aspect = procW/procH; S.has = 1; S.patClock += dt*S.speed*(S.tpRate===undefined?1:S.tpRate); return; }
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
   if(S.mode === "pattern" || S.mode === "text"){
@@ -416,10 +416,68 @@ function renderGen(ch, now){
   draw();
   return C.gen.tex;
 }
+/* A pasted fragment shader, drawn into the same target the pattern synth uses.
+   iChannel1 is always the shader's own previous frame, which is the one input
+   it cannot get any other way and the one that makes a shader a feedback
+   system rather than a function of time. */
+function renderGlsl(ch, now, dt){
+  const C = chanRT[ch], S = SRC[ch];
+  const pr = glslProgOf(ch);
+  if(!pr) return C.gen.tex;              /* it failed to compile: hold the last picture */
+  if(!C.glslPrev) C.glslPrev = makeRT(procW, procH);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, C.gen.fbo);
+  gl.viewport(0,0,procW,procH);
+  gl.useProgram(pr.prog);
+  const u = n=>{ if(!(n in pr.loc)) pr.loc[n] = gl.getUniformLocation(pr.prog, n); return pr.loc[n]; };
+  gl.uniform3f(u("iResolution"), procW, procH, 1.0);
+  gl.uniform1f(u("iTime"), S.patClock);
+  gl.uniform1f(u("iTimeDelta"), dt || 1/60);
+  gl.uniform1f(u("iFrameRate"), dt > 0 ? 1/dt : 60);
+  gl.uniform1f(u("iSampleRate"), 44100);
+  gl.uniform1i(u("iFrame"), S.glslFrame|0);
+  /* no pointer input on a video instrument, so iMouse is parked at the centre
+     rather than at zero, where a lot of published shaders degenerate */
+  gl.uniform4f(u("iMouse"), procW*0.5, procH*0.5, 0, 0);
+  const d = glslDate();
+  gl.uniform4f(u("iDate"), d[0], d[1], d[2], d[3]);
+  const feeds = [S.glslF0 || "none", "self", S.glslF2 || "none", "none"];
+  for(let i=0;i<4;i++){
+    const f = feeds[i];
+    const t = (f === "none") ? blackTex
+            : (f === "self") ? (C.glslPrev ? C.glslPrev.tex : blackTex)
+            : (f === "BUS1" || f === "BUS2" || f === "PGM") ? feedTex(f)
+            : (srcReady(f) && chanRT[f] && chanRT[f].out) ? chanRT[f].out.tex : blackTex;
+    gl.activeTexture(gl.TEXTURE0 + i);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.uniform1i(u("iChannel"+i), i);
+  }
+  gl.uniform3fv(u("iChannelResolution[0]"), new Float32Array([
+    procW,procH,1, procW,procH,1, procW,procH,1, procW,procH,1]));
+  gl.uniform1fv(u("iChannelTime[0]"), new Float32Array([S.patClock,S.patClock,S.patClock,S.patClock]));
+  draw();
+  S.glslFrame = (S.glslFrame|0) + 1;
+  /* keep this frame for iChannel1 next time */
+  if(C.glslPrev) runPass(progCOPY, C.gen.tex, C.glslPrev.fbo, procW, procH, null, ch);
+  return C.gen.tex;
+}
+let glslDateCache = [0,0,0,0], glslDateAt = -1e9;
+function glslDate(){
+  /* recomputed once a second: a Date object per frame per channel is not free
+     and nothing published needs sub-second date resolution */
+  const t = performance.now();
+  if(t - glslDateAt > 1000){
+    glslDateAt = t;
+    const d = new Date();
+    glslDateCache = [d.getFullYear(), d.getMonth(), d.getDate(),
+                     d.getHours()*3600 + d.getMinutes()*60 + d.getSeconds() + d.getMilliseconds()/1000];
+  }
+  return glslDateCache;
+}
 function renderChannel(ch, now, dt){
   ensureChanRT(ch);
   const C = chanRT[ch], S = SRC[ch];
   const chanSrcTex = (S.mode === "synth") ? (sourceFrozen(ch) ? C.gen.tex : renderGen(ch, now))
+                   : (S.mode === "glsl")  ? (sourceFrozen(ch) ? C.gen.tex : renderGlsl(ch, now, dt))
                    : (S.mode === "feed") ? feedTex(S.feed || "PGM")
                    : srcTex[ch];
 
@@ -983,6 +1041,17 @@ function frameEnd(now, dt){
 }
 
 let lastTickMs = 0;
+/* The processing clock, which is not the display's clock.
+   A feedback loop iterates once per rendered frame, so on a 120 Hz display it
+   evolves twice as fast as on a 60 Hz one and the same patch is a different
+   patch. The same is true of the strobe hold, the field parity, the flow store
+   and the phosphor accumulator: everything that carries state from one frame
+   to the next. Real video rigs run at the field rate whatever monitor is
+   plugged into them, so this does too — and it makes what you see match what
+   the offline render produces. FREE keeps the old behaviour, which is still
+   the right answer if you want the loop to run as fast as the machine can. */
+let engineRate = 0;          /* 0 = free-run, otherwise frames per second */
+let rateAcc = 0;
 function doTick(){
   if(offline) return;
   const nowMs = performance.now();
@@ -991,6 +1060,16 @@ function doTick(){
   const now = nowMs/1000;
   let dt = now-lastT; lastT = now;
   dt = Math.min(dt, 0.1);
+  if(engineRate > 0){
+    const step = 1/engineRate;
+    rateAcc += dt;
+    if(rateAcc < step) return;          /* the picture on screen still stands */
+    /* never try to catch up more than a couple of frames: after a stall the
+       right thing is to carry on, not to run the loop forty times in a row */
+    if(rateAcc > step*3) rateAcc = step;
+    dt = step;
+    rateAcc -= step;
+  }
   renderFrame(now, dt);
   if(outTrack && outTrack.requestFrame){ try{ outTrack.requestFrame(); }catch(e){} }
 }

@@ -551,6 +551,22 @@ body.nobend #bendCollapse .mixhint{display:inline;}
   padding:8px; align-content:start; justify-content:start; overflow-y:auto;
 }
 #textdock{padding:10px 12px; overflow-y:auto;}
+#glsldock{padding:10px 12px; overflow-y:auto;}
+#glsldock.notext > *:not(#glslNeedsSrc){opacity:.3; pointer-events:none;}
+#glsldock .edrow{display:flex; align-items:center; gap:8px; padding:5px 0; flex-wrap:wrap;}
+#glsldock label{font-size:8.5px; letter-spacing:1.5px; color:var(--dim); white-space:nowrap;}
+#glsldock textarea{
+  width:100%; min-height:170px; resize:vertical; background:#08080b; color:#cfe9e6;
+  border:1px solid var(--line); border-radius:3px; padding:8px 9px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; line-height:1.45;
+  white-space:pre; tab-size:2;
+}
+#glsldock textarea:focus{outline:none; border-color:var(--cyan);}
+#glslLog{
+  margin:6px 0 0; padding:0; max-height:120px; overflow:auto; white-space:pre-wrap;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px; line-height:1.4; color:#ff6b6b;
+}
+#glslLog.ok{color:var(--cyan);}
 #dockBody > #performdock.on{display:flex; flex-direction:column; gap:16px;}
 #pfmain{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;}
 #dockBody > #mixdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
@@ -915,6 +931,9 @@ body.nomix #mixbuses{display:none;}
         <button id="btnSynth" data-tip="Turn this channel into a pattern synthesiser: oscillators, cross-modulation, a wavefolder, a comparator and a colouriser, all computed on the GPU and all modulatable. Shape it in the PATTERN SYNTH section of the panel.">SYNTH</button>
       </div>
       <div class="mrow2">
+        <button id="btnGlsl" data-tip="Turn this channel into a fragment shader. Paste code written to the common mainImage convention into the SHADER tab of the dock and it compiles onto the channel, with the rest of the rig downstream of it.">SHADER</button>
+      </div>
+      <div class="mrow2">
         <button id="btnFeed" data-tip="Re-entry: take another channel, a bus, or the finished programme as this channel's source. Process it however you like and mix it back in, and you have a feedback loop that runs through the whole rig rather than inside one stage. Exactly like patching a mixer's output back into a spare input.">FEED</button>
       </div>
       <div class="mlabel">RE-ENTRY SOURCE</div>
@@ -940,6 +959,23 @@ body.nomix #mixbuses{display:none;}
         <option value="1080" selected>1080p</option>
         <option value="1440">1440p</option>
         <option value="2160">2160p / 4K</option>
+      </select>
+      <div class="mlabel">ENGINE RATE</div>
+      <select id="selRate" data-tip="How many times a second the processing actually runs, which is not the same as how often your monitor refreshes. It matters because a feedback loop iterates once per rendered frame: on a 120Hz display the same patch evolves twice as fast as it does on a 60Hz one, and so do the strobe, the field parity, the flow store and the phosphor trail. Pinning it means a patch looks the same everywhere and matches what the offline render produces. FREE runs the loop as fast as the machine can, which is the old behaviour and still the right answer if you want it.">
+        <option value="0">FREE (DISPLAY)</option>
+        <option value="60">60 fps</option>
+        <option value="50">50 fps</option>
+        <option value="30">30 fps</option>
+        <option value="25">25 fps</option>
+        <option value="24">24 fps</option>
+      </select>
+      <div class="mlabel">CAPTURE RATE</div>
+      <select id="selCapFps" data-tip="The frame rate used by REC and by the offline RENDER. The offline render steps the source at this rate and encodes every frame at full quality however long each one takes, so 60 costs twice the time of 30 and gives twice the temporal detail. Glitch material benefits from the higher rate more than normal footage does.">
+        <option value="60">60 fps</option>
+        <option value="50">50 fps</option>
+        <option value="30" selected>30 fps</option>
+        <option value="25">25 fps</option>
+        <option value="24">24 fps</option>
       </select>
       <button id="btnFlush" data-tip="Empties every buffer that feeds itself - the feedback store, the flow stage's frame store, the phosphor persistence and the frame ring - without touching a single parameter. If a bad frame gets caught circulating in one of those it will sit there until you reload; this is the way out.">FLUSH BUFFERS</button>
       <button id="btnMidi" data-tip="MIDI learn. Turn it on, click a parameter name, then move a hardware knob to map it. MIDI clock overrides tap tempo; notes C1-F1 fire the bend pads.">MIDI LEARN</button>
@@ -1047,6 +1083,7 @@ body.nomix #mixbuses{display:none;}
           <button data-dock="matrix" class="on" data-tip="The mod matrix: patch any source into any parameter, on any channel.">MATRIX</button>
           <button data-dock="mod" data-tip="Every modulation source drawn live, with editable rates and shapes and a list of what each one is driving.">MOD</button>
           <button data-dock="text" data-tip="The text and shape generator for this channel. Typing here never triggers keyboard shortcuts.">TEXT</button>
+          <button data-dock="glsl" data-tip="A fragment shader as this channel's source. Paste code written to the common mainImage convention and it compiles here. Typing never triggers keyboard shortcuts.">SHADER</button>
           <button data-dock="mix" data-tip="The detail behind each transition: wipe softness and geometry, and the key settings. The faders themselves are on the strip under the picture.">MIX</button>
           <button data-dock="scope" data-tip="A waveform monitor and a vectorscope reading the live output, and a probe that puts an internal signal on the picture instead of the picture.">SCOPE</button>
           <button data-dock="out" data-tip="The master output stage: the display model and everything the picture is watched through. Shared by all four channels.">OUT</button>
@@ -1085,6 +1122,23 @@ body.nomix #mixbuses{display:none;}
         <div id="midimap"></div>
       </div>
       <div id="modgrid"></div>
+      <div id="glsldock">
+        <div id="glslNeedsSrc" style="display:none; color:var(--dim); font-size:9.5px; padding:6px 0 10px;">This channel is not a shader source. Pick <b style="color:var(--amber)">SHADER</b> under SOURCE to switch it, and this comes alive.</div>
+        <div class="edrow">
+          <button id="glslCompile" class="cy" data-tip="Compile what is in the box and put it on this channel. Nothing runs until you press this, so a half-typed shader cannot take the picture down.">COMPILE</button>
+          <button id="glslRevert" data-tip="Back to the shader that is currently running on this channel, throwing away edits you have not compiled.">REVERT</button>
+          <label>iChannel0</label>
+          <select id="glslCh0" data-tip="What the shader gets on iChannel0. Point it at another channel, a bus, or the finished programme and the shader becomes a processing stage rather than only a generator. iChannel1 is always this shader's own previous frame, so a shader can feed back on itself without any of this being involved."></select>
+          <label>iChannel2</label>
+          <select id="glslCh2" data-tip="What the shader gets on iChannel2. iChannel3 is left black."></select>
+          <span id="glslNote" style="font-size:8.5px; letter-spacing:1px; color:var(--dim);"></span>
+        </div>
+        <textarea id="glslBody" rows="14" spellcheck="false" placeholder="void mainImage(out vec4 O, in vec2 fragCoord){&#10;  vec2 uv = fragCoord/iResolution.xy;&#10;  O = vec4(0.5+0.5*cos(iTime+uv.xyx+vec3(0,2,4)), 1.0);&#10;}"></textarea>
+        <pre id="glslLog"></pre>
+        <div id="glslHelp" style="font-size:8.5px; line-height:1.5; color:var(--dim); padding:6px 0 2px;">
+          Paste the image pass of a single-pass shader. <b>iResolution iTime iTimeDelta iFrame iMouse iDate iChannel0-3 iChannelResolution iChannelTime iFrameRate iSampleRate</b> are all provided, <b>texture2D</b> and <b>iGlobalTime</b> are accepted as aliases, and a leading <b>#version</b> line is ignored. Multi-pass shaders (the ones with buffer tabs) will compile but only the image pass runs, so they will not look right. The shader runs on your GPU, at the processing resolution, and is saved with the patch.
+        </div>
+      </div>
       <div id="textdock"><div id="textNeedsSrc" style="display:none; color:var(--dim); font-size:9.5px; padding:6px 0 10px;">This channel is not a text source. Pick <b style="color:var(--amber)">TEXT</b> under SOURCE to switch it, and these controls come alive.</div><textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
     <div class="edrow">
       <label>FONT</label>
@@ -1256,6 +1310,8 @@ body.nomix #mixbuses{display:none;}
   <p>What the transport can do depends on what the channel is looking at. A file has a timeline, so it plays, loops, seeks, mutes and shuttles. A generated source — pattern, text, synth or a feed from another channel — has a clock but nothing to scrub, so SPD and the deck transport drive that clock and the file controls are greyed out. A camera or a screen capture has neither, so it can be held or let run and nothing else. The panel follows the same rule: PATTERN SYNTH only appears on a channel that is actually a synth, because everywhere else it is a page of controls that do nothing.</p>
   <p>Three levels of undoing yourself: any single control resets with a double-click, each section has its own RESET, and <b>RESET FX</b> at the top of the channel column returns every effect on the channel you are editing to default in one press without touching what the channel is looking at — the file stays loaded and the pattern synth keeps its patch. <b>INIT · RESET ALL</b> in the PATCH menu does the whole rig. All of them are undoable with Z.</p>
   <p><b>BYPASS</b> is a momentary: hold the button, or hold B, to see the source with the whole chain switched out. While it is held the picture carries an amber border and a BYPASS badge, so there is never any doubt about which of the two you are looking at.</p>
+  <p><b>SHADER</b> turns a channel into a fragment shader. Paste the image pass of a single-pass shader into the SHADER tab and press COMPILE, or cmd/ctrl-Enter. The uniforms the convention promises are all provided — <b>iResolution iTime iTimeDelta iFrame iMouse iDate iChannel0-3 iChannelResolution iChannelTime iFrameRate iSampleRate</b> — with <b>texture2D</b> and <b>iGlobalTime</b> accepted as aliases and a leading <b>#version</b> line ignored. iChannel0 and iChannel2 can be pointed at another channel, either bus or the finished programme, which makes a shader a processing stage rather than only a generator; iChannel1 is always the shader's own previous frame, so it can feed back on itself. Compile errors appear under the box with their line numbers and the last working shader keeps running, so nothing you type can take the picture down. Multi-pass shaders, the ones with buffer tabs, will compile but only their image pass runs. The code is saved with the patch.</p>
+  <p><b>ENGINE RATE</b> decides how many times a second the processing runs, which is not how often your monitor refreshes. It matters because a feedback loop iterates once per rendered frame: on a 120Hz display a patch evolves twice as fast as it does on a 60Hz one, and so do the strobe, the field parity, the flow store and the phosphor trail. Pinning it makes a patch look the same everywhere and match the offline render. <b>CAPTURE RATE</b> sets the frame rate REC and RENDER work at.</p>
   <p>The top bar holds four menus \u2014 PATCH, SOURCE, ENGINE, OUTPUT \u2014 and everything you touch mid-performance stays out in the open: the preset list, RANDOMIZE and MUTATE, BEND and MOD to fold those panes in and out, and MULTI, BYPASS, REC, POP OUT and FULL on the right.</p>
   <p><b>RANDOMIZE</b> has a small caret beside it that decides what a roll is allowed to touch. <b>THIS CHANNEL</b> rolls only the channel you are editing and leaves the other three alone, which is how you build a mix one channel at a time; <b>ALL FOUR</b> rolls each of them separately so they come out different from each other; <b>FOLLOW LINK</b> is the old behaviour, where LINK decides. Under KEEP: <b>SOURCE</b> holds the pattern synth and the framing still, so whatever you have loaded or built survives and only the processing is rolled; <b>MODULATION</b> holds the routes and the LFOs; <b>OUTPUT + CHAIN</b> holds the mixer, the display, the overlay and the stage order. MUTATE obeys the same settings, and the choices are remembered between sessions.</p>
   <p>The panel is in two zones, with the mixers themselves on the strip under the picture rather than in the sidebar. <b>CHANNEL &middot; SIGNAL PATH</b> holds everything belonging to the selected channel, in the order the signal actually travels &mdash; source, framing, frame store, feedback, then the reorderable stages, then the keyer &mdash; and it is the only zone you can rearrange, by dragging the handle on the left of a section. <b>FOLLOW CHAIN</b> in that zone's header re-sorts it to match whatever order you have dragged the stages into on the rail above the picture, and RESET puts it back. <b>MASTER OUT</b> is pinned at the bottom. Above all of it is the filter: press <kbd>/</kbd> and type, and the panel narrows to whatever matches &mdash; the parameter name, its section, or the body of its help text, so &ldquo;roll&rdquo; finds V ROLL and a phrase from a description finds the control it describes. Two chips beside it answer the other two questions you have while playing: <b>MOVING</b> shows only what something is currently driving, <b>CHANGED</b> shows only what you have moved off its default.</p>

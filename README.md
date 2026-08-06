@@ -160,6 +160,8 @@ Any channel can be a text/shape generator instead of a video source: type anythi
 
 Each channel takes a video file (streamed from disk, so a 4GB file is no heavier than a small one), a camera, a screen, a generated pattern, the pattern synth, a text page, or re-entry from elsewhere in the rig.
 
+It also takes a **fragment shader**. Paste the image pass of a single-pass shader into the SHADER tab and press COMPILE and it becomes the channel's picture, with the whole of the rest of the rig downstream of it. The uniforms of the `mainImage` convention almost every published shader is written to are all provided — `iResolution`, `iTime`, `iTimeDelta`, `iFrame`, `iMouse`, `iDate`, `iChannel0-3`, `iChannelResolution`, `iChannelTime`, `iFrameRate`, `iSampleRate` — with `texture2D` and `iGlobalTime` accepted as aliases and a leading `#version` line ignored. `iChannel0` and `iChannel2` can be pointed at another channel, either bus, or the finished programme, which makes a shader a processing stage rather than only a generator, and `iChannel1` is always the shader's own previous frame, so it can feed back on itself with no help from anything else. Compile errors appear under the box with line numbers and the last working shader keeps running, so nothing you type can take the picture down. Multi-pass shaders will compile but only their image pass runs. Nothing is bundled: the code is whatever you paste, it is saved in your patch, and it runs on your GPU.
+
 **CAM** opens whatever is selected in the device list beside it, so a built-in webcam, a USB one, an HDMI capture stick and a virtual camera from streaming software all work the same way. Device names only appear once camera access has been granted, so the list reads DEVICE 1, DEVICE 2 until the first time CAM is pressed. **SCREEN** captures a screen, a window or a browser tab, which is the general way to bring in anything that is not a camera.
 
 The interface follows what the source can actually do. A file has a timeline, so it plays, loops, seeks, mutes and shuttles. A generated source — pattern, text, synth, or a feed from another channel — has a clock but nothing to scrub, so SPD and the deck transport drive that clock while the file controls grey out. A camera or screen capture has neither: it can be held or let run and nothing else, because asking a live stream to seek does not fail quietly, it throws. The panel obeys the same rule, so PATTERN SYNTH only appears on a channel that is actually a synth.
@@ -228,6 +230,8 @@ The tempo can be typed as well as tapped. Click the number beside TAP and type i
 ## Output
 
 - Processing resolution from 360p to **4K**, independent of window size
+- **Engine rate**, which is not the display rate. A feedback loop iterates once per rendered frame, so on a 120Hz display a patch evolves twice as fast as it does on a 60Hz one, and so do the strobe, the field parity, the flow store and the phosphor trail. Pinning the engine to 60, 50, 30, 25 or 24 makes a patch look the same on any machine and match what the offline render produces; FREE runs it as fast as the display will go
+- **Capture rate** for REC and for the offline render, from 24 to 60
 - **FLUSH BUFFERS** empties every self-feeding buffer (feedback, flow, persistence, frame ring) without disturbing the patch
 - Live **recording** with source audio, MP4 where the browser supports it and WebM otherwise
 - Frame-accurate **offline MP4 render** via WebCodecs — every frame processed at full quality regardless of realtime performance (video only)

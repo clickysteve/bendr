@@ -165,6 +165,11 @@ function allocChan(ch){
   const c = chanRT[ch];
   for(const k of CH_RTS) freeRT(c[k]);
   clearRing(c);
+  /* the shader stage's own previous frame is allocated on demand rather than
+     with the rest, because most channels never carry a shader and at 4K it is
+     another 33 MB each. It has to be dropped here so a resolution change does
+     not leave a target of the wrong size behind. */
+  freeRT(c.glslPrev); c.glslPrev = null;
   for(const k of CH_RTS) c[k] = makeRT(procW, procH);
   c.allocated = true;
 }
@@ -186,6 +191,7 @@ function flushBuffers(){
     const c = chanRT[ch];
     if(!c.allocated) continue;
     for(const k of CH_RTS) clearRT(c[k]);
+    if(c.glslPrev) clearRT(c.glslPrev);
     if(c.ring){ for(const r of c.ring) clearRT(r); c.ringW = 0; c.ringFilled = 0; }
     c.flowLast = -99;
   }
@@ -199,7 +205,7 @@ function allocRTs(){
   for(const ch of CHANNELS){
     const c = chanRT[ch];
     if(c.allocated) allocChan(ch);
-    else { for(const k of CH_RTS) freeRT(c[k]); clearRing(c); }
+    else { for(const k of CH_RTS) freeRT(c[k]); freeRT(c.glslPrev); c.glslPrev = null; clearRing(c); }
   }
   freeRT(scratch1); freeRT(scratch2); freeRT(mixOut); freeRT(busOut1); freeRT(busOut2);
   freeRT(persistA); freeRT(persistB);

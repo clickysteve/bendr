@@ -8,7 +8,9 @@ document.getElementById("btnRender").onclick = ()=>{ offlineRender().catch(e=>{
 async function offlineRender(){
   if(SRC.A.mode!=="file" || !SRC.A.video.duration){ toast("Load a video file into channel A first", true); return; }
   if(!("VideoEncoder" in window)){ toast("This browser has no WebCodecs — use Chrome", true); return; }
-  const fps = 30, W = procW, H = procH;
+  /* the render used to be hard-wired to 30, which is a poor fit for material
+     that changes on every frame; the capture rate is a control now */
+  const fps = captureFps(), W = procW, H = procH;
   const candidates = [["avc1.640028","avc"],["avc1.42003e","avc"],["vp09.00.10.08","vp9"]];
   let codec=null, mcodec=null;
   for(const [c,m] of candidates){
@@ -281,6 +283,14 @@ if(OUTPUT_MODE){
      its own handler overwritten by this loop */
   document.querySelectorAll("#dockTabs button[data-dock]").forEach(b=>{ b.onclick = ()=>setDock(b.dataset.dock); });
   {
+    const rt = document.getElementById("selRate");
+    if(rt) rt.onchange = ()=>{
+      engineRate = parseInt(rt.value) || 0;
+      rateAcc = 0;
+      toast(engineRate ? "Engine running at "+engineRate+" fps" : "Engine free-running at the display rate");
+    };
+    const cf = document.getElementById("selCapFps");
+    if(cf) cf.onchange = ()=>toast("Capture rate "+cf.value+" fps");
     const rs = document.getElementById("selRes");
     rs.onchange = ()=>{
       /* setProcRes refuses anything wider than the machine's maximum texture,

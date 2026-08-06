@@ -8,6 +8,13 @@ let recStream = null, recSize = null, recLocked = false;
 function bitrateFor(w, h, fps){
   return Math.max(8_000_000, Math.min(160_000_000, Math.round(w*h*fps*0.25)));
 }
+/* the rate REC and the offline render work at, which is not the display rate
+   and not necessarily the engine rate either */
+function captureFps(){
+  const e = document.getElementById("selCapFps");
+  const v = e ? parseInt(e.value) : 30;
+  return (v >= 1 && v <= 120) ? v : 30;
+}
 function toggleRec(){
   if(recorder){ recorder.stop(); return; }
   /* each recording used to add another live capture stream to the canvas and
@@ -22,7 +29,8 @@ function toggleRec(){
   recSize = {w: canvas.width, h: canvas.height};
   canvas.width = procW; canvas.height = procH;
   recLocked = true;
-  const stream = recStream = canvas.captureStream(60);
+  const capFps = captureFps();
+  const stream = recStream = canvas.captureStream(capFps);
   if(audioCtx && recDest && audioMode==="source"){
     for(const tr of recDest.stream.getAudioTracks()) stream.addTrack(tr);
   }
@@ -37,7 +45,7 @@ function toggleRec(){
   /* Glitch material is about the worst case an encoder ever sees: every frame
      is high-entropy and almost nothing survives between frames. A flat 16 Mbit
      was thin at 1080p and meaningless at 4K, so scale it with the pixel rate. */
-  recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: bitrateFor(procW, procH, 60)});
+  recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: bitrateFor(procW, procH, capFps)});
   recorder.ondataavailable = e=>{ if(e.data.size) recChunks.push(e.data); };
   recorder.onstop = ()=>{
     const blob = new Blob(recChunks, {type: isMp4 ? "video/mp4" : "video/webm"});
@@ -47,7 +55,7 @@ function toggleRec(){
     recLocked = false;
     if(recSize){ canvas.width = recSize.w; canvas.height = recSize.h; recSize = null; markSizeDirty(); }
     recTime.style.display="none"; clearInterval(recTimer);
-    toast("Recording saved, "+procW+"\u00d7"+procH+" ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
+    toast("Recording saved, "+procW+"\u00d7"+procH+" @"+capFps+"fps ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
   };
   recorder.start(250);
   recStart = performance.now();

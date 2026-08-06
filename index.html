@@ -551,6 +551,22 @@ body.nobend #bendCollapse .mixhint{display:inline;}
   padding:8px; align-content:start; justify-content:start; overflow-y:auto;
 }
 #textdock{padding:10px 12px; overflow-y:auto;}
+#glsldock{padding:10px 12px; overflow-y:auto;}
+#glsldock.notext > *:not(#glslNeedsSrc){opacity:.3; pointer-events:none;}
+#glsldock .edrow{display:flex; align-items:center; gap:8px; padding:5px 0; flex-wrap:wrap;}
+#glsldock label{font-size:8.5px; letter-spacing:1.5px; color:var(--dim); white-space:nowrap;}
+#glsldock textarea{
+  width:100%; min-height:170px; resize:vertical; background:#08080b; color:#cfe9e6;
+  border:1px solid var(--line); border-radius:3px; padding:8px 9px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; line-height:1.45;
+  white-space:pre; tab-size:2;
+}
+#glsldock textarea:focus{outline:none; border-color:var(--cyan);}
+#glslLog{
+  margin:6px 0 0; padding:0; max-height:120px; overflow:auto; white-space:pre-wrap;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px; line-height:1.4; color:#ff6b6b;
+}
+#glslLog.ok{color:var(--cyan);}
 #dockBody > #performdock.on{display:flex; flex-direction:column; gap:16px;}
 #pfmain{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;}
 #dockBody > #mixdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
@@ -915,6 +931,9 @@ body.nomix #mixbuses{display:none;}
         <button id="btnSynth" data-tip="Turn this channel into a pattern synthesiser: oscillators, cross-modulation, a wavefolder, a comparator and a colouriser, all computed on the GPU and all modulatable. Shape it in the PATTERN SYNTH section of the panel.">SYNTH</button>
       </div>
       <div class="mrow2">
+        <button id="btnGlsl" data-tip="Turn this channel into a fragment shader. Paste code written to the common mainImage convention into the SHADER tab of the dock and it compiles onto the channel, with the rest of the rig downstream of it.">SHADER</button>
+      </div>
+      <div class="mrow2">
         <button id="btnFeed" data-tip="Re-entry: take another channel, a bus, or the finished programme as this channel's source. Process it however you like and mix it back in, and you have a feedback loop that runs through the whole rig rather than inside one stage. Exactly like patching a mixer's output back into a spare input.">FEED</button>
       </div>
       <div class="mlabel">RE-ENTRY SOURCE</div>
@@ -940,6 +959,23 @@ body.nomix #mixbuses{display:none;}
         <option value="1080" selected>1080p</option>
         <option value="1440">1440p</option>
         <option value="2160">2160p / 4K</option>
+      </select>
+      <div class="mlabel">ENGINE RATE</div>
+      <select id="selRate" data-tip="How many times a second the processing actually runs, which is not the same as how often your monitor refreshes. It matters because a feedback loop iterates once per rendered frame: on a 120Hz display the same patch evolves twice as fast as it does on a 60Hz one, and so do the strobe, the field parity, the flow store and the phosphor trail. Pinning it means a patch looks the same everywhere and matches what the offline render produces. FREE runs the loop as fast as the machine can, which is the old behaviour and still the right answer if you want it.">
+        <option value="0">FREE (DISPLAY)</option>
+        <option value="60">60 fps</option>
+        <option value="50">50 fps</option>
+        <option value="30">30 fps</option>
+        <option value="25">25 fps</option>
+        <option value="24">24 fps</option>
+      </select>
+      <div class="mlabel">CAPTURE RATE</div>
+      <select id="selCapFps" data-tip="The frame rate used by REC and by the offline RENDER. The offline render steps the source at this rate and encodes every frame at full quality however long each one takes, so 60 costs twice the time of 30 and gives twice the temporal detail. Glitch material benefits from the higher rate more than normal footage does.">
+        <option value="60">60 fps</option>
+        <option value="50">50 fps</option>
+        <option value="30" selected>30 fps</option>
+        <option value="25">25 fps</option>
+        <option value="24">24 fps</option>
       </select>
       <button id="btnFlush" data-tip="Empties every buffer that feeds itself - the feedback store, the flow stage's frame store, the phosphor persistence and the frame ring - without touching a single parameter. If a bad frame gets caught circulating in one of those it will sit there until you reload; this is the way out.">FLUSH BUFFERS</button>
       <button id="btnMidi" data-tip="MIDI learn. Turn it on, click a parameter name, then move a hardware knob to map it. MIDI clock overrides tap tempo; notes C1-F1 fire the bend pads.">MIDI LEARN</button>
@@ -1047,6 +1083,7 @@ body.nomix #mixbuses{display:none;}
           <button data-dock="matrix" class="on" data-tip="The mod matrix: patch any source into any parameter, on any channel.">MATRIX</button>
           <button data-dock="mod" data-tip="Every modulation source drawn live, with editable rates and shapes and a list of what each one is driving.">MOD</button>
           <button data-dock="text" data-tip="The text and shape generator for this channel. Typing here never triggers keyboard shortcuts.">TEXT</button>
+          <button data-dock="glsl" data-tip="A fragment shader as this channel's source. Paste code written to the common mainImage convention and it compiles here. Typing never triggers keyboard shortcuts.">SHADER</button>
           <button data-dock="mix" data-tip="The detail behind each transition: wipe softness and geometry, and the key settings. The faders themselves are on the strip under the picture.">MIX</button>
           <button data-dock="scope" data-tip="A waveform monitor and a vectorscope reading the live output, and a probe that puts an internal signal on the picture instead of the picture.">SCOPE</button>
           <button data-dock="out" data-tip="The master output stage: the display model and everything the picture is watched through. Shared by all four channels.">OUT</button>
@@ -1085,6 +1122,23 @@ body.nomix #mixbuses{display:none;}
         <div id="midimap"></div>
       </div>
       <div id="modgrid"></div>
+      <div id="glsldock">
+        <div id="glslNeedsSrc" style="display:none; color:var(--dim); font-size:9.5px; padding:6px 0 10px;">This channel is not a shader source. Pick <b style="color:var(--amber)">SHADER</b> under SOURCE to switch it, and this comes alive.</div>
+        <div class="edrow">
+          <button id="glslCompile" class="cy" data-tip="Compile what is in the box and put it on this channel. Nothing runs until you press this, so a half-typed shader cannot take the picture down.">COMPILE</button>
+          <button id="glslRevert" data-tip="Back to the shader that is currently running on this channel, throwing away edits you have not compiled.">REVERT</button>
+          <label>iChannel0</label>
+          <select id="glslCh0" data-tip="What the shader gets on iChannel0. Point it at another channel, a bus, or the finished programme and the shader becomes a processing stage rather than only a generator. iChannel1 is always this shader's own previous frame, so a shader can feed back on itself without any of this being involved."></select>
+          <label>iChannel2</label>
+          <select id="glslCh2" data-tip="What the shader gets on iChannel2. iChannel3 is left black."></select>
+          <span id="glslNote" style="font-size:8.5px; letter-spacing:1px; color:var(--dim);"></span>
+        </div>
+        <textarea id="glslBody" rows="14" spellcheck="false" placeholder="void mainImage(out vec4 O, in vec2 fragCoord){&#10;  vec2 uv = fragCoord/iResolution.xy;&#10;  O = vec4(0.5+0.5*cos(iTime+uv.xyx+vec3(0,2,4)), 1.0);&#10;}"></textarea>
+        <pre id="glslLog"></pre>
+        <div id="glslHelp" style="font-size:8.5px; line-height:1.5; color:var(--dim); padding:6px 0 2px;">
+          Paste the image pass of a single-pass shader. <b>iResolution iTime iTimeDelta iFrame iMouse iDate iChannel0-3 iChannelResolution iChannelTime iFrameRate iSampleRate</b> are all provided, <b>texture2D</b> and <b>iGlobalTime</b> are accepted as aliases, and a leading <b>#version</b> line is ignored. Multi-pass shaders (the ones with buffer tabs) will compile but only the image pass runs, so they will not look right. The shader runs on your GPU, at the processing resolution, and is saved with the patch.
+        </div>
+      </div>
       <div id="textdock"><div id="textNeedsSrc" style="display:none; color:var(--dim); font-size:9.5px; padding:6px 0 10px;">This channel is not a text source. Pick <b style="color:var(--amber)">TEXT</b> under SOURCE to switch it, and these controls come alive.</div><textarea id="txtBody" rows="3" placeholder="TYPE ANYTHING&#10;NEW LINES WORK"></textarea>
     <div class="edrow">
       <label>FONT</label>
@@ -1256,6 +1310,8 @@ body.nomix #mixbuses{display:none;}
   <p>What the transport can do depends on what the channel is looking at. A file has a timeline, so it plays, loops, seeks, mutes and shuttles. A generated source — pattern, text, synth or a feed from another channel — has a clock but nothing to scrub, so SPD and the deck transport drive that clock and the file controls are greyed out. A camera or a screen capture has neither, so it can be held or let run and nothing else. The panel follows the same rule: PATTERN SYNTH only appears on a channel that is actually a synth, because everywhere else it is a page of controls that do nothing.</p>
   <p>Three levels of undoing yourself: any single control resets with a double-click, each section has its own RESET, and <b>RESET FX</b> at the top of the channel column returns every effect on the channel you are editing to default in one press without touching what the channel is looking at — the file stays loaded and the pattern synth keeps its patch. <b>INIT · RESET ALL</b> in the PATCH menu does the whole rig. All of them are undoable with Z.</p>
   <p><b>BYPASS</b> is a momentary: hold the button, or hold B, to see the source with the whole chain switched out. While it is held the picture carries an amber border and a BYPASS badge, so there is never any doubt about which of the two you are looking at.</p>
+  <p><b>SHADER</b> turns a channel into a fragment shader. Paste the image pass of a single-pass shader into the SHADER tab and press COMPILE, or cmd/ctrl-Enter. The uniforms the convention promises are all provided — <b>iResolution iTime iTimeDelta iFrame iMouse iDate iChannel0-3 iChannelResolution iChannelTime iFrameRate iSampleRate</b> — with <b>texture2D</b> and <b>iGlobalTime</b> accepted as aliases and a leading <b>#version</b> line ignored. iChannel0 and iChannel2 can be pointed at another channel, either bus or the finished programme, which makes a shader a processing stage rather than only a generator; iChannel1 is always the shader's own previous frame, so it can feed back on itself. Compile errors appear under the box with their line numbers and the last working shader keeps running, so nothing you type can take the picture down. Multi-pass shaders, the ones with buffer tabs, will compile but only their image pass runs. The code is saved with the patch.</p>
+  <p><b>ENGINE RATE</b> decides how many times a second the processing runs, which is not how often your monitor refreshes. It matters because a feedback loop iterates once per rendered frame: on a 120Hz display a patch evolves twice as fast as it does on a 60Hz one, and so do the strobe, the field parity, the flow store and the phosphor trail. Pinning it makes a patch look the same everywhere and match the offline render. <b>CAPTURE RATE</b> sets the frame rate REC and RENDER work at.</p>
   <p>The top bar holds four menus \u2014 PATCH, SOURCE, ENGINE, OUTPUT \u2014 and everything you touch mid-performance stays out in the open: the preset list, RANDOMIZE and MUTATE, BEND and MOD to fold those panes in and out, and MULTI, BYPASS, REC, POP OUT and FULL on the right.</p>
   <p><b>RANDOMIZE</b> has a small caret beside it that decides what a roll is allowed to touch. <b>THIS CHANNEL</b> rolls only the channel you are editing and leaves the other three alone, which is how you build a mix one channel at a time; <b>ALL FOUR</b> rolls each of them separately so they come out different from each other; <b>FOLLOW LINK</b> is the old behaviour, where LINK decides. Under KEEP: <b>SOURCE</b> holds the pattern synth and the framing still, so whatever you have loaded or built survives and only the processing is rolled; <b>MODULATION</b> holds the routes and the LFOs; <b>OUTPUT + CHAIN</b> holds the mixer, the display, the overlay and the stage order. MUTATE obeys the same settings, and the choices are remembered between sessions.</p>
   <p>The panel is in two zones, with the mixers themselves on the strip under the picture rather than in the sidebar. <b>CHANNEL &middot; SIGNAL PATH</b> holds everything belonging to the selected channel, in the order the signal actually travels &mdash; source, framing, frame store, feedback, then the reorderable stages, then the keyer &mdash; and it is the only zone you can rearrange, by dragging the handle on the left of a section. <b>FOLLOW CHAIN</b> in that zone's header re-sorts it to match whatever order you have dragged the stages into on the rail above the picture, and RESET puts it back. <b>MASTER OUT</b> is pinned at the bottom. Above all of it is the filter: press <kbd>/</kbd> and type, and the panel narrows to whatever matches &mdash; the parameter name, its section, or the body of its help text, so &ldquo;roll&rdquo; finds V ROLL and a phrase from a description finds the control it describes. Two chips beside it answer the other two questions you have while playing: <b>MOVING</b> shows only what something is currently driving, <b>CHANGED</b> shows only what you have moved off its default.</p>
@@ -3249,7 +3305,7 @@ const FS_COPY = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v35.4";
+const BENDR_VERSION = "v35.5";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -4138,6 +4194,7 @@ const SECHELP = {
   color:"A straightforward colour corrector at the end of the per-channel chain — levels, saturation, hue, and the graphic operations.",
   field:"The field domain, sitting between the mixer and the display. Video was never frames: it is two interleaved half-height pictures, sampled a fiftieth of a second apart. Almost everything that reads as video rather than film starts here.",
   codec:"An actual encoder and decoder, wired back to back with the bitstream broken in between. Keyframes are removed, differences are held, dropped and re-ordered, and the decoder is left to make what it can of it. Everything else in the instrument is a model of a failure; this one is the failure.",
+  glsl:"A fragment shader as the channel's picture, written to the mainImage convention almost every published shader uses. The rest of the rig sits downstream of it, and iChannel0 can be another channel or the finished programme, so it is equally a processing stage. iChannel1 is always the shader's own previous frame.",
   crt:"The master display stage, shared by everything. Not a filter but a model of a screen: mask geometry, beam profile, persistence, and the output transform.",
   overlay:"Everything between the picture and the eye: the lens, the glass in front of the screen, the panel itself, and the deck's own burnt-in display. Not effects on the signal, but artefacts of whatever it is being watched through.",
   dct:"A block transform, run in real time rather than round-tripped through a file. Eight-point DCT along one axis, quantise, invert, then the same down the other - separable rather than a true 2D quantisation, but every artefact it makes is a real one.",
@@ -4428,6 +4485,11 @@ function allocChan(ch){
   const c = chanRT[ch];
   for(const k of CH_RTS) freeRT(c[k]);
   clearRing(c);
+  /* the shader stage's own previous frame is allocated on demand rather than
+     with the rest, because most channels never carry a shader and at 4K it is
+     another 33 MB each. It has to be dropped here so a resolution change does
+     not leave a target of the wrong size behind. */
+  freeRT(c.glslPrev); c.glslPrev = null;
   for(const k of CH_RTS) c[k] = makeRT(procW, procH);
   c.allocated = true;
 }
@@ -4449,6 +4511,7 @@ function flushBuffers(){
     const c = chanRT[ch];
     if(!c.allocated) continue;
     for(const k of CH_RTS) clearRT(c[k]);
+    if(c.glslPrev) clearRT(c.glslPrev);
     if(c.ring){ for(const r of c.ring) clearRT(r); c.ringW = 0; c.ringFilled = 0; }
     c.flowLast = -99;
   }
@@ -4462,7 +4525,7 @@ function allocRTs(){
   for(const ch of CHANNELS){
     const c = chanRT[ch];
     if(c.allocated) allocChan(ch);
-    else { for(const k of CH_RTS) freeRT(c[k]); clearRing(c); }
+    else { for(const k of CH_RTS) freeRT(c[k]); freeRT(c.glslPrev); c.glslPrev = null; clearRing(c); }
   }
   freeRT(scratch1); freeRT(scratch2); freeRT(mixOut); freeRT(busOut1); freeRT(busOut2);
   freeRT(persistA); freeRT(persistB);
@@ -7924,6 +7987,7 @@ function newSource(ch){
   return {ch, video:v, mode:"pattern", pattern:"bars", cam:null,
           patCanvas:pc, pat:pc.getContext("2d"), patClock:0,
           aspect:16/9, has:0, speed:1, tpRate:1, feed:"PGM", name:"", audioHooked:false,
+          glsl:"", glslProg:null, glslErr:"", glslF0:"none", glslF2:"none", glslFrame:0,
           text:{body:"BENDR", font:"mono", size:0.2, track:0, x:0.5, y:0.5, rot:0,
                 scrollX:0, scrollY:0, repeat:1, ink:"#ffffff", bg:"#000000", outline:0,
                 shape:"none", shpCount:1, shpSize:0.3, shpX:0.5, shpY:0.5,
@@ -8109,7 +8173,7 @@ function stopCam(ch){
 function srcCaps(S){
   const m = S ? S.mode : "";
   if(m === "file") return {timeline:true, clock:true, audio:true, live:false};
-  if(m === "pattern" || m === "text" || m === "synth" || m === "feed")
+  if(m === "pattern" || m === "text" || m === "synth" || m === "feed" || m === "glsl")
     return {timeline:false, clock:true, audio:false, live:false};
   return {timeline:false, clock:false, audio:false, live:true};   /* cam, screen */
 }
@@ -8144,6 +8208,7 @@ function syncChanInputUI(){
     if(T.mode === "pattern") return (T.pattern||"pattern").toUpperCase();
     if(T.mode === "text")    return "TEXT";
     if(T.mode === "synth")   return "SYNTH "+GEN_SHAPES[genMode[ch2].shape];
+    if(T.mode === "glsl")    return "SHADER";
     if(T.mode === "feed")    return "FEED \u2190 "+(T.feed||"PGM");
     return T.mode.toUpperCase();
   };
@@ -8166,6 +8231,7 @@ function syncChanInputUI(){
   { const b=document.getElementById("btnFeed"); if(b) b.classList.toggle("on", S.mode==="feed");
     const f=document.getElementById("selFeed"); if(f) f.value = S.feed || "PGM"; }
   document.getElementById("btnText").classList.toggle("on", S.mode==="text");
+  { const b=document.getElementById("btnGlsl"); if(b) b.classList.toggle("on", S.mode==="glsl"); }
   document.getElementById("btnFile").textContent = "FILE";
   selPat.value = S.pattern;
   const sp = document.getElementById("spd");
@@ -8174,13 +8240,15 @@ function syncChanInputUI(){
   const lp = document.getElementById("btnLoop");
   lp.classList.toggle("on", S.video.loop);
   if(dockTab === "text") syncTextEditor();
+  if(dockTab === "glsl") syncGlslEditor();
+  if(S.mode !== "glsl" && dockTab === "glsl") setDock("matrix");
 }
 window.__syncChanInputUI = syncChanInputUI;
 setInterval(()=>{ if(!offline) syncChanInputUI(); }, 900);
 /* swap two channels' *sources* (what sits on top), not just their effects */
 window.__swapSources = function(a, b){
   const A = SRC[a], B = SRC[b];
-  const keys = ["mode","pattern","cam","patClock","aspect","has","speed","tpRate","feed","name","text"];
+  const keys = ["mode","pattern","cam","patClock","aspect","has","speed","tpRate","feed","name","text","glsl","glslF0","glslF2"];
   for(const k of keys){ const t = A[k]; A[k] = B[k]; B[k] = t; }
   /* video elements carry their own media, so swap what each channel points at */
   const tv = A.video, tp = A.patCanvas, tc = A.pat;
@@ -8310,8 +8378,12 @@ function setDock(t){
     toast("Channel "+activeChan+" is not a text source \u2014 pick TEXT under SOURCE first", true);
     t = dockTab === "text" ? "matrix" : dockTab;
   }
+  if(t === "glsl" && cur().mode !== "glsl"){
+    toast("Channel "+activeChan+" is not a shader source \u2014 pick SHADER under SOURCE first", true);
+    t = dockTab === "glsl" ? "matrix" : dockTab;
+  }
   dockTab = t;
-  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", out:"outdock", scope:"scopedock", audio:"audiodock", perform:"performdock"};
+  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", glsl:"glsldock", out:"outdock", scope:"scopedock", audio:"audiodock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);
     if(el) el.classList.toggle("on", k===t);
@@ -8367,6 +8439,17 @@ for(const [id,key,kind] of TXT_CTRL){
   el.addEventListener("input", handler);
   el.addEventListener("change", handler);
 }
+document.getElementById("btnGlsl").onclick = ()=>{
+  const S = cur();
+  stopCam(activeChan);
+  S.mode = "glsl"; S.name = "shader";
+  if(!S.glsl) S.glsl = GLSL_DEFAULT;
+  S.glslErr = "";
+  syncChanInputUI(); syncGlslEditor();
+  setDock("glsl");
+  setTimeout(()=>{ const t=document.getElementById("glslBody"); if(t) t.focus(); }, 60);
+  closeMenus();
+};
 document.getElementById("btnText").onclick = ()=>{
   const S = cur();
   stopCam(activeChan);
@@ -8633,6 +8716,175 @@ seek.addEventListener("input", ()=>{
 seek.addEventListener("change", ()=>{ seeking=false; });
 function fmtT(s){ if(!isFinite(s)) return "--:--"; s=Math.floor(s); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
 
+
+/* ---- shader source -------------------------------------------------------
+   A channel whose picture is a fragment shader you paste in.
+
+   The convention is the one the online shader sites settled on: you write
+   `void mainImage(out vec4 fragColor, in vec2 fragCoord)` and a set of
+   uniforms is provided for you. That convention is worth supporting because
+   it is what almost every published shader is written to, and because it puts
+   an entire generative language inside a channel — with the whole of the rest
+   of the rig sitting downstream of it, which is the part that makes it more
+   than a viewer. iChannel0 can be another channel, a bus, or the finished
+   programme, so a shader can equally be a processing stage.
+
+   Nothing is bundled: the code is whatever you paste, it stays in your patch,
+   and it runs on your GPU. Compilation is on a button rather than on every
+   keystroke, so a half-typed shader cannot take the picture down.            */
+
+const GLSL_DEFAULT =
+  "// the channel is a fragment shader now.\n" +
+  "// paste an image pass here and press COMPILE.\n" +
+  "void mainImage(out vec4 O, in vec2 fragCoord){\n" +
+  "  vec2 uv = fragCoord/iResolution.xy;\n" +
+  "  vec3 c = 0.5 + 0.5*cos(iTime + uv.xyx*4.0 + vec3(0,2,4));\n" +
+  "  c *= 0.6 + 0.4*sin(iTime*0.7 + length(uv-0.5)*24.0);\n" +
+  "  O = vec4(c, 1.0);\n" +
+  "}\n";
+
+/* The preamble. Everything the convention promises, declared whether or not
+   the pasted code uses it, plus the two legacy aliases that turn up in older
+   published shaders. */
+const GLSL_HEAD =
+  "#version 300 es\n" +
+  "precision highp float;\n" +
+  "precision highp int;\n" +
+  "out vec4 bendr_O;\n" +
+  "uniform vec3 iResolution;\n" +
+  "uniform float iTime, iTimeDelta, iFrameRate, iSampleRate;\n" +
+  "uniform int iFrame;\n" +
+  "uniform vec4 iMouse, iDate;\n" +
+  "uniform sampler2D iChannel0, iChannel1, iChannel2, iChannel3;\n" +
+  "uniform vec3 iChannelResolution[4];\n" +
+  "uniform float iChannelTime[4];\n" +
+  "#define texture2D texture\n" +
+  "#define textureCube texture\n" +
+  "#define iGlobalTime iTime\n" +
+  "#line 1\n";
+const GLSL_TAIL =
+  "\nvoid main(){\n" +
+  "  vec4 c = vec4(0.0,0.0,0.0,1.0);\n" +
+  "  mainImage(c, gl_FragCoord.xy);\n" +
+  "  bendr_O = vec4(c.rgb, 1.0);\n" +
+  "}\n";
+
+function glslWrap(body){
+  /* a pasted file may carry its own version line, which has to be first or
+     not present at all */
+  body = String(body || "").replace(/^\s*#version[^\n]*\n/, "");
+  return GLSL_HEAD + body + GLSL_TAIL;
+}
+
+/* Compiled outside makeProg/checkPrograms deliberately: those exist to fail
+   the build loudly at startup, and this must never do that. A shader typed by
+   hand is expected to fail, and the failure is the feedback. */
+function glslCompile(ch, body){
+  ch = ch || activeChan;
+  const src = glslWrap(body);
+  const vs = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(vs, VS); gl.compileShader(vs);
+  const fs = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(fs, src); gl.compileShader(fs);
+  if(!gl.getShaderParameter(fs, gl.COMPILE_STATUS)){
+    const log = gl.getShaderInfoLog(fs) || "compile failed";
+    gl.deleteShader(vs); gl.deleteShader(fs);
+    return {ok:false, log:log};
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  gl.deleteShader(vs); gl.deleteShader(fs);
+  if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){
+    const log = gl.getProgramInfoLog(prog) || "link failed";
+    gl.deleteProgram(prog);
+    return {ok:false, log:log};
+  }
+  const S = SRC[ch];
+  if(S.glslProg && S.glslProg.prog) { try{ gl.deleteProgram(S.glslProg.prog); }catch(e){} }
+  S.glslProg = {prog:prog, loc:{}};
+  S.glsl = body;
+  S.glslErr = "";
+  S.glslFrame = 0;
+  return {ok:true, log:""};
+}
+
+/* the channel's shader, compiled lazily so a patch that was loaded with a
+   shader on it comes up running rather than needing a press */
+function glslProgOf(ch){
+  const S = SRC[ch];
+  if(S.glslProg) return S.glslProg;
+  if(S.glslErr) return null;
+  const r = glslCompile(ch, S.glsl || GLSL_DEFAULT);
+  if(!r.ok){ S.glslErr = r.log; return null; }
+  return S.glslProg;
+}
+
+/* ---- the shader dock ---- */
+const GLSL_FEEDS = [["none","NONE (BLACK)"],["A","CH A"],["B","CH B"],["C","CH C"],["D","CH D"],
+                    ["BUS1","BUS 1"],["BUS2","BUS 2"],["PGM","PROGRAMME"],["self","THIS CHANNEL, LAST FRAME"]];
+function buildGlslDock(){
+  for(const id of ["glslCh0","glslCh2"]){
+    const sel = document.getElementById(id);
+    if(!sel) continue;
+    sel.innerHTML = "";
+    for(const [v,n] of GLSL_FEEDS){
+      const o = document.createElement("option");
+      o.value = v; o.textContent = n; sel.appendChild(o);
+    }
+    sel.onchange = ()=>{ SRC[activeChan][id==="glslCh0" ? "glslF0" : "glslF2"] = sel.value; };
+  }
+  const body = document.getElementById("glslBody");
+  const log = document.getElementById("glslLog");
+  const btn = document.getElementById("glslCompile");
+  const rev = document.getElementById("glslRevert");
+  if(btn) btn.onclick = ()=>{
+    const r = glslCompile(activeChan, body.value);
+    if(r.ok){
+      log.className = "ok";
+      log.textContent = "compiled ok · running on channel " + activeChan;
+      SRC[activeChan].glslErr = "";
+      toast("Shader compiled onto channel " + activeChan);
+    } else {
+      log.className = "";
+      log.textContent = r.log.trim();
+      SRC[activeChan].glslErr = r.log;
+    }
+  };
+  if(rev) rev.onclick = ()=>{ body.value = SRC[activeChan].glsl || GLSL_DEFAULT; log.textContent = ""; log.className = ""; };
+  if(body) body.addEventListener("keydown", e=>{
+    /* tab indents rather than leaving the field, which is what you want in a
+       code box and nowhere else */
+    if(e.key === "Tab"){
+      e.preventDefault();
+      const a = body.selectionStart, b = body.selectionEnd;
+      body.value = body.value.slice(0,a) + "  " + body.value.slice(b);
+      body.selectionStart = body.selectionEnd = a+2;
+    }
+    /* cmd/ctrl + enter compiles, because that is what every editor does */
+    if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); btn.click(); }
+    e.stopPropagation();
+  });
+}
+function syncGlslEditor(){
+  const S = SRC[activeChan];
+  const d = document.getElementById("glsldock");
+  if(!d) return;
+  const off = S.mode !== "glsl";
+  d.classList.toggle("notext", off);
+  const ns = document.getElementById("glslNeedsSrc");
+  if(ns) ns.style.display = off ? "block" : "none";
+  const body = document.getElementById("glslBody");
+  if(body && document.activeElement !== body) body.value = S.glsl || GLSL_DEFAULT;
+  const c0 = document.getElementById("glslCh0"), c2 = document.getElementById("glslCh2");
+  if(c0) c0.value = S.glslF0 || "none";
+  if(c2) c2.value = S.glslF2 || "none";
+  const note = document.getElementById("glslNote");
+  if(note) note.textContent = "CHANNEL " + activeChan;
+  const log = document.getElementById("glslLog");
+  if(log && S.glslErr){ log.className = ""; log.textContent = S.glslErr.trim(); }
+}
+buildGlslDock();
 /* ---------------- record / snapshot / fullscreen ---------------- */
 let recorder=null, recChunks=[], recStart=0, recTimer=null;
 const btnRec = document.getElementById("btnRec"), recTime = document.getElementById("recTime");
@@ -8642,6 +8894,13 @@ let recStream = null, recSize = null, recLocked = false;
    merely adequate for this, bounded so a 4K recording does not ask for a gigabit */
 function bitrateFor(w, h, fps){
   return Math.max(8_000_000, Math.min(160_000_000, Math.round(w*h*fps*0.25)));
+}
+/* the rate REC and the offline render work at, which is not the display rate
+   and not necessarily the engine rate either */
+function captureFps(){
+  const e = document.getElementById("selCapFps");
+  const v = e ? parseInt(e.value) : 30;
+  return (v >= 1 && v <= 120) ? v : 30;
 }
 function toggleRec(){
   if(recorder){ recorder.stop(); return; }
@@ -8657,7 +8916,8 @@ function toggleRec(){
   recSize = {w: canvas.width, h: canvas.height};
   canvas.width = procW; canvas.height = procH;
   recLocked = true;
-  const stream = recStream = canvas.captureStream(60);
+  const capFps = captureFps();
+  const stream = recStream = canvas.captureStream(capFps);
   if(audioCtx && recDest && audioMode==="source"){
     for(const tr of recDest.stream.getAudioTracks()) stream.addTrack(tr);
   }
@@ -8672,7 +8932,7 @@ function toggleRec(){
   /* Glitch material is about the worst case an encoder ever sees: every frame
      is high-entropy and almost nothing survives between frames. A flat 16 Mbit
      was thin at 1080p and meaningless at 4K, so scale it with the pixel rate. */
-  recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: bitrateFor(procW, procH, 60)});
+  recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: bitrateFor(procW, procH, capFps)});
   recorder.ondataavailable = e=>{ if(e.data.size) recChunks.push(e.data); };
   recorder.onstop = ()=>{
     const blob = new Blob(recChunks, {type: isMp4 ? "video/mp4" : "video/webm"});
@@ -8682,7 +8942,7 @@ function toggleRec(){
     recLocked = false;
     if(recSize){ canvas.width = recSize.w; canvas.height = recSize.h; recSize = null; markSizeDirty(); }
     recTime.style.display="none"; clearInterval(recTimer);
-    toast("Recording saved, "+procW+"\u00d7"+procH+" ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
+    toast("Recording saved, "+procW+"\u00d7"+procH+" @"+capFps+"fps ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
   };
   recorder.start(250);
   recStart = performance.now();
@@ -9759,7 +10019,7 @@ function runStage(id, inTex, dstRT, now, ch){
 
 function srcReady(ch){
   const S = SRC[ch];
-  if(S.mode === "pattern" || S.mode === "text" || S.mode === "synth" || S.mode === "feed") return true;
+  if(S.mode === "pattern" || S.mode === "text" || S.mode === "synth" || S.mode === "feed" || S.mode === "glsl") return true;
   return S.video.readyState >= 2 && S.video.videoWidth > 0;
 }
 window.__chanHasSource = srcReady;
@@ -9768,7 +10028,7 @@ window.__chanHasSource = srcReady;
 function uploadSource(ch, dt){
   const S = SRC[ch];
   if(sourceFrozen(ch)) return;   /* leave the texture holding its last frame */
-  if(S.mode === "synth" || S.mode === "feed"){ S.aspect = procW/procH; S.has = 1; S.patClock += dt*S.speed; return; }
+  if(S.mode === "synth" || S.mode === "feed" || S.mode === "glsl"){ S.aspect = procW/procH; S.has = 1; S.patClock += dt*S.speed*(S.tpRate===undefined?1:S.tpRate); return; }
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.bindTexture(gl.TEXTURE_2D, srcTex[ch]);
   if(S.mode === "pattern" || S.mode === "text"){
@@ -9802,10 +10062,68 @@ function renderGen(ch, now){
   draw();
   return C.gen.tex;
 }
+/* A pasted fragment shader, drawn into the same target the pattern synth uses.
+   iChannel1 is always the shader's own previous frame, which is the one input
+   it cannot get any other way and the one that makes a shader a feedback
+   system rather than a function of time. */
+function renderGlsl(ch, now, dt){
+  const C = chanRT[ch], S = SRC[ch];
+  const pr = glslProgOf(ch);
+  if(!pr) return C.gen.tex;              /* it failed to compile: hold the last picture */
+  if(!C.glslPrev) C.glslPrev = makeRT(procW, procH);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, C.gen.fbo);
+  gl.viewport(0,0,procW,procH);
+  gl.useProgram(pr.prog);
+  const u = n=>{ if(!(n in pr.loc)) pr.loc[n] = gl.getUniformLocation(pr.prog, n); return pr.loc[n]; };
+  gl.uniform3f(u("iResolution"), procW, procH, 1.0);
+  gl.uniform1f(u("iTime"), S.patClock);
+  gl.uniform1f(u("iTimeDelta"), dt || 1/60);
+  gl.uniform1f(u("iFrameRate"), dt > 0 ? 1/dt : 60);
+  gl.uniform1f(u("iSampleRate"), 44100);
+  gl.uniform1i(u("iFrame"), S.glslFrame|0);
+  /* no pointer input on a video instrument, so iMouse is parked at the centre
+     rather than at zero, where a lot of published shaders degenerate */
+  gl.uniform4f(u("iMouse"), procW*0.5, procH*0.5, 0, 0);
+  const d = glslDate();
+  gl.uniform4f(u("iDate"), d[0], d[1], d[2], d[3]);
+  const feeds = [S.glslF0 || "none", "self", S.glslF2 || "none", "none"];
+  for(let i=0;i<4;i++){
+    const f = feeds[i];
+    const t = (f === "none") ? blackTex
+            : (f === "self") ? (C.glslPrev ? C.glslPrev.tex : blackTex)
+            : (f === "BUS1" || f === "BUS2" || f === "PGM") ? feedTex(f)
+            : (srcReady(f) && chanRT[f] && chanRT[f].out) ? chanRT[f].out.tex : blackTex;
+    gl.activeTexture(gl.TEXTURE0 + i);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.uniform1i(u("iChannel"+i), i);
+  }
+  gl.uniform3fv(u("iChannelResolution[0]"), new Float32Array([
+    procW,procH,1, procW,procH,1, procW,procH,1, procW,procH,1]));
+  gl.uniform1fv(u("iChannelTime[0]"), new Float32Array([S.patClock,S.patClock,S.patClock,S.patClock]));
+  draw();
+  S.glslFrame = (S.glslFrame|0) + 1;
+  /* keep this frame for iChannel1 next time */
+  if(C.glslPrev) runPass(progCOPY, C.gen.tex, C.glslPrev.fbo, procW, procH, null, ch);
+  return C.gen.tex;
+}
+let glslDateCache = [0,0,0,0], glslDateAt = -1e9;
+function glslDate(){
+  /* recomputed once a second: a Date object per frame per channel is not free
+     and nothing published needs sub-second date resolution */
+  const t = performance.now();
+  if(t - glslDateAt > 1000){
+    glslDateAt = t;
+    const d = new Date();
+    glslDateCache = [d.getFullYear(), d.getMonth(), d.getDate(),
+                     d.getHours()*3600 + d.getMinutes()*60 + d.getSeconds() + d.getMilliseconds()/1000];
+  }
+  return glslDateCache;
+}
 function renderChannel(ch, now, dt){
   ensureChanRT(ch);
   const C = chanRT[ch], S = SRC[ch];
   const chanSrcTex = (S.mode === "synth") ? (sourceFrozen(ch) ? C.gen.tex : renderGen(ch, now))
+                   : (S.mode === "glsl")  ? (sourceFrozen(ch) ? C.gen.tex : renderGlsl(ch, now, dt))
                    : (S.mode === "feed") ? feedTex(S.feed || "PGM")
                    : srcTex[ch];
 
@@ -10369,6 +10687,17 @@ function frameEnd(now, dt){
 }
 
 let lastTickMs = 0;
+/* The processing clock, which is not the display's clock.
+   A feedback loop iterates once per rendered frame, so on a 120 Hz display it
+   evolves twice as fast as on a 60 Hz one and the same patch is a different
+   patch. The same is true of the strobe hold, the field parity, the flow store
+   and the phosphor accumulator: everything that carries state from one frame
+   to the next. Real video rigs run at the field rate whatever monitor is
+   plugged into them, so this does too — and it makes what you see match what
+   the offline render produces. FREE keeps the old behaviour, which is still
+   the right answer if you want the loop to run as fast as the machine can. */
+let engineRate = 0;          /* 0 = free-run, otherwise frames per second */
+let rateAcc = 0;
 function doTick(){
   if(offline) return;
   const nowMs = performance.now();
@@ -10377,6 +10706,16 @@ function doTick(){
   const now = nowMs/1000;
   let dt = now-lastT; lastT = now;
   dt = Math.min(dt, 0.1);
+  if(engineRate > 0){
+    const step = 1/engineRate;
+    rateAcc += dt;
+    if(rateAcc < step) return;          /* the picture on screen still stands */
+    /* never try to catch up more than a couple of frames: after a stall the
+       right thing is to carry on, not to run the loop forty times in a row */
+    if(rateAcc > step*3) rateAcc = step;
+    dt = step;
+    rateAcc -= step;
+  }
   renderFrame(now, dt);
   if(outTrack && outTrack.requestFrame){ try{ outTrack.requestFrame(); }catch(e){} }
 }
@@ -10396,7 +10735,9 @@ document.getElementById("btnRender").onclick = ()=>{ offlineRender().catch(e=>{
 async function offlineRender(){
   if(SRC.A.mode!=="file" || !SRC.A.video.duration){ toast("Load a video file into channel A first", true); return; }
   if(!("VideoEncoder" in window)){ toast("This browser has no WebCodecs — use Chrome", true); return; }
-  const fps = 30, W = procW, H = procH;
+  /* the render used to be hard-wired to 30, which is a poor fit for material
+     that changes on every frame; the capture rate is a control now */
+  const fps = captureFps(), W = procW, H = procH;
   const candidates = [["avc1.640028","avc"],["avc1.42003e","avc"],["vp09.00.10.08","vp9"]];
   let codec=null, mcodec=null;
   for(const [c,m] of candidates){
@@ -10669,6 +11010,14 @@ if(OUTPUT_MODE){
      its own handler overwritten by this loop */
   document.querySelectorAll("#dockTabs button[data-dock]").forEach(b=>{ b.onclick = ()=>setDock(b.dataset.dock); });
   {
+    const rt = document.getElementById("selRate");
+    if(rt) rt.onchange = ()=>{
+      engineRate = parseInt(rt.value) || 0;
+      rateAcc = 0;
+      toast(engineRate ? "Engine running at "+engineRate+" fps" : "Engine free-running at the display rate");
+    };
+    const cf = document.getElementById("selCapFps");
+    if(cf) cf.onchange = ()=>toast("Capture rate "+cf.value+" fps");
     const rs = document.getElementById("selRes");
     rs.onchange = ()=>{
       /* setProcRes refuses anything wider than the machine's maximum texture,

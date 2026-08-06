@@ -8,6 +8,7 @@ function newSource(ch){
   return {ch, video:v, mode:"pattern", pattern:"bars", cam:null,
           patCanvas:pc, pat:pc.getContext("2d"), patClock:0,
           aspect:16/9, has:0, speed:1, tpRate:1, feed:"PGM", name:"", audioHooked:false,
+          glsl:"", glslProg:null, glslErr:"", glslF0:"none", glslF2:"none", glslFrame:0,
           text:{body:"BENDR", font:"mono", size:0.2, track:0, x:0.5, y:0.5, rot:0,
                 scrollX:0, scrollY:0, repeat:1, ink:"#ffffff", bg:"#000000", outline:0,
                 shape:"none", shpCount:1, shpSize:0.3, shpX:0.5, shpY:0.5,
@@ -193,7 +194,7 @@ function stopCam(ch){
 function srcCaps(S){
   const m = S ? S.mode : "";
   if(m === "file") return {timeline:true, clock:true, audio:true, live:false};
-  if(m === "pattern" || m === "text" || m === "synth" || m === "feed")
+  if(m === "pattern" || m === "text" || m === "synth" || m === "feed" || m === "glsl")
     return {timeline:false, clock:true, audio:false, live:false};
   return {timeline:false, clock:false, audio:false, live:true};   /* cam, screen */
 }
@@ -228,6 +229,7 @@ function syncChanInputUI(){
     if(T.mode === "pattern") return (T.pattern||"pattern").toUpperCase();
     if(T.mode === "text")    return "TEXT";
     if(T.mode === "synth")   return "SYNTH "+GEN_SHAPES[genMode[ch2].shape];
+    if(T.mode === "glsl")    return "SHADER";
     if(T.mode === "feed")    return "FEED \u2190 "+(T.feed||"PGM");
     return T.mode.toUpperCase();
   };
@@ -250,6 +252,7 @@ function syncChanInputUI(){
   { const b=document.getElementById("btnFeed"); if(b) b.classList.toggle("on", S.mode==="feed");
     const f=document.getElementById("selFeed"); if(f) f.value = S.feed || "PGM"; }
   document.getElementById("btnText").classList.toggle("on", S.mode==="text");
+  { const b=document.getElementById("btnGlsl"); if(b) b.classList.toggle("on", S.mode==="glsl"); }
   document.getElementById("btnFile").textContent = "FILE";
   selPat.value = S.pattern;
   const sp = document.getElementById("spd");
@@ -258,13 +261,15 @@ function syncChanInputUI(){
   const lp = document.getElementById("btnLoop");
   lp.classList.toggle("on", S.video.loop);
   if(dockTab === "text") syncTextEditor();
+  if(dockTab === "glsl") syncGlslEditor();
+  if(S.mode !== "glsl" && dockTab === "glsl") setDock("matrix");
 }
 window.__syncChanInputUI = syncChanInputUI;
 setInterval(()=>{ if(!offline) syncChanInputUI(); }, 900);
 /* swap two channels' *sources* (what sits on top), not just their effects */
 window.__swapSources = function(a, b){
   const A = SRC[a], B = SRC[b];
-  const keys = ["mode","pattern","cam","patClock","aspect","has","speed","tpRate","feed","name","text"];
+  const keys = ["mode","pattern","cam","patClock","aspect","has","speed","tpRate","feed","name","text","glsl","glslF0","glslF2"];
   for(const k of keys){ const t = A[k]; A[k] = B[k]; B[k] = t; }
   /* video elements carry their own media, so swap what each channel points at */
   const tv = A.video, tp = A.patCanvas, tc = A.pat;
@@ -394,8 +399,12 @@ function setDock(t){
     toast("Channel "+activeChan+" is not a text source \u2014 pick TEXT under SOURCE first", true);
     t = dockTab === "text" ? "matrix" : dockTab;
   }
+  if(t === "glsl" && cur().mode !== "glsl"){
+    toast("Channel "+activeChan+" is not a shader source \u2014 pick SHADER under SOURCE first", true);
+    t = dockTab === "glsl" ? "matrix" : dockTab;
+  }
   dockTab = t;
-  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", out:"outdock", scope:"scopedock", audio:"audiodock", perform:"performdock"};
+  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", glsl:"glsldock", out:"outdock", scope:"scopedock", audio:"audiodock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);
     if(el) el.classList.toggle("on", k===t);
@@ -451,6 +460,17 @@ for(const [id,key,kind] of TXT_CTRL){
   el.addEventListener("input", handler);
   el.addEventListener("change", handler);
 }
+document.getElementById("btnGlsl").onclick = ()=>{
+  const S = cur();
+  stopCam(activeChan);
+  S.mode = "glsl"; S.name = "shader";
+  if(!S.glsl) S.glsl = GLSL_DEFAULT;
+  S.glslErr = "";
+  syncChanInputUI(); syncGlslEditor();
+  setDock("glsl");
+  setTimeout(()=>{ const t=document.getElementById("glslBody"); if(t) t.focus(); }, 60);
+  closeMenus();
+};
 document.getElementById("btnText").onclick = ()=>{
   const S = cur();
   stopCam(activeChan);
@@ -717,3 +737,172 @@ seek.addEventListener("input", ()=>{
 seek.addEventListener("change", ()=>{ seeking=false; });
 function fmtT(s){ if(!isFinite(s)) return "--:--"; s=Math.floor(s); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
 
+
+/* ---- shader source -------------------------------------------------------
+   A channel whose picture is a fragment shader you paste in.
+
+   The convention is the one the online shader sites settled on: you write
+   `void mainImage(out vec4 fragColor, in vec2 fragCoord)` and a set of
+   uniforms is provided for you. That convention is worth supporting because
+   it is what almost every published shader is written to, and because it puts
+   an entire generative language inside a channel — with the whole of the rest
+   of the rig sitting downstream of it, which is the part that makes it more
+   than a viewer. iChannel0 can be another channel, a bus, or the finished
+   programme, so a shader can equally be a processing stage.
+
+   Nothing is bundled: the code is whatever you paste, it stays in your patch,
+   and it runs on your GPU. Compilation is on a button rather than on every
+   keystroke, so a half-typed shader cannot take the picture down.            */
+
+const GLSL_DEFAULT =
+  "// the channel is a fragment shader now.\n" +
+  "// paste an image pass here and press COMPILE.\n" +
+  "void mainImage(out vec4 O, in vec2 fragCoord){\n" +
+  "  vec2 uv = fragCoord/iResolution.xy;\n" +
+  "  vec3 c = 0.5 + 0.5*cos(iTime + uv.xyx*4.0 + vec3(0,2,4));\n" +
+  "  c *= 0.6 + 0.4*sin(iTime*0.7 + length(uv-0.5)*24.0);\n" +
+  "  O = vec4(c, 1.0);\n" +
+  "}\n";
+
+/* The preamble. Everything the convention promises, declared whether or not
+   the pasted code uses it, plus the two legacy aliases that turn up in older
+   published shaders. */
+const GLSL_HEAD =
+  "#version 300 es\n" +
+  "precision highp float;\n" +
+  "precision highp int;\n" +
+  "out vec4 bendr_O;\n" +
+  "uniform vec3 iResolution;\n" +
+  "uniform float iTime, iTimeDelta, iFrameRate, iSampleRate;\n" +
+  "uniform int iFrame;\n" +
+  "uniform vec4 iMouse, iDate;\n" +
+  "uniform sampler2D iChannel0, iChannel1, iChannel2, iChannel3;\n" +
+  "uniform vec3 iChannelResolution[4];\n" +
+  "uniform float iChannelTime[4];\n" +
+  "#define texture2D texture\n" +
+  "#define textureCube texture\n" +
+  "#define iGlobalTime iTime\n" +
+  "#line 1\n";
+const GLSL_TAIL =
+  "\nvoid main(){\n" +
+  "  vec4 c = vec4(0.0,0.0,0.0,1.0);\n" +
+  "  mainImage(c, gl_FragCoord.xy);\n" +
+  "  bendr_O = vec4(c.rgb, 1.0);\n" +
+  "}\n";
+
+function glslWrap(body){
+  /* a pasted file may carry its own version line, which has to be first or
+     not present at all */
+  body = String(body || "").replace(/^\s*#version[^\n]*\n/, "");
+  return GLSL_HEAD + body + GLSL_TAIL;
+}
+
+/* Compiled outside makeProg/checkPrograms deliberately: those exist to fail
+   the build loudly at startup, and this must never do that. A shader typed by
+   hand is expected to fail, and the failure is the feedback. */
+function glslCompile(ch, body){
+  ch = ch || activeChan;
+  const src = glslWrap(body);
+  const vs = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(vs, VS); gl.compileShader(vs);
+  const fs = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(fs, src); gl.compileShader(fs);
+  if(!gl.getShaderParameter(fs, gl.COMPILE_STATUS)){
+    const log = gl.getShaderInfoLog(fs) || "compile failed";
+    gl.deleteShader(vs); gl.deleteShader(fs);
+    return {ok:false, log:log};
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  gl.deleteShader(vs); gl.deleteShader(fs);
+  if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){
+    const log = gl.getProgramInfoLog(prog) || "link failed";
+    gl.deleteProgram(prog);
+    return {ok:false, log:log};
+  }
+  const S = SRC[ch];
+  if(S.glslProg && S.glslProg.prog) { try{ gl.deleteProgram(S.glslProg.prog); }catch(e){} }
+  S.glslProg = {prog:prog, loc:{}};
+  S.glsl = body;
+  S.glslErr = "";
+  S.glslFrame = 0;
+  return {ok:true, log:""};
+}
+
+/* the channel's shader, compiled lazily so a patch that was loaded with a
+   shader on it comes up running rather than needing a press */
+function glslProgOf(ch){
+  const S = SRC[ch];
+  if(S.glslProg) return S.glslProg;
+  if(S.glslErr) return null;
+  const r = glslCompile(ch, S.glsl || GLSL_DEFAULT);
+  if(!r.ok){ S.glslErr = r.log; return null; }
+  return S.glslProg;
+}
+
+/* ---- the shader dock ---- */
+const GLSL_FEEDS = [["none","NONE (BLACK)"],["A","CH A"],["B","CH B"],["C","CH C"],["D","CH D"],
+                    ["BUS1","BUS 1"],["BUS2","BUS 2"],["PGM","PROGRAMME"],["self","THIS CHANNEL, LAST FRAME"]];
+function buildGlslDock(){
+  for(const id of ["glslCh0","glslCh2"]){
+    const sel = document.getElementById(id);
+    if(!sel) continue;
+    sel.innerHTML = "";
+    for(const [v,n] of GLSL_FEEDS){
+      const o = document.createElement("option");
+      o.value = v; o.textContent = n; sel.appendChild(o);
+    }
+    sel.onchange = ()=>{ SRC[activeChan][id==="glslCh0" ? "glslF0" : "glslF2"] = sel.value; };
+  }
+  const body = document.getElementById("glslBody");
+  const log = document.getElementById("glslLog");
+  const btn = document.getElementById("glslCompile");
+  const rev = document.getElementById("glslRevert");
+  if(btn) btn.onclick = ()=>{
+    const r = glslCompile(activeChan, body.value);
+    if(r.ok){
+      log.className = "ok";
+      log.textContent = "compiled ok · running on channel " + activeChan;
+      SRC[activeChan].glslErr = "";
+      toast("Shader compiled onto channel " + activeChan);
+    } else {
+      log.className = "";
+      log.textContent = r.log.trim();
+      SRC[activeChan].glslErr = r.log;
+    }
+  };
+  if(rev) rev.onclick = ()=>{ body.value = SRC[activeChan].glsl || GLSL_DEFAULT; log.textContent = ""; log.className = ""; };
+  if(body) body.addEventListener("keydown", e=>{
+    /* tab indents rather than leaving the field, which is what you want in a
+       code box and nowhere else */
+    if(e.key === "Tab"){
+      e.preventDefault();
+      const a = body.selectionStart, b = body.selectionEnd;
+      body.value = body.value.slice(0,a) + "  " + body.value.slice(b);
+      body.selectionStart = body.selectionEnd = a+2;
+    }
+    /* cmd/ctrl + enter compiles, because that is what every editor does */
+    if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); btn.click(); }
+    e.stopPropagation();
+  });
+}
+function syncGlslEditor(){
+  const S = SRC[activeChan];
+  const d = document.getElementById("glsldock");
+  if(!d) return;
+  const off = S.mode !== "glsl";
+  d.classList.toggle("notext", off);
+  const ns = document.getElementById("glslNeedsSrc");
+  if(ns) ns.style.display = off ? "block" : "none";
+  const body = document.getElementById("glslBody");
+  if(body && document.activeElement !== body) body.value = S.glsl || GLSL_DEFAULT;
+  const c0 = document.getElementById("glslCh0"), c2 = document.getElementById("glslCh2");
+  if(c0) c0.value = S.glslF0 || "none";
+  if(c2) c2.value = S.glslF2 || "none";
+  const note = document.getElementById("glslNote");
+  if(note) note.textContent = "CHANNEL " + activeChan;
+  const log = document.getElementById("glslLog");
+  if(log && S.glslErr){ log.className = ""; log.textContent = S.glslErr.trim(); }
+}
+buildGlslDock();

@@ -18,8 +18,20 @@ body{
 }
 /* ---------- header ---------- */
 #hdr{
-  flex:0 0 auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  /* One line. It used to wrap, and the thing that got pushed onto the second
+     line was whatever happened to be last - the manual button - which looked
+     like a mistake rather than a layout. The preset list is the one elastic
+     item, so it takes up the slack and gives it back instead. */
+  flex:0 0 auto; display:flex; align-items:center; gap:8px; flex-wrap:nowrap;
   padding:6px 12px; border-bottom:1px solid var(--line); background:var(--panel);
+}
+#hdr > *{flex:0 0 auto;}
+#hdr #selPreset{flex:1 1 200px; min-width:70px;}
+#hdr .spacer{flex:1 1 0; min-width:0;}
+/* below this the bar genuinely cannot hold everything, so let it wrap again */
+@media (max-width:900px){
+  #hdr{flex-wrap:wrap;}
+  #hdr #selPreset{flex:1 1 140px;}
 }
 .hgrp{
   position:relative; display:flex; align-items:center; gap:4px;
@@ -188,9 +200,11 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
   border-top:1px solid var(--line); background:var(--panel2);
 }
 #mixCollapse{
+  /* top-aligned, because the strip is three rows tall and every other fold
+     control on the layout sits at the top-left of the thing it folds */
   flex:0 0 auto; border:none; border-right:1px solid var(--line); border-radius:0;
-  padding:0 10px; font-size:8px; letter-spacing:2px; color:var(--dim);
-  display:flex; align-items:center; gap:4px; background:rgba(0,0,0,.2);
+  padding:8px 10px 0; font-size:8px; letter-spacing:2px; color:var(--dim);
+  display:flex; align-items:flex-start; gap:4px; background:rgba(0,0,0,.2);
 }
 #mixCollapse i{font-style:normal; font-size:8px; transition:transform .12s;}
 #mixCollapse .mixhint{display:none;}
@@ -617,6 +631,9 @@ body.nobend #bendCollapse .mixhint{display:inline;}
   color:var(--dim); border-color:var(--line); flex:0 0 auto;
 }
 .secbypass.off{color:#0b0b0e; background:var(--amber); border-color:var(--amber);}
+.secbypass svg{display:block;}
+/* every section the hovered bypass would take out with it */
+.sec.stagehover > h3{background:rgba(255,122,24,.16); box-shadow:inset 2px 0 0 var(--amber);}
 .sec.bypassed > h3{opacity:.55;}
 .sec.bypassed .secbody{opacity:.4;}
 #audiodock .sec{flex:1 1 0; min-width:250px; border-bottom:none; padding:0;}
@@ -661,6 +678,13 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 }
 
 #mixdock .sec{flex:1 1 0; min-width:230px; border-bottom:none; padding:0;}
+/* Sections in the dock do not collapse. They sit side by side in a fixed
+   layout, a collapsed one looks identical to one that is simply empty, and
+   there is nothing to gain: the dock as a whole already folds. */
+#mixdock .sec > h3, #outdock .sec > h3, #performdock .sec > h3{cursor:default;}
+#mixdock .sec > h3 .caret, #outdock .sec > h3 .caret, #performdock .sec > h3 .caret{display:none;}
+#mixdock .sec.collapsed .secbody, #outdock .sec.collapsed .secbody,
+#performdock .sec.collapsed .secbody{display:block;}
 #mixdock .sec h3{padding-top:0;}
 .pfcol{flex:0 0 auto; display:flex; flex-direction:column; gap:6px;}
 .pfcol .trow{width:100%;}
@@ -779,9 +803,11 @@ audio,video{display:none;}
   border-top:1px solid var(--line); background:var(--panel2);
 }
 #mixCollapse{
+  /* top-aligned, because the strip is three rows tall and every other fold
+     control on the layout sits at the top-left of the thing it folds */
   flex:0 0 auto; border:none; border-right:1px solid var(--line); border-radius:0;
-  padding:0 10px; font-size:8px; letter-spacing:2px; color:var(--dim);
-  display:flex; align-items:center; gap:4px; background:rgba(0,0,0,.2);
+  padding:8px 10px 0; font-size:8px; letter-spacing:2px; color:var(--dim);
+  display:flex; align-items:flex-start; gap:4px; background:rgba(0,0,0,.2);
 }
 #mixCollapse i{font-style:normal; font-size:8px; transition:transform .12s;}
 #mixCollapse .mixhint{display:none;}
@@ -917,7 +943,7 @@ body.nomix #mixbuses{display:none;}
     <div class="menupanel">
       <div class="mrow2">
         <button id="btnUndo" class="cy" data-tip="Step back through the last two dozen changes. Keyboard: Z.">UNDO</button>
-        <button id="btnInit" data-tip="Init patch: every control back to its default, on all four channels and all three buses, plus the mod routes, the chain order and every mode button. The sources you have loaded stay loaded. Undoable with Z, so it is safe to press.">INIT &middot; RESET ALL</button>
+        <button id="btnInit" data-tip="Init patch: every control back to its default, on all four channels and all three buses, plus the mod routes, the chain order and every mode button. The sources you have loaded stay loaded. Undoable with Z, so it is safe to press.">INIT</button>
       </div>
       <div class="mrow2">
         <button id="btnSave" data-tip="Save the whole rig - every channel, every route, LFO and toggle - as a .json patch file on disk.">SAVE FILE</button>
@@ -1375,6 +1401,7 @@ body.nomix #mixbuses{display:none;}
   <h3>FINDING YOUR WAY AROUND</h3>
   <p>What the transport can do depends on what the channel is looking at. A file has a timeline, so it plays, loops, seeks, mutes and shuttles. A generated source — pattern, text, synth or a feed from another channel — has a clock but nothing to scrub, so SPD and the deck transport drive that clock and the file controls are greyed out. A camera or a screen capture has neither, so it can be held or let run and nothing else. The panel follows the same rule: PATTERN SYNTH only appears on a channel that is actually a synth, because everywhere else it is a page of controls that do nothing.</p>
   <p>Three levels of undoing yourself: any single control resets with a double-click, each section has its own RESET, and <b>RESET FX</b> at the top of the channel column returns every effect on the channel you are editing to default in one press without touching what the channel is looking at — the file stays loaded and the pattern synth keeps its patch. <b>INIT · RESET ALL</b> in the PATCH menu does the whole rig. All of them are undoable with Z.</p>
+  <p>The eye beside each section switches <b>that section</b> out of the signal path and nothing else. Its controls keep their values and stop having any effect, so shutting the eye and opening it again puts you back exactly where you were. The pills on the rail above the picture are the coarser version: each one switches out a whole stage, which is several sections at once.</p>
   <p><b>BYPASS</b> is a momentary: hold the button, or hold B, to see the source with the whole chain switched out. While it is held the picture carries an amber border and a BYPASS badge, so there is never any doubt about which of the two you are looking at.</p>
   <p><b>SHADER</b> turns a channel into a fragment shader. Paste the image pass of a single-pass shader into the SHADER tab and press COMPILE, or cmd/ctrl-Enter. The uniforms the convention promises are all provided — <b>iResolution iTime iTimeDelta iFrame iMouse iDate iChannel0-3 iChannelResolution iChannelTime iFrameRate iSampleRate</b> — with <b>texture2D</b> and <b>iGlobalTime</b> accepted as aliases and a leading <b>#version</b> line ignored. iChannel0 and iChannel2 can be pointed at another channel, either bus or the finished programme, which makes a shader a processing stage rather than only a generator; iChannel1 is always the shader's own previous frame, so it can feed back on itself. Compile errors appear under the box with their line numbers and the last working shader keeps running, so nothing you type can take the picture down. Multi-pass shaders, the ones with buffer tabs, will compile but only their image pass runs. The code is saved with the patch.</p>
   <p><b>ENGINE RATE</b> decides how many times a second the processing runs, which is not how often your monitor refreshes. It matters because a feedback loop iterates once per rendered frame: on a 120Hz display a patch evolves twice as fast as it does on a 60Hz one, and so do the strobe, the field parity, the flow store and the phosphor trail. Pinning it makes a patch look the same everywhere and match the offline render. <b>CAPTURE RATE</b> sets the frame rate REC and RENDER work at.</p>
@@ -3393,7 +3420,7 @@ const FS_COPY = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v35.8";
+const BENDR_VERSION = "v35.9";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -4382,6 +4409,11 @@ const MIXBUS = {
        "edgeAmtM","edgeWidthM","edgeHoldM","edgeSwirlM","edgeChromaM","edgeCreepM",
        "wipeBordM","wipeBordColM","wipeRepM","mixKeyGainM","mixKeyDensM","mixKeyEdgeM","mixKeyEdgeColM","mixKeyShadowM","mixDirtM","mixDirtRateM","mixDirtDropM","mixDirtCutM","mixDirtKnockM","mixDirtNoiseM"]
 };
+/* Sections switched out individually. The rail pills switch out a whole stage;
+   this is the finer control, and it works by making the section's parameters
+   read as their defaults, so nothing downstream needs to know it exists. */
+const secBypass = {};
+let secBypassOn = false;
 let fbWrap = 0;        // 0 clamp 1 repeat 2 mirror
 let fbMirror = 0;      // 0 none 1 H 2 V 3 quad
 let fbBlend = 0;       // 0 mix 1 add 2 screen 3 max 4 min 5 difference
@@ -5195,6 +5227,19 @@ function applyParams(dt){
     }
   }
 
+  /* A bypassed section is switched out on its own, not as part of its stage.
+     The way to switch a group of controls out of a signal path is to make them
+     read as if nobody had touched them, so every parameter in the section takes
+     its default for as long as the eye is shut. Everything downstream — the
+     shaders, the presets, the modulation — needs to know nothing about it. */
+  if(secBypassOn){
+    for(const p of PLIST){
+      if(!secBypass[p.sec]) continue;
+      if(p.master){ mCur[p.id] = p.def; curTouched.add("M:"+p.id); }
+      else for(const ch of CHANNELS){ chanCur[ch][p.id] = p.def; curTouched.add(ch+":"+p.id); }
+    }
+  }
+
   /* clamp only what was written: base values are already in range */
   if(full || morphing){
     for(const ch of CHANNELS){ const cc=chanCur[ch]; for(const p of CLIST) cc[p.id] = Math.min(p.max, Math.max(p.min, cc[p.id])); }
@@ -5881,11 +5926,20 @@ function buildPanel(){
       const by = document.createElement("button");
       by.className = "secbypass";
       by.dataset.stage = stg;
-      attachTip(by, "BYPASS STAGE", "Switches the whole "+STAGE_INFO[stg].name+" stage out of the signal path, on every channel. The same control as the pill on the rail above the picture, and it turns amber when the stage is off.");
+      by.dataset.sec = sec.id;
+      attachTip(by, "SWITCH THIS SECTION OUT",
+        "Takes this section out of the signal path and nothing else, on every channel. Its controls keep their values and stop having any effect, so shutting the eye and opening it again puts you back exactly where you were.",
+        "The pills on the rail above the picture switch out a whole stage at once, which is several sections.");
       /* not the title as well: clicking the header collapses the section, and
          one target cannot mean two things */
-      by.onclick = e=>{ e.stopPropagation(); stageEnabled[stg] = !stageEnabled[stg]; renderChain(); refreshBypassBtns(); };
-      by.textContent = "\u25c9";      /* until refreshBypassBtns runs */
+      by.onclick = e=>{
+        e.stopPropagation();
+        secBypass[sec.id] = !secBypass[sec.id];
+        secBypassOn = Object.keys(secBypass).some(k=>secBypass[k]);
+        bumpParams();
+        refreshBypassBtns();
+      };
+      by.innerHTML = EYE_OPEN;        /* until refreshBypassBtns runs */
       h.appendChild(by);
     }
     /* the manual is an essay; this is the reference. Same words, but arranged
@@ -5900,7 +5954,10 @@ function buildPanel(){
     attachTip(rb, "RESET SECTION", "Returns every control in this section to its default, on the channel you are editing.", "Individual controls reset with a double-click, or the \u21ba that appears when you hover the row.");
     rb.onclick = e=>{ e.stopPropagation(); resetSection(sec.id); };
     h.appendChild(rb);
-    h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
+    /* only the sidebar collapses. A section in the dock sits in a fixed
+       side-by-side layout where a collapsed one is indistinguishable from an
+       empty one, and the dock as a whole already folds. */
+    if(sec.zone === "chain") h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
     d.appendChild(h);
     /* only the channel signal path reorders — the mix, the master out and the
        tools stay where they are, because their position carries meaning */
@@ -6418,6 +6475,8 @@ function saveCollapse(){
   }catch(e){}
 }
 function loadCollapse(){
+  /* a state saved before dock sections stopped collapsing would leave BUS 2
+     and MASTER folded away with no caret to open them again */
   let st = null;
   try{ st = JSON.parse(localStorage.getItem("bendr.collapse")); }catch(e){}
   if(!st){
@@ -6427,7 +6486,9 @@ function loadCollapse(){
        all of them; only the pattern synth starts folded */
     st = {gen:true};
   }
-  for(const k in st) if(secEls[k] && st[k]) secEls[k].classList.add("collapsed");
+  const SECZONE = {};
+  for(const q of SECTIONS) SECZONE[q.id] = q.zone;
+  for(const k in st) if(secEls[k] && st[k] && SECZONE[k] === "chain") secEls[k].classList.add("collapsed");
 }
 function revealSection(id){
   const d = secEls[id];
@@ -6446,15 +6507,23 @@ function stageOfSection(id){
   for(const k in STAGE_INFO) if(STAGE_INFO[k].sec.indexOf(id) >= 0) return k;
   return null;
 }
+const EYE_OPEN =
+  '<svg viewBox="0 0 24 16" width="15" height="11" aria-hidden="true">' +
+  '<path d="M1 8s4-6.2 11-6.2S23 8 23 8s-4 6.2-11 6.2S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.7"/>' +
+  '<circle cx="12" cy="8" r="2.7" fill="currentColor"/></svg>';
+const EYE_SHUT =
+  '<svg viewBox="0 0 24 16" width="15" height="11" aria-hidden="true">' +
+  '<path d="M1 8s4-6.2 11-6.2S23 8 23 8s-4 6.2-11 6.2S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.7" opacity="0.65"/>' +
+  '<circle cx="12" cy="8" r="2.7" fill="currentColor" opacity="0.5"/>' +
+  '<path d="M3 15 21 1" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
 function refreshBypassBtns(){
   for(const b of document.querySelectorAll(".secbypass")){
-    const off = !stageEnabled[b.dataset.stage];
+    const off = !!secBypass[b.dataset.sec];
     b.classList.toggle("off", off);
-    /* an eye, open or struck through. It used to say ON or BYPASSED, and the
-       two words are different lengths, so the button changed width every time
-       you pressed it and the whole header jumped. A control that moves when
-       you use it is a control you have to aim at twice. */
-    b.textContent = off ? "\u29b8" : "\u25c9";
+    /* A drawn eye rather than a glyph: the filled circle that stood in for one
+       reads as a record button, which is the last thing this should look like.
+       Open when the stage is in the path, struck through when it is out. */
+    b.innerHTML = off ? EYE_SHUT : EYE_OPEN;
     b.setAttribute("aria-label", off ? "stage bypassed" : "stage on");
     const sec = b.closest(".sec");
     if(sec) sec.classList.toggle("bypassed", off);
@@ -7866,12 +7935,16 @@ function captureState(){
     mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
     fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbFlip, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
     scanRevH, scanRevV, syncLatch, fbNoServo, ilMode, ilOrder, moshRecycle,
-    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
+    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}, secBypass: {...secBypass},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
     srcMode: (()=>{ const o={}; for(const ch of CHANNELS){
       const m = SRC[ch].mode;
-      if(m==="pattern"||m==="synth"||m==="text"||m==="feed") o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed};
+      /* a shader is a generated source like any other, and its code is the
+         source: without it the mode restores to a channel with nothing on it */
+      if(m==="pattern"||m==="synth"||m==="text"||m==="feed"||m==="glsl")
+        o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed,
+                 glsl:SRC[ch].glsl, glslF0:SRC[ch].glslF0, glslF2:SRC[ch].glslF2};
     } return o; })(),
     srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   st.mods = JSON.parse(JSON.stringify(mods));
@@ -7913,6 +7986,9 @@ function restoreState(st){
   for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbFlip","fbTap","outModel","osdMode","osdDate","fieldSrc","flowField","flowEdge","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM","mixKey","mixKey2","mixKeyM","scanRevH","scanRevV","syncLatch","fbNoServo","ilMode","ilOrder","moshRecycle"]){
     if(st[k] !== undefined) eval(k+" = st."+k);
   }
+  for(const k in secBypass) delete secBypass[k];
+  if(st.secBypass) Object.assign(secBypass, st.secBypass);
+  secBypassOn = Object.keys(secBypass).some(k=>secBypass[k]);
   if(st.fbInvert !== undefined) fbInvert = st.fbInvert;
   if(st.linkChans !== undefined){ linkChans = st.linkChans; const lb=document.getElementById("btnLinkChans"); if(lb) lb.classList.toggle("on", linkChans); }
   if(st.keyChroma !== undefined) keyChroma = st.keyChroma;
@@ -7945,6 +8021,10 @@ function restoreState(st){
     SRC[ch].mode = m.mode; SRC[ch].name = m.mode;
     if(m.pattern) SRC[ch].pattern = m.pattern;
     if(m.feed) SRC[ch].feed = m.feed;
+    if(m.glsl !== undefined){
+      SRC[ch].glsl = m.glsl; SRC[ch].glslF0 = m.glslF0 || "none"; SRC[ch].glslF2 = m.glslF2 || "none";
+      SRC[ch].glslProg = null; SRC[ch].glslErr = "";   /* recompiled on the next frame */
+    }
   }
   if(typeof syncChanInputUI === "function") syncChanInputUI();
   if(st.snapSlots) for(let i=0;i<SNAP_N;i++) snapSlots[i] = st.snapSlots[i] || null;
@@ -8023,6 +8103,7 @@ function resetGlobals(){
   mixBlend=0; mixBlend2=0; mixBlendM=0;
   mixKey=0;   mixKey2=0;   mixKeyM=0;
   edgeMode=0; linkChans=false;
+  for(const k in secBypass) delete secBypass[k]; secBypassOn = false;
   fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbFlip=0; fbTap=0;
   outModel=0; fieldSrc=0; flowField=0; flowEdge=0;
   osdMode=1; osdDate=0;
@@ -8071,13 +8152,17 @@ document.getElementById("btnSave").onclick = ()=>{
     mixMode2, wipeInv2, mixModeM, wipeInvM,
     mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
     fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbFlip, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
-    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
+    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}, secBypass: {...secBypass},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
     snapSlots, snapGlide, perfTake: perfRec.data, perfLen: perfRec.len,
     srcMode: (()=>{ const o={}; for(const ch of CHANNELS){
       const m = SRC[ch].mode;
-      if(m==="pattern"||m==="synth"||m==="text"||m==="feed") o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed};
+      /* a shader is a generated source like any other, and its code is the
+         source: without it the mode restores to a channel with nothing on it */
+      if(m==="pattern"||m==="synth"||m==="text"||m==="feed"||m==="glsl")
+        o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed,
+                 glsl:SRC[ch].glsl, glslF0:SRC[ch].glslF0, glslF2:SRC[ch].glslF2};
     } return o; })(),
     srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   state.mods = JSON.parse(JSON.stringify(mods));
@@ -9486,15 +9571,24 @@ function refreshPerfUI(){
 
 /* Crash and reload insurance. A tab crash, an accidental refresh or a laptop
    going flat used to lose the patch, the eight snapshots and the take. */
-let patchDirty = 0, autosaveLast = -1;
+let patchDirty = 0, autosaveLastJson = "";
 function writeAutosave(){
-  if(patchDirty === autosaveLast) return;
-  autosaveLast = patchDirty;
+  /* This was gated on a counter that only pushHistory ever incremented, so the
+     autosave only wrote when an undo entry was pushed. Everything that does not
+     push one — changing a channel's source, every mode toggle, the shader
+     editor, the text page — was never recorded, and reopening the window came
+     back with the source you had two edits ago. Comparing the payload cannot
+     miss anything and cannot need a new call site every time something is
+     added: one stringify every seven seconds is nothing next to what the
+     render loop is doing. */
   try{
     const st = captureState();
     st.snapSlots = snapSlots;
     st.snapGlide = snapGlide;
-    localStorage.setItem("bendr.autosave", JSON.stringify({t:Date.now(), st}));
+    const body = JSON.stringify(st);
+    if(body === autosaveLastJson) return;
+    autosaveLastJson = body;
+    localStorage.setItem("bendr.autosave", '{"t":' + Date.now() + ',"st":' + body + '}');
   }catch(e){}
 }
 setInterval(writeAutosave, 7000);
@@ -10808,7 +10902,6 @@ function updateScopes(now){
 const THUMB_W = 48, THUMB_H = 27;
 const thumbPix = new Uint8Array(THUMB_W*THUMB_H*4);
 let thumbAt = 0, thumbRT = null, thumbImg = null;
-let thumbTurn = 0;
 function updateThumbs(now){
   if(now - thumbAt < 0.5) return;
   thumbAt = now;
@@ -10820,9 +10913,10 @@ function updateThumbs(now){
      nothing happened until you faded it up. One idle channel per tick gets its
      source pulled and shown, which is two passes twice a second and tells you
      what is actually loaded before you commit to it. */
-  const idle = CHANNELS.filter(c=>!liveNow[c] && srcReady(c));
-  if(idle.length){
-    const ch = idle[thumbTurn++ % idle.length];
+  /* every idle channel, not one per tick: a round robin over three of them is
+     two seconds between updates each, which reads as frozen rather than live */
+  for(const ch of CHANNELS){
+    if(liveNow[ch] || !srcReady(ch)) continue;
     ensureChanRT(ch);
     uploadSource(ch, 0);
     const S = SRC[ch], C = chanRT[ch];

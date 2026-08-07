@@ -411,15 +411,24 @@ function refreshPerfUI(){
 
 /* Crash and reload insurance. A tab crash, an accidental refresh or a laptop
    going flat used to lose the patch, the eight snapshots and the take. */
-let patchDirty = 0, autosaveLast = -1;
+let patchDirty = 0, autosaveLastJson = "";
 function writeAutosave(){
-  if(patchDirty === autosaveLast) return;
-  autosaveLast = patchDirty;
+  /* This was gated on a counter that only pushHistory ever incremented, so the
+     autosave only wrote when an undo entry was pushed. Everything that does not
+     push one — changing a channel's source, every mode toggle, the shader
+     editor, the text page — was never recorded, and reopening the window came
+     back with the source you had two edits ago. Comparing the payload cannot
+     miss anything and cannot need a new call site every time something is
+     added: one stringify every seven seconds is nothing next to what the
+     render loop is doing. */
   try{
     const st = captureState();
     st.snapSlots = snapSlots;
     st.snapGlide = snapGlide;
-    localStorage.setItem("bendr.autosave", JSON.stringify({t:Date.now(), st}));
+    const body = JSON.stringify(st);
+    if(body === autosaveLastJson) return;
+    autosaveLastJson = body;
+    localStorage.setItem("bendr.autosave", '{"t":' + Date.now() + ',"st":' + body + '}');
   }catch(e){}
 }
 setInterval(writeAutosave, 7000);

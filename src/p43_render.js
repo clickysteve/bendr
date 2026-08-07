@@ -975,7 +975,6 @@ function updateScopes(now){
 const THUMB_W = 48, THUMB_H = 27;
 const thumbPix = new Uint8Array(THUMB_W*THUMB_H*4);
 let thumbAt = 0, thumbRT = null, thumbImg = null;
-let thumbTurn = 0;
 function updateThumbs(now){
   if(now - thumbAt < 0.5) return;
   thumbAt = now;
@@ -987,9 +986,10 @@ function updateThumbs(now){
      nothing happened until you faded it up. One idle channel per tick gets its
      source pulled and shown, which is two passes twice a second and tells you
      what is actually loaded before you commit to it. */
-  const idle = CHANNELS.filter(c=>!liveNow[c] && srcReady(c));
-  if(idle.length){
-    const ch = idle[thumbTurn++ % idle.length];
+  /* every idle channel, not one per tick: a round robin over three of them is
+     two seconds between updates each, which reads as frozen rather than live */
+  for(const ch of CHANNELS){
+    if(liveNow[ch] || !srcReady(ch)) continue;
     ensureChanRT(ch);
     uploadSource(ch, 0);
     const S = SRC[ch], C = chanRT[ch];

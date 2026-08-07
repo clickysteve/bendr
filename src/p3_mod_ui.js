@@ -464,6 +464,19 @@ function applyParams(dt){
     }
   }
 
+  /* A bypassed section is switched out on its own, not as part of its stage.
+     The way to switch a group of controls out of a signal path is to make them
+     read as if nobody had touched them, so every parameter in the section takes
+     its default for as long as the eye is shut. Everything downstream — the
+     shaders, the presets, the modulation — needs to know nothing about it. */
+  if(secBypassOn){
+    for(const p of PLIST){
+      if(!secBypass[p.sec]) continue;
+      if(p.master){ mCur[p.id] = p.def; curTouched.add("M:"+p.id); }
+      else for(const ch of CHANNELS){ chanCur[ch][p.id] = p.def; curTouched.add(ch+":"+p.id); }
+    }
+  }
+
   /* clamp only what was written: base values are already in range */
   if(full || morphing){
     for(const ch of CHANNELS){ const cc=chanCur[ch]; for(const p of CLIST) cc[p.id] = Math.min(p.max, Math.max(p.min, cc[p.id])); }
@@ -1150,11 +1163,20 @@ function buildPanel(){
       const by = document.createElement("button");
       by.className = "secbypass";
       by.dataset.stage = stg;
-      attachTip(by, "BYPASS STAGE", "Switches the whole "+STAGE_INFO[stg].name+" stage out of the signal path, on every channel. The same control as the pill on the rail above the picture, and it turns amber when the stage is off.");
+      by.dataset.sec = sec.id;
+      attachTip(by, "SWITCH THIS SECTION OUT",
+        "Takes this section out of the signal path and nothing else, on every channel. Its controls keep their values and stop having any effect, so shutting the eye and opening it again puts you back exactly where you were.",
+        "The pills on the rail above the picture switch out a whole stage at once, which is several sections.");
       /* not the title as well: clicking the header collapses the section, and
          one target cannot mean two things */
-      by.onclick = e=>{ e.stopPropagation(); stageEnabled[stg] = !stageEnabled[stg]; renderChain(); refreshBypassBtns(); };
-      by.textContent = "\u25c9";      /* until refreshBypassBtns runs */
+      by.onclick = e=>{
+        e.stopPropagation();
+        secBypass[sec.id] = !secBypass[sec.id];
+        secBypassOn = Object.keys(secBypass).some(k=>secBypass[k]);
+        bumpParams();
+        refreshBypassBtns();
+      };
+      by.innerHTML = EYE_OPEN;        /* until refreshBypassBtns runs */
       h.appendChild(by);
     }
     /* the manual is an essay; this is the reference. Same words, but arranged
@@ -1169,7 +1191,10 @@ function buildPanel(){
     attachTip(rb, "RESET SECTION", "Returns every control in this section to its default, on the channel you are editing.", "Individual controls reset with a double-click, or the \u21ba that appears when you hover the row.");
     rb.onclick = e=>{ e.stopPropagation(); resetSection(sec.id); };
     h.appendChild(rb);
-    h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
+    /* only the sidebar collapses. A section in the dock sits in a fixed
+       side-by-side layout where a collapsed one is indistinguishable from an
+       empty one, and the dock as a whole already folds. */
+    if(sec.zone === "chain") h.onclick = ()=>{ d.classList.toggle("collapsed"); saveCollapse(); };
     d.appendChild(h);
     /* only the channel signal path reorders — the mix, the master out and the
        tools stay where they are, because their position carries meaning */
@@ -1687,6 +1712,8 @@ function saveCollapse(){
   }catch(e){}
 }
 function loadCollapse(){
+  /* a state saved before dock sections stopped collapsing would leave BUS 2
+     and MASTER folded away with no caret to open them again */
   let st = null;
   try{ st = JSON.parse(localStorage.getItem("bendr.collapse")); }catch(e){}
   if(!st){
@@ -1696,7 +1723,9 @@ function loadCollapse(){
        all of them; only the pattern synth starts folded */
     st = {gen:true};
   }
-  for(const k in st) if(secEls[k] && st[k]) secEls[k].classList.add("collapsed");
+  const SECZONE = {};
+  for(const q of SECTIONS) SECZONE[q.id] = q.zone;
+  for(const k in st) if(secEls[k] && st[k] && SECZONE[k] === "chain") secEls[k].classList.add("collapsed");
 }
 function revealSection(id){
   const d = secEls[id];
@@ -1715,15 +1744,23 @@ function stageOfSection(id){
   for(const k in STAGE_INFO) if(STAGE_INFO[k].sec.indexOf(id) >= 0) return k;
   return null;
 }
+const EYE_OPEN =
+  '<svg viewBox="0 0 24 16" width="15" height="11" aria-hidden="true">' +
+  '<path d="M1 8s4-6.2 11-6.2S23 8 23 8s-4 6.2-11 6.2S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.7"/>' +
+  '<circle cx="12" cy="8" r="2.7" fill="currentColor"/></svg>';
+const EYE_SHUT =
+  '<svg viewBox="0 0 24 16" width="15" height="11" aria-hidden="true">' +
+  '<path d="M1 8s4-6.2 11-6.2S23 8 23 8s-4 6.2-11 6.2S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.7" opacity="0.65"/>' +
+  '<circle cx="12" cy="8" r="2.7" fill="currentColor" opacity="0.5"/>' +
+  '<path d="M3 15 21 1" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
 function refreshBypassBtns(){
   for(const b of document.querySelectorAll(".secbypass")){
-    const off = !stageEnabled[b.dataset.stage];
+    const off = !!secBypass[b.dataset.sec];
     b.classList.toggle("off", off);
-    /* an eye, open or struck through. It used to say ON or BYPASSED, and the
-       two words are different lengths, so the button changed width every time
-       you pressed it and the whole header jumped. A control that moves when
-       you use it is a control you have to aim at twice. */
-    b.textContent = off ? "\u29b8" : "\u25c9";
+    /* A drawn eye rather than a glyph: the filled circle that stood in for one
+       reads as a record button, which is the last thing this should look like.
+       Open when the stage is in the path, struck through when it is out. */
+    b.innerHTML = off ? EYE_SHUT : EYE_OPEN;
     b.setAttribute("aria-label", off ? "stage bypassed" : "stage on");
     const sec = b.closest(".sec");
     if(sec) sec.classList.toggle("bypassed", off);

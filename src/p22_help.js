@@ -506,6 +506,11 @@ const MIXBUS = {
        "edgeAmtM","edgeWidthM","edgeHoldM","edgeSwirlM","edgeChromaM","edgeCreepM",
        "wipeBordM","wipeBordColM","wipeRepM","mixKeyGainM","mixKeyDensM","mixKeyEdgeM","mixKeyEdgeColM","mixKeyShadowM","mixDirtM","mixDirtRateM","mixDirtDropM","mixDirtCutM","mixDirtKnockM","mixDirtNoiseM"]
 };
+/* Sections switched out individually. The rail pills switch out a whole stage;
+   this is the finer control, and it works by making the section's parameters
+   read as their defaults, so nothing downstream needs to know it exists. */
+const secBypass = {};
+let secBypassOn = false;
 let fbWrap = 0;        // 0 clamp 1 repeat 2 mirror
 let fbMirror = 0;      // 0 none 1 H 2 V 3 quad
 let fbBlend = 0;       // 0 mix 1 add 2 screen 3 max 4 min 5 difference

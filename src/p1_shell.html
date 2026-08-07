@@ -18,8 +18,20 @@ body{
 }
 /* ---------- header ---------- */
 #hdr{
-  flex:0 0 auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  /* One line. It used to wrap, and the thing that got pushed onto the second
+     line was whatever happened to be last - the manual button - which looked
+     like a mistake rather than a layout. The preset list is the one elastic
+     item, so it takes up the slack and gives it back instead. */
+  flex:0 0 auto; display:flex; align-items:center; gap:8px; flex-wrap:nowrap;
   padding:6px 12px; border-bottom:1px solid var(--line); background:var(--panel);
+}
+#hdr > *{flex:0 0 auto;}
+#hdr #selPreset{flex:1 1 200px; min-width:70px;}
+#hdr .spacer{flex:1 1 0; min-width:0;}
+/* below this the bar genuinely cannot hold everything, so let it wrap again */
+@media (max-width:900px){
+  #hdr{flex-wrap:wrap;}
+  #hdr #selPreset{flex:1 1 140px;}
 }
 .hgrp{
   position:relative; display:flex; align-items:center; gap:4px;
@@ -188,9 +200,11 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
   border-top:1px solid var(--line); background:var(--panel2);
 }
 #mixCollapse{
+  /* top-aligned, because the strip is three rows tall and every other fold
+     control on the layout sits at the top-left of the thing it folds */
   flex:0 0 auto; border:none; border-right:1px solid var(--line); border-radius:0;
-  padding:0 10px; font-size:8px; letter-spacing:2px; color:var(--dim);
-  display:flex; align-items:center; gap:4px; background:rgba(0,0,0,.2);
+  padding:8px 10px 0; font-size:8px; letter-spacing:2px; color:var(--dim);
+  display:flex; align-items:flex-start; gap:4px; background:rgba(0,0,0,.2);
 }
 #mixCollapse i{font-style:normal; font-size:8px; transition:transform .12s;}
 #mixCollapse .mixhint{display:none;}
@@ -617,6 +631,9 @@ body.nobend #bendCollapse .mixhint{display:inline;}
   color:var(--dim); border-color:var(--line); flex:0 0 auto;
 }
 .secbypass.off{color:#0b0b0e; background:var(--amber); border-color:var(--amber);}
+.secbypass svg{display:block;}
+/* every section the hovered bypass would take out with it */
+.sec.stagehover > h3{background:rgba(255,122,24,.16); box-shadow:inset 2px 0 0 var(--amber);}
 .sec.bypassed > h3{opacity:.55;}
 .sec.bypassed .secbody{opacity:.4;}
 #audiodock .sec{flex:1 1 0; min-width:250px; border-bottom:none; padding:0;}
@@ -661,6 +678,13 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 }
 
 #mixdock .sec{flex:1 1 0; min-width:230px; border-bottom:none; padding:0;}
+/* Sections in the dock do not collapse. They sit side by side in a fixed
+   layout, a collapsed one looks identical to one that is simply empty, and
+   there is nothing to gain: the dock as a whole already folds. */
+#mixdock .sec > h3, #outdock .sec > h3, #performdock .sec > h3{cursor:default;}
+#mixdock .sec > h3 .caret, #outdock .sec > h3 .caret, #performdock .sec > h3 .caret{display:none;}
+#mixdock .sec.collapsed .secbody, #outdock .sec.collapsed .secbody,
+#performdock .sec.collapsed .secbody{display:block;}
 #mixdock .sec h3{padding-top:0;}
 .pfcol{flex:0 0 auto; display:flex; flex-direction:column; gap:6px;}
 .pfcol .trow{width:100%;}
@@ -779,9 +803,11 @@ audio,video{display:none;}
   border-top:1px solid var(--line); background:var(--panel2);
 }
 #mixCollapse{
+  /* top-aligned, because the strip is three rows tall and every other fold
+     control on the layout sits at the top-left of the thing it folds */
   flex:0 0 auto; border:none; border-right:1px solid var(--line); border-radius:0;
-  padding:0 10px; font-size:8px; letter-spacing:2px; color:var(--dim);
-  display:flex; align-items:center; gap:4px; background:rgba(0,0,0,.2);
+  padding:8px 10px 0; font-size:8px; letter-spacing:2px; color:var(--dim);
+  display:flex; align-items:flex-start; gap:4px; background:rgba(0,0,0,.2);
 }
 #mixCollapse i{font-style:normal; font-size:8px; transition:transform .12s;}
 #mixCollapse .mixhint{display:none;}
@@ -917,7 +943,7 @@ body.nomix #mixbuses{display:none;}
     <div class="menupanel">
       <div class="mrow2">
         <button id="btnUndo" class="cy" data-tip="Step back through the last two dozen changes. Keyboard: Z.">UNDO</button>
-        <button id="btnInit" data-tip="Init patch: every control back to its default, on all four channels and all three buses, plus the mod routes, the chain order and every mode button. The sources you have loaded stay loaded. Undoable with Z, so it is safe to press.">INIT &middot; RESET ALL</button>
+        <button id="btnInit" data-tip="Init patch: every control back to its default, on all four channels and all three buses, plus the mod routes, the chain order and every mode button. The sources you have loaded stay loaded. Undoable with Z, so it is safe to press.">INIT</button>
       </div>
       <div class="mrow2">
         <button id="btnSave" data-tip="Save the whole rig - every channel, every route, LFO and toggle - as a .json patch file on disk.">SAVE FILE</button>
@@ -1375,6 +1401,7 @@ body.nomix #mixbuses{display:none;}
   <h3>FINDING YOUR WAY AROUND</h3>
   <p>What the transport can do depends on what the channel is looking at. A file has a timeline, so it plays, loops, seeks, mutes and shuttles. A generated source — pattern, text, synth or a feed from another channel — has a clock but nothing to scrub, so SPD and the deck transport drive that clock and the file controls are greyed out. A camera or a screen capture has neither, so it can be held or let run and nothing else. The panel follows the same rule: PATTERN SYNTH only appears on a channel that is actually a synth, because everywhere else it is a page of controls that do nothing.</p>
   <p>Three levels of undoing yourself: any single control resets with a double-click, each section has its own RESET, and <b>RESET FX</b> at the top of the channel column returns every effect on the channel you are editing to default in one press without touching what the channel is looking at — the file stays loaded and the pattern synth keeps its patch. <b>INIT · RESET ALL</b> in the PATCH menu does the whole rig. All of them are undoable with Z.</p>
+  <p>The eye beside each section switches <b>that section</b> out of the signal path and nothing else. Its controls keep their values and stop having any effect, so shutting the eye and opening it again puts you back exactly where you were. The pills on the rail above the picture are the coarser version: each one switches out a whole stage, which is several sections at once.</p>
   <p><b>BYPASS</b> is a momentary: hold the button, or hold B, to see the source with the whole chain switched out. While it is held the picture carries an amber border and a BYPASS badge, so there is never any doubt about which of the two you are looking at.</p>
   <p><b>SHADER</b> turns a channel into a fragment shader. Paste the image pass of a single-pass shader into the SHADER tab and press COMPILE, or cmd/ctrl-Enter. The uniforms the convention promises are all provided — <b>iResolution iTime iTimeDelta iFrame iMouse iDate iChannel0-3 iChannelResolution iChannelTime iFrameRate iSampleRate</b> — with <b>texture2D</b> and <b>iGlobalTime</b> accepted as aliases and a leading <b>#version</b> line ignored. iChannel0 and iChannel2 can be pointed at another channel, either bus or the finished programme, which makes a shader a processing stage rather than only a generator; iChannel1 is always the shader's own previous frame, so it can feed back on itself. Compile errors appear under the box with their line numbers and the last working shader keeps running, so nothing you type can take the picture down. Multi-pass shaders, the ones with buffer tabs, will compile but only their image pass runs. The code is saved with the patch.</p>
   <p><b>ENGINE RATE</b> decides how many times a second the processing runs, which is not how often your monitor refreshes. It matters because a feedback loop iterates once per rendered frame: on a 120Hz display a patch evolves twice as fast as it does on a 60Hz one, and so do the strobe, the field parity, the flow store and the phosphor trail. Pinning it makes a patch look the same everywhere and match the offline render. <b>CAPTURE RATE</b> sets the frame rate REC and RENDER work at.</p>

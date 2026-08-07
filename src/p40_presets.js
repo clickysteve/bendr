@@ -459,12 +459,16 @@ function captureState(){
     mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
     fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbFlip, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
     scanRevH, scanRevV, syncLatch, fbNoServo, ilMode, ilOrder, moshRecycle,
-    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
+    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}, secBypass: {...secBypass},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
     srcMode: (()=>{ const o={}; for(const ch of CHANNELS){
       const m = SRC[ch].mode;
-      if(m==="pattern"||m==="synth"||m==="text"||m==="feed") o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed};
+      /* a shader is a generated source like any other, and its code is the
+         source: without it the mode restores to a channel with nothing on it */
+      if(m==="pattern"||m==="synth"||m==="text"||m==="feed"||m==="glsl")
+        o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed,
+                 glsl:SRC[ch].glsl, glslF0:SRC[ch].glslF0, glslF2:SRC[ch].glslF2};
     } return o; })(),
     srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   st.mods = JSON.parse(JSON.stringify(mods));
@@ -506,6 +510,9 @@ function restoreState(st){
   for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbFlip","fbTap","outModel","osdMode","osdDate","fieldSrc","flowField","flowEdge","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM","mixKey","mixKey2","mixKeyM","scanRevH","scanRevV","syncLatch","fbNoServo","ilMode","ilOrder","moshRecycle"]){
     if(st[k] !== undefined) eval(k+" = st."+k);
   }
+  for(const k in secBypass) delete secBypass[k];
+  if(st.secBypass) Object.assign(secBypass, st.secBypass);
+  secBypassOn = Object.keys(secBypass).some(k=>secBypass[k]);
   if(st.fbInvert !== undefined) fbInvert = st.fbInvert;
   if(st.linkChans !== undefined){ linkChans = st.linkChans; const lb=document.getElementById("btnLinkChans"); if(lb) lb.classList.toggle("on", linkChans); }
   if(st.keyChroma !== undefined) keyChroma = st.keyChroma;
@@ -538,6 +545,10 @@ function restoreState(st){
     SRC[ch].mode = m.mode; SRC[ch].name = m.mode;
     if(m.pattern) SRC[ch].pattern = m.pattern;
     if(m.feed) SRC[ch].feed = m.feed;
+    if(m.glsl !== undefined){
+      SRC[ch].glsl = m.glsl; SRC[ch].glslF0 = m.glslF0 || "none"; SRC[ch].glslF2 = m.glslF2 || "none";
+      SRC[ch].glslProg = null; SRC[ch].glslErr = "";   /* recompiled on the next frame */
+    }
   }
   if(typeof syncChanInputUI === "function") syncChanInputUI();
   if(st.snapSlots) for(let i=0;i<SNAP_N;i++) snapSlots[i] = st.snapSlots[i] || null;
@@ -616,6 +627,7 @@ function resetGlobals(){
   mixBlend=0; mixBlend2=0; mixBlendM=0;
   mixKey=0;   mixKey2=0;   mixKeyM=0;
   edgeMode=0; linkChans=false;
+  for(const k in secBypass) delete secBypass[k]; secBypassOn = false;
   fbWrap=0; fbMirror=0; fbBlend=0; fbNL=0; fbInvert=false; fbFlip=0; fbTap=0;
   outModel=0; fieldSrc=0; flowField=0; flowEdge=0;
   osdMode=1; osdDate=0;
@@ -664,13 +676,17 @@ document.getElementById("btnSave").onclick = ()=>{
     mixMode2, wipeInv2, mixModeM, wipeInvM,
     mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
     fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbFlip, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
-    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled},
+    chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}, secBypass: {...secBypass},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
     genMode: JSON.parse(JSON.stringify(genMode)),
     snapSlots, snapGlide, perfTake: perfRec.data, perfLen: perfRec.len,
     srcMode: (()=>{ const o={}; for(const ch of CHANNELS){
       const m = SRC[ch].mode;
-      if(m==="pattern"||m==="synth"||m==="text"||m==="feed") o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed};
+      /* a shader is a generated source like any other, and its code is the
+         source: without it the mode restores to a channel with nothing on it */
+      if(m==="pattern"||m==="synth"||m==="text"||m==="feed"||m==="glsl")
+        o[ch] = {mode:m, pattern:SRC[ch].pattern, feed:SRC[ch].feed,
+                 glsl:SRC[ch].glsl, glslF0:SRC[ch].glslF0, glslF2:SRC[ch].glslF2};
     } return o; })(),
     srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   state.mods = JSON.parse(JSON.stringify(mods));

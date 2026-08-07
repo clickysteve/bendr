@@ -3416,11 +3416,16 @@ const FS_MULTI = COMMON +
 const FS_COPY = COMMON +
 "uniform sampler2D u_tex;\n" +
 "void main(){ O = texture(u_tex, gl_FragCoord.xy/u_res); }\n";
+/* the same copy, but told where in a larger target it is being drawn, so the
+   four channel thumbnails can be packed into one atlas and read back once */
+const FS_TILE = COMMON +
+"uniform sampler2D u_tex; uniform vec2 u_ofs;\n" +
+"void main(){ O = texture(u_tex, (gl_FragCoord.xy-u_ofs)/u_res); }\n";
 
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v35.9";
+const BENDR_VERSION = "v36.1";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -4497,6 +4502,7 @@ function U(pr, name){
 const progFB = makeProg(FS_FB), progSIG = makeProg(FS_SIG), progCOL = makeProg(FS_COL), progCRT = makeProg(FS_CRT);
 const progGLITCH = makeProg(FS_GLITCH), progFLOW = makeProg(FS_FLOW), progCOPY = makeProg(FS_COPY);
 const progMIX = makeProg(FS_MIX);
+const progTILE = makeProg(FS_TILE);
 const progMULTI = makeProg(FS_MULTI);
 const progGEN = makeProg(FS_GEN);
 const progLAB = makeProg(FS_LAB);
@@ -4569,7 +4575,7 @@ let RING_N = 30;
 /* Each channel owns its feedback history, flow history and frame ring;
    scratch buffers are shared because channels render one after the other. */
 function newChanRT(){
-  return {fbPrev:null, fbNext:null, crt:null, flowA:null, flowB:null, flowSrc:null, gen:null, out:null,
+  return {fbNext:null, crt:null, flowA:null, flowB:null, flowSrc:null, gen:null, out:null,
           ring:null, ringW:0, ringFilled:0};
 }
 const chanRT = {};
@@ -4603,7 +4609,10 @@ function clearRing(c){
 function ensureRing(c){
   if(!c.ring){ c.ring=[]; for(let i=0;i<RING_N;i++) c.ring.push(makeRT(procW,procH)); c.ringW=0; c.ringFilled=0; }
 }
-const CH_RTS = ["fbPrev","fbNext","crt","flowA","flowB","flowSrc","gen","out"];
+/* fbPrev is gone: the feedback source is the channel's own out target, read
+   before it is written again, so there was never anything to copy into a
+   second buffer. One less full-raster target per channel. */
+const CH_RTS = ["fbNext","crt","flowA","flowB","flowSrc","gen","out"];
 /* A channel's eight render targets are only allocated once that channel is
    actually used. At 720p that hardly matters; at 2160p each one is 33 MB, so
    allocating all four channels up front would cost a gigabyte for nothing. */
@@ -10046,10 +10055,20 @@ function updateSyncChannel(ch, ci, dt, t){
     dispData[o]=d; dispData[o+1]=gn; dispData[o+2]=ng; dispData[o+3]=Math.min(1, hf);
   }
 }
-function updateSyncModel(dt, t){
-  for(let ci=0; ci<CHANNELS.length && ci<SCHAN; ci++) updateSyncChannel(CHANNELS[ci], ci, dt, t);
+/* The PLL runs 576 rows per channel with trig, exponentials and a few hundred
+   random draws in each. Doing that for four channels when one is on screen
+   threw three quarters of the work away: nothing samples a dead channel's rows,
+   so they can sit stale until it comes back. */
+function updateSyncModel(dt, t, live){
+  for(let ci=0; ci<CHANNELS.length && ci<SCHAN; ci++){
+    if(live && !live[CHANNELS[ci]]) continue;
+    updateSyncChannel(CHANNELS[ci], ci, dt, t);
+  }
   gl.bindTexture(gl.TEXTURE_2D, dispTex);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,SROWS,SCHAN,0,gl.RGBA,gl.FLOAT,dispData);
+  /* texSubImage2D, not texImage2D: the storage is allocated once at startup and
+     never changes shape, so re-specifying it every frame was 36 KB of pointless
+     reallocation sixty times a second */
+  gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,SROWS,SCHAN,gl.RGBA,gl.FLOAT,dispData);
 }
 
 /* ---------------- main loop ---------------- */
@@ -10085,7 +10104,25 @@ const anaC = document.createElement("canvas"); anaC.width=32; anaC.height=18;
 const anaCtx = anaC.getContext("2d", {willReadFrequently:true});
 const anaPrev = new Float32Array(576);
 let mdAvg=0.02, motionPeak=0.05, cutV=0;
+/* This drew the source into a 32x18 canvas and pulled it back with
+   getImageData on every frame, whether or not anything was listening. That is
+   a CPU readback of a GPU-resident video frame sixty times a second for three
+   numbers that, in most patches, nothing reads. It now runs when something
+   actually consumes it: a patched route, a scene-cut trigger, the feedback
+   auto-level servo, or the MOD page being open with its meters showing. */
+let anaGrid = null, anaWasOn = false;
+function contentAnalysisNeeded(){
+  for(const r of routes) if(r.src==="motion" || r.src==="bright" || r.src==="cut") return true;
+  for(const m of mods) if(m.trig === "cut") return true;
+  if(!fbNoServo) for(const ch of CHANNELS) if(getCur("fbAuto",ch) > 0.003) return true;
+  if(!anaGrid) anaGrid = document.getElementById("modgrid");
+  if(anaGrid && anaGrid.classList.contains("on")) return true;
+  return false;
+}
 function updateContentAnalysis(dt){
+  if(!contentAnalysisNeeded()){ anaWasOn = false; return; }
+  const first = !anaWasOn;
+  anaWasOn = true;
   const S = SRC.A;
   let src = null;
   if(S.mode==="pattern" || S.mode==="text") src = S.patCanvas;
@@ -10100,6 +10137,9 @@ function updateContentAnalysis(dt){
   }
   const mean = sum/576, md = diff/576;
   modVal.bright = mean;
+  /* the first frame after a gap has nothing to difference against but whatever
+     was on screen when it last ran, so it reads as one enormous cut */
+  if(first){ modVal.motion = 0; cutV = 0; modVal.cut = 0; return; }
   motionPeak = Math.max(motionPeak*(1-dt*0.05), md, 0.02);
   modVal.motion += (Math.min(1, md/motionPeak) - modVal.motion)*Math.min(1, dt*10);
   if(md > Math.max(0.06, mdAvg*3.5)) cutV = 1;
@@ -10184,6 +10224,10 @@ let scanRT = null, fieldPrev = null, fieldOut = null;
 function runScan(inTex, dstRT, now, ch){
   const lines = Math.max(8, Math.round(getCur("scanLines", ch)));
   const samples = Math.max(8, Math.round(getCur("scanSamples", ch)));
+  /* these three are allocated on demand and were never rebuilt when the
+     processing resolution changed, so the stage drew into a target of the
+     wrong size and the picture landed in a corner */
+  if(scanRT && (scanRT.w !== procW || scanRT.h !== procH)){ freeRT(scanRT); scanRT = null; }
   if(!scanRT) scanRT = makeRT(procW, procH, true);
   if(!scanRT) return;
   gl.bindFramebuffer(gl.FRAMEBUFFER, scanRT.fbo);
@@ -10207,6 +10251,19 @@ function runScan(inTex, dstRT, now, ch){
   gl.disable(gl.BLEND);
   runPass(progCOPY, scanRT.tex, dstRT.fbo, procW, procH, null, ch);
 }
+/* SIG and COL have no gate, and after measuring them they are not going to get
+   one. The idea was that they could be dropped whenever nothing feeding them
+   had moved off its default, the way the other six stages are dropped when
+   their amount is zero. They cannot: the defaults are not neutral. Chroma bleed
+   sits at 0.25, ringing at 0.15, hum at 0.1, jitter at 0.1, dot crawl at 0.1,
+   glow at 0.15 — that baseline is what makes a fresh patch look like video
+   rather than a texture on a quad. Running each stage against a plain copy of
+   the same input and reading both back as floats, SIG moves a pixel by as much
+   as 1.22 and COL by 0.12 with everything at default, so a default-value gate
+   would quietly delete the house sound. A hand-written table of genuinely
+   neutral values could be built instead, but it would fire only for a patch
+   where every one of some thirty parameters had been zeroed by hand, and one
+   omission in the table would silently drop an effect. Not worth it. */
 function stageNeeded(id, ch){
   if(id === "dct") return getCur("dctAmt",ch) > 0.003;
   if(id === "tdisp") return getCur("tdAmt",ch) > 0.003;
@@ -10427,7 +10484,7 @@ function renderChannel(ch, now, dt){
   gl.useProgram(progFB.prog);
   gl.uniform2f(U(progFB,"u_res"), procW, procH);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, chanSrcTex);
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, (rescanMode?C.crt:C.fbPrev).tex);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, (rescanMode?C.crt:C.out).tex);
   gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, hasDelay?C.ring[readIdx].tex:chanSrcTex);
   gl.uniform1i(U(progFB,"u_src"), 0);
   gl.uniform1i(U(progFB,"u_prev"), 1);
@@ -10476,13 +10533,25 @@ function renderChannel(ch, now, dt){
   }
   if(active.length === 0) runPass(progCOPY, srcT, C.out.fbo, procW, procH, null, ch);
 
-  /* this channel's output becomes next frame's feedback source */
-  const t = C.fbPrev; C.fbPrev = C.out; C.out = t;
-  /* keep .out pointing at the freshly rendered image */
-  const swap = C.fbPrev; C.fbPrev = C.out; C.out = swap;
-  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, C.out.fbo);
-  gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, C.fbPrev.fbo);
-  gl.blitFramebuffer(0,0,procW,procH, 0,0,procW,procH, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+  /* Next frame's feedback source is this frame's output, and it is already
+     sitting in C.out — pass 1 reads it before anything writes it again, so
+     there is nothing to copy. There used to be a swap here, an identical swap
+     undoing it, and a full-raster blit of C.out into a separate fbPrev. At
+     2160p that blit alone moved 66 MB per channel per frame. */
+}
+
+/* The mixer used to send its whole parameter block twice on every pass:
+   setParamUniforms filled all 33 slots from bus 1, and the loop straight after
+   overwrote every one of them with the right bus's value. On bus 2 and master
+   the first set was simply the wrong bus, corrected a microsecond later. Either
+   way it was ninety-nine uniform calls and thirty-three strings built per frame
+   to end up where one pass would have. The shader has one set of uniform names,
+   MIXP's, and each bus pushes its own parameters into them, so there is a
+   single location list and it never moves: resolve it once and keep it. */
+let mixLocList = null;
+function mixLocs(){
+  if(!mixLocList) mixLocList = MIXP.map(id=>U(progMIX, "u_"+id));
+  return mixLocList;
 }
 
 function renderFrame(now, dt){
@@ -10497,7 +10566,6 @@ function renderFrame(now, dt){
   updateMod(dt, now);
   pushModHistory();
   applyParams(dt);
-  updateSyncModel(dt, now);
   /* feedback auto-level servo — keeps the loop off the black/white attractors */
   for(const ch of CHANNELS){
     const amt = fbNoServo ? 0 : getCur("fbAuto", ch);
@@ -10549,6 +10617,9 @@ function renderFrame(now, dt){
   }
   liveList = CHANNELS.filter(c=>live[c]).join("+");
   liveNow = live;      /* the thumbnails need to know who is not being rendered */
+  /* the sync model only has to run for the channels about to be drawn, so it
+     waits until the live set is known */
+  updateSyncModel(dt, now, live);
   for(const ch of CHANNELS){
     if(!live[ch]) continue;
     uploadSource(ch, dt);
@@ -10578,8 +10649,8 @@ function renderFrame(now, dt){
     gl.uniform1i(U(progMIX,"u_prev"), 2);
     gl.uniform1f(U(progMIX,"u_hasPrev"), prevTex?1:0);
     gl.uniform1f(U(progMIX,"u_time"), now);
-    setParamUniforms(progMIX, "A");
-    for(let i=0;i<MIXP.length;i++) gl.uniform1f(U(progMIX,"u_"+MIXP[i]), mCur[ids[i]]);
+    const locs = mixLocs();
+    for(let i=0;i<locs.length;i++) gl.uniform1f(locs[i], mCur[ids[i]]);
     draw();
   }
   let p1 = null, p2t = null, pM = null;
@@ -10622,6 +10693,8 @@ function renderFrame(now, dt){
      is a property of the signal leaving the desk, not of any one channel */
   let outTex = mixOut.tex;   /* not dispTex: that name is the sync model's texture */
   if(mCur.ilAmt > 0.003){
+    if(fieldPrev && (fieldPrev.w !== procW || fieldPrev.h !== procH)){ freeRT(fieldPrev); fieldPrev = null; }
+    if(fieldOut && (fieldOut.w !== procW || fieldOut.h !== procH)){ freeRT(fieldOut); fieldOut = null; }
     if(!fieldPrev) fieldPrev = makeRT(procW, procH);
     if(!fieldOut) fieldOut = makeRT(procW, procH);
     if(fieldPrev && fieldOut){
@@ -10698,8 +10771,13 @@ function renderFrame(now, dt){
 
   /* full rescan: give each channel a CRT-processed copy to eat next frame */
   if(rescanMode){
+    /* This relied on progCRT still being bound from the display pass, which
+       the phosphor accumulator and the codec overlay both break — so with
+       RESCAN and phosphor on it drew the phosphor shader into every channel's
+       rescan buffer and fed that into the loop. Bind the program. */
+    gl.useProgram(progCRT.prog);
     for(const ch of CHANNELS){
-      if(!chanRT[ch].allocated) continue;
+      if(!liveNow[ch] || !chanRT[ch].allocated) continue;
       gl.bindFramebuffer(gl.FRAMEBUFFER, chanRT[ch].crt.fbo);
       gl.viewport(0,0,procW,procH);
       gl.uniform2f(U(progCRT,"u_res"), procW, procH);
@@ -10900,13 +10978,18 @@ function updateScopes(now){
   v.putImageData(vi,0,0);
 }
 const THUMB_W = 48, THUMB_H = 27;
-const thumbPix = new Uint8Array(THUMB_W*THUMB_H*4);
+/* The four thumbnails used to be drawn and read back one at a time, so each
+   readPixels stalled on the draw immediately before it and the pipeline emptied
+   four times. They are packed into one 96x54 atlas now and read once. */
+const ATLAS_W = THUMB_W*2, ATLAS_H = THUMB_H*2;
+const THUMB_SLOT = {A:[0,1], B:[1,1], C:[0,0], D:[1,0]};
+const thumbPix = new Uint8Array(ATLAS_W*ATLAS_H*4);
 let thumbAt = 0, thumbRT = null, thumbImg = null;
 function updateThumbs(now){
   if(now - thumbAt < 0.5) return;
   thumbAt = now;
   if(typeof chanThumbs === "undefined") return;
-  if(!thumbRT) thumbRT = makeRT(THUMB_W, THUMB_H);
+  if(!thumbRT) thumbRT = makeRT(ATLAS_W, ATLAS_H);
   if(!thumbRT) return;
   /* A channel that is not in the mix is not rendered, so its thumbnail used to
      sit on whatever it last produced — change a source on an idle channel and
@@ -10915,36 +10998,64 @@ function updateThumbs(now){
      what is actually loaded before you commit to it. */
   /* every idle channel, not one per tick: a round robin over three of them is
      two seconds between updates each, which reads as frozen rather than live */
+  const idleTex = {};
   for(const ch of CHANNELS){
     if(liveNow[ch] || !srcReady(ch)) continue;
-    ensureChanRT(ch);
+    /* Deliberately without ensureChanRT: allocating a channel's eight
+       full-raster targets so a 48x27 thumbnail can be made costs 265 MB per
+       channel at 2160p, which is exactly what the lazy allocation exists to
+       avoid. The source texture goes straight to the thumbnail instead.
+       A synth or a shader needs somewhere to draw, so those keep their one
+       target and no more. */
     uploadSource(ch, 0);
-    const S = SRC[ch], C = chanRT[ch];
-    const t = (S.mode === "synth") ? renderGen(ch, now)
-            : (S.mode === "feed")  ? feedTex(S.feed || "PGM")
-            : srcTex[ch];
-    if(t && C.allocated){
-      if(!C.out) C.out = makeRT(procW, procH);
-      if(C.out) runPass(progCOPY, t, C.out.fbo, procW, procH, null, ch);
+    const S = SRC[ch];
+    if(S.mode === "synth" || S.mode === "glsl"){
+      ensureChanRT(ch);
+      idleTex[ch] = (S.mode === "synth") ? renderGen(ch, now) : renderGlsl(ch, now, 1/60);
+    } else if(S.mode === "feed"){
+      idleTex[ch] = feedTex(S.feed || "PGM");
+    } else {
+      idleTex[ch] = srcTex[ch];
     }
   }
+  /* every thumbnail is scaled down on the GPU into its own quarter of the atlas
+     first — reading a full raster back would be absurd — and only then does one
+     readPixels bring the lot across */
+  const drawn = {};
+  gl.bindFramebuffer(gl.FRAMEBUFFER, thumbRT.fbo);
+  gl.useProgram(progTILE.prog);
+  gl.uniform2f(U(progTILE,"u_res"), THUMB_W, THUMB_H);
+  gl.uniform1i(U(progTILE,"u_tex"), 0);
+  gl.activeTexture(gl.TEXTURE0);
+  let any = false;
   for(const ch of CHANNELS){
     const g = chanThumbs[ch];
     if(!g) continue;
     const c = chanRT[ch];
-    if(!c.allocated || !c.out){ g.clearRect(0,0,THUMB_W,THUMB_H); continue; }
-    /* scale down on the GPU first: reading a full raster back would be absurd */
-    runPass(progCOPY, c.out.tex, thumbRT.fbo, THUMB_W, THUMB_H, null, ch);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, thumbRT.fbo);
-    gl.readPixels(0,0,THUMB_W,THUMB_H, gl.RGBA, gl.UNSIGNED_BYTE, thumbPix);
-    if(!thumbImg) thumbImg = g.createImageData(THUMB_W, THUMB_H);
-    const d = thumbImg.data;
-    /* readPixels is bottom-up */
-    for(let y=0;y<THUMB_H;y++){
-      const src = (THUMB_H-1-y)*THUMB_W*4, dst = y*THUMB_W*4;
-      for(let i=0;i<THUMB_W*4;i++) d[dst+i] = thumbPix[src+i];
+    const tex = idleTex[ch] || ((c.allocated && c.out) ? c.out.tex : null);
+    if(!tex){ g.clearRect(0,0,THUMB_W,THUMB_H); continue; }
+    const sl = THUMB_SLOT[ch], ox = sl[0]*THUMB_W, oy = sl[1]*THUMB_H;
+    gl.viewport(ox, oy, THUMB_W, THUMB_H);
+    gl.uniform2f(U(progTILE,"u_ofs"), ox, oy);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    draw();
+    drawn[ch] = true; any = true;
+  }
+  if(any){
+    gl.readPixels(0,0,ATLAS_W,ATLAS_H, gl.RGBA, gl.UNSIGNED_BYTE, thumbPix);
+    for(const ch of CHANNELS){
+      if(!drawn[ch]) continue;
+      const g = chanThumbs[ch];
+      if(!thumbImg) thumbImg = g.createImageData(THUMB_W, THUMB_H);
+      const d = thumbImg.data;
+      const sl = THUMB_SLOT[ch], ox = sl[0]*THUMB_W, oy = sl[1]*THUMB_H;
+      /* readPixels is bottom-up, so the tile's top row is its last one */
+      for(let y=0;y<THUMB_H;y++){
+        const src = ((oy + THUMB_H-1-y)*ATLAS_W + ox)*4, dst = y*THUMB_W*4;
+        for(let i=0;i<THUMB_W*4;i++) d[dst+i] = thumbPix[src+i];
+      }
+      g.putImageData(thumbImg, 0, 0);
     }
-    g.putImageData(thumbImg, 0, 0);
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }

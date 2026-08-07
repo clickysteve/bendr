@@ -51,6 +51,7 @@ function U(pr, name){
 const progFB = makeProg(FS_FB), progSIG = makeProg(FS_SIG), progCOL = makeProg(FS_COL), progCRT = makeProg(FS_CRT);
 const progGLITCH = makeProg(FS_GLITCH), progFLOW = makeProg(FS_FLOW), progCOPY = makeProg(FS_COPY);
 const progMIX = makeProg(FS_MIX);
+const progTILE = makeProg(FS_TILE);
 const progMULTI = makeProg(FS_MULTI);
 const progGEN = makeProg(FS_GEN);
 const progLAB = makeProg(FS_LAB);
@@ -123,7 +124,7 @@ let RING_N = 30;
 /* Each channel owns its feedback history, flow history and frame ring;
    scratch buffers are shared because channels render one after the other. */
 function newChanRT(){
-  return {fbPrev:null, fbNext:null, crt:null, flowA:null, flowB:null, flowSrc:null, gen:null, out:null,
+  return {fbNext:null, crt:null, flowA:null, flowB:null, flowSrc:null, gen:null, out:null,
           ring:null, ringW:0, ringFilled:0};
 }
 const chanRT = {};
@@ -157,7 +158,10 @@ function clearRing(c){
 function ensureRing(c){
   if(!c.ring){ c.ring=[]; for(let i=0;i<RING_N;i++) c.ring.push(makeRT(procW,procH)); c.ringW=0; c.ringFilled=0; }
 }
-const CH_RTS = ["fbPrev","fbNext","crt","flowA","flowB","flowSrc","gen","out"];
+/* fbPrev is gone: the feedback source is the channel's own out target, read
+   before it is written again, so there was never anything to copy into a
+   second buffer. One less full-raster target per channel. */
+const CH_RTS = ["fbNext","crt","flowA","flowB","flowSrc","gen","out"];
 /* A channel's eight render targets are only allocated once that channel is
    actually used. At 720p that hardly matters; at 2160p each one is 33 MB, so
    allocating all four channels up front would cost a gigabyte for nothing. */

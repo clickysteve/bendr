@@ -1962,4 +1962,9 @@ const FS_MULTI = COMMON +
 const FS_COPY = COMMON +
 "uniform sampler2D u_tex;\n" +
 "void main(){ O = texture(u_tex, gl_FragCoord.xy/u_res); }\n";
+/* the same copy, but told where in a larger target it is being drawn, so the
+   four channel thumbnails can be packed into one atlas and read back once */
+const FS_TILE = COMMON +
+"uniform sampler2D u_tex; uniform vec2 u_ofs;\n" +
+"void main(){ O = texture(u_tex, (gl_FragCoord.xy-u_ofs)/u_res); }\n";
 

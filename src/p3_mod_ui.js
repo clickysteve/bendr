@@ -113,6 +113,11 @@ const ENV_TRIGS = [
   ["tempo2","EVERY 2 BEATS"], ["tempo4","EVERY BAR"],
 ];
 const ENV_MODES = [["once","ONE SHOT"],["gate","GATE"],["loop","LOOP"]];
+/* every tap is also a trigger, so an envelope can be fired by the kick on
+   input 1 while a different envelope is fired by the hats on input 3 */
+function envTrigList(){
+  return ENV_TRIGS.concat(audioTaps.map(t=>["aud:"+t.id, t.name.toUpperCase()+" HIT"]));
+}
 let mods = [];
 let modSeq = 0;
 function mkLfo(o){
@@ -138,6 +143,7 @@ const MODSRC = [];
 function rebuildMODSRC(){
   MODSRC.length = 0;
   for(const m of mods) MODSRC.push({id:m.id, name:m.name, type:m.type});
+  for(const t of audioTaps) MODSRC.push({id:t.id, name:t.name, type:"audtap"});
   for(const f of FIXED_SRC) MODSRC.push({id:f.id, name:f.name, type:"fixed"});
   for(const m of MODSRC){
     if(modVal[m.id] === undefined) modVal[m.id] = 0;
@@ -518,9 +524,50 @@ function hookVideoAudio(){
     }catch(e){ console.warn(e); }
   }
   if(srcNode){ try{ srcNode.connect(analyser); }catch(e){} }
+  wireTaps();
 }
+/* ---- audio taps: one listener per input channel ----
+   A single analyser fed by whatever the interface happened to sum down to is
+   fine for a laptop microphone and useless for a desk. With a multi-output
+   interface the kick, the hats and the vocal arrive on separate inputs, and the
+   whole point is that each one drives something different. A tap is a listener:
+   pick an input channel, pick a band inside it, and it becomes a modulation
+   source with its own meter, its own gain, its own response and its own onset
+   trigger, patchable to any parameter on any channel like an LFO.
+
+   Channel 1 narrowed to 30-120 Hz is a kick. Channel 3 narrowed to 6-14 kHz is
+   a hat. Nothing stops two taps sharing an input either, so one channel can
+   drive feedback zoom off its low end and dropout off its transients. */
+const AUD_BANDS = [
+  ["KICK",      30,   120],
+  ["SNARE",     150,  400],
+  ["TOM",       80,   300],
+  ["HAT",       6000, 14000],
+  ["BASS",      30,   150],
+  ["LOW MID",   200,  800],
+  ["MID",       300,  2200],
+  ["HIGH MID",  2000, 5000],
+  ["PRESENCE",  4000, 11000],
+  ["AIR",       10000,16000],
+  ["FULL RANGE",20,   16000],
+];
+const AUD_MAX = 16;             /* interfaces beyond this are rare and the UI stops reading */
+let audioTaps = [], audTapSeq = 0;
+const audNodes = {};            /* tap id -> {an, buf} */
+function mkAudTap(o){
+  const n = (audioTaps.length % AUD_BANDS.length);
+  const b = AUD_BANDS[n];
+  return Object.assign({
+    id: "aud" + (++audTapSeq) + "t",
+    name: "IN " + (((o && o.chan) || 0) + 1) + " " + b[0],
+    chan: 0, lo: b[1], hi: b[2], gain: 1, resp: 0.5,
+    /* runtime */ val: 0, peak: 0.05, raw: 0, avg: 0.02, hit: 0, prevHit: false, gate: false
+  }, o || {});
+}
+function audTapById(id){ return audioTaps.find(t=>t.id===id); }
 /* audio input device + channel routing (for audio interfaces) */
 let audioDeviceId = "", audioChannel = -1, micSplitter = null;   // channel -1 = mix
+let tapSplitter = null, tapSrcNode = null, audInChannels = 2;
 async function listAudioDevices(){
   try{
     const devs = await navigator.mediaDevices.enumerateDevices();
@@ -531,7 +578,7 @@ function wireMic(){
   if(!micNode) return;
   try{ micNode.disconnect(); }catch(e){}
   if(micSplitter){ try{ micSplitter.disconnect(); }catch(e){} micSplitter=null; }
-  const nCh = micNode.channelCount || 2;
+  const nCh = audInChannels || micNode.channelCount || 2;
   if(audioChannel >= 0 && audioChannel < nCh){
     micSplitter = audioCtx.createChannelSplitter(Math.max(2,nCh));
     micNode.connect(micSplitter);
@@ -539,15 +586,71 @@ function wireMic(){
   } else {
     micNode.connect(analyser);
   }
+  wireTaps();
+}
+/* Whichever input is selected also feeds the taps, split back out into its
+   individual channels. The mic path is where a real interface turns up, but a
+   stereo file or a video soundtrack still has a left and a right, and being
+   able to put the left on one parameter and the right on another is worth
+   having on its own. */
+function currentAudioNode(){
+  if(audioMode === "mic")    return micNode;
+  if(audioMode === "file")   return audioFileNode;
+  if(audioMode === "source") return srcNode;
+  return null;
+}
+/* An analyser with nothing hanging off its output is pulled by the graph
+   anyway, so the taps need no sink. A gain of zero into the destination was
+   tried first, on the theory that an unlistened branch might not be rendered;
+   measured against four steady tones on four channels it made no difference,
+   so it came back out. */
+function tapAnalyser(t){
+  let e = audNodes[t.id];
+  if(!e){
+    const an = audioCtx.createAnalyser();
+    an.fftSize = 2048; an.smoothingTimeConstant = 0.55;
+    e = audNodes[t.id] = {an, buf:new Uint8Array(an.frequencyBinCount)};
+  }
+  return e;
+}
+function wireTaps(){
+  if(!audioCtx) return;
+  const node = currentAudioNode();
+  /* unhook the feed as well as the splitter's outputs: leaving the old node
+     wired to a dead splitter would pile up a new one on every rewire */
+  if(tapSplitter){
+    if(tapSrcNode){ try{ tapSrcNode.disconnect(tapSplitter); }catch(e){} }
+    try{ tapSplitter.disconnect(); }catch(e){}
+    tapSplitter = null;
+  }
+  tapSrcNode = node;
+  if(!node || !audioTaps.length) return;
+  const nCh = Math.max(2, Math.min(AUD_MAX, audInChannels || node.channelCount || 2));
+  tapSplitter = audioCtx.createChannelSplitter(nCh);
+  try{ node.connect(tapSplitter); }catch(e){ return; }
+  for(const t of audioTaps){
+    const e = tapAnalyser(t);
+    const c = Math.max(0, Math.min(nCh-1, t.chan|0));
+    try{ tapSplitter.connect(e.an, c, 0); }catch(err){}
+  }
 }
 async function openMic(){
   if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; micNode=null; }
-  const constraints = {audio: audioDeviceId ? {deviceId:{exact:audioDeviceId}, echoCancellation:false, autoGainControl:false, noiseSuppression:false}
-                                            : {echoCancellation:false, autoGainControl:false, noiseSuppression:false}};
+  /* ask for everything the device has. A browser that will not give sixteen
+     channels quietly hands back what it can, which is the point of "ideal". */
+  const base = {echoCancellation:false, autoGainControl:false, noiseSuppression:false,
+                channelCount:{ideal:AUD_MAX}};
+  const constraints = {audio: audioDeviceId ? Object.assign({deviceId:{exact:audioDeviceId}}, base) : base};
   micStream = await navigator.mediaDevices.getUserMedia(constraints);
+  const tr = micStream.getAudioTracks()[0];
+  let n = 0;
+  try{ n = (tr.getSettings && tr.getSettings().channelCount) || 0; }catch(e){}
   micNode = audioCtx.createMediaStreamSource(micStream);
+  audInChannels = Math.max(1, n || micNode.channelCount || 2);
+  micNode.channelCountMode = "max";
   wireMic();
   refreshAudioDeviceUI();
+  if(typeof buildAudTapList === "function") buildAudTapList();
 }
 /* An audio file as a modulation source. The point is being able to build a
    piece against the track it will be shown with, rather than only against
@@ -578,6 +681,7 @@ function wireAudioFile(){
     }catch(e){ console.warn(e); return; }
   }
   try{ audioFileNode.connect(analyser); }catch(e){}
+  wireTaps();
 }
 async function loadAudioFile(f){
   if(!f) return;
@@ -601,6 +705,8 @@ async function setAudioMode(m){
     if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; micNode=null; }
     if(audioFileEl) audioFileEl.pause();
     audioBands.bass=audioBands.mid=audioBands.high=0;
+    for(const t of audioTaps){ t.val = 0; modVal[t.id] = 0; }
+    wireTaps();
     return;
   }
   ensureAudioCtx();
@@ -629,25 +735,44 @@ const audioCfg = {
   high:{lo:4000, hi:11000, gain:1},
   response:0.5,   // 0 = slow/smooth, 1 = twitchy
 };
+function bandAvgOf(buf, n, nyq, lo, hi){
+  let a = Math.floor(lo/nyq*n), b = Math.ceil(hi/nyq*n);
+  if(b<=a) b=a+1;
+  a=Math.max(0,Math.min(n-1,a)); b=Math.max(1,Math.min(n,b));
+  let s=0; for(let i=a;i<b;i++) s+=buf[i];
+  return s/(b-a)/255;
+}
 function updateAudio(dt){
   if(audioMode==="off" || !analyser) return;
+  const nyq = audioCtx.sampleRate/2;
   analyser.getByteFrequencyData(fftBuf);
   const n = analyser.frequencyBinCount;
-  const nyq = audioCtx.sampleRate/2;
-  function bandAvg(lo, hi){
-    let a = Math.floor(lo/nyq*n), b = Math.ceil(hi/nyq*n);
-    if(b<=a) b=a+1;
-    a=Math.max(0,Math.min(n-1,a)); b=Math.max(1,Math.min(n,b));
-    let s=0; for(let i=a;i<b;i++) s+=fftBuf[i];
-    return s/(b-a)/255;
-  }
   const speed = 4 + audioCfg.response*36;
   for(const k of ["bass","mid","high"]){
     const c = audioCfg[k];
-    const raw = bandAvg(c.lo, c.hi);
+    const raw = bandAvgOf(fftBuf, n, nyq, c.lo, c.hi);
     audioBands.peak[k] = Math.max(audioBands.peak[k]*(1-dt*0.08), raw, 0.05);
     const v = Math.min(1.5, (raw/audioBands.peak[k]) * c.gain);
     audioBands[k] += (v-audioBands[k]) * Math.min(1, dt*speed);
+  }
+  /* each tap tracks its own running peak, so a quiet input channel still reads
+     across the full range rather than sitting at a tenth of the meter */
+  for(const t of audioTaps){
+    const e = audNodes[t.id];
+    if(!e){ t.val = 0; continue; }
+    e.an.getByteFrequencyData(e.buf);
+    const bn = e.an.frequencyBinCount;
+    const raw = bandAvgOf(e.buf, bn, nyq, t.lo, t.hi);
+    t.raw = raw;
+    t.peak = Math.max(t.peak*(1-dt*0.08), raw, 0.05);
+    const v = Math.min(1.5, (raw/t.peak) * t.gain);
+    const sp = 4 + t.resp*36;
+    t.val += (v - t.val) * Math.min(1, dt*sp);
+    /* onset: a jump well above the running average, which is what makes a tap
+       usable as an envelope trigger rather than only as a level */
+    t.hit = raw > Math.max(0.08, t.avg*1.6) ? 1 : 0;
+    t.avg = t.avg*0.92 + raw*0.08;
+    modVal[t.id] = t.val;
   }
 }
 
@@ -1306,10 +1431,26 @@ function buildModPage(){
     };
     addCard.appendChild(btn);
   }
+  {
+    const btn = document.createElement("button");
+    btn.textContent = "+ AUDIO TAP"; btn.style.width = "100%";
+    attachTip(btn, "AUDIO TAP",
+      "A listener on one input channel, narrowed to one band. On an interface with separate outputs into it, that means the kick on input 1 can drive one parameter while the hats on input 3 drive another. Set the channel and the band on the AUDIO REACT · CHANNEL TAPS panel, then patch it like any other modulator. Every tap is also an envelope trigger.");
+    btn.onclick = ()=>{
+      if(audioTaps.length >= AUD_MAX){ toast("That is as many taps as the interface list goes to", true); return; }
+      const t = mkAudTap();
+      audioTaps.push(t);
+      rebuildMODSRC(); wireTaps(); buildAudTapList(); buildModPage(); renderRoutes();
+      setTimeout(()=>focusModSource(t.id), 30);
+      toast(t.name + " added");
+    };
+    addCard.appendChild(btn);
+  }
   grid.appendChild(addCard);
 
   const groups = [
     {cls:"", ids:mods.map(m=>m.id)},
+    {cls:"audio", ids:audioTaps.map(t=>t.id)},
     {cls:"audio", ids:["bass","mid","high"]},
     {cls:"vid", ids:["motion","bright","cut"]},
     {cls:"", ids:["chaos","drift","spike"]},
@@ -1318,18 +1459,20 @@ function buildModPage(){
     const src = MODSRC.find(x=>x.id===id);
     if(!src) continue;
     const m = modById(id);
+    const tp = audTapById(id);
+    const own = m || tp;
     const card = document.createElement("div");
-    card.className = "modcard " + g.cls + (m ? " usermod" : "");
+    card.className = "modcard " + g.cls + (own ? " usermod" : "");
     const h = document.createElement("h4");
     const nm = document.createElement("span");
     nm.textContent = src.name;
-    if(m){
+    if(own){
       nm.className = "modname";
       nm.title = "Click to rename";
       nm.onclick = ()=>{
-        const v = (prompt("Name this modulator", m.name) || "").trim();
+        const v = (prompt("Name this modulator", own.name) || "").trim();
         if(!v) return;
-        m.name = v; rebuildMODSRC(); buildModPage(); renderRoutes();
+        own.name = v; rebuildMODSRC(); buildModPage(); renderRoutes();
       };
     }
     h.appendChild(nm);
@@ -1338,18 +1481,32 @@ function buildModPage(){
       tag.className = "mtype"; tag.textContent = m.type === "env" ? "ENV" : "MACRO";
       h.appendChild(tag);
     }
+    if(tp){
+      const tag = document.createElement("i");
+      tag.className = "mtype"; tag.textContent = "IN " + ((tp.chan|0)+1);
+      h.appendChild(tag);
+    }
     const val = document.createElement("span");
     val.style.cssText = "margin-left:auto; color:var(--txt); font-size:9px;";
     h.appendChild(val);
-    if(m){
+    if(own){
       const del = document.createElement("button");
       del.className = "moddel"; del.textContent = "✕";
       attachTip(del, "REMOVE", "Deletes this modulator and every route using it.");
       del.onclick = ()=>{
-        mods.splice(mods.indexOf(m), 1);
-        routes = routes.filter(r=>r.src !== m.id);
+        if(tp){
+          audioTaps.splice(audioTaps.indexOf(tp), 1);
+          if(audNodes[tp.id]){ try{ audNodes[tp.id].an.disconnect(); }catch(e){} delete audNodes[tp.id]; }
+          /* an envelope pointed at a tap that no longer exists would never fire
+             again and would never say why, so it falls back to manual */
+          for(const mm of mods) if(mm.trig === "aud:"+tp.id) mm.trig = "manual";
+          wireTaps(); buildAudTapList();
+        } else {
+          mods.splice(mods.indexOf(m), 1);
+        }
+        routes = routes.filter(r=>r.src !== own.id);
         rebuildMODSRC(); buildModPage(); renderRoutes();
-        toast(m.name + " removed");
+        toast(own.name + " removed");
       };
       h.appendChild(del);
     }
@@ -1358,6 +1515,78 @@ function buildModPage(){
     cv.width = 250; cv.height = 44;
     card.appendChild(cv);
 
+    if(tp){
+      /* everything a tap needs sits on its own card: which input it listens to,
+         how wide a slice of the spectrum, how hard it pushes and how quickly it
+         follows. The graph above is its meter. */
+      const mkrow = (label, el)=>{
+        const r = document.createElement("div"); r.className = "mcrow";
+        const l = document.createElement("label"); l.textContent = label;
+        r.appendChild(l); r.appendChild(el);
+        card.appendChild(r);
+        return r;
+      };
+      const chs = document.createElement("select");
+      const fillCh = ()=>{
+        chs.innerHTML = "";
+        const n = Math.max(2, Math.min(AUD_MAX, audInChannels||2));
+        for(let i2=0;i2<n;i2++){
+          const o=document.createElement("option"); o.value=i2; o.textContent="INPUT "+(i2+1); chs.appendChild(o);
+        }
+        chs.value = String(Math.min(n-1, tp.chan|0));
+      };
+      fillCh();
+      chs.onmousedown = fillCh;
+      chs.onchange = ()=>{ tp.chan = parseInt(chs.value)||0; wireTaps(); rebuildMODSRC(); buildModPage(); renderRoutes(); };
+      mkrow("INPUT", chs);
+
+      const bnd = document.createElement("select");
+      for(const [nmb,lo,hi] of AUD_BANDS){
+        const o=document.createElement("option"); o.value=lo+","+hi; o.textContent=nmb; bnd.appendChild(o);
+      }
+      const cust = document.createElement("option"); cust.value="custom"; cust.textContent="CUSTOM"; bnd.appendChild(cust);
+      const matchBand = ()=>{
+        const hit = AUD_BANDS.find(b=>b[1]===tp.lo && b[2]===tp.hi);
+        bnd.value = hit ? (hit[1]+","+hit[2]) : "custom";
+      };
+      matchBand();
+      bnd.onchange = ()=>{
+        if(bnd.value === "custom") return;
+        const [lo,hi] = bnd.value.split(",").map(Number);
+        tp.lo = lo; tp.hi = hi; tp.peak = 0.05;
+        loS.value = Math.log10(tp.lo); hiS.value = Math.log10(tp.hi); updHz();
+      };
+      mkrow("BAND", bnd);
+
+      const loS = document.createElement("input");
+      loS.type="range"; loS.step=0.001; loS.min=Math.log10(20); loS.max=Math.log10(16000); loS.value=Math.log10(tp.lo);
+      const loV = document.createElement("span"); loV.className="mcval";
+      const hiS = document.createElement("input");
+      hiS.type="range"; hiS.step=0.001; hiS.min=Math.log10(20); hiS.max=Math.log10(16000); hiS.value=Math.log10(tp.hi);
+      const hiV = document.createElement("span"); hiV.className="mcval";
+      const updHz = ()=>{ loV.textContent = hzFmt(tp.lo); hiV.textContent = hzFmt(tp.hi); matchBand(); };
+      loS.addEventListener("input", ()=>{
+        tp.lo = Math.min(Math.pow(10, parseFloat(loS.value)), tp.hi-5); tp.peak = 0.05; updHz(); });
+      hiS.addEventListener("input", ()=>{
+        tp.hi = Math.max(Math.pow(10, parseFloat(hiS.value)), tp.lo+5); tp.peak = 0.05; updHz(); });
+      { const r = mkrow("LO", loS); r.appendChild(loV); }
+      { const r = mkrow("HI", hiS); r.appendChild(hiV); }
+      updHz();
+
+      const gS = document.createElement("input");
+      gS.type="range"; gS.min=0; gS.max=3; gS.step=0.01; gS.value=tp.gain;
+      const gV = document.createElement("span"); gV.className="mcval";
+      const updG = ()=>{ tp.gain = parseFloat(gS.value); gV.textContent = tp.gain.toFixed(2); };
+      gS.addEventListener("input", updG); updG();
+      { const r = mkrow("GAIN", gS); r.appendChild(gV); }
+
+      const rS = document.createElement("input");
+      rS.type="range"; rS.min=0; rS.max=1; rS.step=0.01; rS.value=tp.resp;
+      const rV = document.createElement("span"); rV.className="mcval";
+      const updR = ()=>{ tp.resp = parseFloat(rS.value); rV.textContent = tp.resp.toFixed(2); };
+      rS.addEventListener("input", updR); updR();
+      { const r = mkrow("RESPONSE", rS); r.appendChild(rV); }
+    }
     if(m && m.type === "lfo"){
       const r1 = document.createElement("div"); r1.className = "mcrow";
       const l1 = document.createElement("label"); l1.textContent = "RATE";
@@ -1399,7 +1628,7 @@ function buildModPage(){
       const r3 = document.createElement("div"); r3.className = "mcrow";
       const l3 = document.createElement("label"); l3.textContent = "TRIG";
       const tg = document.createElement("select");
-      for(const [v,n] of ENV_TRIGS){ const op = document.createElement("option"); op.value = v; op.textContent = n; tg.appendChild(op); }
+      for(const [v,n] of envTrigList()){ const op = document.createElement("option"); op.value = v; op.textContent = n; tg.appendChild(op); }
       tg.value = m.trig;
       tg.onchange = ()=>{ m.trig = tg.value; };
       r3.appendChild(l3); r3.appendChild(tg);
@@ -2429,6 +2658,71 @@ function buildAudioSection(){
     refreshAudioDeviceUI();
     sel.onchange = ()=>{ audioChannel = parseInt(sel.value); if(audioMode==="mic") wireMic(); };
   }
+  /* the rack of taps, with a meter each, so a desk with ten sends into the
+     interface reads as ten meters rather than one */
+  {
+    tapDock = mkSection("audiotaps", "cyan", "AUDIO REACT · CHANNEL TAPS",
+                        document.getElementById("audiodock"));
+    buildAudTapList();
+  }
+}
+let tapDock = null;
+const tapMeterEls = {};
+function buildAudTapList(){
+  if(!tapDock) return;
+  for(const k in tapMeterEls) delete tapMeterEls[k];
+  /* mkSection rebinds appendChild to the section body, so the body is what has
+     to be emptied — clearing the section itself would take the header with it */
+  const body = tapDock.querySelector(".secbody");
+  if(body) body.innerHTML = "";
+  {
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:0 0 6px;";
+    note.textContent = "A tap listens to one input channel through one band, and becomes a modulation source you can patch to anything — and an envelope trigger. On an interface fed by separate sends, put the kick on input 1 and the hats on input 3 and they drive different parameters. The controls live on each tap's card on the MOD page; these are the meters. Live input reports "
+      + Math.max(2, audInChannels||2) + " channel" + ((audInChannels||2)===1?"":"s") + ".";
+    tapDock.appendChild(note);
+  }
+  {
+    const row = document.createElement("div"); row.className="prow";
+    const add = document.createElement("button"); add.textContent = "+ TAP";
+    attachTip(add, "ADD AUDIO TAP", "Adds a listener on an input channel. It appears on the MOD page with its input, band, gain and response, and in every modulation source list.");
+    add.onclick = ()=>{
+      if(audioTaps.length >= AUD_MAX){ toast("That is as many taps as the interface list goes to", true); return; }
+      const t = mkAudTap();
+      audioTaps.push(t);
+      rebuildMODSRC(); wireTaps(); buildAudTapList();
+      if(typeof buildModPage === "function"){ buildModPage(); renderRoutes(); }
+      toast(t.name + " added");
+    };
+    const go = document.createElement("button"); go.textContent = "MOD PAGE";
+    go.onclick = ()=>{ const b = document.querySelector('[data-dock="mod"]'); if(b) b.click(); };
+    row.appendChild(add); row.appendChild(go);
+    tapDock.appendChild(row);
+  }
+  for(const t of audioTaps){
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex; align-items:center; gap:6px; padding:2px 0;";
+    const lab = document.createElement("span");
+    lab.style.cssText = "font-size:8.5px; color:var(--txt); min-width:96px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
+    lab.textContent = t.name;
+    const sub = document.createElement("span");
+    sub.style.cssText = "font-size:8px; color:var(--dim); min-width:74px;";
+    sub.textContent = "IN " + ((t.chan|0)+1) + " · " + hzFmt(t.lo) + "-" + hzFmt(t.hi);
+    const box = document.createElement("div");
+    box.style.cssText = "flex:1; height:8px; background:#22222c; border-radius:2px; overflow:hidden;";
+    const fill = document.createElement("div");
+    fill.style.cssText = "height:100%; width:0%; background:linear-gradient(90deg,var(--cyan),var(--mag)); transition:width 60ms linear;";
+    box.appendChild(fill);
+    row.appendChild(lab); row.appendChild(sub); row.appendChild(box);
+    tapDock.appendChild(row);
+    tapMeterEls[t.id] = fill;
+  }
+  if(!audioTaps.length){
+    const e = document.createElement("div");
+    e.style.cssText = "color:var(--dim); font-size:8.5px; padding:4px 0;";
+    e.textContent = "No taps yet.";
+    tapDock.appendChild(e);
+  }
 }
 let refreshAudioDeviceUI = ()=>{};
 function refreshAudioUI(){ for(const r of audioUIRefs) r.refresh(); }
@@ -2487,6 +2781,10 @@ setInterval(()=>{
   }
   for(const k in meterEls){
     meterEls[k].style.width = (Math.min(1,audioBands[k])*100).toFixed(0)+"%";
+  }
+  for(const t of audioTaps){
+    const el = tapMeterEls[t.id];
+    if(el) el.style.width = (Math.min(1,t.val)*100).toFixed(0)+"%";
   }
 }, 66);
 

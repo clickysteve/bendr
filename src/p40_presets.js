@@ -472,6 +472,9 @@ function captureState(){
     } return o; })(),
     srcText: (()=>{ const o={}; for(const ch of CHANNELS) o[ch] = {...SRC[ch].text}; return o; })()};
   st.mods = JSON.parse(JSON.stringify(mods));
+  /* the taps travel with the patch: which input each one listens to, the band,
+     the gain and the response. The analyser nodes are rebuilt on load. */
+  st.audioTaps = audioTaps.map(t=>({id:t.id, name:t.name, chan:t.chan, lo:t.lo, hi:t.hi, gain:t.gain, resp:t.resp}));
   return st;
 }
 /* patches from before the mixer was split carry one combined value, where 13
@@ -530,7 +533,7 @@ function restoreState(st){
       if(st.chan[ch][p.id] !== undefined) chanBase[ch][p.id] = st.chan[ch][p.id];
     if(st.master) for(const p of MLIST) if(st.master[p.id] !== undefined) mBase[p.id] = st.master[p.id];
     routes = (st.routes||[]).map(r=>({ch:"A", ...r}));
-    if(st.mods || st.lfo1 || st.audioCfg) applyExtras(st);
+    if(st.mods || st.lfo1 || st.audioCfg || st.audioTaps) applyExtras(st);
     refreshUI(); renderRoutes(); refreshLfoUI(); refreshAudioUI();
   } else {
     applyState(st.bases||{}, st.routes||[], st);   /* legacy single-channel state */
@@ -579,6 +582,17 @@ function applyExtras(extra){
   if(extra.audioCfg){
     for(const k of ["bass","mid","high"]) if(extra.audioCfg[k]) Object.assign(audioCfg[k], extra.audioCfg[k]);
     if(extra.audioCfg.response !== undefined) audioCfg.response = extra.audioCfg.response;
+  }
+  if(extra.audioTaps){
+    for(const id in audNodes){ try{ audNodes[id].an.disconnect(); }catch(e){} delete audNodes[id]; }
+    audioTaps = extra.audioTaps.map(t=>mkAudTap({...t}));
+    let hiT = audioTaps.length;
+    for(const t of audioTaps){ const n = parseInt(String(t.id).replace(/^\D+/, ""), 10); if(n > hiT) hiT = n; }
+    audTapSeq = Math.max(audTapSeq, hiT);
+    if(typeof wireTaps === "function") wireTaps();
+    rebuildMODSRC();
+    if(typeof buildAudTapList === "function") buildAudTapList();
+    buildModPage();
   }
   if(extra.fbTrailMode !== undefined) fbTrailMode = extra.fbTrailMode;
 }

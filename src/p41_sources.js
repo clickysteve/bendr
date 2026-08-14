@@ -6,6 +6,9 @@ function newSource(ch){
   const pc = document.createElement("canvas");
   pc.width = 960; pc.height = 540;
   return {ch, video:v, mode:"pattern", pattern:"bars", cam:null,
+          /* a still lives in the FILE slot alongside the clips: same button,
+             same drag target, no transport */
+          img:null, still:false, stillAnim:false, stillDirty:false,
           patCanvas:pc, pat:pc.getContext("2d"), patClock:0,
           aspect:16/9, has:0, speed:1, tpRate:1, feed:"PGM", name:"", audioHooked:false,
           glsl:"", glslProg:null, glslErr:"", glslF0:"none", glslF2:"none", glslFrame:0,
@@ -22,19 +25,57 @@ const videoB = SRC.B.video;
 function cur(){ return SRC[activeChan]; }
 
 const fileIn = document.getElementById("fileIn");
-document.getElementById("btnFile").onclick = ()=>{ fileIn.accept="video/*"; fileIn.dataset.chan = activeChan; fileIn.click(); };
+document.getElementById("btnFile").onclick = ()=>{ fileIn.accept="video/*,image/*"; fileIn.dataset.chan = activeChan; fileIn.click(); };
 fileIn.onchange = ()=>{ if(fileIn.files[0]) handleFile(fileIn.files[0], fileIn.dataset.chan || activeChan); fileIn.value=""; };
 {
   const afi = document.getElementById("audioFileIn");
   if(afi) afi.onchange = ()=>{ if(afi.files[0]) loadAudioFile(afi.files[0]); afi.value=""; };
 }
 
+const IMG_RE = /\.(jpe?g|png|gif|webp|bmp|avif|apng|svg)$/i;
+const IMG_ANIM_RE = /\.(gif|webp|apng)$/i;
+/* A still is a source like any other. It goes in the FILE slot rather than
+   getting a button of its own, because from the signal path's point of view a
+   photograph and a frozen frame of tape are the same thing: a picture arriving
+   at the framing pass. Everything downstream — the feedback loop, the sync
+   corruption, the enhancer, the scan processor — then has something to chew on
+   that never changes, which is exactly the condition under which a feedback
+   patch develops properly. */
+function handleImageFile(f, ch){
+  const S = SRC[ch];
+  stopCam(ch);
+  try{ S.video.pause(); }catch(e){}
+  S.video.srcObject = null;
+  S.video.removeAttribute("src");
+  if(S.objUrl){ try{ URL.revokeObjectURL(S.objUrl); }catch(e){} }
+  S.objUrl = URL.createObjectURL(f);
+  if(!S.img){ S.img = new Image(); S.img.decoding = "async"; }
+  S.img.onload = ()=>{
+    S.stillDirty = true;
+    S.aspect = (S.img.naturalWidth || 16) / (S.img.naturalHeight || 9);
+    syncChanInputUI();
+    toast("Channel "+ch+": "+f.name+"  "+S.img.naturalWidth+"x"+S.img.naturalHeight);
+  };
+  S.img.onerror = ()=>{ toast("Couldn't decode that image", true); };
+  S.img.src = S.objUrl;
+  S.still = true;
+  /* a GIF or an animated WebP keeps running inside the img element, so its
+     frames have to be pulled every time rather than uploaded once */
+  S.stillAnim = IMG_ANIM_RE.test(f.name) || /gif|apng/i.test(f.type||"");
+  S.stillDirty = true;
+  S.name = f.name;
+  S.mode = "file";
+  S.speed = 1;
+  syncChanInputUI();
+}
 function handleFile(f, ch){
   ch = ch || activeChan;
   if(f.name.endsWith(".json")){ loadStateFile(f); return; }
-  if(!f.type.startsWith("video/") && !/\.(mp4|mov|webm|m4v|mkv)$/i.test(f.name)){ toast("Not a video file", true); return; }
+  if((f.type && f.type.startsWith("image/")) || IMG_RE.test(f.name)){ handleImageFile(f, ch); return; }
+  if(!f.type.startsWith("video/") && !/\.(mp4|mov|webm|m4v|mkv)$/i.test(f.name)){ toast("Not a video or image file", true); return; }
   const S = SRC[ch];
   stopCam(ch);
+  S.still = false; S.stillAnim = false;
   S.video.srcObject = null;
   /* the previous clip's blob keeps the whole file resident until it is revoked */
   if(S.objUrl){ try{ URL.revokeObjectURL(S.objUrl); }catch(e){} }
@@ -193,6 +234,9 @@ function stopCam(ch){
    worse than one that is not there. */
 function srcCaps(S){
   const m = S ? S.mode : "";
+  /* a still has no timeline, no clock and no soundtrack, and saying so is what
+     greys out the transport instead of letting it drive an empty video element */
+  if(m === "file" && S.still) return {timeline:false, clock:false, audio:false, live:false, still:true};
   if(m === "file") return {timeline:true, clock:true, audio:true, live:false};
   if(m === "pattern" || m === "text" || m === "synth" || m === "feed" || m === "glsl")
     return {timeline:false, clock:true, audio:false, live:false};
@@ -202,11 +246,12 @@ function capsOf(ch){ return srcCaps(SRC[ch||activeChan]); }
 const CAP_WHY = {
   live: "Not available on a live camera or screen capture: there is no timeline to move around in.",
   gen:  "Not available on a generated source: there is no file to seek, loop or mute.",
+  still:"Not available on a still: there is one frame, and it is already showing.",
 };
 function syncChanInputUI(){
   const S = cur();
   const caps = srcCaps(S);
-  const why = caps.live ? CAP_WHY.live : CAP_WHY.gen;
+  const why = caps.still ? CAP_WHY.still : caps.live ? CAP_WHY.live : CAP_WHY.gen;
   for(const [id, need] of [["btnPlay","timeline"],["btnLoop","timeline"],["seek","timeline"],
                            ["btnMute","audio"],["btnVari","audio"],["spd","clock"]]){
     const el = document.getElementById(id);
@@ -217,7 +262,7 @@ function syncChanInputUI(){
     el.title = off ? why : "";
   }
   { const tc = document.getElementById("tcode");
-    if(tc && !caps.timeline) tc.textContent = caps.live ? "LIVE" : "--:-- / --:--"; }
+    if(tc && !caps.timeline) tc.textContent = caps.still ? "STILL" : caps.live ? "LIVE" : "--:-- / --:--"; }
   refreshSourceSections();
   for(const q of document.querySelectorAll(".mchan")) q.textContent = activeChan;
   /* say what every channel is looking at, in three places, because "which
@@ -675,6 +720,10 @@ function setTransport(mode, ch){
   const caps = srcCaps(S);
   /* a live stream can be held or let run, and that is the whole of it: there
      is nothing to shuttle through */
+  if(caps.still){
+    toast("This channel is holding a still \u2014 there is nothing to shuttle through", true);
+    return;
+  }
   if(caps.live && mode !== "play" && mode !== "still"){
     toast("Shuttle and jog need a timeline \u2014 this channel is a live input", true);
     return;
@@ -950,7 +999,12 @@ function copySource(from, to){
   B.glsl = A.glsl; B.glslF0 = A.glslF0; B.glslF2 = A.glslF2;
   B.glslProg = null; B.glslErr = ""; B.glslFrame = 0;   /* compiled per channel */
   if(typeof genMode !== "undefined" && genMode[from]) genMode[to] = {...genMode[from]};
-  if(A.mode === "file" && A.video.src){
+  B.still = !!A.still; B.stillAnim = !!A.stillAnim;
+  if(A.still && A.img){
+    if(!B.img){ B.img = new Image(); B.img.decoding = "async"; }
+    B.img.src = A.img.src;              /* the same blob, not another copy of it */
+    B.stillDirty = true;
+  } else if(A.mode === "file" && A.video.src){
     B.video.srcObject = null;
     B.video.src = A.video.src;          /* the same blob, not another copy of it */
     B.video.loop = A.video.loop;

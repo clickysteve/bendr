@@ -414,6 +414,7 @@ const SECHELP = {
   scan:"A scan processor, in the sense the word had before it meant anything digital. The picture is not sampled; it is drawn, as a stack of glowing lines whose vertical position is pushed by brightness, and then photographed. The apparent depth is an artefact of that, not a model of a scene. Where the lines bunch you get a bright ridge and where they splay you get a gap, which is the part a displacement map cannot reproduce and the part that makes it look like a machine.",
   lab:"Techniques from the open-source glitch canon, rebuilt: sparse line jitter, NTSC crosstalk, slitscan, bit crush, moire, and video-rate field modulation.",
   audio:"Sets what the audio-reactive mod sources listen to: each band's frequency range and gain, the input device, and the response time.",
+  audiotaps:"One listener per input channel. An interface fed by separate sends puts the kick on one input and the hats on another, and a tap turns each of those into its own modulation source with its own band, gain and response \u2014 patchable to any parameter on any channel, and usable as an envelope trigger. The controls sit on each tap's card on the MOD page; these are the meters.",
   lfo:"Rates and shapes for the four LFOs, plus tempo and the sync divisions.",
 };
 

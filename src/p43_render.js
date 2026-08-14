@@ -190,6 +190,7 @@ function updateContentAnalysis(dt){
   const S = SRC.A;
   let src = null;
   if(S.mode==="pattern" || S.mode==="text") src = S.patCanvas;
+  else if(S.mode==="file" && S.still) src = (S.img && S.img.complete && S.img.naturalWidth>0) ? S.img : null;
   else if(S.video.readyState>=2 && S.video.videoWidth>0) src = S.video;
   if(!src){ modVal.motion *= 1-Math.min(1,dt*4); cutV *= Math.exp(-dt*5); modVal.cut = cutV; return; }
   try{ anaCtx.drawImage(src, 0, 0, 32, 18); }catch(e){ return; }
@@ -422,6 +423,7 @@ function runStage(id, inTex, dstRT, now, ch){
 function srcReady(ch){
   const S = SRC[ch];
   if(S.mode === "pattern" || S.mode === "text" || S.mode === "synth" || S.mode === "feed" || S.mode === "glsl") return true;
+  if(S.mode === "file" && S.still) return !!(S.img && S.img.complete && S.img.naturalWidth > 0);
   return S.video.readyState >= 2 && S.video.videoWidth > 0;
 }
 window.__chanHasSource = srcReady;
@@ -438,6 +440,15 @@ function uploadSource(ch, dt){
     if(S.mode === "text") drawTextSource(S, S.patClock); else drawPattern(S, S.patClock);
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, S.patCanvas);
     S.aspect = S.patCanvas.width/S.patCanvas.height; S.has = 1;
+  } else if(S.mode === "file" && S.still){
+    /* a photograph only has to travel to the GPU once. A GIF keeps moving
+       inside the img element, so that one is pulled every frame. */
+    if(S.img && S.img.complete && S.img.naturalWidth > 0 && (S.stillDirty || S.stillAnim)){
+      try{
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, S.img);
+        S.aspect = S.img.naturalWidth/S.img.naturalHeight; S.has = 1; S.stillDirty = false;
+      }catch(err){}
+    }
   } else if(S.video.readyState >= 2 && S.video.videoWidth > 0){
     try{
       gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, S.video);

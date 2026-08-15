@@ -1664,15 +1664,14 @@ function buildModPage(){
     const dests = document.createElement("div");
     dests.className = "dests";
     card.appendChild(dests);
-    const pk = document.createElement("select");
+    const pk = document.createElement("button");
     pk.className = "patchpick";
-    lazyOptions(pk, fillPatchOptions, "", "PATCH TO…");
-    pk.onchange = ()=>{
-      if(!pk.value) return;
-      addRoute(id, pk.value);
-      toast(src.name + " → " + P[pk.value].name);
-      pk.value = "";
-    };
+    pk.textContent = "PATCH TO\u2026";
+    attachTip(pk, "PATCH TO", "Points this modulator at a parameter. Opens a search field: type a few letters of the name or the section and press Enter.");
+    pk.onclick = ()=>openParamPicker(null, pid=>{
+      addRoute(id, pid);
+      toast(src.name + " \u2192 " + P[pid].name);
+    }, "PATCH " + src.name.toUpperCase() + " TO");
     card.appendChild(pk);
     grid.appendChild(card);
     modCards[id] = {cv, ctx:cv.getContext("2d"), val, dests, card};
@@ -1767,8 +1766,45 @@ function openModMenu(ev, p){
   /* Which modulators are already doing something. Eight LFOs, envelopes and
      macros all look identical in a list, so picking an unused one meant
      remembering what you had patched. Used ones carry a count and what they
-     drive; free ones say so. */
-  for(const src of MODSRC){
+     drive; free ones say so.
+
+     The list is grouped now. Ungrouped, it was one flat column of twenty-odd
+     identical rows in a menu that stopped at 340 pixels, so AUD BASS sat right
+     on the cut and AUD MID and AUD HIGH were below it. They were there, but
+     nothing said so, and a list that ends mid-family reads as a list that ends.
+     Headings make the shape of it visible whether or not it fits. */
+  const MMGROUP = [
+    ["MODULATORS",  x=>x.type === "lfo" || x.type === "env" || x.type === "macro"],
+    ["AUDIO TAPS",  x=>x.type === "audtap"],
+    ["AUDIO BANDS", x=>["bass","mid","high"].indexOf(x.id) >= 0],
+    ["PICTURE",     x=>["motion","bright","cut"].indexOf(x.id) >= 0],
+    ["SIGNALS",     x=>["chaos","drift","spike"].indexOf(x.id) >= 0],
+  ];
+  const ordered = [];
+  for(const [label, test] of MMGROUP){
+    const hits = MODSRC.filter(test);
+    if(hits.length) ordered.push([label, hits]);
+  }
+  /* anything a future version adds still turns up rather than vanishing */
+  const placed = new Set(ordered.flatMap(g=>g[1].map(x=>x.id)));
+  const rest = MODSRC.filter(x=>!placed.has(x.id));
+  if(rest.length) ordered.push(["OTHER", rest]);
+
+  /* flattened back out to headings and rows so the loop below stays one level
+     deep, the way it was before there were families to separate */
+  const flat = [];
+  for(const [label, group] of ordered){
+    flat.push({head:label});
+    for(const src of group) flat.push({src});
+  }
+  for(const item of flat){
+    if(item.head){
+      const gh = document.createElement("div");
+      gh.className = "mmgroup"; gh.textContent = item.head;
+      m.appendChild(gh);
+      continue;
+    }
+    const src = item.src;
     const used = routes.filter(r=>r.src===src.id);
     const b = document.createElement("div");
     b.className = "mmrow " + (used.length ? "used" : "free");
@@ -1798,9 +1834,12 @@ function openModMenu(ev, p){
     m.appendChild(b);
   }
   document.body.appendChild(m);
-  const w = 200, h = Math.min(m.scrollHeight, 340);
-  m.style.left = Math.min(ev.clientX, window.innerWidth - w - 8) + "px";
-  m.style.top  = Math.min(ev.clientY, window.innerHeight - h - 8) + "px";
+  /* measure it rather than assuming: the menu grows with however many
+     modulators and taps exist, and it must not open off the bottom */
+  const w = m.offsetWidth || 236;
+  const h = Math.min(m.scrollHeight, Math.round(window.innerHeight * 0.72));
+  m.style.left = Math.max(6, Math.min(ev.clientX, window.innerWidth - w - 8)) + "px";
+  m.style.top  = Math.max(6, Math.min(ev.clientY, window.innerHeight - h - 8)) + "px";
 }
 
 /* ---- collapsible + drag-reorderable section plumbing ---- */
@@ -2820,48 +2859,113 @@ function addRoute(srcId, dstId){
   renderRoutes();
   return routes.length-1;
 }
-/* A 349-option destination list per route row and per modulator card was about
-   seven thousand hidden DOM nodes doing nothing until someone opened a menu -
-   two thirds of the whole document. Show the current value, build the rest on
-   first use. */
-function lazyOptions(sel, fill, curVal, curLabel){
-  sel.innerHTML = "";
-  const o = document.createElement("option");
-  o.value = curVal === undefined ? "" : curVal;
-  o.textContent = curLabel;
-  sel.appendChild(o);
-  sel.value = o.value;
-  let filled = false;
-  const show = ()=>{
-    if(filled) return;
-    filled = true;
-    const keep = sel.value;
-    sel.innerHTML = "";
-    fill(sel);
-    sel.value = keep;
-  };
-  for(const ev of ["mousedown","focus","keydown","touchstart"]) sel.addEventListener(ev, show);
-  return show;
+/* ---- the parameter picker ----
+   A dropdown carrying four hundred parameters is not a control, it is a filing
+   cabinet with the drawers taken out. Even grouped into sections you are
+   scrolling a list the height of six screens looking for a word you already
+   know. So: type it. The picker opens on a search field, narrows as you type
+   across the parameter name, its internal id and its section name, and Enter
+   takes the highlighted one. The whole list is still there to browse if you do
+   not know what you are looking for, grouped and marked with what is already
+   patched, but nobody has to scroll to find CONTRAST.
+
+   It replaces both places the long list used to appear: the destination on a
+   route row, and PATCH TO on a modulator card. */
+let pickEl = null, pickRows = [], pickIdx = 0;
+function closeParamPicker(){
+  if(!pickEl) return;
+  pickEl.remove(); pickEl = null; pickRows = [];
 }
-function destLabel(id){ const p = P[id]; return p ? p.name+" ("+p.sec+")" : "\u2014"; }
-function fillDestOptions(sel){
-  for(const p of PLIST){ const o=document.createElement("option"); o.value=p.id; o.textContent=p.name+" ("+p.sec+")"; sel.appendChild(o); }
-}
-function fillPatchOptions(sel){
-  const ph = document.createElement("option"); ph.value = ""; ph.textContent = "PATCH TO\u2026"; sel.appendChild(ph);
-  let lastSec = null, grp = null;
-  for(const pp of PLIST){
-    if(pp.sec !== lastSec){
-      lastSec = pp.sec;
-      grp = document.createElement("optgroup");
-      const sd = SECTIONS.find(x=>x.id===pp.sec);
-      grp.label = sd ? sd.name : pp.sec.toUpperCase();
-      sel.appendChild(grp);
-    }
-    const o = document.createElement("option"); o.value = pp.id; o.textContent = pp.name;
-    grp.appendChild(o);
+function secLabel(id){ const sd = SECTIONS.find(x=>x.id===id); return sd ? sd.name : String(id).toUpperCase(); }
+function openParamPicker(curId, onPick, title){
+  closeParamPicker();
+  const ov = document.createElement("div"); ov.className = "ppick";
+  const box = document.createElement("div"); box.className = "ppbox";
+  const head = document.createElement("div"); head.className = "pphead";
+  const ht = document.createElement("span"); ht.textContent = title || "PATCH TO";
+  head.appendChild(ht);
+  if(curId && P[curId]){
+    const c = document.createElement("span"); c.className = "ppcur";
+    c.textContent = "now: " + P[curId].name;
+    head.appendChild(c);
   }
+  const inp = document.createElement("input");
+  inp.className = "ppsearch"; inp.type = "text"; inp.spellcheck = false;
+  inp.placeholder = "Type a parameter, or a section name";
+  const list = document.createElement("div"); list.className = "pplist";
+  const note = document.createElement("div"); note.className = "ppnote";
+  box.appendChild(head); box.appendChild(inp); box.appendChild(list); box.appendChild(note);
+  ov.appendChild(box);
+  document.body.appendChild(ov);
+  pickEl = ov;
+
+  function setIdx(i){
+    if(!pickRows.length){ note.textContent = ""; return; }
+    pickIdx = Math.max(0, Math.min(pickRows.length - 1, i));
+    for(let k=0;k<pickRows.length;k++) pickRows[k].classList.toggle("sel", k === pickIdx);
+    const row = pickRows[pickIdx];
+    row.scrollIntoView({block:"nearest"});
+    const h = PHELP[row.dataset.pid];
+    note.textContent = h ? h : "";
+  }
+  function build(q){
+    q = (q || "").trim().toLowerCase();
+    list.innerHTML = ""; pickRows = [];
+    const routed = new Set(routes.map(r=>r.dst));
+    let lastSec = null;
+    for(const p of PLIST){
+      if(q && (p.name + " " + p.id + " " + secLabel(p.sec)).toLowerCase().indexOf(q) < 0) continue;
+      if(p.sec !== lastSec){
+        lastSec = p.sec;
+        const h = document.createElement("div"); h.className = "ppsec"; h.textContent = secLabel(p.sec);
+        list.appendChild(h);
+      }
+      const r = document.createElement("div");
+      r.className = "pprow" + (p.id === curId ? " on" : "");
+      r.dataset.pid = p.id;
+      const n = document.createElement("span"); n.className = "ppname"; n.textContent = p.name;
+      r.appendChild(n);
+      if(p.master){ const t = document.createElement("i"); t.className = "ppmaster"; t.textContent = "MASTER"; r.appendChild(t); }
+      if(routed.has(p.id)){ const t = document.createElement("i"); t.className = "pptag"; t.textContent = "PATCHED"; r.appendChild(t); }
+      const idx = pickRows.length;
+      r.onclick = ()=>{ onPick(p.id); closeParamPicker(); };
+      r.onmouseenter = ()=>setIdx(idx);
+      list.appendChild(r); pickRows.push(r);
+    }
+    if(!pickRows.length){
+      const e = document.createElement("div"); e.className = "ppempty";
+      e.textContent = "Nothing matches that";
+      list.appendChild(e);
+      note.textContent = "";
+      return;
+    }
+    /* open on what is already chosen rather than at the top of the alphabet */
+    const at = pickRows.findIndex(r=>r.dataset.pid === curId);
+    setIdx(at >= 0 ? at : 0);
+  }
+  build("");
+  inp.addEventListener("input", ()=>build(inp.value));
+  /* the app takes single letters as shortcuts, so nothing typed here escapes */
+  inp.addEventListener("keydown", e=>{
+    e.stopPropagation();
+    if(e.key === "ArrowDown"){ e.preventDefault(); setIdx(pickIdx + 1); }
+    else if(e.key === "ArrowUp"){ e.preventDefault(); setIdx(pickIdx - 1); }
+    else if(e.key === "PageDown"){ e.preventDefault(); setIdx(pickIdx + 10); }
+    else if(e.key === "PageUp"){ e.preventDefault(); setIdx(pickIdx - 10); }
+    else if(e.key === "Enter"){
+      e.preventDefault();
+      if(pickRows[pickIdx]){ onPick(pickRows[pickIdx].dataset.pid); closeParamPicker(); }
+    }
+    else if(e.key === "Escape"){ e.preventDefault(); closeParamPicker(); }
+  });
+  ov.addEventListener("mousedown", e=>{ if(e.target === ov) closeParamPicker(); });
+  setTimeout(()=>inp.focus(), 0);
 }
+/* This list used to be a select carrying every parameter, on every route row
+   and every modulator card. It was built lazily to keep seven thousand hidden
+   option nodes out of the document; now it is not built at all, because the
+   picker above replaced it. */
+function destLabel(id){ const p = P[id]; return p ? p.name+"  \u00b7 "+p.sec : "\u2014"; }
 const routeAmtRefs = {};
 function renderRoutes(){
   for(const k in routeAmtRefs) delete routeAmtRefs[k];
@@ -2874,9 +2978,13 @@ function renderRoutes(){
     const go = document.createElement("button"); go.className="rgo"; go.textContent="\u25ce";
     attachTip(go, "SHOW THIS SOURCE", "Jumps to the MOD page and flashes this modulator's card, so you can see what it is doing and what else it is driving.");
     go.onclick = ()=>focusModSource(r.src);
-    const dst = document.createElement("select"); dst.className="dst";
-    lazyOptions(dst, fillDestOptions, r.dst, destLabel(r.dst));
-    dst.onchange = ()=>{ r.dst = dst.value; syncChanSel(); };
+    const dst = document.createElement("button"); dst.className="dst";
+    const dstLabel = ()=>{ dst.textContent = destLabel(r.dst); };
+    dstLabel();
+    attachTip(dst, "DESTINATION", "Which parameter this route drives. Click to search the whole list by name or section.");
+    dst.onclick = ()=>openParamPicker(r.dst, id=>{
+      r.dst = id; dstLabel(); syncChanSel();
+    }, "ROUTE DESTINATION");
     const chSel = document.createElement("select"); chSel.className="rch";
     for(const c of CHANNELS.concat(["AB"])){ const o=document.createElement("option"); o.value=c; o.textContent=(c==="AB"?"ALL":c); chSel.appendChild(o); }
     chSel.value = r.ch || "A";

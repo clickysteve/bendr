@@ -77,9 +77,56 @@ function serviceGrabs(){
 function grabCanvas(fn){ grabQueue.push(fn); }
 /* so a test, or anything else outside the loop, can still read a frame */
 window.__grab = (type)=>new Promise(res=>grabCanvas(c=>res(c.toDataURL(type||"image/png"))));
-document.getElementById("btnSnap").onclick = ()=>{
-  grabCanvas(c=>c.toBlob(b=>{ if(b){ dl(URL.createObjectURL(b), "bendr-"+stamp()+".png"); toast("Still saved"); } }, "image/png"));
-};
+/* SNAP used to hand back whatever the display canvas happened to be. That is
+   the size of the pane on screen and has nothing to do with the raster the
+   picture was processed at, so a still taken from a half-width window came out
+   around nine hundred pixels wide while the engine had been running at 1920.
+   It renders one frame at the processing resolution now, the same way the
+   offline render does, so a patch at 1080p always saves 1920x1080.
+
+   While the recorder is running it takes the picture as it stands instead. It
+   is already the right size, because REC pins the canvas to the same raster for
+   the duration, and both the recorder and the pop-out hold a captureStream off
+   this canvas: resizing it underneath a MediaRecorder mid-take is a good way to
+   end up with a broken file. */
+function snapStill(){
+  if(recorder){
+    grabCanvas(c=>c.toBlob(b=>{
+      if(!b) return;
+      dl(URL.createObjectURL(b), "bendr-"+stamp()+".png");
+      toast("Still saved  " + c.width + "x" + c.height);
+    }, "image/png"));
+    return;
+  }
+  const W = procW, H = procH;
+  const oldW = canvas.width, oldH = canvas.height;
+  const wasLocked = recLocked;
+  let shot = null;
+  try{
+    recLocked = true;                  /* the same latch REC uses to own the size */
+    canvas.width = W; canvas.height = H;
+    renderFrame(performance.now()/1000, 1/Math.max(1, captureFps()));
+    /* copy it out in the same task as the draw: preserveDrawingBuffer is off,
+       so the buffer stops being readable the moment this one yields */
+    shot = document.createElement("canvas");
+    shot.width = W; shot.height = H;
+    shot.getContext("2d").drawImage(canvas, 0, 0);
+  }catch(e){
+    shot = null;
+    toast("Still failed: " + (e && e.message), true);
+  }finally{
+    canvas.width = oldW; canvas.height = oldH;
+    recLocked = wasLocked;
+    markSizeDirty();
+  }
+  if(!shot) return;
+  shot.toBlob(b=>{
+    if(!b){ toast("Still failed", true); return; }
+    dl(URL.createObjectURL(b), "bendr-"+stamp()+".png");
+    toast("Still saved  " + W + "x" + H);
+  }, "image/png");
+}
+document.getElementById("btnSnap").onclick = snapStill;
 document.getElementById("btnFull").onclick = ()=>{
   const w = document.getElementById("canvasWrap");
   if(document.fullscreenElement) document.exitFullscreen();

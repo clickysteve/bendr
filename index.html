@@ -1049,7 +1049,7 @@ body.nomix #mixbuses{display:none;}
     <button class="menubtn" data-tip="Stills, offline render and the clean output window.">OUTPUT <i>&#9662;</i></button>
     <div class="menupanel">
       <div class="mrow2">
-        <button id="btnSnap" data-tip="Save the current frame as a PNG at the processing resolution. Keyboard: S.">SNAP</button>
+        <button id="btnSnap" data-tip="Save the current frame as a PNG at the processing resolution, not at whatever size the window happens to be — a patch running at 1080p saves 1920x1080 even from a narrow pane. Keyboard: S.">SNAP</button>
         <button id="btnRender" data-tip="Offline render: steps channel A through the file frame by frame and encodes every frame at full quality regardless of realtime speed. Video only - use REC if you need the audio.">RENDER</button>
       </div>
       <div class="mlabel">WHERE IT GOES</div>
@@ -1419,7 +1419,7 @@ body.nomix #mixbuses{display:none;}
   <p>Hold <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd> for the six bend pads. <kbd>0</kbd> is the panic key: it empties every buffer that feeds itself &mdash; the feedback store, the flow stage, the phosphor and the frame ring &mdash; without touching a single control, which is the way out when a bad frame gets caught circulating.</p>
   <p>Your patch, your snapshots and your take are saved to this browser every few seconds, so a reload or a crash picks up where you left off. Press <kbd>Z</kbd> straight after opening if you would rather start clean.</p>
   <h3>OUTPUT</h3>
-  <p><b>STORE</b> under PATCH saves everything you have set up as a named preset, kept on this machine and listed under SAVED alongside the built-in ones; DELETE removes one. SAVE FILE and OPEN FILE move a patch between machines. <b>REC</b> captures the live output (with source audio when AUDIO=SOURCE) — MP4 where the browser supports it, WebM otherwise. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
+  <p><b>STORE</b> under PATCH saves everything you have set up as a named preset, kept on this machine and listed under SAVED alongside the built-in ones; DELETE removes one. SAVE FILE and OPEN FILE move a patch between machines. <b>REC</b> captures the live output (with source audio when AUDIO=SOURCE) — MP4 where the browser supports it, WebM otherwise. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still at the processing resolution rather than at the size of the pane, so a patch running at 1080p gives a 1920x1080 file however narrow the window is. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
   </div>
   <p style="padding-top:10px; color:var(--dim);">Escape, the cross, or a click outside this panel closes it.</p>
 </div></div>
@@ -3426,7 +3426,7 @@ const FS_TILE = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v36.2";
+const BENDR_VERSION = "v36.3";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -9614,9 +9614,56 @@ function serviceGrabs(){
 function grabCanvas(fn){ grabQueue.push(fn); }
 /* so a test, or anything else outside the loop, can still read a frame */
 window.__grab = (type)=>new Promise(res=>grabCanvas(c=>res(c.toDataURL(type||"image/png"))));
-document.getElementById("btnSnap").onclick = ()=>{
-  grabCanvas(c=>c.toBlob(b=>{ if(b){ dl(URL.createObjectURL(b), "bendr-"+stamp()+".png"); toast("Still saved"); } }, "image/png"));
-};
+/* SNAP used to hand back whatever the display canvas happened to be. That is
+   the size of the pane on screen and has nothing to do with the raster the
+   picture was processed at, so a still taken from a half-width window came out
+   around nine hundred pixels wide while the engine had been running at 1920.
+   It renders one frame at the processing resolution now, the same way the
+   offline render does, so a patch at 1080p always saves 1920x1080.
+
+   While the recorder is running it takes the picture as it stands instead. It
+   is already the right size, because REC pins the canvas to the same raster for
+   the duration, and both the recorder and the pop-out hold a captureStream off
+   this canvas: resizing it underneath a MediaRecorder mid-take is a good way to
+   end up with a broken file. */
+function snapStill(){
+  if(recorder){
+    grabCanvas(c=>c.toBlob(b=>{
+      if(!b) return;
+      dl(URL.createObjectURL(b), "bendr-"+stamp()+".png");
+      toast("Still saved  " + c.width + "x" + c.height);
+    }, "image/png"));
+    return;
+  }
+  const W = procW, H = procH;
+  const oldW = canvas.width, oldH = canvas.height;
+  const wasLocked = recLocked;
+  let shot = null;
+  try{
+    recLocked = true;                  /* the same latch REC uses to own the size */
+    canvas.width = W; canvas.height = H;
+    renderFrame(performance.now()/1000, 1/Math.max(1, captureFps()));
+    /* copy it out in the same task as the draw: preserveDrawingBuffer is off,
+       so the buffer stops being readable the moment this one yields */
+    shot = document.createElement("canvas");
+    shot.width = W; shot.height = H;
+    shot.getContext("2d").drawImage(canvas, 0, 0);
+  }catch(e){
+    shot = null;
+    toast("Still failed: " + (e && e.message), true);
+  }finally{
+    canvas.width = oldW; canvas.height = oldH;
+    recLocked = wasLocked;
+    markSizeDirty();
+  }
+  if(!shot) return;
+  shot.toBlob(b=>{
+    if(!b){ toast("Still failed", true); return; }
+    dl(URL.createObjectURL(b), "bendr-"+stamp()+".png");
+    toast("Still saved  " + W + "x" + H);
+  }, "image/png");
+}
+document.getElementById("btnSnap").onclick = snapStill;
 document.getElementById("btnFull").onclick = ()=>{
   const w = document.getElementById("canvasWrap");
   if(document.fullscreenElement) document.exitFullscreen();

@@ -210,7 +210,10 @@ input[type=range]::-moz-range-thumb{width:10px; height:10px; border-radius:2px; 
 #mixCollapse .mixhint{display:none;}
 body.nomix #mixstrip{background:rgba(255,122,24,.06);}
 body.nomix #mixCollapse{
-  flex:1 1 auto; justify-content:center; gap:9px; padding:9px 10px;
+  /* the whole bar stays clickable, but the caret and the label sit at the left
+     edge where BEND and the dock fold put theirs. Centred, it read as a title
+     for the row below rather than as the control that brings the faders back. */
+  flex:1 1 auto; justify-content:flex-start; gap:9px; padding:9px 10px;
   border-right:none; color:var(--amber); font-size:9px; letter-spacing:3px;
 }
 body.nomix #mixCollapse:hover{background:rgba(255,122,24,.14);}
@@ -856,28 +859,10 @@ audio,video{display:none;}
   .prow{padding:5px 0;}
   .sldwrap{height:30px;}
   /* ---------- mixer strip ---------- */
-#mixstrip{
-  flex:0 0 auto; display:flex; align-items:stretch;
-  border-top:1px solid var(--line); background:var(--panel2);
-}
-#mixCollapse{
-  /* top-aligned, because the strip is three rows tall and every other fold
-     control on the layout sits at the top-left of the thing it folds */
-  flex:0 0 auto; border:none; border-right:1px solid var(--line); border-radius:0;
-  padding:8px 10px 0; font-size:8px; letter-spacing:2px; color:var(--dim);
-  display:flex; align-items:flex-start; gap:4px; background:rgba(0,0,0,.2);
-}
-#mixCollapse i{font-style:normal; font-size:8px; transition:transform .12s;}
-#mixCollapse .mixhint{display:none;}
-body.nomix #mixstrip{background:rgba(255,122,24,.06);}
-body.nomix #mixCollapse{
-  flex:1 1 auto; justify-content:center; gap:9px; padding:9px 10px;
-  border-right:none; color:var(--amber); font-size:9px; letter-spacing:3px;
-}
-body.nomix #mixCollapse:hover{background:rgba(255,122,24,.14);}
-body.nomix #mixCollapse i{transform:rotate(-90deg);}
-body.nomix #mixCollapse .mixhint{display:inline; color:var(--dim); letter-spacing:2px; font-size:8px;}
-body.nomix #mixbuses{display:none;}
+  /* the mixer strip needs nothing different under a finger: its rules are
+     above and apply everywhere. There used to be a byte-for-byte copy of
+     all twenty-two lines of them here, which changed nothing and quietly
+     ate one attempt at fixing the fold bar's alignment. */
 #mixbuses{flex:1; display:flex; min-width:0;}
 .mixbus{
   flex:1 1 0; min-width:0; padding:6px 12px 7px;
@@ -3485,7 +3470,7 @@ const FS_TILE = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v36.4";
+const BENDR_VERSION = "v36.5";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and

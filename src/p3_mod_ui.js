@@ -8,7 +8,7 @@ function resetParam(p, toMin){
   else if(linkChans){ for(const ch of CHANNELS) morphOverride.add(ch+":"+p.id); }
   else morphOverride.add(activeChan+":"+p.id);
   const r = uiRefs[p.id];
-  if(r){ r.slider.value = v; r.val.textContent = fmt(p, v); }
+  if(r){ r.slider.value = v; setReadout(r.val, fmt(p, v)); }
 }
 
 /* ---------------- header menus ---------------- */
@@ -825,6 +825,71 @@ function renderMidiMap(){
 }
 
 function fmt(p, v){ return (Math.abs(v)<10 ? v.toFixed(2) : v.toFixed(1)); }
+/* ---- readouts you can type into ----
+   A slider is a good way to find a value and a poor way to state one. Matching
+   a setting you already know, or copying one from a patch you wrote down, meant
+   nudging a four-hundred-step range until the number beside it agreed. So the
+   number beside it is the field. Click it and type. Enter commits, Escape puts
+   back what was there, the arrows nudge by a fortieth of the range and shift
+   makes that a four-hundredth, which is one step of the slider.
+
+   The typed value goes in exactly as typed rather than snapped to the slider's
+   step, because the parameter underneath is continuous and the slider is only
+   how it is usually reached. */
+function setReadout(el, text){
+  if(!el) return;
+  if(el.tagName === "INPUT"){
+    /* never fight the person typing: a modulator or a snapshot recall landing
+       mid-edit would otherwise rewrite the field underneath them */
+    if(document.activeElement === el) return;
+    el.value = text;
+  } else el.textContent = text;
+}
+function makeReadoutField(p, el, slider){
+  el.type = "text"; el.inputMode = "decimal";
+  el.autocomplete = "off"; el.spellcheck = false;
+  el.setAttribute("aria-label", p.name + " value");
+  el.title = "Type a value \u2014 " + fmt(p, p.min) + " to " + fmt(p, p.max);
+  let held = el.value;
+  const put = v=>{
+    v = Math.min(p.max, Math.max(p.min, v));
+    slider.value = v;
+    /* through the slider's own handler, so link, morph override, the mirrored
+       copy of the control and everything else it does still happens */
+    slider.dispatchEvent(new Event("input", {bubbles:true}));
+    setBase(p.id, v);          /* then the exact number, not the nearest step */
+    el.value = fmt(p, v);
+  };
+  const commit = ()=>{
+    const v = parseFloat(String(el.value).replace(/[^0-9.+\-eE]/g, ""));
+    if(!isFinite(v)){ el.value = held; return; }
+    put(v);
+    held = el.value;
+  };
+  el.addEventListener("focus", ()=>{ held = el.value; el.select(); });
+  el.addEventListener("pointerdown", ()=>{ if(typeof armGesture === "function") armGesture(); });
+  el.addEventListener("keydown", e=>{
+    if(e.key === "Enter"){ commit(); el.blur(); return; }
+    if(e.key === "Escape"){ el.value = held; el.blur(); return; }
+    if(e.key === "ArrowUp" || e.key === "ArrowDown"){
+      e.preventDefault();
+      const step = (p.max - p.min) / (e.shiftKey ? 400 : 40);
+      /* nudge from the value, not from the text. The field shows two decimals,
+         so reading the displayed number back and adding to it made every press
+         after the first compound its own rounding: up a fortieth then down a
+         four-hundredth came out higher than it started. The typed text only
+         wins when it is actually something the person has typed. */
+      const shown = fmt(p, getBase(p.id));
+      const typed = parseFloat(el.value);
+      const cur = (String(el.value).trim() !== shown && isFinite(typed)) ? typed : getBase(p.id);
+      put(cur + (e.key === "ArrowUp" ? step : -step));
+      return;
+    }
+  });
+  el.addEventListener("blur", commit);
+  el.addEventListener("dblclick", e=>e.stopPropagation());
+  return el;
+}
 const chanThumbs = {};
 function buildChanBar(){
   const bar = document.createElement("div");
@@ -1019,14 +1084,15 @@ function buildMixStrip(){
     sl.type = "range"; sl.min = p.min; sl.max = p.max; sl.step = (p.max-p.min)/400;
     sl.value = getBase(p.id);
     attachTip(sl, p.name, PHELP[p.id] || "", "Double-click to return it to zero.");
-    const val = document.createElement("span"); val.className = "mval";
-    val.textContent = fmt(p, getBase(p.id));
+    const val = document.createElement("input"); val.className = "mval";
+    val.value = fmt(p, getBase(p.id));
     sl.addEventListener("input", ()=>{
       const v = parseFloat(sl.value);
-      setBase(p.id, v); val.textContent = fmt(p, v);
+      setBase(p.id, v); setReadout(val, fmt(p, v));
       morphOverride.add("M:"+p.id);
     });
     sl.addEventListener("dblclick", ()=>{ resetParam(p); });
+    makeReadoutField(p, val, sl);
     const tick = document.createElement("div"); tick.className = "modtick";
     wrap.appendChild(sl); wrap.appendChild(tick);
     fr.appendChild(wrap); fr.appendChild(val);
@@ -1042,16 +1108,17 @@ function buildMixStrip(){
     const esl = document.createElement("input");
     esl.type = "range"; esl.min = ep.min; esl.max = ep.max; esl.step = (ep.max-ep.min)/400;
     esl.value = getBase(ep.id);
-    const eval_ = document.createElement("span"); eval_.className = "mval";
-    eval_.textContent = fmt(ep, getBase(ep.id));
+    const eval_ = document.createElement("input"); eval_.className = "mval";
+    eval_.value = fmt(ep, getBase(ep.id));
     esl.addEventListener("input", ()=>{
       const v = parseFloat(esl.value);
-      setBase(ep.id, v); eval_.textContent = fmt(ep, v);
+      setBase(ep.id, v); setReadout(eval_, fmt(ep, v));
       morphOverride.add("M:"+ep.id);
-      const r0 = uiRefs[ep.id]; if(r0 && r0.slider !== esl){ r0.slider.value = v; r0.val.textContent = fmt(ep, v); }
+      const r0 = uiRefs[ep.id]; if(r0 && r0.slider !== esl){ r0.slider.value = v; setReadout(r0.val, fmt(ep, v)); }
     });
     esl.addEventListener("dblclick", ()=>{ resetParam(ep); });
     esl.addEventListener("contextmenu", e=>{ e.preventDefault(); openModMenu(e, ep); });
+    makeReadoutField(ep, eval_, esl);
     const etick = document.createElement("div"); etick.className = "modtick";
     ewrap.appendChild(esl); ewrap.appendChild(etick);
     er.appendChild(elab); er.appendChild(ewrap); er.appendChild(eval_);
@@ -1337,7 +1404,7 @@ function buildPanel(){
       const lab = document.createElement("label"); lab.textContent = p.name;
       lab.htmlFor = "prm_" + p.id;
       attachTip(lab, p.name, PHELP[p.id] || "",
-        "Double-click the slider or press \u21ba to reset \u00b7 right-click to patch a modulator \u00b7 click while MIDI learn is on to map a controller");
+        "Type into the number to set it exactly \u00b7 double-click the slider or press \u21ba to reset \u00b7 right-click to patch a modulator \u00b7 click while MIDI learn is on to map a controller");
       lab.onclick = ()=>{ if(midiLearnMode){ setLearnTarget(p.id); } };
       lab.addEventListener("dblclick", ()=>resetParam(p));
       row.addEventListener("contextmenu", e=>{ e.preventDefault(); openModMenu(e, p); });
@@ -1349,7 +1416,7 @@ function buildPanel(){
       s.addEventListener("pointerdown", armGesture);
       s.addEventListener("input", ()=>{
         const v = parseFloat(s.value);
-        setBase(p.id, v); val.textContent = fmt(p,v);
+        setBase(p.id, v); setReadout(val, fmt(p,v));
         if(p.master) morphOverride.add("M:"+p.id);
         else if(linkChans){ for(const ch of CHANNELS) morphOverride.add(ch+":"+p.id); }
         else morphOverride.add(activeChan+":"+p.id);
@@ -1360,10 +1427,11 @@ function buildPanel(){
           }
         }
       });
-      s.addEventListener("dblclick", ()=>{ setBase(p.id, p.def); s.value=p.def; val.textContent = fmt(p,p.def); });
+      s.addEventListener("dblclick", ()=>{ setBase(p.id, p.def); s.value=p.def; setReadout(val, fmt(p,p.def)); });
       const tick = document.createElement("div"); tick.className="modtick";
       wrap.appendChild(s); wrap.appendChild(tick);
-      const val = document.createElement("span"); val.className="val"; val.textContent = fmt(p,getBase(p.id));
+      const val = document.createElement("input"); val.className="val"; val.value = fmt(p,getBase(p.id));
+      makeReadoutField(p, val, s);
       const rst = document.createElement("button"); rst.className="prst"; rst.textContent="\u21ba";
       attachTip(rst, "RESET " + p.name, "Back to the default ("+fmt(p,p.def)+").",
         "Shift-click for the bottom of the range ("+fmt(p,p.min)+"). Double-clicking the slider does the same as a plain click.");
@@ -2634,17 +2702,47 @@ function buildAudioSection(){
     s.type="range"; s.step=0.001;
     if(log){ s.min=Math.log10(min); s.max=Math.log10(max); s.value=Math.log10(get()); }
     else { s.min=min; s.max=max; s.value=get(); }
-    const val = document.createElement("span"); val.className="val";
+    const val = document.createElement("input"); val.className="val";
     const upd = ()=>{
       const v = log ? Math.pow(10, parseFloat(s.value)) : parseFloat(s.value);
-      set(v); val.textContent = fmtFn(v);
+      set(v); setReadout(val, fmtFn(v));
     };
     s.addEventListener("input", upd); upd();
+    /* the band edges are the strongest case in the whole app for typing: a
+       crossover is a number you know in hertz, not a position on a log slider
+       running from 20 to 16000. "1.2k" is accepted, because that is how anyone
+       writing a crossover down writes it. */
+    val.type="text"; val.inputMode="decimal"; val.autocomplete="off"; val.spellcheck=false;
+    val.setAttribute("aria-label", label);
+    val.title = "Type a value \u2014 " + fmtFn(min) + " to " + fmtFn(max);
+    let held = val.value;
+    const putV = v=>{
+      set(Math.min(max, Math.max(min, v)));
+      /* read it back: the low and high edges of a band hold each other apart,
+         so what was asked for and what was taken are not always the same */
+      const actual = get();
+      s.value = log ? Math.log10(actual) : actual;
+      val.value = fmtFn(actual);
+    };
+    const commitV = ()=>{
+      const t = String(val.value).trim().toLowerCase();
+      const mul = /k$/.test(t) ? 1000 : 1;
+      const n = parseFloat(t.replace(/[^0-9.+\-eE]/g, ""));
+      if(!isFinite(n)){ val.value = fmtFn(get()); return; }
+      putV(n * mul);
+      held = val.value;
+    };
+    val.addEventListener("focus", ()=>{ held = val.value; val.select(); });
+    val.addEventListener("keydown", e=>{
+      if(e.key === "Enter"){ commitV(); val.blur(); return; }
+      if(e.key === "Escape"){ val.value = held; val.blur(); return; }
+    });
+    val.addEventListener("blur", commitV);
     wrap.appendChild(s);
     row.appendChild(lab); row.appendChild(wrap); row.appendChild(val);
     dTarget.appendChild(row);
     audioUIRefs.push({s, val, get, log, fmtFn,
-      refresh(){ s.value = log ? Math.log10(get()) : get(); val.textContent = fmtFn(get()); }});
+      refresh(){ s.value = log ? Math.log10(get()) : get(); setReadout(val, fmtFn(get())); }});
   }
   dTarget = mkSection("audioband", "cyan", "AUDIO REACT \u00b7 BANDS", document.getElementById("audiodock"));
   for(const k of ["bass","mid","high"]){
@@ -2776,9 +2874,9 @@ function refreshUI(){
   for(const p of PLIST){
     const r = uiRefs[p.id]; if(!r) continue;
     const v = getBase(p.id);
-    r.slider.value = v; r.val.textContent = fmt(p,v);
+    r.slider.value = v; setReadout(r.val, fmt(p,v));
   }
-  for(const m of stripMelt){ const v = getBase(m.p.id); m.slider.value = v; m.val.textContent = fmt(m.p, v); }
+  for(const m of stripMelt){ const v = getBase(m.p.id); m.slider.value = v; setReadout(m.val, fmt(m.p, v)); }
   const fm = document.getElementById("fbModeBtn");
   if(fm) fm.textContent = "MODE: "+(fbTrailMode?"TRAIL":"MIX");
   if(tapeBtnRefs[0] && window.__transportOf){
@@ -3114,6 +3212,6 @@ function onMidi(e){
     const v = p.min + (d2/127)*(p.max-p.min);
     setBase(pid, v);
     const r = uiRefs[pid];
-    if(r){ r.slider.value = v; r.val.textContent = fmt(p,v); }
+    if(r){ r.slider.value = v; setReadout(r.val, fmt(p,v)); }
   }
 }

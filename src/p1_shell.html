@@ -183,6 +183,18 @@ body.midilearn .prow label{cursor:crosshair; text-decoration:underline dotted va
 #btnMidi.on{background:var(--mag); border-color:var(--mag); color:#0b0b0e;}
 .prow label.mapped::after{content:"·"; color:var(--mag); font-weight:700;}
 .prow .val{width:38px; flex:0 0 38px; text-align:right; color:var(--txt); font-size:9.5px;}
+/* the readouts are fields. They look like text until you go near them, then
+   they look like something you can type in, which is what they are. */
+input.val, input.mval{
+  box-sizing:border-box; -webkit-appearance:none; appearance:none;
+  background:transparent; border:1px solid transparent; border-radius:2px;
+  padding:0 1px; margin:0; font-family:inherit; font-weight:inherit;
+  letter-spacing:inherit; min-width:0; cursor:text;
+}
+input.val:hover, input.mval:hover{border-color:var(--line);}
+input.val:focus, input.mval:focus{
+  outline:none; border-color:var(--amber); background:rgba(255,176,46,.10); color:var(--amber);
+}
 .sldwrap{flex:1; position:relative; height:16px; display:flex; align-items:center;}
 input[type=range]{
   -webkit-appearance:none; appearance:none; width:100%; height:16px; background:transparent; cursor:ew-resize; margin:0;
@@ -1443,6 +1455,8 @@ audio,video{display:none;}
   <p>Going the other way — picking a destination from the route row, or PATCH TO on a modulator card — opens a search field rather than a dropdown, because there are over four hundred parameters and a list that long is not a control. Type a few letters of the name, or the name of a section, and it narrows: "wobb" finds every wobble, "tape transport" gives you that whole section. Arrows move, Enter takes the highlighted one, Escape backs out. The full list is still there to scroll if you would rather browse, grouped by section, with anything already patched marked as such, and the help for whatever is highlighted along the bottom.</p>
   <h3>TEMPO &amp; MIDI</h3>
   <p>TAP sets the tempo, or click the number beside it and type one — Enter commits, Escape reverts, and the arrow keys nudge by one beat, or a tenth with shift. LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
+  <h3>TYPING A VALUE</h3>
+  <p>Every number beside a slider is a field. Click it and type. <kbd>Enter</kbd> commits, <kbd>Esc</kbd> puts back what was there, and the up and down arrows nudge by a fortieth of the range, or a four-hundredth with <kbd>shift</kbd> held, which is one step of the slider. A typed value goes in exactly as typed rather than snapped to the slider's step, because the parameter underneath is continuous and the slider is only the usual way to reach it. The audio band edges take hertz the way you would write them down, so <b>1.2k</b> is understood as well as <b>1200</b>.</p>
   <h3>FINDING YOUR WAY AROUND</h3>
   <p>What the transport can do depends on what the channel is looking at. A file has a timeline, so it plays, loops, seeks, mutes and shuttles. A generated source — pattern, text, synth or a feed from another channel — has a clock but nothing to scrub, so SPD and the deck transport drive that clock and the file controls are greyed out. A camera or a screen capture has neither, so it can be held or let run and nothing else. The panel follows the same rule: PATTERN SYNTH only appears on a channel that is actually a synth, because everywhere else it is a page of controls that do nothing.</p>
   <p>Three levels of undoing yourself: any single control resets with a double-click, each section has its own RESET, and <b>RESET FX</b> at the top of the channel column returns every effect on the channel you are editing to default in one press without touching what the channel is looking at — the file stays loaded and the pattern synth keeps its patch. <b>INIT · RESET ALL</b> in the PATCH menu does the whole rig. All of them are undoable with Z.</p>

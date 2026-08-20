@@ -11852,6 +11852,50 @@ async function offlineRender(){
       fileStream = await fileHandle.createWritable();
     }catch(e){ if(e && e.name === "AbortError"){ offline=false; ov.style.display="none"; canvas.width=oldW; canvas.height=oldH; return; } }
   }
+
+  /* Audio extraction & decoding:
+     Priority 1: Dedicated audio file from the AUDIO tab (audioFileEl)
+     Priority 2: Channel A video file soundtrack (SRC.A.video) */
+  let audioBuffer = null;
+  const audioSrcUrl = (audioFileEl && (audioFileEl.src || audioFileEl.dataset?.url))
+    ? (audioFileEl.src || audioFileEl.dataset.url)
+    : ((SRC.A.mode === "file" && (SRC.A.video.src || SRC.A.objUrl)) ? (SRC.A.video.src || SRC.A.objUrl) : null);
+
+  if(audioSrcUrl){
+    try{
+      const res = await fetch(audioSrcUrl);
+      if(res.ok){
+        const ab = await res.arrayBuffer();
+        const actx = (typeof audioCtx !== "undefined" && audioCtx) ? audioCtx : new (window.AudioContext || window.webkitAudioContext)();
+        audioBuffer = await new Promise((resolve, reject)=>{
+          actx.decodeAudioData(ab.slice(0), resolve, reject);
+        });
+      }
+    }catch(e){
+      console.warn("Offline audio decode failed, falling back to video only:", e);
+      audioBuffer = null;
+    }
+  }
+
+  let hasAudio = false;
+  if("AudioEncoder" in window && audioBuffer && audioBuffer.numberOfChannels > 0 && audioBuffer.length > 0){
+    try{
+      const aconf = {
+        codec: "mp4a.40.2",
+        numberOfChannels: audioBuffer.numberOfChannels,
+        sampleRate: audioBuffer.sampleRate,
+        bitrate: 192000,
+      };
+      const asup = await AudioEncoder.isConfigSupported(aconf);
+      if(asup && asup.supported){
+        hasAudio = true;
+      }
+    }catch(e){
+      console.warn("AudioEncoder config check failed:", e);
+      hasAudio = false;
+    }
+  }
+
   const parts = [];
   const target = fileStream
     ? new Mp4Muxer.FileSystemWritableFileStreamTarget(fileStream, {chunked: true})
@@ -11862,6 +11906,11 @@ async function offlineRender(){
   const muxer = new Mp4Muxer.Muxer({
     target,
     video: {codec: mcodec, width: W, height: H},
+    audio: hasAudio ? {
+      codec: 'aac',
+      numberOfChannels: audioBuffer.numberOfChannels,
+      sampleRate: audioBuffer.sampleRate,
+    } : undefined,
     /* seeking metadata has to go at the front, which needs a rewrite the
        stream target cannot do, so it goes at the end when we are streaming */
     fastStart: fileStream ? false : "in-memory",
@@ -11871,7 +11920,67 @@ async function offlineRender(){
     error: e => { console.error(e); toast("Encoder error: "+e.message, true); renderCancel = true; },
   });
   enc.configure({codec, width:W, height:H, bitrate:bitrateFor(W,H,fps), framerate:fps});
+
+  let aenc = null;
+  if(hasAudio){
+    aenc = new AudioEncoder({
+      output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+      error: e => { console.error("Audio encoder error:", e); },
+    });
+    aenc.configure({
+      codec: "mp4a.40.2",
+      numberOfChannels: audioBuffer.numberOfChannels,
+      sampleRate: audioBuffer.sampleRate,
+      bitrate: 192000,
+    });
+  }
+
   const total = Math.max(1, Math.floor(video.duration*fps));
+
+  /* Encode audio track: slice AudioBuffer into chunks and send to AudioEncoder */
+  if(hasAudio && !renderCancel){
+    try{
+      const totalDurSec = total / fps;
+      const totalAudioFrames = Math.round(totalDurSec * audioBuffer.sampleRate);
+      const CHUNK_SIZE = 1024;
+      const numChannels = audioBuffer.numberOfChannels;
+      const sr = audioBuffer.sampleRate;
+      const srcLen = audioBuffer.length;
+      const channelData = [];
+      for(let ch = 0; ch < numChannels; ch++){
+        channelData.push(audioBuffer.getChannelData(ch));
+      }
+
+      for(let offset = 0; offset < totalAudioFrames && !renderCancel; offset += CHUNK_SIZE){
+        const framesInChunk = Math.min(CHUNK_SIZE, totalAudioFrames - offset);
+        const planar = new Float32Array(framesInChunk * numChannels);
+        for(let ch = 0; ch < numChannels; ch++){
+          const src = channelData[ch];
+          const dstOffset = ch * framesInChunk;
+          for(let f = 0; f < framesInChunk; f++){
+            planar[dstOffset + f] = src[(offset + f) % srcLen];
+          }
+        }
+        const timestampUs = Math.round((offset * 1e6) / sr);
+        const ad = new AudioData({
+          format: "f32-planar",
+          sampleRate: sr,
+          numberOfFrames: framesInChunk,
+          numberOfChannels: numChannels,
+          timestamp: timestampUs,
+          data: planar,
+        });
+        aenc.encode(ad);
+        ad.close();
+      }
+      if(!renderCancel){
+        await aenc.flush();
+      }
+    }catch(e){
+      console.error("Audio encoding error:", e);
+    }
+  }
+
   const seekTo = (v,t)=>new Promise(res=>{
     const h = ()=>{ v.removeEventListener("seeked", h); res(); };
     v.addEventListener("seeked", h);
@@ -11900,12 +12009,12 @@ async function offlineRender(){
       muxer.finalize();
       if(fileStream){
         await fileStream.close();
-        toast("Rendered "+total+" frames \u2192 "+fileHandle.name+" (video only \u2014 REC captures audio)");
+        toast("Rendered "+total+" frames "+(hasAudio?"with audio":"(video only)")+" \u2192 "+fileHandle.name);
       } else {
         parts.sort((a,b)=>a.position-b.position);
         const blob = new Blob(parts.map(x=>x.data), {type:"video/mp4"});
         dl(URL.createObjectURL(blob), suggested);
-        toast("Rendered "+total+" frames \u2192 MP4, "+(blob.size/1048576).toFixed(1)+" MB (video only \u2014 REC captures audio)");
+        toast("Rendered "+total+" frames "+(hasAudio?"with audio":"(video only)")+" \u2192 MP4, "+(blob.size/1048576).toFixed(1)+" MB");
       }
     } else {
       if(fileStream){ try{ await fileStream.abort(); }catch(e){} }
@@ -11914,7 +12023,8 @@ async function offlineRender(){
   } finally {
     /* the encoder used to be closed only on the cancel path, so every
        completed render left one behind */
-    try{ if(enc.state !== "closed") enc.close(); }catch(e){}
+    try{ if(enc && enc.state !== "closed") enc.close(); }catch(e){}
+    try{ if(aenc && aenc.state !== "closed") aenc.close(); }catch(e){}
     parts.length = 0;
   }
   canvas.width = oldW; canvas.height = oldH;

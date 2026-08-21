@@ -1915,7 +1915,7 @@ const FS_MIX = COMMON + KEYFN +
 "      c = vec2(cs*c.x - sn*c.y, sn*c.x + cs*c.y) * zo;\n" +
 "      puv = c / vec2(outA, 1.0) + 0.5;\n" +
 "      w = 1.0;\n" +
-"      if(u_meltMode > 1.5){\n" +
+"      if(u_meltMode > 1.5 && u_meltMode < 2.5){\n" +
 "        vec3 lw = vec3(0.299, 0.587, 0.114);\n" +
 "        float d = abs(dot(src, lw) - dot(texture(u_prev, uv).rgb, lw));\n" +
 "        w = clamp(d * (3.0 + u_edgeWidth*14.0), 0.0, 1.0);\n" +
@@ -1948,13 +1948,19 @@ const FS_MIX = COMMON + KEYFN +
 "      float ha = u_meltHue * 0.22, hc = cos(ha), hs = sin(ha);\n" +
 "      pv = yiq2rgb(vec3(yy.x, hc*yy.y - hs*yy.z, hs*yy.y + hc*yy.z));\n" +
 "    }\n" +
-"    /* the ceiling on how much of the last frame can survive. Unity is the\n" +
-"       old limit and still reads as a trail that settles; past it the band\n" +
-"       stops settling at all and keeps building, which is the point of the\n" +
-"       extra travel on the control. */\n" +
-"    float hcap = min(0.94 + max(u_edgeHold-1.0, 0.0)*0.11, 0.995);\n" +
+"    /* How much of the last frame survives, and the ceiling on it.\n" +
+"       The amount used to be clamped at unity before it reached the blend, so\n" +
+"       the whole top half of the MELT control did nothing at all in the frame\n" +
+"       modes: it only lengthened the edge offset. It drives the blend across\n" +
+"       its whole travel now, and both it and HOLD lift the ceiling as they go\n" +
+"       past one, so the top of the range is a picture made almost entirely of\n" +
+"       its own history \u2014 a trail that never quite settles, which is what a\n" +
+"       feedback loop pointed at itself actually does. */\n" +
+"    float hcap = min(0.90 + max(u_edgeAmt-1.0, 0.0)*0.055\n" +
+"                          + max(u_edgeHold-1.0, 0.0)*0.055, 0.998);\n" +
 "    float mixAmt = (u_meltMode < 0.5) ? (band * u_edgeHold)\n" +
-"                                      : (w * u_edgeHold * min(u_edgeAmt, 1.0));\n" +
+"                  : (u_meltMode > 2.5) ? (w * u_edgeHold)\n" +
+"                                       : (w * u_edgeHold * u_edgeAmt);\n" +
 "    src = mix(src, pv, clamp(mixAmt, 0.0, hcap));\n" +
 "  }\n" +
 "  return src;}\n" +
@@ -2088,6 +2094,61 @@ const FS_MIX = COMMON + KEYFN +
 "    /* CREEP pushes the melt onto the outgoing side, so the shape bleeds into\n" +
 "       the background rather than the background eating into the shape */\n" +
 "    band *= mix(1.0, 1.0 - clamp(m,0.0,1.0), u_edgeCreep);\n" +
+"  }\n" +
+/* The melt as a mixer stage rather than a picture effect. EDGE, FRAME and
+   MOTION all act on the composite once it exists, which makes them read as
+   something the sidebar could have done. These three act on the mix itself:
+   the boundary between the layers, and where each layer is sampled from, are
+   decided by what was on screen a frame ago. So the layers interpenetrate,
+   and because the result feeds the next frame's decision the boundary keeps
+   moving on its own. That is a feedback loop with two pictures in it. */
+"  if(u_meltMode > 2.5 && u_hasPrev > 0.5 && u_edgeAmt > 0.002){\n" +
+"    float amt = clamp(u_edgeAmt, 0.0, 2.0);\n" +
+"    /* both ends of the fader stay honest: with one picture showing there is\n" +
+"       nothing for it to melt into, and the trail alone carries the effect */\n" +
+"    float gt = smoothstep(0.0, 0.10, t) * smoothstep(0.0, 0.10, 1.0-t);\n" +
+"    float ro = u_edgeSwirl * 0.10, zo = 1.0 - u_meltZoom * 0.05;\n" +
+"    vec2 cc = (uv - 0.5) * vec2(outA, 1.0);\n" +
+"    cc = vec2(cos(ro)*cc.x - sin(ro)*cc.y, sin(ro)*cc.x + cos(ro)*cc.y) * zo;\n" +
+"    vec2 puv = clamp(cc / vec2(outA, 1.0) + 0.5, 0.0, 1.0);\n" +
+"    vec3 lwv = vec3(0.299, 0.587, 0.114);\n" +
+"    float pl = dot(texture(u_prev, puv).rgb, lwv);\n" +
+"    float sft = max(0.02, 0.34 - u_edgeWidth*0.30);\n" +
+"    if(u_meltMode < 3.5){\n" +
+"      /* MELD: the last frame is the wipe's contour map. Bright history pulls\n" +
+"         the incoming picture through, dark history holds the outgoing one, so\n" +
+"         islands of each open up inside the other and drift. */\n" +
+"      float mm2 = clamp((m + (pl-0.5)*amt*1.5 - 0.5)/sft + 0.5, 0.0, 1.0);\n" +
+"      m = mix(m, mm2, gt);\n" +
+"    } else if(u_meltMode < 4.5){\n" +
+"      /* DRIP: the same contour read along one direction and taken at its\n" +
+"         brightest, so the melted region runs the way wet paint runs. SWIRL\n" +
+"         turns the direction, MELT sets how far it reaches. */\n" +
+"      float ang = u_edgeSwirl * 6.28318;\n" +
+"      vec2 dir = vec2(sin(ang), -cos(ang));\n" +
+"      float acc = pl;\n" +
+"      for(int i=1;i<=6;i++){\n" +
+"        vec2 su = clamp(puv - dir*(float(i)/6.0)*amt*0.07, 0.0, 1.0);\n" +
+"        acc = max(acc, dot(texture(u_prev, su).rgb, lwv));\n" +
+"      }\n" +
+"      float mm2 = clamp((m + (acc-0.5)*amt*1.7 - 0.5)/sft + 0.5, 0.0, 1.0);\n" +
+"      m = mix(m, mm2, gt);\n" +
+"    } else {\n" +
+"      /* BLEED: neither layer is sampled where it should be. Both are dragged\n" +
+"         along the slope of what is already on screen, in opposite directions,\n" +
+"         so each picture is pulled into the other's shapes and the two smear\n" +
+"         through one another instead of meeting at a line. */\n" +
+"      float r = 0.0025 + u_edgeWidth*0.012;\n" +
+"      vec2 rx = vec2(r/outA, 0.0), ry = vec2(0.0, r);\n" +
+"      vec2 g = vec2(dot(texture(u_prev, clamp(uv+rx,0.0,1.0)).rgb, lwv)\n" +
+"                  - dot(texture(u_prev, clamp(uv-rx,0.0,1.0)).rgb, lwv),\n" +
+"                    dot(texture(u_prev, clamp(uv+ry,0.0,1.0)).rgb, lwv)\n" +
+"                  - dot(texture(u_prev, clamp(uv-ry,0.0,1.0)).rgb, lwv));\n" +
+"      vec2 dsp = g * amt * 0.55;\n" +
+"      a = texture(u_texA, clamp(duv - dsp, 0.0, 1.0)).rgb;\n" +
+"      buv = clamp(buv + dsp, 0.0, 1.0);\n" +
+"      m = clamp(m + (pl-0.5)*amt*0.6*gt, 0.0, 1.0);\n" +
+"    }\n" +
 "  }\n" +
 "  vec2 bd = en * band * u_edgeAmt * 0.055;\n" +
 "  vec3 b = texture(u_texB, clamp(buv + bd, 0.0, 1.0)).rgb;\n" +
@@ -3566,7 +3627,7 @@ const FS_TILE = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v37.1";
+const BENDR_VERSION = "v37.2";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -3624,12 +3685,12 @@ const PDEF = [
   ["pipY","PIP Y","mixer",-1,1,-0.45],
   ["pipSize","PIP SIZE","mixer",0,1,0.35],
   ["pipBorder","PIP BORDER","mixer",0,1,0.12],
-  ["edgeAmt","EDGE MELT","mixer",0,2,0],
-  ["edgeWidth","EDGE WIDTH","mixer",0,2,0.3],
-  ["edgeHold","EDGE HOLD","mixer",0,1.5,0.6],
-  ["edgeSwirl","EDGE SWIRL","mixer",-1,1,0],
-  ["edgeChroma","EDGE CHROMA","mixer",0,1,0.5],
-  ["edgeCreep","EDGE CREEP","mixer",0,1,0.35],
+  ["edgeAmt","MELT","mixer",0,2,0],
+  ["edgeWidth","MELT WIDTH","mixer",0,2,0.3],
+  ["edgeHold","MELT HOLD","mixer",0,1.5,0.6],
+  ["edgeSwirl","MELT SWIRL","mixer",-1,1,0],
+  ["edgeChroma","MELT CHROMA","mixer",0,1,0.5],
+  ["edgeCreep","MELT CREEP","mixer",0,1,0.35],
   ["meltZoom","MELT ZOOM","mixer",-1,1,0.3],
   ["meltHue","MELT HUE","mixer",-1,1,0],
   ["meltSoft","MELT SOFTEN","mixer",0,1,0.35],
@@ -3661,12 +3722,12 @@ const PDEF = [
   ["pipY2","PIP Y","mixer2",-1,1,-0.45],
   ["pipSize2","PIP SIZE","mixer2",0,1,0.35],
   ["pipBorder2","PIP BORDER","mixer2",0,1,0.12],
-  ["edgeAmt2","EDGE MELT","mixer2",0,2,0],
-  ["edgeWidth2","EDGE WIDTH","mixer2",0,2,0.3],
-  ["edgeHold2","EDGE HOLD","mixer2",0,1.5,0.6],
-  ["edgeSwirl2","EDGE SWIRL","mixer2",-1,1,0],
-  ["edgeChroma2","EDGE CHROMA","mixer2",0,1,0.5],
-  ["edgeCreep2","EDGE CREEP","mixer2",0,1,0.35],
+  ["edgeAmt2","MELT","mixer2",0,2,0],
+  ["edgeWidth2","MELT WIDTH","mixer2",0,2,0.3],
+  ["edgeHold2","MELT HOLD","mixer2",0,1.5,0.6],
+  ["edgeSwirl2","MELT SWIRL","mixer2",-1,1,0],
+  ["edgeChroma2","MELT CHROMA","mixer2",0,1,0.5],
+  ["edgeCreep2","MELT CREEP","mixer2",0,1,0.35],
   ["meltZoom2","MELT ZOOM","mixer2",-1,1,0.3],
   ["meltHue2","MELT HUE","mixer2",-1,1,0],
   ["meltSoft2","MELT SOFTEN","mixer2",0,1,0.35],
@@ -3698,12 +3759,12 @@ const PDEF = [
   ["pipYM","PIP Y","mixerM",-1,1,-0.45],
   ["pipSizeM","PIP SIZE","mixerM",0,1,0.35],
   ["pipBorderM","PIP BORDER","mixerM",0,1,0.12],
-  ["edgeAmtM","EDGE MELT","mixerM",0,2,0],
-  ["edgeWidthM","EDGE WIDTH","mixerM",0,2,0.3],
-  ["edgeHoldM","EDGE HOLD","mixerM",0,1.5,0.6],
-  ["edgeSwirlM","EDGE SWIRL","mixerM",-1,1,0],
-  ["edgeChromaM","EDGE CHROMA","mixerM",0,1,0.5],
-  ["edgeCreepM","EDGE CREEP","mixerM",0,1,0.35],
+  ["edgeAmtM","MELT","mixerM",0,2,0],
+  ["edgeWidthM","MELT WIDTH","mixerM",0,2,0.3],
+  ["edgeHoldM","MELT HOLD","mixerM",0,1.5,0.6],
+  ["edgeSwirlM","MELT SWIRL","mixerM",-1,1,0],
+  ["edgeChromaM","MELT CHROMA","mixerM",0,1,0.5],
+  ["edgeCreepM","MELT CREEP","mixerM",0,1,0.35],
   ["meltZoomM","MELT ZOOM","mixerM",-1,1,0.3],
   ["meltHueM","MELT HUE","mixerM",-1,1,0],
   ["meltSoftM","MELT SOFTEN","mixerM",0,1,0.35],
@@ -4076,13 +4137,13 @@ const PHELP = {
   pipY:"Vertical position of the subscreen.",
   pipSize:"How large the subscreen is, from a small inset to most of the frame.",
   pipBorder:"Width of the border drawn around the subscreen. Zero for none.",
-  edgeAmt:"How much of the melt there is. What it melts depends on MELT MODE beside the fader. On EDGE it works only on the seam between the two pictures, which is why it looks dead on a plain dissolve: a dissolve has no seam to stand on. On FRAME the whole picture feeds back through itself, turned and scaled a little on every pass, which is video feedback and trails like it. On MOTION the same trail appears only where the picture is changing, so a still shot stays clean and anything moving drags a tail behind it. The travel past 1.0 is headroom rather than a different behaviour. Zero switches the stage off and costs nothing, including the frame of history it would otherwise keep.",
-  meltZoom:"How much the fed-back picture is scaled on each pass. Positive pulls it inward and the trail runs away into the middle, which is the tunnel; negative pushes it out and the trail grows towards the edges. It is a fraction of a percent per pass, but at sixty passes a second a fraction of a percent is a tunnel. Only does anything on FRAME and MOTION.",
-  meltHue:"How far the colour wheel turns on each pass, so the trail changes hue as it ages. This is where feedback gets its rainbows: the picture is one colour, what it left behind a second ago is another. Small amounts read as a warm or cold wake; large ones cycle. Only does anything on FRAME and MOTION.",
+  edgeAmt:"How much of the melt there is. What it melts depends on MELT MODE beside the fader, and the modes fall into two halves. EDGE, FRAME and MOTION act on the composite once it has been made: EDGE works only on the seam between the two pictures, which is why it looks dead on a plain dissolve, a dissolve having no seam to stand on; FRAME feeds the whole picture back through itself, turned and scaled a little on every pass, which is video feedback and trails like it; MOTION does the same only where the picture is changing, so a still shot stays clean and anything moving drags a tail. MELD, DRIP and BLEED act on the mix instead, and are the ones that let the two layers melt into each other rather than sit one on top of the other. On those three this control sets how far into each other they go, and MELT HOLD sets the trail on its own. The travel past 1.0 is headroom rather than a different behaviour. Zero switches the stage off and costs nothing, including the frame of history it would otherwise keep.",
+  meltZoom:"How much the fed-back picture is scaled on each pass. Positive pulls it inward and the trail runs away into the middle, which is the tunnel; negative pushes it out and the trail grows towards the edges. It is a fraction of a percent per pass, but at sixty passes a second a fraction of a percent is a tunnel. Does nothing on EDGE.",
+  meltHue:"How far the colour wheel turns on each pass, so the trail changes hue as it ages. This is where feedback gets its rainbows: the picture is one colour, what it left behind a second ago is another. Small amounts read as a warm or cold wake; large ones cycle. Does nothing on EDGE.",
   meltSoft:"How much the fed-back picture is blurred on each pass. Without it every copy is as sharp as the last and the trail reads as a stack of ghosts or a strobe; with it they merge into a smear, which is what a long-persistence tube actually does. Costs four extra samples when it is up and nothing when it is down.",
-  edgeWidth:"How far either side of the boundary the melt reaches. Past 1.0 the band is wide enough to swallow most of the frame, which is a look rather than an edge treatment. Small values give a wet-looking rim; large values turn the whole transition into a smear.",
-  edgeHold:"How much of the last frame survives inside the band. This is the persistence that turns a smear into a trail, and above about 0.8 it stops settling and keeps building, which is where it starts to look properly bent. Past 1.0 the ceiling on that survival lifts as well, so it never settles at all for as long as you leave it there.",
-  edgeSwirl:"Turns the drag direction. At zero the melt runs straight out across the boundary; wound fully either way it runs along it instead, so the edge stirs rather than bleeds.",
+  edgeWidth:"On EDGE, how far either side of the boundary the melt reaches: small values give a wet-looking rim, large ones turn the whole transition into a smear. On MELD and DRIP it does something related but not the same, setting how abruptly the layers change over: down at zero the boundary is a hard torn edge, wound up it is a long soft interpenetration. On MOTION it sets how little movement counts as movement, and on BLEED how far apart the picture is sampled to find its slope.",
+  edgeHold:"How much of the last frame survives. This is the persistence that turns a smear into a trail, and above about 0.8 it stops settling and keeps building, which is where it starts to look properly bent. Past 1.0 the ceiling on that survival lifts as well, so it never settles at all for as long as you leave it there. On MELD, DRIP and BLEED this owns the trail by itself, so that MELT is free to mean how far the layers reach into one another: hold low and melt high is two pictures tearing into each other cleanly, both high is that plus a feedback tunnel.",
+  edgeSwirl:"Turns the direction. On EDGE, at zero the melt runs straight out across the boundary and wound fully either way it runs along it instead, so the edge stirs rather than bleeds. On FRAME, MOTION and MELD it is the rotation of the feedback itself, which is what makes the trail spiral rather than sit still. On DRIP it is which way is down: at zero the melt runs down the frame, and it swings all the way round from there.",
   edgeChroma:"Lets colour run further than brightness, the way it does off a composite edge. This is what makes the melt read as analogue rather than as a blur.",
   wipeBord:"Lays a coloured rule along the join, the way a bench mixer's border wipe does. It follows the wipe wherever it goes and disappears when the fader reaches either end.",
   wipeBordCol:"Which of the eight standard back colours the border is drawn in: white, yellow, cyan, green, magenta, red, blue, black, in that order.",
@@ -4550,8 +4611,17 @@ let mixModeM = 0, wipeInvM = false;   // MASTER (bus 1 / bus 2)
    FRAME feeds the whole picture back through itself, moved a little each pass,
    which is video feedback and behaves like it. MOTION does the same but only
    where the picture is changing, so still things stay clean and moving things
-   drag a tail behind them. */
-const MELTMODES = ["EDGE", "FRAME", "MOTION"];
+   drag a tail behind them.
+   Those three all act on the composite after it exists, so they behave like a
+   picture effect that happens to live in the mixer. The last three act on the
+   mix: MELD lets the last frame decide where the boundary between the layers
+   runs, so each opens islands inside the other; DRIP does the same but reads
+   the history along one direction, so the melted region runs downward the way
+   wet paint runs; BLEED drags the two layers along the slope of what is
+   already on screen, in opposite directions, so they smear through each other
+   rather than meeting at a line. All three feed their own result back, which
+   is what keeps the boundary moving once it has started. */
+const MELTMODES = ["EDGE", "FRAME", "MOTION", "MELD", "DRIP", "BLEED"];
 let meltMode = 0, meltMode2 = 0, meltModeM = 0;
 /* transition, mix type and key are three independent choices per bus */
 let mixBlend = 0, mixBlend2 = 0, mixBlendM = 0;
@@ -5456,8 +5526,13 @@ function applyParams(dt){
   if(secBypassOn){
     for(const p of PLIST){
       if(!secBypass[p.sec]) continue;
-      if(p.master){ mCur[p.id] = p.def; curTouched.add("M:"+p.id); }
-      else for(const ch of CHANNELS){ chanCur[ch][p.id] = p.def; curTouched.add(ch+":"+p.id); }
+      /* the three bus faders live in the transition sections but are not part
+         of the transition: slamming a fader is not a bypass, it is a cut */
+      if(STRIP_PARAMS.has(p.id)) continue;
+      const nz = SEC_NEUTRAL[p.sec];
+      const v = (nz && nz[p.id] !== undefined) ? nz[p.id] : p.def;
+      if(p.master){ mCur[p.id] = v; curTouched.add("M:"+p.id); }
+      else for(const ch of CHANNELS){ chanCur[ch][p.id] = v; curTouched.add(ch+":"+p.id); }
     }
   }
 
@@ -6025,6 +6100,26 @@ function setActiveChan(ch){
    detail (softness, wipe geometry, key) stays in the sidebar, where it is
    setup rather than performance. */
 const STRIP_PARAMS = new Set(["abMix","cdMix","busMix"]);
+/* The eye used to appear only on sections that belong to a reorderable chain
+   stage, which left a third of the sidebar and the whole dock without one for
+   no reason a user could see. Switching a section out is a general idea: hold
+   every control in it at the value that means "nobody has touched this" and
+   the stage stops having an effect, whatever stage it is. Two sections are
+   left off the list and it is not an oversight. PATTERN SYNTH is a source
+   rather than a stage, so there is nothing underneath it to fall through to,
+   and PRESET MORPH is a tool that moves other controls rather than a thing in
+   the signal path. */
+const BYPASS_SECS = new Set(["mixer","mixer2","mixerM","frame","time","feedback",
+                             "keyer","field","codec","crt","overlay"]);
+/* For most sections the default IS the neutral, because an effect defaults to
+   an amount of zero and everything else in it is only a shape. The display is
+   the exception: it ships with a tube already on, so its defaults are a look
+   rather than an absence of one, and a bypass that restored them would be a
+   bypass that did nothing. These are the values that mean no tube. */
+const SEC_NEUTRAL = {
+  crt: {scanlines:0, aperture:0, curvature:0, cornerRound:0, vignette:0, bloomRad:0.4}
+};
+function sectionCanBypass(id){ return !!stageOfSection(id) || BYPASS_SECS.has(id); }
 function buildMixStrip(){
   const host = document.getElementById("mixbuses");
   if(!host) return;
@@ -6106,8 +6201,8 @@ function buildMixStrip(){
     const ml = document.createElement("select");
     ml.id = "selMelt"+bus.key;
     attachTip(ml, "MELT MODE",
-      "What the MELT control does. EDGE treats the seam between the two pictures as a feedback region and leaves everything else alone, which is why it looks dead on a plain dissolve: a dissolve has no seam to stand on. FRAME feeds the whole picture back through itself, turned and scaled a little each pass, which is video feedback and trails like it. MOTION does the same but only where the picture is changing, so a still shot stays clean and anything moving drags a tail.",
-      "ZOOM, HUE and SOFTEN on the MIX tab shape the trail; SWIRL turns it and HOLD decides how long it lasts.");
+      "What the MELT control does. The first three act on the composite once it exists. EDGE treats the seam between the two pictures as a feedback region and leaves everything else alone, which is why it looks dead on a plain dissolve: a dissolve has no seam to stand on. FRAME feeds the whole picture back through itself, turned and scaled a little each pass, which is video feedback and trails like it. MOTION does the same but only where the picture is changing. The last three act on the mix itself, and are the ones that melt the layers into each other: MELD lets the last frame decide where the boundary between them runs, so each opens islands inside the other and they drift; DRIP reads that history along one direction so the melted region runs, the way wet paint runs; BLEED drags the two layers along the slope of what is already on screen, in opposite directions, so they smear through one another instead of meeting at a line.",
+      "The last three need the fader off both ends to have two layers to work with. ZOOM, HUE and SOFTEN on the MIX tab shape the trail; SWIRL turns it, and on MELD, DRIP and BLEED it is HOLD alone that sets how long the trail lasts.");
     MELTMODES.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent="MELT: "+m; ml.appendChild(o); });
     ml.value = bus.getMelt();
     ml.onchange = ()=>{ bus.setMelt(parseInt(ml.value)); };
@@ -6290,7 +6385,7 @@ function initHelpUI(){
 function buildFilterBar(){
   const bar = document.createElement("div"); bar.id = "pfilter";
   const inp = document.createElement("input");
-  inp.type = "text"; inp.id = "pfilterInput"; inp.placeholder = "FILTER  \u2014  press /";
+  inp.type = "text"; inp.id = "pfilterInput"; inp.placeholder = "NARROW THIS PANEL";
   inp.spellcheck = false;
   const mk = (label, tip)=>{
     const b = document.createElement("button"); b.className = "fchip"; b.textContent = label;
@@ -6303,6 +6398,18 @@ function buildFilterBar(){
   const clr = document.createElement("button"); clr.className = "fchip"; clr.textContent = "\u2715";
   attachTip(clr, "CLEAR FILTER", "Back to the whole panel. Escape does the same.");
   clr.onclick = ()=>{ inp.value = ""; cMod.classList.remove("on"); cChg.classList.remove("on"); applyFilter(); };
+  window.__clearFilter = ()=>{ inp.value = ""; cMod.classList.remove("on"); cChg.classList.remove("on"); applyFilter(); };
+  {
+    /* the panel filter hides rows in front of you; this one goes and gets a
+       control from wherever it lives, including the tabs this panel cannot see */
+    const find = document.createElement("button");
+    find.id = "pfilterFind"; find.textContent = "FIND \u2026";
+    attachTip(find, "FIND A PARAMETER",
+      "Searches all four hundred and thirteen controls by name, by section, and by what the help says they do, then takes you to the one you pick \u2014 opening the right tab and section on the way. Keyboard: /",
+      "The box beside it does something different: it narrows the panel you are already looking at.");
+    find.onclick = ()=>openParamJump();
+    bar.appendChild(find);
+  }
   const count = document.createElement("span"); count.id = "pfilterCount";
   inp.addEventListener("input", ()=>applyFilter());
   inp.addEventListener("keydown", e=>{
@@ -6322,7 +6429,12 @@ function buildFilterBar(){
     let shown = 0;
     for(const p of PLIST){
       const r = uiRefs[p.id];
-      if(!r || !r.row || !r.row.closest("#panel")) continue;
+      /* This used to skip anything that was not inside #panel, which quietly
+         excluded every parameter living on a dock tab: the three transition
+         sections, the CRT, the overlay, the interlace and codec stages and the
+         morph. Searching for "melt" found nothing, because the melt controls
+         are on the MIX tab. Everything with a row is searchable now. */
+      if(!r || !r.row) continue;
       let ok = true;
       if(q) ok = p.name.toLowerCase().indexOf(q) >= 0
               || p.sec.toLowerCase().indexOf(q) >= 0
@@ -6334,7 +6446,7 @@ function buildFilterBar(){
     }
     for(const id in secEls){
       const d = secEls[id];
-      if(!d.closest || !d.closest("#panel")) continue;
+      if(!d.closest) continue;
       /* a section that does not belong to this channel's source stays hidden
          whatever the filter says */
       if(d.classList.contains("srcoff")){ d.style.display = "none"; continue; }
@@ -6390,10 +6502,10 @@ function buildPanel(){
        pill used to be the only way, it was silent, and a bypassed pill looked
        almost exactly like the three that are not controls at all. */
     const stg = stageOfSection(sec.id);
-    if(stg){
+    if(stg || BYPASS_SECS.has(sec.id)){
       const by = document.createElement("button");
       by.className = "secbypass";
-      by.dataset.stage = stg;
+      if(stg) by.dataset.stage = stg;
       by.dataset.sec = sec.id;
       attachTip(by, "SWITCH THIS SECTION OUT",
         "Takes this section out of the signal path and nothing else, on every channel. Its controls keep their values and stop having any effect, so shutting the eye and opening it again puts you back exactly where you were.",
@@ -8039,14 +8151,37 @@ function focusModSource(id){
 function focusParam(pid){
   const r = uiRefs[pid], p = P[pid];
   if(!r || !p) return;
-  /* the mixer faders live on the strip and the transition detail on the MIX tab */
+  /* the mixer faders live on the strip, and everything else that is not in the
+     sidebar is on one dock tab or another. Work it out from the section's zone
+     rather than from a list of three section names that went stale the moment
+     anything else moved into the dock. */
   if(STRIP_PARAMS.has(pid)) document.body.classList.remove("nomix");
-  else if(p.sec === "mixer" || p.sec === "mixer2" || p.sec === "mixerM") setDock("mix");
+  else {
+    const sd = SECTIONS.find(x=>x.id === p.sec);
+    const tab = sd ? {mix:"mix", outdock:"out", perform:"perform"}[sd.zone] : null;
+    if(tab) setDock(tab);
+  }
+  /* a filter left running can be hiding the very row being jumped to */
+  if(filterOn && typeof window.__clearFilter === "function") window.__clearFilter();
   const sec = secEls[p.sec];
   if(sec) sec.classList.remove("collapsed");
   r.row.scrollIntoView({block:"center", behavior:"smooth"});
   flashEl(r.row);
 }
+/* Finding a control among four hundred and thirteen of them, spread across a
+   sidebar and four dock tabs, was a matter of knowing where it lived. The
+   filter narrows the panel you are looking at; this finds the thing wherever it
+   is and takes you to it, opening the right tab and section on the way. Same
+   picker the modulation matrix uses, so it searches names, section names and
+   the help text, and shows what a control does before you commit to it. */
+function openParamJump(){
+  openParamPicker(null, pid=>{
+    focusParam(pid);
+    const p = P[pid];
+    if(p) toast(p.name + "  \u00b7  " + secLabel(p.sec));
+  }, "FIND A PARAMETER");
+}
+window.__findParam = openParamJump;
 function addRoute(srcId, dstId){
   routes.push({src:srcId, dst:dstId, amt:0.3,
     ch:(P[dstId] && P[dstId].master) ? "A" : activeChan, inv:false, curve:0});
@@ -8492,6 +8627,9 @@ for(const [name, base, tog] of OUTP) PRESETS.push([name, base, [], tog]);
 
 PRESETS.push(["MELT · TUNNEL", {"chan": {"A": {"genFreqX": 0.22, "genFreqY": 0.13, "genRate": 0.05, "genHue": 0.55, "genSpread": 1.5, "genSat": 0.95, "saturation": 1.2, "glow": 0.3, "chromaBleed": 0.3}}, "master": {"abMix": 0, "edgeAmt": 1.0, "edgeHold": 0.94, "meltZoom": 0.85, "edgeSwirl": 0.12, "meltHue": 0.18, "meltSoft": 0.35, "edgeChroma": 0.45, "scanlines": 0.22, "curvature": 0.3, "vignette": 0.4, "bloom": 0.3, "halation": 0.25, "phosphor": 0.4}, "routes": [], "mixMode": 0, "meltMode": 1, "meltMode2": 0, "meltModeM": 0, "mixBlend": 0, "mixKey": 0, "wipeInv": false, "activeChan": "A", "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}}, "genMode": {"A": {"shape": 2, "wave": 0, "col": 2}}}, null]);
 PRESETS.push(["MELT · COMET TRAILS", {"chan": {"A": {"genFreqX": 0.4, "genFreqY": 0.28, "genRate": 0.55, "genFM": 0.6, "genHue": 0.08, "genSpread": 1.7, "saturation": 1.35, "glow": 0.4}}, "master": {"abMix": 0, "edgeAmt": 1.0, "edgeHold": 0.9, "edgeWidth": 0.25, "meltZoom": 0.3, "edgeSwirl": -0.3, "meltHue": 0.5, "meltSoft": 0.6, "edgeChroma": 0.6, "scanlines": 0.28, "curvature": 0.26, "vignette": 0.42, "bloom": 0.35, "halation": 0.3}, "routes": [], "mixMode": 0, "meltMode": 2, "meltMode2": 0, "meltModeM": 0, "mixBlend": 0, "mixKey": 0, "wipeInv": false, "activeChan": "A", "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}}, "genMode": {"A": {"shape": 2, "wave": 0, "col": 2}}}, null]);
+PRESETS.push(["MELT \u00b7 LAYERS MELD", {"chan": {"A": {"genFreqX": 0.26, "genFreqY": 0.09, "genRate": 0.07, "genHue": 0.02, "genSpread": 0.5, "genSat": 0.95, "saturation": 1.2}, "B": {"genFreqX": 0.11, "genFreqY": 0.31, "genRate": -0.05, "genHue": 0.58, "genSpread": 0.6, "genSat": 0.95, "saturation": 1.2}}, "master": {"abMix": 0.5, "edgeAmt": 1.5, "edgeHold": 0.72, "edgeWidth": 0.55, "meltZoom": 0.25, "edgeSwirl": 0.06, "meltHue": 0.12, "meltSoft": 0.4, "edgeChroma": 0.5, "scanlines": 0.2, "curvature": 0.3, "vignette": 0.4, "bloom": 0.3, "halation": 0.25}, "routes": [], "mixMode": 0, "meltMode": 3, "meltMode2": 0, "meltModeM": 0, "mixBlend": 0, "mixKey": 0, "wipeInv": false, "activeChan": "A", "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}}, "genMode": {"A": {"shape": 2, "wave": 0, "col": 2}, "B": {"shape": 4, "wave": 1, "col": 2}}}, null]);
+PRESETS.push(["MELT \u00b7 WET PAINT", {"chan": {"A": {"genFreqX": 0.3, "genFreqY": 0.05, "genRate": 0.03, "genHue": 0.12, "genSpread": 0.4, "genSat": 1.0, "genBright": 1.1}, "B": {"genFreqX": 0.07, "genFreqY": 0.22, "genRate": 0.09, "genHue": 0.72, "genSpread": 0.8, "genSat": 1.0}}, "master": {"abMix": 0.45, "edgeAmt": 1.8, "edgeHold": 0.86, "edgeWidth": 0.15, "meltZoom": 0.1, "edgeSwirl": 0.0, "meltHue": -0.2, "meltSoft": 0.55, "edgeChroma": 0.65, "scanlines": 0.24, "curvature": 0.28, "vignette": 0.45, "bloom": 0.35, "halation": 0.3, "phosphor": 0.3}, "routes": [], "mixMode": 0, "meltMode": 4, "meltMode2": 0, "meltModeM": 0, "mixBlend": 0, "mixKey": 0, "wipeInv": false, "activeChan": "A", "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}}, "genMode": {"A": {"shape": 1, "wave": 0, "col": 2}, "B": {"shape": 3, "wave": 2, "col": 2}}}, null]);
+PRESETS.push(["MELT \u00b7 BLEED THROUGH", {"chan": {"A": {"genFreqX": 0.18, "genFreqY": 0.18, "genRate": 0.12, "genFM": 0.4, "genHue": 0.45, "genSpread": 1.2, "genSat": 0.9}, "B": {"genFreqX": 0.42, "genFreqY": 0.06, "genRate": -0.08, "genHue": 0.05, "genSpread": 0.9, "genSat": 1.0}}, "master": {"abMix": 0.5, "edgeAmt": 2.0, "edgeHold": 0.62, "edgeWidth": 1.1, "meltZoom": 0.5, "edgeSwirl": -0.18, "meltHue": 0.3, "meltSoft": 0.3, "edgeChroma": 0.55, "scanlines": 0.18, "curvature": 0.26, "vignette": 0.38, "bloom": 0.4, "defocus": 0.12}, "routes": [], "mixMode": 0, "meltMode": 5, "meltMode2": 0, "meltModeM": 0, "mixBlend": 0, "mixKey": 0, "wipeInv": false, "activeChan": "A", "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}}, "genMode": {"A": {"shape": 5, "wave": 1, "col": 2}, "B": {"shape": 2, "wave": 0, "col": 2}}}, null]);
 PRESETS.push(["MELT \u00b7 CIRCLE BLEED", {"chan": {"A": {"genFreqX": 0.09, "genFreqY": 0.06, "genRate": 0.05, "genHue": 0.08, "genSpread": 1.2, "genSat": 0.85, "chromaBleed": 0.35, "saturation": 1.15, "glow": 0.35}, "B": {"genFreqX": 0.34, "genFreqY": 0.2, "genRate": 0.09, "genFM": 0.55, "genHue": 0.62, "genSpread": 1.5, "contour": 0.35, "contourBands": 8, "chromaBleed": 0.5, "chromaDelay": 0.2, "saturation": 1.3, "glow": 0.4}}, "master": {"abMix": 0.52, "wipeSoft": 0.06, "edgeAmt": 0.62, "edgeHold": 0.86, "edgeSwirl": 0.25, "edgeChroma": 0.65, "edgeCreep": 0.7, "scanlines": 0.28, "curvature": 0.28, "bloom": 0.25, "halation": 0.2}, "routes": [{"ch": "A", "src": "lfo1", "dst": "wipeX", "amt": 0.35}, {"ch": "A", "src": "lfo3", "dst": "edgeSwirl", "amt": 0.5}, {"ch": "A", "src": "lfo2", "dst": "abMix", "amt": 0.12}], "audioCfg": {"bass": {"lo": 30, "hi": 150, "gain": 1}, "mid": {"lo": 300, "hi": 2200, "gain": 1}, "high": {"lo": 4000, "hi": 11000, "gain": 1}, "response": 0.5}, "fbTrailMode": false, "rescanMode": false, "keyChroma": false, "mixMode": 5, "edgeMode": 0, "wipeInv": false, "activeChan": "A", "linkChans": false, "mixMode2": 0, "wipeInv2": false, "mixModeM": 0, "wipeInvM": false, "mixBlend": 0, "mixBlend2": 0, "mixBlendM": 0, "mixKey": 0, "mixKey2": 0, "mixKeyM": 0, "fbWrap": 0, "fbMirror": 0, "fbBlend": 0, "fbNL": 0, "fbInvert": false, "fbTap": 0, "outModel": 0, "fieldSrc": 0, "flowField": 0, "flowEdge": 0, "chainOrder": ["sig", "col", "glitch", "lab", "flow"], "stageEnabled": {"sig": true, "col": true, "glitch": true, "lab": true, "flow": true}, "busSrc": {"b1": ["A", "B"], "b2": ["C", "D"]}, "genMode": {"A": {"shape": 1, "wave": 0, "col": 2}, "B": {"shape": 2, "wave": 2, "col": 1}, "C": {"shape": 0, "wave": 0, "col": 1}, "D": {"shape": 0, "wave": 0, "col": 1}}, "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "C": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}, "D": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}}, "srcText": {"A": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "B": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "C": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "D": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}}, "mods": [{"id": "lfo1", "type": "lfo", "name": "LFO 1", "rate": 0.05, "shape": "sine", "phase": 0.46354626282197164, "snh": 0, "sync": 0}, {"id": "lfo2", "type": "lfo", "name": "LFO 2", "rate": 0.11, "shape": "tri", "phase": 0.9169826661389351, "snh": 0, "sync": 0}, {"id": "lfo3", "type": "lfo", "name": "LFO 3", "rate": 0.037, "shape": "sine2", "phase": 0.4304286177016956, "snh": 0, "sync": 0}, {"id": "lfo4", "type": "lfo", "name": "LFO 4", "rate": 5.495408738576246, "shape": "sine", "phase": 0.055445735688429365, "snh": 0, "sync": 0}, {"id": "lfo5", "type": "lfo", "name": "LFO 5", "rate": 0.016982436524617443, "shape": "tri", "phase": 0.0670557549083246, "snh": 0, "sync": 0}, {"id": "lfo6", "type": "lfo", "name": "LFO 6", "rate": 0.8912509381337456, "shape": "saw", "phase": 0.5590496733908549, "snh": 0, "sync": 0}, {"id": "lfo7", "type": "lfo", "name": "LFO 7", "rate": 3.0902954325135905, "shape": "sqr", "phase": 0.08658904215108909, "snh": 0, "sync": 0}, {"id": "lfo8", "type": "lfo", "name": "LFO 8", "rate": 0.1288249551693134, "shape": "drift", "phase": 0.38726246081341276, "snh": 0, "sync": 0}]}, null]);
 
 PRESETS.push(["DIRTY MIXER \u00b7 CROSSBAR FAULT", {"chan": {"A": {"genFreqX": 0.14, "genFreqY": 0.07, "genHue": 0.12, "genSpread": 1.25, "chromaBleed": 0.55, "chromaDelay": 0.3, "rainbow": 0.25, "saturation": 1.2, "glow": 0.3}, "B": {"genFreqX": 0.3, "genFreqY": 0.22, "genHue": 0.62, "genBands": 7, "contour": 0.3, "saturation": 1.25}}, "master": {"abMix": 0.5, "wipeSoft": 0.05, "edgeAmt": 0.3, "edgeWidth": 0.22, "edgeHold": 0.7, "edgeCreep": 0.5, "wipeBord": 0.3, "wipeBordCol": 0.14, "mixDirt": 0.7, "mixDirtRate": 0.45, "mixDirtDrop": 0.8, "mixDirtCut": 0.55, "mixDirtKnock": 0.7, "mixDirtNoise": 0.5, "scanlines": 0.32, "vignette": 0.4, "bloom": 0.3, "halation": 0.25, "grain": 0.2, "lensCA": 0.3, "lightLeak": 0.2, "osdShow": 0.9, "osdGlow": 0.6}, "routes": [{"ch": "A", "src": "lfo1", "dst": "abMix", "amt": 0.45}, {"ch": "A", "src": "lfo4", "dst": "mixDirt", "amt": 0.3}], "audioCfg": {"bass": {"lo": 30, "hi": 150, "gain": 1}, "mid": {"lo": 300, "hi": 2200, "gain": 1}, "high": {"lo": 4000, "hi": 11000, "gain": 1}, "response": 0.5}, "fbTrailMode": false, "rescanMode": false, "keyChroma": false, "mixMode": 1, "edgeMode": 0, "wipeInv": false, "activeChan": "A", "linkChans": false, "mixMode2": 0, "wipeInv2": false, "mixModeM": 0, "wipeInvM": false, "mixBlend": 2, "mixBlend2": 0, "mixBlendM": 0, "mixKey": 0, "mixKey2": 0, "mixKeyM": 0, "fbWrap": 0, "fbMirror": 0, "fbBlend": 0, "fbNL": 0, "fbInvert": false, "fbTap": 0, "outModel": 0, "osdMode": 0, "osdDate": 2, "fieldSrc": 0, "flowField": 0, "flowEdge": 0, "chainOrder": ["sig", "col", "glitch", "lab", "flow"], "stageEnabled": {"sig": true, "col": true, "glitch": true, "lab": true, "flow": true}, "busSrc": {"b1": ["A", "B"], "b2": ["C", "D"]}, "genMode": {"A": {"shape": 0, "wave": 0, "col": 2}, "B": {"shape": 7, "wave": 3, "col": 4}, "C": {"shape": 0, "wave": 0, "col": 1}, "D": {"shape": 0, "wave": 0, "col": 1}}, "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "C": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}, "D": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}}, "srcText": {"A": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "B": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "C": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "D": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}}, "mods": [{"id": "lfo1", "type": "lfo", "name": "LFO 1", "rate": 0.06, "shape": "tri", "phase": 0.8253412995992825, "snh": 0, "sync": 0}, {"id": "lfo2", "type": "lfo", "name": "LFO 2", "rate": 1.6982436524617444, "shape": "snh", "phase": 0.12453162469815826, "snh": 0, "sync": 0}, {"id": "lfo3", "type": "lfo", "name": "LFO 3", "rate": 0.0707945784384138, "shape": "tri", "phase": 0.9578821927416256, "snh": 0, "sync": 0}, {"id": "lfo4", "type": "lfo", "name": "LFO 4", "rate": 0.13, "shape": "snh", "phase": 0.32377943033823176, "snh": 0, "sync": 0}, {"id": "lfo5", "type": "lfo", "name": "LFO 5", "rate": 0.016982436524617443, "shape": "tri", "phase": 0.6386992951546443, "snh": 0, "sync": 0}, {"id": "lfo6", "type": "lfo", "name": "LFO 6", "rate": 0.8912509381337456, "shape": "saw", "phase": 0.27703329526621123, "snh": 0, "sync": 0}, {"id": "lfo7", "type": "lfo", "name": "LFO 7", "rate": 3.0902954325135905, "shape": "sqr", "phase": 0.18160376469231443, "snh": 0, "sync": 0}, {"id": "lfo8", "type": "lfo", "name": "LFO 8", "rate": 0.1288249551693134, "shape": "drift", "phase": 0.2055807543055579, "snh": 0, "sync": 0}]}, null]);
@@ -8981,7 +9119,7 @@ function resetGlobals(){
      all on a single source, which is where most patches sit. Defaulting to it
      meant turning MELT up and watching nothing happen, which is exactly the
      complaint the modes were built to answer. */
-  meltMode = meltMode2 = meltModeM = 1;
+  meltMode = meltMode2 = meltModeM = 3;
   stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true, scan:true, dct:true, tdisp:true};
   scanRevH = false; scanRevV = false; syncLatch = false; fbNoServo = false;
   ilMode = 0; ilOrder = false; moshRecycle = false;
@@ -10647,7 +10785,10 @@ window.addEventListener("keydown", e=>{
   if(k==="s"){ document.getElementById("btnSnap").click(); return; }
   if(k==="h"){ if(help.classList.contains("show")) help.classList.remove("show"); else window.__openHelp(); return; }
   if(e.key === "Escape" && help.classList.contains("show")){ help.classList.remove("show"); return; }
-  if(k==="/"){ e.preventDefault(); if(window.__focusFilter) window.__focusFilter(); return; }
+  /* / used to focus the panel filter, which only ever searched the panel. It
+     opens the search that finds anything, anywhere; the filter box is still
+     there to narrow what is in front of you. */
+  if(k==="/"){ e.preventDefault(); if(window.__findParam) window.__findParam(); else if(window.__focusFilter) window.__focusFilter(); return; }
   if(k==="d"){ setDock(dockTab==="mod" ? "matrix" : "mod"); return; }
   if(k==="p"){ btnPlay.click(); return; }
   if(k==="b"){ if(!e.repeat) setBypass(true); return; }
@@ -11672,18 +11813,26 @@ function renderFrame(now, dt){
     draw();
   }
   let p1 = null, p2t = null, pM = null;
+  /* A transition section switched out at the eye has to lose its mode choices
+     as well as its numbers: the transition, the blend, the key and the melt
+     are selects rather than parameters, so holding the parameters at neutral
+     would leave a wipe wiping and a key keying with nothing to show for it. */
+  const byp1 = !!secBypass["mixer"], byp2 = !!secBypass["mixer2"], bypM = !!secBypass["mixerM"];
+  const mMode1 = byp1 ? 0 : mixMode,  mBl1 = byp1 ? 0 : mixBlend,  mKy1 = byp1 ? 0 : mixKey,  mMl1 = byp1 ? 0 : meltMode;
+  const mMode2 = byp2 ? 0 : mixMode2, mBl2 = byp2 ? 0 : mixBlend2, mKy2 = byp2 ? 0 : mixKey2, mMl2 = byp2 ? 0 : meltMode2;
+  const mModeM = bypM ? 0 : mixModeM, mBlM = bypM ? 0 : mixBlendM, mKyM = bypM ? 0 : mixKeyM, mMlM = bypM ? 0 : meltModeM;
   if(masterLive){
     ensureShared("busOut1"); ensureShared("busOut2");
     if(edgeLive(MIXBUS.b1)){ ensureShared("busHist1"); const t = busOut1; busOut1 = busHist1; busHist1 = t; p1 = busHist1.tex; }
     if(edgeLive(MIXBUS.b2)){ ensureShared("busHist2"); const t = busOut2; busOut2 = busHist2; busHist2 = t; p2t = busHist2.tex; }
     if(edgeLive(MIXBUS.bM)){ ensureShared("mixHist"); const t = mixOut; mixOut = mixHist; mixHist = t; pM = mixHist.tex; }
-    mixPass(busOut1, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv, mixBlend, mixKey, p1, meltMode);
-    mixPass(busOut2, chanOutTex(b2[0]), chanOutTex(b2[1]), live[b2[1]], MIXBUS.b2, mixMode2, wipeInv2, mixBlend2, mixKey2, p2t, meltMode2);
-    mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mixModeM, wipeInvM, mixBlendM, mixKeyM, pM, meltModeM);
+    mixPass(busOut1, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mMode1, wipeInv, mBl1, mKy1, p1, mMl1);
+    mixPass(busOut2, chanOutTex(b2[0]), chanOutTex(b2[1]), live[b2[1]], MIXBUS.b2, mMode2, wipeInv2, mBl2, mKy2, p2t, mMl2);
+    mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mModeM, wipeInvM, mBlM, mKyM, pM, mMlM);
   } else {
     /* nothing on bus 2, so bus 1 goes straight to master and costs one pass, as before */
     if(edgeLive(MIXBUS.b1)){ ensureShared("mixHist"); const t = mixOut; mixOut = mixHist; mixHist = t; p1 = mixHist.tex; }
-    mixPass(mixOut, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv, mixBlend, mixKey, p1, meltMode);
+    mixPass(mixOut, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mMode1, wipeInv, mBl1, mKy1, p1, mMl1);
   }
 
   if(multiView){

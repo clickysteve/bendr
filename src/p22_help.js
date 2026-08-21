@@ -18,13 +18,13 @@ const PHELP = {
   pipY:"Vertical position of the subscreen.",
   pipSize:"How large the subscreen is, from a small inset to most of the frame.",
   pipBorder:"Width of the border drawn around the subscreen. Zero for none.",
-  edgeAmt:"How much of the melt there is. What it melts depends on MELT MODE beside the fader. On EDGE it works only on the seam between the two pictures, which is why it looks dead on a plain dissolve: a dissolve has no seam to stand on. On FRAME the whole picture feeds back through itself, turned and scaled a little on every pass, which is video feedback and trails like it. On MOTION the same trail appears only where the picture is changing, so a still shot stays clean and anything moving drags a tail behind it. The travel past 1.0 is headroom rather than a different behaviour. Zero switches the stage off and costs nothing, including the frame of history it would otherwise keep.",
-  meltZoom:"How much the fed-back picture is scaled on each pass. Positive pulls it inward and the trail runs away into the middle, which is the tunnel; negative pushes it out and the trail grows towards the edges. It is a fraction of a percent per pass, but at sixty passes a second a fraction of a percent is a tunnel. Only does anything on FRAME and MOTION.",
-  meltHue:"How far the colour wheel turns on each pass, so the trail changes hue as it ages. This is where feedback gets its rainbows: the picture is one colour, what it left behind a second ago is another. Small amounts read as a warm or cold wake; large ones cycle. Only does anything on FRAME and MOTION.",
+  edgeAmt:"How much of the melt there is. What it melts depends on MELT MODE beside the fader, and the modes fall into two halves. EDGE, FRAME and MOTION act on the composite once it has been made: EDGE works only on the seam between the two pictures, which is why it looks dead on a plain dissolve, a dissolve having no seam to stand on; FRAME feeds the whole picture back through itself, turned and scaled a little on every pass, which is video feedback and trails like it; MOTION does the same only where the picture is changing, so a still shot stays clean and anything moving drags a tail. MELD, DRIP and BLEED act on the mix instead, and are the ones that let the two layers melt into each other rather than sit one on top of the other. On those three this control sets how far into each other they go, and MELT HOLD sets the trail on its own. The travel past 1.0 is headroom rather than a different behaviour. Zero switches the stage off and costs nothing, including the frame of history it would otherwise keep.",
+  meltZoom:"How much the fed-back picture is scaled on each pass. Positive pulls it inward and the trail runs away into the middle, which is the tunnel; negative pushes it out and the trail grows towards the edges. It is a fraction of a percent per pass, but at sixty passes a second a fraction of a percent is a tunnel. Does nothing on EDGE.",
+  meltHue:"How far the colour wheel turns on each pass, so the trail changes hue as it ages. This is where feedback gets its rainbows: the picture is one colour, what it left behind a second ago is another. Small amounts read as a warm or cold wake; large ones cycle. Does nothing on EDGE.",
   meltSoft:"How much the fed-back picture is blurred on each pass. Without it every copy is as sharp as the last and the trail reads as a stack of ghosts or a strobe; with it they merge into a smear, which is what a long-persistence tube actually does. Costs four extra samples when it is up and nothing when it is down.",
-  edgeWidth:"How far either side of the boundary the melt reaches. Past 1.0 the band is wide enough to swallow most of the frame, which is a look rather than an edge treatment. Small values give a wet-looking rim; large values turn the whole transition into a smear.",
-  edgeHold:"How much of the last frame survives inside the band. This is the persistence that turns a smear into a trail, and above about 0.8 it stops settling and keeps building, which is where it starts to look properly bent. Past 1.0 the ceiling on that survival lifts as well, so it never settles at all for as long as you leave it there.",
-  edgeSwirl:"Turns the drag direction. At zero the melt runs straight out across the boundary; wound fully either way it runs along it instead, so the edge stirs rather than bleeds.",
+  edgeWidth:"On EDGE, how far either side of the boundary the melt reaches: small values give a wet-looking rim, large ones turn the whole transition into a smear. On MELD and DRIP it does something related but not the same, setting how abruptly the layers change over: down at zero the boundary is a hard torn edge, wound up it is a long soft interpenetration. On MOTION it sets how little movement counts as movement, and on BLEED how far apart the picture is sampled to find its slope.",
+  edgeHold:"How much of the last frame survives. This is the persistence that turns a smear into a trail, and above about 0.8 it stops settling and keeps building, which is where it starts to look properly bent. Past 1.0 the ceiling on that survival lifts as well, so it never settles at all for as long as you leave it there. On MELD, DRIP and BLEED this owns the trail by itself, so that MELT is free to mean how far the layers reach into one another: hold low and melt high is two pictures tearing into each other cleanly, both high is that plus a feedback tunnel.",
+  edgeSwirl:"Turns the direction. On EDGE, at zero the melt runs straight out across the boundary and wound fully either way it runs along it instead, so the edge stirs rather than bleeds. On FRAME, MOTION and MELD it is the rotation of the feedback itself, which is what makes the trail spiral rather than sit still. On DRIP it is which way is down: at zero the melt runs down the frame, and it swings all the way round from there.",
   edgeChroma:"Lets colour run further than brightness, the way it does off a composite edge. This is what makes the melt read as analogue rather than as a blur.",
   wipeBord:"Lays a coloured rule along the join, the way a bench mixer's border wipe does. It follows the wipe wherever it goes and disappears when the fader reaches either end.",
   wipeBordCol:"Which of the eight standard back colours the border is drawn in: white, yellow, cyan, green, magenta, red, blue, black, in that order.",
@@ -492,8 +492,17 @@ let mixModeM = 0, wipeInvM = false;   // MASTER (bus 1 / bus 2)
    FRAME feeds the whole picture back through itself, moved a little each pass,
    which is video feedback and behaves like it. MOTION does the same but only
    where the picture is changing, so still things stay clean and moving things
-   drag a tail behind them. */
-const MELTMODES = ["EDGE", "FRAME", "MOTION"];
+   drag a tail behind them.
+   Those three all act on the composite after it exists, so they behave like a
+   picture effect that happens to live in the mixer. The last three act on the
+   mix: MELD lets the last frame decide where the boundary between the layers
+   runs, so each opens islands inside the other; DRIP does the same but reads
+   the history along one direction, so the melted region runs downward the way
+   wet paint runs; BLEED drags the two layers along the slope of what is
+   already on screen, in opposite directions, so they smear through each other
+   rather than meeting at a line. All three feed their own result back, which
+   is what keeps the boundary moving once it has started. */
+const MELTMODES = ["EDGE", "FRAME", "MOTION", "MELD", "DRIP", "BLEED"];
 let meltMode = 0, meltMode2 = 0, meltModeM = 0;
 /* transition, mix type and key are three independent choices per bus */
 let mixBlend = 0, mixBlend2 = 0, mixBlendM = 0;

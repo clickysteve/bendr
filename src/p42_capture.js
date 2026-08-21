@@ -538,7 +538,10 @@ window.addEventListener("keydown", e=>{
   if(k==="s"){ document.getElementById("btnSnap").click(); return; }
   if(k==="h"){ if(help.classList.contains("show")) help.classList.remove("show"); else window.__openHelp(); return; }
   if(e.key === "Escape" && help.classList.contains("show")){ help.classList.remove("show"); return; }
-  if(k==="/"){ e.preventDefault(); if(window.__focusFilter) window.__focusFilter(); return; }
+  /* / used to focus the panel filter, which only ever searched the panel. It
+     opens the search that finds anything, anywhere; the filter box is still
+     there to narrow what is in front of you. */
+  if(k==="/"){ e.preventDefault(); if(window.__findParam) window.__findParam(); else if(window.__focusFilter) window.__focusFilter(); return; }
   if(k==="d"){ setDock(dockTab==="mod" ? "matrix" : "mod"); return; }
   if(k==="p"){ btnPlay.click(); return; }
   if(k==="b"){ if(!e.repeat) setBypass(true); return; }

@@ -478,8 +478,13 @@ function applyParams(dt){
   if(secBypassOn){
     for(const p of PLIST){
       if(!secBypass[p.sec]) continue;
-      if(p.master){ mCur[p.id] = p.def; curTouched.add("M:"+p.id); }
-      else for(const ch of CHANNELS){ chanCur[ch][p.id] = p.def; curTouched.add(ch+":"+p.id); }
+      /* the three bus faders live in the transition sections but are not part
+         of the transition: slamming a fader is not a bypass, it is a cut */
+      if(STRIP_PARAMS.has(p.id)) continue;
+      const nz = SEC_NEUTRAL[p.sec];
+      const v = (nz && nz[p.id] !== undefined) ? nz[p.id] : p.def;
+      if(p.master){ mCur[p.id] = v; curTouched.add("M:"+p.id); }
+      else for(const ch of CHANNELS){ chanCur[ch][p.id] = v; curTouched.add(ch+":"+p.id); }
     }
   }
 
@@ -1047,6 +1052,26 @@ function setActiveChan(ch){
    detail (softness, wipe geometry, key) stays in the sidebar, where it is
    setup rather than performance. */
 const STRIP_PARAMS = new Set(["abMix","cdMix","busMix"]);
+/* The eye used to appear only on sections that belong to a reorderable chain
+   stage, which left a third of the sidebar and the whole dock without one for
+   no reason a user could see. Switching a section out is a general idea: hold
+   every control in it at the value that means "nobody has touched this" and
+   the stage stops having an effect, whatever stage it is. Two sections are
+   left off the list and it is not an oversight. PATTERN SYNTH is a source
+   rather than a stage, so there is nothing underneath it to fall through to,
+   and PRESET MORPH is a tool that moves other controls rather than a thing in
+   the signal path. */
+const BYPASS_SECS = new Set(["mixer","mixer2","mixerM","frame","time","feedback",
+                             "keyer","field","codec","crt","overlay"]);
+/* For most sections the default IS the neutral, because an effect defaults to
+   an amount of zero and everything else in it is only a shape. The display is
+   the exception: it ships with a tube already on, so its defaults are a look
+   rather than an absence of one, and a bypass that restored them would be a
+   bypass that did nothing. These are the values that mean no tube. */
+const SEC_NEUTRAL = {
+  crt: {scanlines:0, aperture:0, curvature:0, cornerRound:0, vignette:0, bloomRad:0.4}
+};
+function sectionCanBypass(id){ return !!stageOfSection(id) || BYPASS_SECS.has(id); }
 function buildMixStrip(){
   const host = document.getElementById("mixbuses");
   if(!host) return;
@@ -1128,8 +1153,8 @@ function buildMixStrip(){
     const ml = document.createElement("select");
     ml.id = "selMelt"+bus.key;
     attachTip(ml, "MELT MODE",
-      "What the MELT control does. EDGE treats the seam between the two pictures as a feedback region and leaves everything else alone, which is why it looks dead on a plain dissolve: a dissolve has no seam to stand on. FRAME feeds the whole picture back through itself, turned and scaled a little each pass, which is video feedback and trails like it. MOTION does the same but only where the picture is changing, so a still shot stays clean and anything moving drags a tail.",
-      "ZOOM, HUE and SOFTEN on the MIX tab shape the trail; SWIRL turns it and HOLD decides how long it lasts.");
+      "What the MELT control does. The first three act on the composite once it exists. EDGE treats the seam between the two pictures as a feedback region and leaves everything else alone, which is why it looks dead on a plain dissolve: a dissolve has no seam to stand on. FRAME feeds the whole picture back through itself, turned and scaled a little each pass, which is video feedback and trails like it. MOTION does the same but only where the picture is changing. The last three act on the mix itself, and are the ones that melt the layers into each other: MELD lets the last frame decide where the boundary between them runs, so each opens islands inside the other and they drift; DRIP reads that history along one direction so the melted region runs, the way wet paint runs; BLEED drags the two layers along the slope of what is already on screen, in opposite directions, so they smear through one another instead of meeting at a line.",
+      "The last three need the fader off both ends to have two layers to work with. ZOOM, HUE and SOFTEN on the MIX tab shape the trail; SWIRL turns it, and on MELD, DRIP and BLEED it is HOLD alone that sets how long the trail lasts.");
     MELTMODES.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent="MELT: "+m; ml.appendChild(o); });
     ml.value = bus.getMelt();
     ml.onchange = ()=>{ bus.setMelt(parseInt(ml.value)); };
@@ -1312,7 +1337,7 @@ function initHelpUI(){
 function buildFilterBar(){
   const bar = document.createElement("div"); bar.id = "pfilter";
   const inp = document.createElement("input");
-  inp.type = "text"; inp.id = "pfilterInput"; inp.placeholder = "FILTER  \u2014  press /";
+  inp.type = "text"; inp.id = "pfilterInput"; inp.placeholder = "NARROW THIS PANEL";
   inp.spellcheck = false;
   const mk = (label, tip)=>{
     const b = document.createElement("button"); b.className = "fchip"; b.textContent = label;
@@ -1325,6 +1350,18 @@ function buildFilterBar(){
   const clr = document.createElement("button"); clr.className = "fchip"; clr.textContent = "\u2715";
   attachTip(clr, "CLEAR FILTER", "Back to the whole panel. Escape does the same.");
   clr.onclick = ()=>{ inp.value = ""; cMod.classList.remove("on"); cChg.classList.remove("on"); applyFilter(); };
+  window.__clearFilter = ()=>{ inp.value = ""; cMod.classList.remove("on"); cChg.classList.remove("on"); applyFilter(); };
+  {
+    /* the panel filter hides rows in front of you; this one goes and gets a
+       control from wherever it lives, including the tabs this panel cannot see */
+    const find = document.createElement("button");
+    find.id = "pfilterFind"; find.textContent = "FIND \u2026";
+    attachTip(find, "FIND A PARAMETER",
+      "Searches all four hundred and thirteen controls by name, by section, and by what the help says they do, then takes you to the one you pick \u2014 opening the right tab and section on the way. Keyboard: /",
+      "The box beside it does something different: it narrows the panel you are already looking at.");
+    find.onclick = ()=>openParamJump();
+    bar.appendChild(find);
+  }
   const count = document.createElement("span"); count.id = "pfilterCount";
   inp.addEventListener("input", ()=>applyFilter());
   inp.addEventListener("keydown", e=>{
@@ -1344,7 +1381,12 @@ function buildFilterBar(){
     let shown = 0;
     for(const p of PLIST){
       const r = uiRefs[p.id];
-      if(!r || !r.row || !r.row.closest("#panel")) continue;
+      /* This used to skip anything that was not inside #panel, which quietly
+         excluded every parameter living on a dock tab: the three transition
+         sections, the CRT, the overlay, the interlace and codec stages and the
+         morph. Searching for "melt" found nothing, because the melt controls
+         are on the MIX tab. Everything with a row is searchable now. */
+      if(!r || !r.row) continue;
       let ok = true;
       if(q) ok = p.name.toLowerCase().indexOf(q) >= 0
               || p.sec.toLowerCase().indexOf(q) >= 0
@@ -1356,7 +1398,7 @@ function buildFilterBar(){
     }
     for(const id in secEls){
       const d = secEls[id];
-      if(!d.closest || !d.closest("#panel")) continue;
+      if(!d.closest) continue;
       /* a section that does not belong to this channel's source stays hidden
          whatever the filter says */
       if(d.classList.contains("srcoff")){ d.style.display = "none"; continue; }
@@ -1412,10 +1454,10 @@ function buildPanel(){
        pill used to be the only way, it was silent, and a bypassed pill looked
        almost exactly like the three that are not controls at all. */
     const stg = stageOfSection(sec.id);
-    if(stg){
+    if(stg || BYPASS_SECS.has(sec.id)){
       const by = document.createElement("button");
       by.className = "secbypass";
-      by.dataset.stage = stg;
+      if(stg) by.dataset.stage = stg;
       by.dataset.sec = sec.id;
       attachTip(by, "SWITCH THIS SECTION OUT",
         "Takes this section out of the signal path and nothing else, on every channel. Its controls keep their values and stop having any effect, so shutting the eye and opening it again puts you back exactly where you were.",
@@ -3061,14 +3103,37 @@ function focusModSource(id){
 function focusParam(pid){
   const r = uiRefs[pid], p = P[pid];
   if(!r || !p) return;
-  /* the mixer faders live on the strip and the transition detail on the MIX tab */
+  /* the mixer faders live on the strip, and everything else that is not in the
+     sidebar is on one dock tab or another. Work it out from the section's zone
+     rather than from a list of three section names that went stale the moment
+     anything else moved into the dock. */
   if(STRIP_PARAMS.has(pid)) document.body.classList.remove("nomix");
-  else if(p.sec === "mixer" || p.sec === "mixer2" || p.sec === "mixerM") setDock("mix");
+  else {
+    const sd = SECTIONS.find(x=>x.id === p.sec);
+    const tab = sd ? {mix:"mix", outdock:"out", perform:"perform"}[sd.zone] : null;
+    if(tab) setDock(tab);
+  }
+  /* a filter left running can be hiding the very row being jumped to */
+  if(filterOn && typeof window.__clearFilter === "function") window.__clearFilter();
   const sec = secEls[p.sec];
   if(sec) sec.classList.remove("collapsed");
   r.row.scrollIntoView({block:"center", behavior:"smooth"});
   flashEl(r.row);
 }
+/* Finding a control among four hundred and thirteen of them, spread across a
+   sidebar and four dock tabs, was a matter of knowing where it lived. The
+   filter narrows the panel you are looking at; this finds the thing wherever it
+   is and takes you to it, opening the right tab and section on the way. Same
+   picker the modulation matrix uses, so it searches names, section names and
+   the help text, and shows what a control does before you commit to it. */
+function openParamJump(){
+  openParamPicker(null, pid=>{
+    focusParam(pid);
+    const p = P[pid];
+    if(p) toast(p.name + "  \u00b7  " + secLabel(p.sec));
+  }, "FIND A PARAMETER");
+}
+window.__findParam = openParamJump;
 function addRoute(srcId, dstId){
   routes.push({src:srcId, dst:dstId, amt:0.3,
     ch:(P[dstId] && P[dstId].master) ? "A" : activeChan, inv:false, curve:0});

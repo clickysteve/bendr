@@ -733,18 +733,26 @@ function renderFrame(now, dt){
     draw();
   }
   let p1 = null, p2t = null, pM = null;
+  /* A transition section switched out at the eye has to lose its mode choices
+     as well as its numbers: the transition, the blend, the key and the melt
+     are selects rather than parameters, so holding the parameters at neutral
+     would leave a wipe wiping and a key keying with nothing to show for it. */
+  const byp1 = !!secBypass["mixer"], byp2 = !!secBypass["mixer2"], bypM = !!secBypass["mixerM"];
+  const mMode1 = byp1 ? 0 : mixMode,  mBl1 = byp1 ? 0 : mixBlend,  mKy1 = byp1 ? 0 : mixKey,  mMl1 = byp1 ? 0 : meltMode;
+  const mMode2 = byp2 ? 0 : mixMode2, mBl2 = byp2 ? 0 : mixBlend2, mKy2 = byp2 ? 0 : mixKey2, mMl2 = byp2 ? 0 : meltMode2;
+  const mModeM = bypM ? 0 : mixModeM, mBlM = bypM ? 0 : mixBlendM, mKyM = bypM ? 0 : mixKeyM, mMlM = bypM ? 0 : meltModeM;
   if(masterLive){
     ensureShared("busOut1"); ensureShared("busOut2");
     if(edgeLive(MIXBUS.b1)){ ensureShared("busHist1"); const t = busOut1; busOut1 = busHist1; busHist1 = t; p1 = busHist1.tex; }
     if(edgeLive(MIXBUS.b2)){ ensureShared("busHist2"); const t = busOut2; busOut2 = busHist2; busHist2 = t; p2t = busHist2.tex; }
     if(edgeLive(MIXBUS.bM)){ ensureShared("mixHist"); const t = mixOut; mixOut = mixHist; mixHist = t; pM = mixHist.tex; }
-    mixPass(busOut1, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv, mixBlend, mixKey, p1, meltMode);
-    mixPass(busOut2, chanOutTex(b2[0]), chanOutTex(b2[1]), live[b2[1]], MIXBUS.b2, mixMode2, wipeInv2, mixBlend2, mixKey2, p2t, meltMode2);
-    mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mixModeM, wipeInvM, mixBlendM, mixKeyM, pM, meltModeM);
+    mixPass(busOut1, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mMode1, wipeInv, mBl1, mKy1, p1, mMl1);
+    mixPass(busOut2, chanOutTex(b2[0]), chanOutTex(b2[1]), live[b2[1]], MIXBUS.b2, mMode2, wipeInv2, mBl2, mKy2, p2t, mMl2);
+    mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mModeM, wipeInvM, mBlM, mKyM, pM, mMlM);
   } else {
     /* nothing on bus 2, so bus 1 goes straight to master and costs one pass, as before */
     if(edgeLive(MIXBUS.b1)){ ensureShared("mixHist"); const t = mixOut; mixOut = mixHist; mixHist = t; p1 = mixHist.tex; }
-    mixPass(mixOut, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv, mixBlend, mixKey, p1, meltMode);
+    mixPass(mixOut, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mMode1, wipeInv, mBl1, mKy1, p1, mMl1);
   }
 
   if(multiView){

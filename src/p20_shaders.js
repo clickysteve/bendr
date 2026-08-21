@@ -390,7 +390,7 @@ const FS_MIX = COMMON + KEYFN +
 "      c = vec2(cs*c.x - sn*c.y, sn*c.x + cs*c.y) * zo;\n" +
 "      puv = c / vec2(outA, 1.0) + 0.5;\n" +
 "      w = 1.0;\n" +
-"      if(u_meltMode > 1.5){\n" +
+"      if(u_meltMode > 1.5 && u_meltMode < 2.5){\n" +
 "        vec3 lw = vec3(0.299, 0.587, 0.114);\n" +
 "        float d = abs(dot(src, lw) - dot(texture(u_prev, uv).rgb, lw));\n" +
 "        w = clamp(d * (3.0 + u_edgeWidth*14.0), 0.0, 1.0);\n" +
@@ -423,13 +423,19 @@ const FS_MIX = COMMON + KEYFN +
 "      float ha = u_meltHue * 0.22, hc = cos(ha), hs = sin(ha);\n" +
 "      pv = yiq2rgb(vec3(yy.x, hc*yy.y - hs*yy.z, hs*yy.y + hc*yy.z));\n" +
 "    }\n" +
-"    /* the ceiling on how much of the last frame can survive. Unity is the\n" +
-"       old limit and still reads as a trail that settles; past it the band\n" +
-"       stops settling at all and keeps building, which is the point of the\n" +
-"       extra travel on the control. */\n" +
-"    float hcap = min(0.94 + max(u_edgeHold-1.0, 0.0)*0.11, 0.995);\n" +
+"    /* How much of the last frame survives, and the ceiling on it.\n" +
+"       The amount used to be clamped at unity before it reached the blend, so\n" +
+"       the whole top half of the MELT control did nothing at all in the frame\n" +
+"       modes: it only lengthened the edge offset. It drives the blend across\n" +
+"       its whole travel now, and both it and HOLD lift the ceiling as they go\n" +
+"       past one, so the top of the range is a picture made almost entirely of\n" +
+"       its own history \u2014 a trail that never quite settles, which is what a\n" +
+"       feedback loop pointed at itself actually does. */\n" +
+"    float hcap = min(0.90 + max(u_edgeAmt-1.0, 0.0)*0.055\n" +
+"                          + max(u_edgeHold-1.0, 0.0)*0.055, 0.998);\n" +
 "    float mixAmt = (u_meltMode < 0.5) ? (band * u_edgeHold)\n" +
-"                                      : (w * u_edgeHold * min(u_edgeAmt, 1.0));\n" +
+"                  : (u_meltMode > 2.5) ? (w * u_edgeHold)\n" +
+"                                       : (w * u_edgeHold * u_edgeAmt);\n" +
 "    src = mix(src, pv, clamp(mixAmt, 0.0, hcap));\n" +
 "  }\n" +
 "  return src;}\n" +
@@ -563,6 +569,61 @@ const FS_MIX = COMMON + KEYFN +
 "    /* CREEP pushes the melt onto the outgoing side, so the shape bleeds into\n" +
 "       the background rather than the background eating into the shape */\n" +
 "    band *= mix(1.0, 1.0 - clamp(m,0.0,1.0), u_edgeCreep);\n" +
+"  }\n" +
+/* The melt as a mixer stage rather than a picture effect. EDGE, FRAME and
+   MOTION all act on the composite once it exists, which makes them read as
+   something the sidebar could have done. These three act on the mix itself:
+   the boundary between the layers, and where each layer is sampled from, are
+   decided by what was on screen a frame ago. So the layers interpenetrate,
+   and because the result feeds the next frame's decision the boundary keeps
+   moving on its own. That is a feedback loop with two pictures in it. */
+"  if(u_meltMode > 2.5 && u_hasPrev > 0.5 && u_edgeAmt > 0.002){\n" +
+"    float amt = clamp(u_edgeAmt, 0.0, 2.0);\n" +
+"    /* both ends of the fader stay honest: with one picture showing there is\n" +
+"       nothing for it to melt into, and the trail alone carries the effect */\n" +
+"    float gt = smoothstep(0.0, 0.10, t) * smoothstep(0.0, 0.10, 1.0-t);\n" +
+"    float ro = u_edgeSwirl * 0.10, zo = 1.0 - u_meltZoom * 0.05;\n" +
+"    vec2 cc = (uv - 0.5) * vec2(outA, 1.0);\n" +
+"    cc = vec2(cos(ro)*cc.x - sin(ro)*cc.y, sin(ro)*cc.x + cos(ro)*cc.y) * zo;\n" +
+"    vec2 puv = clamp(cc / vec2(outA, 1.0) + 0.5, 0.0, 1.0);\n" +
+"    vec3 lwv = vec3(0.299, 0.587, 0.114);\n" +
+"    float pl = dot(texture(u_prev, puv).rgb, lwv);\n" +
+"    float sft = max(0.02, 0.34 - u_edgeWidth*0.30);\n" +
+"    if(u_meltMode < 3.5){\n" +
+"      /* MELD: the last frame is the wipe's contour map. Bright history pulls\n" +
+"         the incoming picture through, dark history holds the outgoing one, so\n" +
+"         islands of each open up inside the other and drift. */\n" +
+"      float mm2 = clamp((m + (pl-0.5)*amt*1.5 - 0.5)/sft + 0.5, 0.0, 1.0);\n" +
+"      m = mix(m, mm2, gt);\n" +
+"    } else if(u_meltMode < 4.5){\n" +
+"      /* DRIP: the same contour read along one direction and taken at its\n" +
+"         brightest, so the melted region runs the way wet paint runs. SWIRL\n" +
+"         turns the direction, MELT sets how far it reaches. */\n" +
+"      float ang = u_edgeSwirl * 6.28318;\n" +
+"      vec2 dir = vec2(sin(ang), -cos(ang));\n" +
+"      float acc = pl;\n" +
+"      for(int i=1;i<=6;i++){\n" +
+"        vec2 su = clamp(puv - dir*(float(i)/6.0)*amt*0.07, 0.0, 1.0);\n" +
+"        acc = max(acc, dot(texture(u_prev, su).rgb, lwv));\n" +
+"      }\n" +
+"      float mm2 = clamp((m + (acc-0.5)*amt*1.7 - 0.5)/sft + 0.5, 0.0, 1.0);\n" +
+"      m = mix(m, mm2, gt);\n" +
+"    } else {\n" +
+"      /* BLEED: neither layer is sampled where it should be. Both are dragged\n" +
+"         along the slope of what is already on screen, in opposite directions,\n" +
+"         so each picture is pulled into the other's shapes and the two smear\n" +
+"         through one another instead of meeting at a line. */\n" +
+"      float r = 0.0025 + u_edgeWidth*0.012;\n" +
+"      vec2 rx = vec2(r/outA, 0.0), ry = vec2(0.0, r);\n" +
+"      vec2 g = vec2(dot(texture(u_prev, clamp(uv+rx,0.0,1.0)).rgb, lwv)\n" +
+"                  - dot(texture(u_prev, clamp(uv-rx,0.0,1.0)).rgb, lwv),\n" +
+"                    dot(texture(u_prev, clamp(uv+ry,0.0,1.0)).rgb, lwv)\n" +
+"                  - dot(texture(u_prev, clamp(uv-ry,0.0,1.0)).rgb, lwv));\n" +
+"      vec2 dsp = g * amt * 0.55;\n" +
+"      a = texture(u_texA, clamp(duv - dsp, 0.0, 1.0)).rgb;\n" +
+"      buv = clamp(buv + dsp, 0.0, 1.0);\n" +
+"      m = clamp(m + (pl-0.5)*amt*0.6*gt, 0.0, 1.0);\n" +
+"    }\n" +
 "  }\n" +
 "  vec2 bd = en * band * u_edgeAmt * 0.055;\n" +
 "  vec3 b = texture(u_texB, clamp(buv + bd, 0.0, 1.0)).rgb;\n" +

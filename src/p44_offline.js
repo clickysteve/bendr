@@ -44,47 +44,73 @@ async function offlineRender(){
     }catch(e){ if(e && e.name === "AbortError"){ offline=false; ov.style.display="none"; canvas.width=oldW; canvas.height=oldH; return; } }
   }
 
-  /* Audio extraction & decoding:
-     Priority 1: Dedicated audio file from the AUDIO tab (audioFileEl)
-     Priority 2: Channel A video file soundtrack (SRC.A.video) */
+  let enc = null;
+  let aenc = null;
   let audioBuffer = null;
-  let localActx = null;
-  const audioSrcUrl = (audioFileEl && (audioFileEl.src || audioFileEl.dataset?.url))
-    ? (audioFileEl.src || audioFileEl.dataset.url)
-    : ((SRC.A.mode === "file" && (SRC.A.video.src || SRC.A.objUrl)) ? (SRC.A.video.src || SRC.A.objUrl) : null);
+  let channelData = null;
+  const parts = [];
 
-  if(audioSrcUrl){
-    try{
-      const res = await fetch(audioSrcUrl);
-      if(res.ok){
-        const ab = await res.arrayBuffer();
-        if(ab.byteLength > 100 * 1024 * 1024){
-          console.warn("Audio file is large (" + (ab.byteLength/1048576).toFixed(1) + " MB), decoding may take significant memory.");
+  try {
+    /* Audio extraction & decoding:
+       Priority 1: Dedicated audio file from the AUDIO tab (audioFileEl)
+       Priority 2: Channel A video file soundtrack (SRC.A.video) */
+    let localActx = null;
+    const audioSrcUrl = (audioFileEl && (audioFileEl.src || audioFileEl.dataset?.url))
+      ? (audioFileEl.src || audioFileEl.dataset.url)
+      : ((SRC.A.mode === "file" && (SRC.A.video.src || SRC.A.objUrl)) ? (SRC.A.video.src || SRC.A.objUrl) : null);
+
+    if(audioSrcUrl){
+      try{
+        const res = await fetch(audioSrcUrl);
+        if(res.ok){
+          const contentLength = res.headers.get('content-length');
+          if(contentLength && parseInt(contentLength, 10) > 100 * 1024 * 1024){
+            throw new Error("Audio source file is too large (" + (parseInt(contentLength, 10)/1048576).toFixed(1) + " MB). Fallback to video-only to prevent crash.");
+          }
+          const ab = await res.arrayBuffer();
+          const actx = (typeof audioCtx !== "undefined" && audioCtx)
+            ? audioCtx
+            : (localActx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100));
+          audioBuffer = await new Promise((resolve, reject)=>{
+            actx.decodeAudioData(ab, resolve, reject);
+          });
         }
-        const actx = (typeof audioCtx !== "undefined" && audioCtx)
-          ? audioCtx
-          : (localActx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100));
-        audioBuffer = await new Promise((resolve, reject)=>{
-          actx.decodeAudioData(ab, resolve, reject);
-        });
-      }
-    }catch(e){
-      console.warn("Offline audio decode failed, falling back to video only:", e);
-      audioBuffer = null;
-    }finally{
-      if(localActx && localActx.close){
-        try{ await localActx.close(); }catch(e){}
+      }catch(e){
+        console.warn("Offline audio decode failed, falling back to video only:", e);
+        audioBuffer = null;
+      }finally{
+        if(localActx && localActx.close){
+          try{ await localActx.close(); }catch(e){}
+        }
       }
     }
-  }
 
-  let hasAudio = false;
-  let aenc = null;
-  if("AudioEncoder" in window && audioBuffer && audioBuffer.numberOfChannels > 0 && audioBuffer.length > 0){
-    const standardRates = [32000, 44100, 48000];
-    if(audioBuffer.numberOfChannels > 2 || !standardRates.includes(audioBuffer.sampleRate)){
-      console.warn("Offline audio rendering requires 1 or 2 channels and 32k/44.1k/48kHz sample rate (found "+audioBuffer.numberOfChannels+"ch, "+audioBuffer.sampleRate+"Hz). Falling back to video only.");
-    } else {
+    /* Resample/downmix if non-standard sample rate or channels > 2 */
+    if(audioBuffer && audioBuffer.length > 0){
+      const standardRates = [32000, 44100, 48000];
+      if(!standardRates.includes(audioBuffer.sampleRate) || audioBuffer.numberOfChannels > 2){
+        try{
+          const targetChannels = Math.min(2, audioBuffer.numberOfChannels);
+          const targetRate = 44100;
+          const targetLength = Math.max(1, Math.round(audioBuffer.duration * targetRate));
+          const resampleCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
+            targetChannels,
+            targetLength,
+            targetRate
+          );
+          const source = resampleCtx.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(resampleCtx.destination);
+          source.start();
+          audioBuffer = await resampleCtx.startRendering();
+        }catch(e){
+          console.warn("Audio resampling failed, keeping original:", e);
+        }
+      }
+    }
+
+    let hasAudio = false;
+    if("AudioEncoder" in window && audioBuffer && audioBuffer.numberOfChannels > 0 && audioBuffer.length > 0){
       try{
         const aconf = {
           codec: "mp4a.40.2",
@@ -110,118 +136,113 @@ async function offlineRender(){
         }
       }
     }
-  }
 
-  const parts = [];
-  const target = fileStream
-    ? new Mp4Muxer.FileSystemWritableFileStreamTarget(fileStream, {chunked: true})
-    : new Mp4Muxer.StreamTarget({
-        onData: (data, position) => { parts.push({position, data: data.slice()}); },
-        chunked: true,
-      });
-  const muxer = new Mp4Muxer.Muxer({
-    target,
-    video: {codec: mcodec, width: W, height: H},
-    audio: hasAudio ? {
-      codec: 'aac',
-      numberOfChannels: audioBuffer.numberOfChannels,
-      sampleRate: audioBuffer.sampleRate,
-    } : undefined,
-    /* seeking metadata has to go at the front, which needs a rewrite the
-       stream target cannot do, so it goes at the end when we are streaming */
-    fastStart: fileStream ? false : "in-memory",
-  });
-  const enc = new VideoEncoder({
-    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-    error: e => { console.error(e); toast("Encoder error: "+e.message, true); renderCancel = true; },
-  });
-  enc.configure({codec, width:W, height:H, bitrate:bitrateFor(W,H,fps), framerate:fps});
+    const target = fileStream
+      ? new Mp4Muxer.FileSystemWritableFileStreamTarget(fileStream, {chunked: true})
+      : new Mp4Muxer.StreamTarget({
+          onData: (data, position) => { parts.push({position, data: data.slice()}); },
+          chunked: true,
+        });
+    const muxer = new Mp4Muxer.Muxer({
+      target,
+      video: {codec: mcodec, width: W, height: H},
+      audio: hasAudio ? {
+        codec: 'aac',
+        numberOfChannels: audioBuffer.numberOfChannels,
+        sampleRate: audioBuffer.sampleRate,
+      } : undefined,
+      /* seeking metadata has to go at the front, which needs a rewrite the
+         stream target cannot do, so it goes at the end when we are streaming */
+      fastStart: fileStream ? false : "in-memory",
+    });
+    enc = new VideoEncoder({
+      output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+      error: e => { console.error(e); toast("Encoder error: "+e.message, true); renderCancel = true; },
+    });
+    enc.configure({codec, width:W, height:H, bitrate:bitrateFor(W,H,fps), framerate:fps});
 
-  const duration = (video && !isNaN(video.duration) && video.duration > 0) ? video.duration : 1;
-  const total = Math.max(1, Math.floor(duration * fps));
+    const duration = (video && !isNaN(video.duration) && video.duration > 0) ? video.duration : 1;
+    const total = Math.max(1, Math.floor(duration * fps));
 
-  /* Progressive audio encoding: encode audio chunks incrementally alongside video frames
-     so audio and video are properly interleaved in the output MP4 stream, avoiding memory spikes */
-  const CHUNK_SIZE = 1024;
-  let audioOffset = 0;
-  let totalAudioFrames = 0;
-  let channelData = null;
-  let numChannels = 0;
-  let sr = 0;
-  let srcLen = 0;
-  let maxPlanarBuffer = null;
+    /* Progressive audio encoding: encode audio chunks incrementally alongside video frames
+       so audio and video are properly interleaved in the output MP4 stream, avoiding memory spikes */
+    const CHUNK_SIZE = 1024;
+    let audioOffset = 0;
+    let totalAudioFrames = 0;
+    let numChannels = 0;
+    let sr = 0;
+    let srcLen = 0;
 
-  if(hasAudio){
-    const totalDurSec = total / fps;
-    totalAudioFrames = Math.round(totalDurSec * audioBuffer.sampleRate);
-    numChannels = audioBuffer.numberOfChannels;
-    sr = audioBuffer.sampleRate;
-    srcLen = audioBuffer.length;
-    channelData = [];
-    for(let ch = 0; ch < numChannels; ch++){
-      channelData.push(audioBuffer.getChannelData(ch));
-    }
-    maxPlanarBuffer = new Float32Array(CHUNK_SIZE * numChannels);
-  }
-
-  const encodeAudioUpTo = (targetFrames) => {
-    while(audioOffset < targetFrames && !renderCancel){
-      const framesInChunk = Math.min(CHUNK_SIZE, targetFrames - audioOffset);
-      const planar = maxPlanarBuffer.subarray(0, framesInChunk * numChannels);
-      for(let ch = 0; ch < numChannels; ch++){
-        const src = channelData[ch];
-        const dstOffset = ch * framesInChunk;
-        for(let f = 0; f < framesInChunk; f++){
-          const idx = audioOffset + f;
-          planar[dstOffset + f] = idx < srcLen ? src[idx] : 0.0;
-        }
-      }
-      const timestampUs = Math.round((audioOffset * 1e6) / sr);
-      const ad = new AudioData({
-        format: "f32-planar",
-        sampleRate: sr,
-        numberOfFrames: framesInChunk,
-        numberOfChannels: numChannels,
-        timestamp: timestampUs,
-        data: planar,
-      });
-      aenc.encode(ad);
-      ad.close();
-      audioOffset += framesInChunk;
-    }
-  };
-
-  const seekTo = (v,t)=>new Promise(res=>{
-    const h = ()=>{ v.removeEventListener("seeked", h); res(); };
-    v.addEventListener("seeked", h);
-    v.currentTime = Math.min(t, v.duration-0.001);
-  });
-  const t0 = 1000;   // virtual clock offset so time-based effects behave
-  for(let i=0; i<total && !renderCancel; i++){
-    const t = i/fps;
-    await seekTo(video, t);
-    for(const ch of ["B","C","D"]){ const v = SRC[ch].video; if(srcReady(ch) && v.duration) await seekTo(v, t % v.duration); }
-    renderFrame(t0+t, 1/fps);
-    const vf = new VideoFrame(canvas, {timestamp: Math.round(i*1e6/fps), duration: Math.round(1e6/fps)});
-    enc.encode(vf, {keyFrame: i%(fps*2)===0});
-    vf.close();
-
-    /* Progressively encode audio matching the current video frame progress to ensure interleaving */
     if(hasAudio){
-      const targetFrames = Math.min(totalAudioFrames, Math.round(((i + 1) / total) * totalAudioFrames));
-      encodeAudioUpTo(targetFrames);
+      const totalDurSec = total / fps;
+      totalAudioFrames = Math.round(totalDurSec * audioBuffer.sampleRate);
+      numChannels = audioBuffer.numberOfChannels;
+      sr = audioBuffer.sampleRate;
+      srcLen = audioBuffer.length;
+      channelData = [];
+      for(let ch = 0; ch < numChannels; ch++){
+        channelData.push(audioBuffer.getChannelData(ch));
+      }
     }
 
-    while((enc.encodeQueueSize > 6 || (aenc && aenc.encodeQueueSize > 30)) && !renderCancel){
-      await new Promise(r=>setTimeout(r,5));
+    const encodeAudioUpTo = (targetFrames) => {
+      while(audioOffset < targetFrames && !renderCancel){
+        const framesInChunk = Math.min(CHUNK_SIZE, targetFrames - audioOffset);
+        const planar = new Float32Array(framesInChunk * numChannels);
+        for(let ch = 0; ch < numChannels; ch++){
+          const src = channelData[ch];
+          const dstOffset = ch * framesInChunk;
+          for(let f = 0; f < framesInChunk; f++){
+            const idx = audioOffset + f;
+            planar[dstOffset + f] = idx < srcLen ? src[idx] : 0.0;
+          }
+        }
+        const timestampUs = Math.round((audioOffset * 1e6) / sr);
+        const ad = new AudioData({
+          format: "f32-planar",
+          sampleRate: sr,
+          numberOfFrames: framesInChunk,
+          numberOfChannels: numChannels,
+          timestamp: timestampUs,
+          data: planar,
+        });
+        aenc.encode(ad);
+        ad.close();
+        audioOffset += framesInChunk;
+      }
+    };
+
+    const seekTo = (v,t)=>new Promise(res=>{
+      const h = ()=>{ v.removeEventListener("seeked", h); res(); };
+      v.addEventListener("seeked", h);
+      v.currentTime = Math.min(t, v.duration-0.001);
+    });
+    const t0 = 1000;   // virtual clock offset so time-based effects behave
+    for(let i=0; i<total && !renderCancel; i++){
+      const t = i/fps;
+      await seekTo(video, t);
+      for(const ch of ["B","C","D"]){ const v = SRC[ch].video; if(srcReady(ch) && v.duration) await seekTo(v, t % v.duration); }
+      renderFrame(t0+t, 1/fps);
+      const vf = new VideoFrame(canvas, {timestamp: Math.round(i*1e6/fps), duration: Math.round(1e6/fps)});
+      enc.encode(vf, {keyFrame: i%(fps*2)===0});
+      vf.close();
+
+      /* Progressively encode audio matching the current video frame progress to ensure interleaving */
+      if(hasAudio){
+        const targetFrames = Math.min(totalAudioFrames, Math.round(((i + 1) / total) * totalAudioFrames));
+        encodeAudioUpTo(targetFrames);
+      }
+
+      while((enc.encodeQueueSize > 6 || (aenc && aenc.encodeQueueSize > 30)) && !renderCancel){
+        await new Promise(r=>setTimeout(r,5));
+      }
+      if(i%3===0){
+        ovTxt.textContent = "RENDERING "+Math.round(i/total*100)+"%  ("+i+"/"+total+" frames, "+codec.split(".")[0].toUpperCase()+")";
+        ovBar.style.width = (i/total*100)+"%";
+        await new Promise(r=>setTimeout(r,0));
+      }
     }
-    if(i%3===0){
-      ovTxt.textContent = "RENDERING "+Math.round(i/total*100)+"%  ("+i+"/"+total+" frames, "+codec.split(".")[0].toUpperCase()+")";
-      ovBar.style.width = (i/total*100)+"%";
-      await new Promise(r=>setTimeout(r,0));
-    }
-  }
-  try{
+
     if(!renderCancel){
       ovTxt.textContent = "FINALIZING…";
       if(hasAudio){
@@ -236,7 +257,9 @@ async function offlineRender(){
       } else {
         parts.sort((a,b)=>a.position-b.position);
         const blob = new Blob(parts.map(x=>x.data), {type:"video/mp4"});
-        dl(URL.createObjectURL(blob), suggested);
+        const url = URL.createObjectURL(blob);
+        dl(url, suggested);
+        setTimeout(() => URL.revokeObjectURL(url), 15000);
         toast("Rendered "+total+" frames "+(hasAudio?"with audio":"(video only)")+" \u2192 MP4, "+(blob.size/1048576).toFixed(1)+" MB");
       }
     } else {
@@ -244,24 +267,21 @@ async function offlineRender(){
       toast("Render cancelled", true);
     }
   } catch(e) {
-    console.error("Render finalization failed:", e);
+    console.error("Offline render failed:", e);
     if(fileStream){ try{ await fileStream.abort(); }catch(_){} }
-    toast("Render finalization failed: " + e.message, true);
+    toast("Render failed: " + e.message, true);
   } finally {
-    /* the encoder used to be closed only on the cancel path, so every
-       completed render left one behind */
-    try{ if(enc && enc.state !== "closed") enc.close(); }catch(e){}
-    try{ if(aenc && aenc.state !== "closed") aenc.close(); }catch(e){}
+    try{ if(enc && enc.state !== "closed") enc.close(); }catch(_){}
+    try{ if(aenc && aenc.state !== "closed") aenc.close(); }catch(_){}
     parts.length = 0;
     audioBuffer = null;
     channelData = null;
-    maxPlanarBuffer = null;
+    canvas.width = oldW; canvas.height = oldH;
+    ov.style.display = "none";
+    offline = false; lastT = performance.now()/1000;
+    if(wasPlaying) video.play();
+    for(const ch of ["B","C","D"]) if(SRC[ch].mode==="file") SRC[ch].video.play();
   }
-  canvas.width = oldW; canvas.height = oldH;
-  ov.style.display = "none";
-  offline = false; lastT = performance.now()/1000;
-  if(wasPlaying) video.play();
-  for(const ch of ["B","C","D"]) if(SRC[ch].mode==="file") SRC[ch].video.play();
 }
 
 /* ---------------- init ---------------- */

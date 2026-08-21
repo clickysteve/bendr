@@ -48,6 +48,7 @@ async function offlineRender(){
      Priority 1: Dedicated audio file from the AUDIO tab (audioFileEl)
      Priority 2: Channel A video file soundtrack (SRC.A.video) */
   let audioBuffer = null;
+  let localActx = null;
   const audioSrcUrl = (audioFileEl && (audioFileEl.src || audioFileEl.dataset?.url))
     ? (audioFileEl.src || audioFileEl.dataset.url)
     : ((SRC.A.mode === "file" && (SRC.A.video.src || SRC.A.objUrl)) ? (SRC.A.video.src || SRC.A.objUrl) : null);
@@ -57,33 +58,52 @@ async function offlineRender(){
       const res = await fetch(audioSrcUrl);
       if(res.ok){
         const ab = await res.arrayBuffer();
-        const actx = (typeof audioCtx !== "undefined" && audioCtx) ? audioCtx : new (window.AudioContext || window.webkitAudioContext)();
+        const actx = (typeof audioCtx !== "undefined" && audioCtx) ? audioCtx : (localActx = new (window.AudioContext || window.webkitAudioContext)());
         audioBuffer = await new Promise((resolve, reject)=>{
-          actx.decodeAudioData(ab.slice(0), resolve, reject);
+          actx.decodeAudioData(ab, resolve, reject);
         });
       }
     }catch(e){
       console.warn("Offline audio decode failed, falling back to video only:", e);
       audioBuffer = null;
+    }finally{
+      if(localActx){
+        try{ await localActx.close(); }catch(e){}
+      }
     }
   }
 
   let hasAudio = false;
+  let aenc = null;
   if("AudioEncoder" in window && audioBuffer && audioBuffer.numberOfChannels > 0 && audioBuffer.length > 0){
-    try{
-      const aconf = {
-        codec: "mp4a.40.2",
-        numberOfChannels: audioBuffer.numberOfChannels,
-        sampleRate: audioBuffer.sampleRate,
-        bitrate: 192000,
-      };
-      const asup = await AudioEncoder.isConfigSupported(aconf);
-      if(asup && asup.supported){
-        hasAudio = true;
+    const standardRates = [32000, 44100, 48000];
+    if(audioBuffer.numberOfChannels > 2 || !standardRates.includes(audioBuffer.sampleRate)){
+      console.warn("Offline audio rendering requires 1 or 2 channels and 32k/44.1k/48kHz sample rate (found "+audioBuffer.numberOfChannels+"ch, "+audioBuffer.sampleRate+"Hz). Falling back to video only.");
+    } else {
+      try{
+        const aconf = {
+          codec: "mp4a.40.2",
+          numberOfChannels: audioBuffer.numberOfChannels,
+          sampleRate: audioBuffer.sampleRate,
+          bitrate: 192000,
+        };
+        const asup = await AudioEncoder.isConfigSupported(aconf);
+        if(asup && asup.supported){
+          aenc = new AudioEncoder({
+            output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+            error: e => { console.error("Audio encoder error:", e); toast("Audio encoder error: "+e.message, true); renderCancel = true; },
+          });
+          aenc.configure(aconf);
+          hasAudio = true;
+        }
+      }catch(e){
+        console.warn("AudioEncoder initialization/configuration failed. Falling back to video only:", e);
+        hasAudio = false;
+        if(aenc){
+          try{ if(aenc.state !== "closed") aenc.close(); }catch(_){}
+          aenc = null;
+        }
       }
-    }catch(e){
-      console.warn("AudioEncoder config check failed:", e);
-      hasAudio = false;
     }
   }
 
@@ -112,65 +132,58 @@ async function offlineRender(){
   });
   enc.configure({codec, width:W, height:H, bitrate:bitrateFor(W,H,fps), framerate:fps});
 
-  let aenc = null;
-  if(hasAudio){
-    aenc = new AudioEncoder({
-      output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-      error: e => { console.error("Audio encoder error:", e); },
-    });
-    aenc.configure({
-      codec: "mp4a.40.2",
-      numberOfChannels: audioBuffer.numberOfChannels,
-      sampleRate: audioBuffer.sampleRate,
-      bitrate: 192000,
-    });
-  }
-
   const total = Math.max(1, Math.floor(video.duration*fps));
 
-  /* Encode audio track: slice AudioBuffer into chunks and send to AudioEncoder */
-  if(hasAudio && !renderCancel){
-    try{
-      const totalDurSec = total / fps;
-      const totalAudioFrames = Math.round(totalDurSec * audioBuffer.sampleRate);
-      const CHUNK_SIZE = 1024;
-      const numChannels = audioBuffer.numberOfChannels;
-      const sr = audioBuffer.sampleRate;
-      const srcLen = audioBuffer.length;
-      const channelData = [];
-      for(let ch = 0; ch < numChannels; ch++){
-        channelData.push(audioBuffer.getChannelData(ch));
-      }
+  /* Progressive audio encoding: encode audio chunks incrementally alongside video frames
+     so audio and video are properly interleaved in the output MP4 stream, avoiding memory spikes */
+  const CHUNK_SIZE = 1024;
+  let audioOffset = 0;
+  let totalAudioFrames = 0;
+  let channelData = null;
+  let numChannels = 0;
+  let sr = 0;
+  let srcLen = 0;
+  let maxPlanarBuffer = null;
 
-      for(let offset = 0; offset < totalAudioFrames && !renderCancel; offset += CHUNK_SIZE){
-        const framesInChunk = Math.min(CHUNK_SIZE, totalAudioFrames - offset);
-        const planar = new Float32Array(framesInChunk * numChannels);
-        for(let ch = 0; ch < numChannels; ch++){
-          const src = channelData[ch];
-          const dstOffset = ch * framesInChunk;
-          for(let f = 0; f < framesInChunk; f++){
-            planar[dstOffset + f] = src[(offset + f) % srcLen];
-          }
-        }
-        const timestampUs = Math.round((offset * 1e6) / sr);
-        const ad = new AudioData({
-          format: "f32-planar",
-          sampleRate: sr,
-          numberOfFrames: framesInChunk,
-          numberOfChannels: numChannels,
-          timestamp: timestampUs,
-          data: planar,
-        });
-        aenc.encode(ad);
-        ad.close();
-      }
-      if(!renderCancel){
-        await aenc.flush();
-      }
-    }catch(e){
-      console.error("Audio encoding error:", e);
+  if(hasAudio){
+    const totalDurSec = total / fps;
+    totalAudioFrames = Math.round(totalDurSec * audioBuffer.sampleRate);
+    numChannels = audioBuffer.numberOfChannels;
+    sr = audioBuffer.sampleRate;
+    srcLen = audioBuffer.length;
+    channelData = [];
+    for(let ch = 0; ch < numChannels; ch++){
+      channelData.push(audioBuffer.getChannelData(ch));
     }
+    maxPlanarBuffer = new Float32Array(CHUNK_SIZE * numChannels);
   }
+
+  const encodeAudioUpTo = (targetFrames) => {
+    while(audioOffset < targetFrames && !renderCancel){
+      const framesInChunk = Math.min(CHUNK_SIZE, targetFrames - audioOffset);
+      const planar = maxPlanarBuffer.subarray(0, framesInChunk * numChannels);
+      for(let ch = 0; ch < numChannels; ch++){
+        const src = channelData[ch];
+        const dstOffset = ch * framesInChunk;
+        for(let f = 0; f < framesInChunk; f++){
+          const idx = audioOffset + f;
+          planar[dstOffset + f] = idx < srcLen ? src[idx] : 0.0;
+        }
+      }
+      const timestampUs = Math.round((audioOffset * 1e6) / sr);
+      const ad = new AudioData({
+        format: "f32-planar",
+        sampleRate: sr,
+        numberOfFrames: framesInChunk,
+        numberOfChannels: numChannels,
+        timestamp: timestampUs,
+        data: planar,
+      });
+      aenc.encode(ad);
+      ad.close();
+      audioOffset += framesInChunk;
+    }
+  };
 
   const seekTo = (v,t)=>new Promise(res=>{
     const h = ()=>{ v.removeEventListener("seeked", h); res(); };
@@ -186,7 +199,16 @@ async function offlineRender(){
     const vf = new VideoFrame(canvas, {timestamp: Math.round(i*1e6/fps), duration: Math.round(1e6/fps)});
     enc.encode(vf, {keyFrame: i%(fps*2)===0});
     vf.close();
-    while(enc.encodeQueueSize > 6 && !renderCancel) await new Promise(r=>setTimeout(r,5));
+
+    /* Progressively encode audio matching the current video frame progress to ensure interleaving */
+    if(hasAudio){
+      const targetFrames = Math.min(totalAudioFrames, Math.round(((i + 1) / total) * totalAudioFrames));
+      encodeAudioUpTo(targetFrames);
+    }
+
+    while((enc.encodeQueueSize > 6 || (aenc && aenc.encodeQueueSize > 30)) && !renderCancel){
+      await new Promise(r=>setTimeout(r,5));
+    }
     if(i%3===0){
       ovTxt.textContent = "RENDERING "+Math.round(i/total*100)+"%  ("+i+"/"+total+" frames, "+codec.split(".")[0].toUpperCase()+")";
       ovBar.style.width = (i/total*100)+"%";
@@ -196,6 +218,10 @@ async function offlineRender(){
   try{
     if(!renderCancel){
       ovTxt.textContent = "FINALIZING…";
+      if(hasAudio){
+        encodeAudioUpTo(totalAudioFrames);
+        await aenc.flush();
+      }
       await enc.flush();
       muxer.finalize();
       if(fileStream){
@@ -217,6 +243,9 @@ async function offlineRender(){
     try{ if(enc && enc.state !== "closed") enc.close(); }catch(e){}
     try{ if(aenc && aenc.state !== "closed") aenc.close(); }catch(e){}
     parts.length = 0;
+    audioBuffer = null;
+    channelData = null;
+    maxPlanarBuffer = null;
   }
   canvas.width = oldW; canvas.height = oldH;
   ov.style.display = "none";

@@ -1009,13 +1009,13 @@ function buildMixStrip(){
   const buses = [
     {key:"b1", pid:"abMix", label:"BUS 1", routed:true,
      get:()=>mixMode, set:v=>{mixMode=v;}, inv:()=>wipeInv, tinv:()=>{wipeInv=!wipeInv;},
-     getBlend:()=>mixBlend, setBlend:v=>{mixBlend=v;}, getKey:()=>mixKey, setKey:v=>{mixKey=v;}},
+     getBlend:()=>mixBlend, setBlend:v=>{mixBlend=v;}, getKey:()=>mixKey, setKey:v=>{mixKey=v;}, getMelt:()=>meltMode, setMelt:v=>{meltMode=v;}},
     {key:"b2", pid:"cdMix", label:"BUS 2", routed:true,
      get:()=>mixMode2, set:v=>{mixMode2=v;}, inv:()=>wipeInv2, tinv:()=>{wipeInv2=!wipeInv2;},
-     getBlend:()=>mixBlend2, setBlend:v=>{mixBlend2=v;}, getKey:()=>mixKey2, setKey:v=>{mixKey2=v;}},
+     getBlend:()=>mixBlend2, setBlend:v=>{mixBlend2=v;}, getKey:()=>mixKey2, setKey:v=>{mixKey2=v;}, getMelt:()=>meltMode2, setMelt:v=>{meltMode2=v;}},
     {key:"bM", pid:"busMix", label:"MASTER · BUS 1 ↔ BUS 2", routed:false,
      get:()=>mixModeM, set:v=>{mixModeM=v;}, inv:()=>wipeInvM, tinv:()=>{wipeInvM=!wipeInvM;},
-     getBlend:()=>mixBlendM, setBlend:v=>{mixBlendM=v;}, getKey:()=>mixKeyM, setKey:v=>{mixKeyM=v;}},
+     getBlend:()=>mixBlendM, setBlend:v=>{mixBlendM=v;}, getKey:()=>mixKeyM, setKey:v=>{mixKeyM=v;}, getMelt:()=>meltModeM, setMelt:v=>{meltModeM=v;}},
   ];
   for(const bus of buses){
     const p = P[bus.pid];
@@ -1080,8 +1080,19 @@ function buildMixStrip(){
     MIXKEYS.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=m; ky.appendChild(o); });
     ky.value = bus.getKey();
     ky.onchange = ()=>{ bus.setKey(parseInt(ky.value)); };
+    const ml = document.createElement("select");
+    ml.id = "selMelt"+bus.key;
+    attachTip(ml, "MELT MODE",
+      "What the MELT control does. EDGE treats the seam between the two pictures as a feedback region and leaves everything else alone, which is why it looks dead on a plain dissolve: a dissolve has no seam to stand on. FRAME feeds the whole picture back through itself, turned and scaled a little each pass, which is video feedback and trails like it. MOTION does the same but only where the picture is changing, so a still shot stays clean and anything moving drags a tail.",
+      "ZOOM, HUE and SOFTEN on the MIX tab shape the trail; SWIRL turns it and HOLD decides how long it lasts.");
+    MELTMODES.forEach((m,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent="MELT: "+m; ml.appendChild(o); });
+    ml.value = bus.getMelt();
+    ml.onchange = ()=>{ bus.setMelt(parseInt(ml.value)); };
     row2.appendChild(bl); row2.appendChild(ky);
     el.appendChild(row2);
+    const row2b = document.createElement("div"); row2b.className = "mixrow";
+    row2b.appendChild(ml);
+    el.appendChild(row2b);
 
     const fr = document.createElement("div"); fr.className = "mixfader";
     const wrap = document.createElement("div"); wrap.className = "sldwrap";
@@ -2259,6 +2270,7 @@ function refreshToggles(){
   const setSel = (id, v)=>{ const e = document.getElementById(id); if(e) e.value = String(v); };
   setSel("selMixMode", mixMode);   setSel("selMixMode2", mixMode2);  setSel("selMixModeM", mixModeM);
   setSel("selMixBlendb1", mixBlend); setSel("selMixBlendb2", mixBlend2); setSel("selMixBlendbM", mixBlendM);
+  setSel("selMeltb1", meltMode); setSel("selMeltb2", meltMode2); setSel("selMeltbM", meltModeM);
   setSel("selMixKeyb1", mixKey);     setSel("selMixKeyb2", mixKey2);     setSel("selMixKeybM", mixKeyM);
   for(const k in stripInvBtns){
     const r = stripInvBtns[k];

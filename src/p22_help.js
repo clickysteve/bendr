@@ -18,7 +18,10 @@ const PHELP = {
   pipY:"Vertical position of the subscreen.",
   pipSize:"How large the subscreen is, from a small inset to most of the frame.",
   pipBorder:"Width of the border drawn around the subscreen. Zero for none.",
-  edgeAmt:"How hard the seam between the two pictures melts. The travel past 1.0 is headroom rather than a different behaviour: it keeps pushing the same drag further, to where the seam stops reading as a seam at all. The mixer works out where the boundary is and which way it faces, then drags the incoming picture along that direction and feeds its own last frame back into the same narrow band. The result is a soft trailing boundary that creeps outward, instead of a clean cut. Zero switches the whole stage off and costs nothing.",
+  edgeAmt:"How much of the melt there is. What it melts depends on MELT MODE beside the fader. On EDGE it works only on the seam between the two pictures, which is why it looks dead on a plain dissolve: a dissolve has no seam to stand on. On FRAME the whole picture feeds back through itself, turned and scaled a little on every pass, which is video feedback and trails like it. On MOTION the same trail appears only where the picture is changing, so a still shot stays clean and anything moving drags a tail behind it. The travel past 1.0 is headroom rather than a different behaviour. Zero switches the stage off and costs nothing, including the frame of history it would otherwise keep.",
+  meltZoom:"How much the fed-back picture is scaled on each pass. Positive pulls it inward and the trail runs away into the middle, which is the tunnel; negative pushes it out and the trail grows towards the edges. It is a fraction of a percent per pass, but at sixty passes a second a fraction of a percent is a tunnel. Only does anything on FRAME and MOTION.",
+  meltHue:"How far the colour wheel turns on each pass, so the trail changes hue as it ages. This is where feedback gets its rainbows: the picture is one colour, what it left behind a second ago is another. Small amounts read as a warm or cold wake; large ones cycle. Only does anything on FRAME and MOTION.",
+  meltSoft:"How much the fed-back picture is blurred on each pass. Without it every copy is as sharp as the last and the trail reads as a stack of ghosts or a strobe; with it they merge into a smear, which is what a long-persistence tube actually does. Costs four extra samples when it is up and nothing when it is down.",
   edgeWidth:"How far either side of the boundary the melt reaches. Past 1.0 the band is wide enough to swallow most of the frame, which is a look rather than an edge treatment. Small values give a wet-looking rim; large values turn the whole transition into a smear.",
   edgeHold:"How much of the last frame survives inside the band. This is the persistence that turns a smear into a trail, and above about 0.8 it stops settling and keeps building, which is where it starts to look properly bent. Past 1.0 the ceiling on that survival lifts as well, so it never settles at all for as long as you leave it there.",
   edgeSwirl:"Turns the drag direction. At zero the melt runs straight out across the boundary; wound fully either way it runs along it instead, so the edge stirs rather than bleeds.",
@@ -378,6 +381,7 @@ const PHELP = {
 for(const [suffix, note] of [["2"," (bus 2: channels C and D)"], ["M"," (master: bus 1 against bus 2)"]]){
   for(const id of ["wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue","pipX","pipY","pipSize","pipBorder",
                    "edgeAmt","edgeWidth","edgeHold","edgeSwirl","edgeChroma","edgeCreep",
+                   "meltZoom","meltHue","meltSoft",
                    "wipeBord","wipeBordCol","wipeRep","mixKeyGain","mixKeyDens","mixKeyEdge","mixKeyEdgeCol","mixKeyShadow","mixDirt","mixDirtRate","mixDirtDrop","mixDirtCut","mixDirtKnock","mixDirtNoise"]){
     PHELP[id+suffix] = PHELP[id] + note;
   }
@@ -482,13 +486,23 @@ let mixMode = 0;           // BUS 1 (A/B) transition/blend mode (see MIXMODES)
 let wipeInv = false;
 let mixMode2 = 0, wipeInv2 = false;   // BUS 2 (C/D)
 let mixModeM = 0, wipeInvM = false;   // MASTER (bus 1 / bus 2)
+/* How the melt feeds back. EDGE is the original: the seam between the two
+   pictures is treated as a feedback region and nothing else moves, which means
+   it does nothing at all on a plain dissolve, because a dissolve has no seam.
+   FRAME feeds the whole picture back through itself, moved a little each pass,
+   which is video feedback and behaves like it. MOTION does the same but only
+   where the picture is changing, so still things stay clean and moving things
+   drag a tail behind them. */
+const MELTMODES = ["EDGE", "FRAME", "MOTION"];
+let meltMode = 0, meltMode2 = 0, meltModeM = 0;
 /* transition, mix type and key are three independent choices per bus */
 let mixBlend = 0, mixBlend2 = 0, mixBlendM = 0;
 let mixKey = 0,   mixKey2 = 0,   mixKeyM = 0;
 /* the mixer shader has one set of uniform names; each bus feeds it its own params */
 const MIXP = ["abMix","wipeSoft","wipeDetail","wipeX","wipeY","mixKeyThresh","mixKeySoft","mixKeyInv","mixKeyHue","pipX","pipY","pipSize","pipBorder",
               "edgeAmt","edgeWidth","edgeHold","edgeSwirl","edgeChroma","edgeCreep",
-              "wipeBord","wipeBordCol","wipeRep","mixKeyGain","mixKeyDens","mixKeyEdge","mixKeyEdgeCol","mixKeyShadow","mixDirt","mixDirtRate","mixDirtDrop","mixDirtCut","mixDirtKnock","mixDirtNoise"];
+              "wipeBord","wipeBordCol","wipeRep","mixKeyGain","mixKeyDens","mixKeyEdge","mixKeyEdgeCol","mixKeyShadow","mixDirt","mixDirtRate","mixDirtDrop","mixDirtCut","mixDirtKnock","mixDirtNoise",
+              "meltZoom","meltHue","meltSoft"];
 const MIXP_EDGE = 13;   /* index of edgeAmt inside a bus's parameter list */
 /* which channel feeds each side of each bus — any channel can meet any other */
 const busSrc = {b1:["A","B"], b2:["C","D"]};
@@ -502,10 +516,12 @@ const MIXBUS = {
   b1: MIXP,
   b2: ["cdMix","wipeSoft2","wipeDetail2","wipeX2","wipeY2","mixKeyThresh2","mixKeySoft2","mixKeyInv2","mixKeyHue2","pipX2","pipY2","pipSize2","pipBorder2",
        "edgeAmt2","edgeWidth2","edgeHold2","edgeSwirl2","edgeChroma2","edgeCreep2",
-       "wipeBord2","wipeBordCol2","wipeRep2","mixKeyGain2","mixKeyDens2","mixKeyEdge2","mixKeyEdgeCol2","mixKeyShadow2","mixDirt2","mixDirtRate2","mixDirtDrop2","mixDirtCut2","mixDirtKnock2","mixDirtNoise2"],
+       "wipeBord2","wipeBordCol2","wipeRep2","mixKeyGain2","mixKeyDens2","mixKeyEdge2","mixKeyEdgeCol2","mixKeyShadow2","mixDirt2","mixDirtRate2","mixDirtDrop2","mixDirtCut2","mixDirtKnock2","mixDirtNoise2",
+       "meltZoom2","meltHue2","meltSoft2"],
   bM: ["busMix","wipeSoftM","wipeDetailM","wipeXM","wipeYM","mixKeyThreshM","mixKeySoftM","mixKeyInvM","mixKeyHueM","pipXM","pipYM","pipSizeM","pipBorderM",
        "edgeAmtM","edgeWidthM","edgeHoldM","edgeSwirlM","edgeChromaM","edgeCreepM",
-       "wipeBordM","wipeBordColM","wipeRepM","mixKeyGainM","mixKeyDensM","mixKeyEdgeM","mixKeyEdgeColM","mixKeyShadowM","mixDirtM","mixDirtRateM","mixDirtDropM","mixDirtCutM","mixDirtKnockM","mixDirtNoiseM"]
+       "wipeBordM","wipeBordColM","wipeRepM","mixKeyGainM","mixKeyDensM","mixKeyEdgeM","mixKeyEdgeColM","mixKeyShadowM","mixDirtM","mixDirtRateM","mixDirtDropM","mixDirtCutM","mixDirtKnockM","mixDirtNoiseM",
+       "meltZoomM","meltHueM","meltSoftM"]
 };
 /* Sections switched out individually. The rail pills switch out a whole stage;
    this is the finer control, and it works by making the section's parameters

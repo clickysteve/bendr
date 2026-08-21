@@ -221,6 +221,7 @@ const FS_MIX = COMMON + KEYFN +
 "uniform float u_pipX,u_pipY,u_pipSize,u_pipBorder;\n" +
 "uniform sampler2D u_prev; uniform float u_hasPrev;\n" +
 "uniform float u_edgeAmt,u_edgeWidth,u_edgeHold,u_edgeSwirl,u_edgeChroma,u_edgeCreep;\n" +
+"uniform float u_meltMode,u_meltZoom,u_meltHue,u_meltSoft;\n" +
 "uniform float u_mixDirt,u_mixDirtRate,u_mixDirtDrop,u_mixDirtCut,u_mixDirtKnock,u_mixDirtNoise;\n" +
 "/* the eight back colours a bench mixer offers, in the order they are always\n" +
 "   listed: white, yellow, cyan, green, magenta, red, blue, black */\n" +
@@ -360,10 +361,94 @@ const FS_MIX = COMMON + KEYFN +
 "  if(blend<21.5) return mix(a, hsv2rgbM(vec3(ha.x, hb.y, ha.z)), m);\n" +   /* SATURATION */
 "  if(blend<22.5) return mix(a, hsv2rgbM(vec3(hb.x, hb.y, ha.z)), m);\n" +   /* COLOUR */
 "  return mix(a, hsv2rgbM(vec3(ha.x, ha.y, hb.z)), m);\n}\n" +               /* LUMINOSITY */
+/* The melt is a feedback loop on this stage's own output, so it is a
+   function rather than a passage inside the mix: the mixer takes a short
+   cut when there is only one picture to show, and the melt still has to
+   happen on that. */
+"vec3 applyMelt(vec3 src, vec2 uv, float outA, float band, vec2 en){\n" +
+"  /* ---- the melt's feedback ----\n" +
+"     EDGE keeps what this always did: only the band around the seam dissolves\n" +
+"     the last frame back in, so the boundary smears and creeps and the rest of\n" +
+"     the picture is untouched. It is also why the control appeared to do\n" +
+"     nothing on a plain dissolve \u2014 a dissolve has no seam to stand on.\n" +
+"     FRAME feeds the whole picture back through itself, rotated and scaled a\n" +
+"     little each pass, which is what video feedback actually is: a trail that\n" +
+"     goes somewhere rather than a smudge that sits still. MOTION does the same\n" +
+"     but weighted by how much the picture changed since last frame, so a still\n" +
+"     shot stays clean and anything that moves drags a tail. */\n" +
+"  bool meltOn = u_hasPrev > 0.5 && u_edgeHold > 0.002 &&\n" +
+"                ((u_meltMode > 0.5 && u_edgeAmt > 0.002) || (u_meltMode < 0.5 && band > 0.001));\n" +
+"  if(meltOn){\n" +
+"    vec2 puv = uv; float w = band;\n" +
+"    if(u_meltMode > 0.5){\n" +
+"      /* a rotation and a scale about the centre, per pass. Small numbers: at\n" +
+"         sixty passes a second a tenth of a degree is already a spiral. */\n" +
+"      vec2 c = (uv - 0.5) * vec2(outA, 1.0);\n" +
+"      float ro = u_edgeSwirl * 0.10;\n" +
+"      float zo = 1.0 - u_meltZoom * 0.05;\n" +
+"      float cs = cos(ro), sn = sin(ro);\n" +
+"      c = vec2(cs*c.x - sn*c.y, sn*c.x + cs*c.y) * zo;\n" +
+"      puv = c / vec2(outA, 1.0) + 0.5;\n" +
+"      w = 1.0;\n" +
+"      if(u_meltMode > 1.5){\n" +
+"        vec3 lw = vec3(0.299, 0.587, 0.114);\n" +
+"        float d = abs(dot(src, lw) - dot(texture(u_prev, uv).rgb, lw));\n" +
+"        w = clamp(d * (3.0 + u_edgeWidth*14.0), 0.0, 1.0);\n" +
+"      }\n" +
+"    } else {\n" +
+"      puv = uv + en * (0.0015 + u_edgeAmt*0.04);\n" +
+"    }\n" +
+"    puv = clamp(puv, 0.0, 1.0);\n" +
+"    vec3 pv = texture(u_prev, puv).rgb;\n" +
+"    /* softening per pass is the difference between a smear and a stack of\n" +
+"       ghosts: without it every copy is sharp and the trail reads as strobing */\n" +
+"    if(u_meltSoft > 0.002){\n" +
+"      float sr = u_meltSoft * 0.006;\n" +
+"      pv = (pv + texture(u_prev, clamp(puv+vec2(sr/outA,0.0),0.0,1.0)).rgb\n" +
+"              + texture(u_prev, clamp(puv-vec2(sr/outA,0.0),0.0,1.0)).rgb\n" +
+"              + texture(u_prev, clamp(puv+vec2(0.0,sr),0.0,1.0)).rgb\n" +
+"              + texture(u_prev, clamp(puv-vec2(0.0,sr),0.0,1.0)).rgb) * 0.2;\n" +
+"    }\n" +
+"    if(u_edgeChroma > 0.002){\n" +
+"      /* colour runs further than luma, the way it does off a composite edge */\n" +
+"      vec2 co = (u_meltMode > 0.5) ? (puv - uv) : (en * (0.0015 + u_edgeAmt*0.04));\n" +
+"      vec3 pc = texture(u_prev, clamp(puv + co*3.0*u_edgeChroma, 0.0, 1.0)).rgb;\n" +
+"      vec3 y1 = rgb2yiq(pv), y2 = rgb2yiq(pc);\n" +
+"      pv = yiq2rgb(vec3(y1.x, mix(y1.yz, y2.yz, u_edgeChroma)));\n" +
+"    }\n" +
+"    /* a turn of the colour wheel on every pass, which is where feedback gets\n" +
+"       its rainbows from: the trail changes hue as it ages */\n" +
+"    if(abs(u_meltHue) > 0.002){\n" +
+"      vec3 yy = rgb2yiq(pv);\n" +
+"      float ha = u_meltHue * 0.22, hc = cos(ha), hs = sin(ha);\n" +
+"      pv = yiq2rgb(vec3(yy.x, hc*yy.y - hs*yy.z, hs*yy.y + hc*yy.z));\n" +
+"    }\n" +
+"    /* the ceiling on how much of the last frame can survive. Unity is the\n" +
+"       old limit and still reads as a trail that settles; past it the band\n" +
+"       stops settling at all and keeps building, which is the point of the\n" +
+"       extra travel on the control. */\n" +
+"    float hcap = min(0.94 + max(u_edgeHold-1.0, 0.0)*0.11, 0.995);\n" +
+"    float mixAmt = (u_meltMode < 0.5) ? (band * u_edgeHold)\n" +
+"                                      : (w * u_edgeHold * min(u_edgeAmt, 1.0));\n" +
+"    src = mix(src, pv, clamp(mixAmt, 0.0, hcap));\n" +
+"  }\n" +
+"  return src;}\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
 "  float outA = u_res.x/u_res.y;\n" +
-"  if(u_hasB<0.5 || u_abMix<0.0005){ O = texture(u_texA, uv); return; }\n" +
+"  /* One picture, or the fader down: there is nothing to mix, and running\n" +
+"     the wipes, the keyer and twenty-four blend modes to arrive back at\n" +
+"     picture A would be a waste. The melt still gets its turn, because it\n" +
+"     feeds back this stage's own output and that exists whether or not\n" +
+"     anything is being mixed into it. Without this the control did nothing\n" +
+"     at all unless the fader was up AND the transition had a visible seam,\n" +
+"     which is two invisible conditions and most of the reason it read as a\n" +
+"     control that does not work. */\n" +
+"  if(u_hasB<0.5 || u_abMix<0.0005){\n" +
+"    vec4 s0 = texture(u_texA, uv);\n" +
+"    if(u_meltMode > 0.5) s0.rgb = applyMelt(s0.rgb, uv, outA, 0.0, vec2(0.0));\n" +
+"    O = s0; return;\n" +
+"  }\n" +
 "  float t = u_abMix;\n" +
 "  float mm = u_mixMode;\n" +
 "  /* ---- 0. the dirty mixer ----\n" +
@@ -463,7 +548,7 @@ const FS_MIX = COMMON + KEYFN +
 "     put and creeps a little further out every frame. That is what makes it\n" +
 "     melt instead of blur, and it only happens at the edge. */\n" +
 "  float band = 0.0; vec2 en = vec2(0.0);\n" +
-"  if(u_edgeAmt > 0.002){\n" +
+"  if(u_edgeAmt > 0.002 && u_meltMode < 0.5){\n" +
 "    float r = 0.004 + u_edgeWidth*0.085;\n" +
 "    vec2 rx = vec2(r/outA, 0.0), ry = vec2(0.0, r);\n" +
 "    float mL = matteAt(duv-rx, mm, t, outA), mR = matteAt(duv+rx, mm, t, outA);\n" +
@@ -491,22 +576,7 @@ const FS_MIX = COMMON + KEYFN +
 "  if(keyShad > 0.001) src = mix(src, src*(1.0 - 0.8*u_mixKeyShadow), keyShad);\n" +
 "  if(keyEdge > 0.001) src = mix(src, backCol(u_mixKeyEdgeCol), keyEdge*clamp(u_mixKeyEdge*3.0,0.0,1.0));\n" +
 "  if(wipeBand > 0.001) src = mix(src, backCol(u_wipeBordCol), wipeBand*clamp(u_wipeBord*2.5,0.0,1.0));\n" +
-"  if(u_hasPrev > 0.5 && band > 0.001 && u_edgeHold > 0.002){\n" +
-"    vec2 pd = en * (0.0015 + u_edgeAmt*0.04);\n" +
-"    vec3 pv = texture(u_prev, clamp(uv + pd, 0.0, 1.0)).rgb;\n" +
-"    if(u_edgeChroma > 0.002){\n" +
-"      /* colour runs further than luma, the way it does off a composite edge */\n" +
-"      vec3 pc = texture(u_prev, clamp(uv + pd*(1.0+3.0*u_edgeChroma), 0.0, 1.0)).rgb;\n" +
-"      vec3 y1 = rgb2yiq(pv), y2 = rgb2yiq(pc);\n" +
-"      pv = yiq2rgb(vec3(y1.x, mix(y1.yz, y2.yz, u_edgeChroma)));\n" +
-"    }\n" +
-"    /* the ceiling on how much of the last frame can survive. Unity is the\n" +
-"       old limit and still reads as a trail that settles; past it the band\n" +
-"       stops settling at all and keeps building, which is the point of the\n" +
-"       extra travel on the control. */\n" +
-"    float hcap = min(0.94 + max(u_edgeHold-1.0, 0.0)*0.11, 0.995);\n" +
-"    src = mix(src, pv, clamp(band*u_edgeHold, 0.0, hcap));\n" +
-"  }\n" +
+"  src = applyMelt(src, uv, outA, band, en);\n" +
 "  if(border > 0.5) src = mix(src, vec3(1.0), t);\n" +
 "  /* ---- 4. what is left of a firing: dropped lines and switching noise ---- */\n" +
 "  if(dirtE > 0.001){\n" +

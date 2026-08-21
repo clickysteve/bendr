@@ -705,8 +705,11 @@ function renderFrame(now, dt){
      crossfades the two buses. So A can meet C, or D can meet B. */
   /* the melt stage reads the previous frame of this same mixer stage, so the
      two buffers ping-pong rather than one being copied into the other */
+  /* the melt needs the stage's own last frame, so it decides whether the
+     history buffer gets allocated at all. Amount and hold both have to be up
+     whichever mode it is in, because the blend is their product. */
   function edgeLive(ids){ return mCur[ids[MIXP_EDGE]] > 0.002 && mCur[ids[MIXP_EDGE+2]] > 0.002; }
-  function mixPass(dstRT, texA, texB, hasB, ids, mode, inv, blend, key, prevTex){
+  function mixPass(dstRT, texA, texB, hasB, ids, mode, inv, blend, key, prevTex, melt){
     gl.bindFramebuffer(gl.FRAMEBUFFER, dstRT.fbo);
     gl.viewport(0,0,procW,procH);
     gl.useProgram(progMIX.prog);
@@ -724,6 +727,7 @@ function renderFrame(now, dt){
     gl.uniform1i(U(progMIX,"u_prev"), 2);
     gl.uniform1f(U(progMIX,"u_hasPrev"), prevTex?1:0);
     gl.uniform1f(U(progMIX,"u_time"), now);
+    gl.uniform1f(U(progMIX,"u_meltMode"), melt||0);
     const locs = mixLocs();
     for(let i=0;i<locs.length;i++) gl.uniform1f(locs[i], mCur[ids[i]]);
     draw();
@@ -734,13 +738,13 @@ function renderFrame(now, dt){
     if(edgeLive(MIXBUS.b1)){ ensureShared("busHist1"); const t = busOut1; busOut1 = busHist1; busHist1 = t; p1 = busHist1.tex; }
     if(edgeLive(MIXBUS.b2)){ ensureShared("busHist2"); const t = busOut2; busOut2 = busHist2; busHist2 = t; p2t = busHist2.tex; }
     if(edgeLive(MIXBUS.bM)){ ensureShared("mixHist"); const t = mixOut; mixOut = mixHist; mixHist = t; pM = mixHist.tex; }
-    mixPass(busOut1, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv, mixBlend, mixKey, p1);
-    mixPass(busOut2, chanOutTex(b2[0]), chanOutTex(b2[1]), live[b2[1]], MIXBUS.b2, mixMode2, wipeInv2, mixBlend2, mixKey2, p2t);
-    mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mixModeM, wipeInvM, mixBlendM, mixKeyM, pM);
+    mixPass(busOut1, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv, mixBlend, mixKey, p1, meltMode);
+    mixPass(busOut2, chanOutTex(b2[0]), chanOutTex(b2[1]), live[b2[1]], MIXBUS.b2, mixMode2, wipeInv2, mixBlend2, mixKey2, p2t, meltMode2);
+    mixPass(mixOut, busOut1.tex, busOut2.tex, true, MIXBUS.bM, mixModeM, wipeInvM, mixBlendM, mixKeyM, pM, meltModeM);
   } else {
     /* nothing on bus 2, so bus 1 goes straight to master and costs one pass, as before */
     if(edgeLive(MIXBUS.b1)){ ensureShared("mixHist"); const t = mixOut; mixOut = mixHist; mixHist = t; p1 = mixHist.tex; }
-    mixPass(mixOut, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv, mixBlend, mixKey, p1);
+    mixPass(mixOut, chanOutTex(b1[0]), chanOutTex(b1[1]), live[b1[1]], MIXBUS.b1, mixMode, wipeInv, mixBlend, mixKey, p1, meltMode);
   }
 
   if(multiView){

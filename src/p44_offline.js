@@ -6,6 +6,10 @@ document.getElementById("btnRender").onclick = ()=>{ offlineRender().catch(e=>{
   offline=false; document.getElementById("renderOv").style.display="none";
 }); };
 async function offlineRender(){
+  if(window.activeDownloadUrl){
+    try{ URL.revokeObjectURL(window.activeDownloadUrl); }catch(_){}
+    window.activeDownloadUrl = null;
+  }
   if(SRC.A.mode!=="file" || !SRC.A.video.duration){ toast("Load a video file into channel A first", true); return; }
   if(!("VideoEncoder" in window)){ toast("This browser has no WebCodecs — use Chrome", true); return; }
   /* the render used to be hard-wired to 30, which is a poor fit for material
@@ -246,13 +250,16 @@ async function offlineRender(){
     };
 
     const seekTo = (v,t)=>new Promise(res=>{
-      const target = Math.min(t, v.duration-0.001);
-      if(Math.abs(v.currentTime - target) < 0.001){
+      const duration = (v && !isNaN(v.duration) && v.duration > 0) ? v.duration : 0;
+      const target = duration > 0 ? Math.min(t, duration - 0.001) : 0;
+      if(Math.abs(v.currentTime - target) < 0.001 || renderCancel){
         return res();
       }
       let timeout;
+      let pollInterval;
       const h = ()=>{
         clearTimeout(timeout);
+        clearInterval(pollInterval);
         v.removeEventListener("seeked", h);
         res();
       };
@@ -260,6 +267,9 @@ async function offlineRender(){
         console.warn("Seek timeout reached at "+target.toFixed(3)+"s; proceeding");
         h();
       }, 1000);
+      pollInterval = setInterval(()=>{
+        if(renderCancel) h();
+      }, 50);
       v.addEventListener("seeked", h);
       v.currentTime = target;
     });
@@ -312,8 +322,8 @@ async function offlineRender(){
         parts.sort((a,b)=>a.position-b.position);
         const blob = new Blob(parts.map(x=>x.data), {type:"video/mp4"});
         const url = URL.createObjectURL(blob);
+        window.activeDownloadUrl = url;
         dl(url, suggested);
-        setTimeout(() => URL.revokeObjectURL(url), 15000);
         toast("Rendered "+total+" frames "+(hasAudio?"with audio":"(video only)")+" \u2192 MP4, "+(blob.size/1048576).toFixed(1)+" MB");
       }
     } else {
@@ -334,8 +344,10 @@ async function offlineRender(){
     canvas.width = oldW; canvas.height = oldH;
     ov.style.display = "none";
     offline = false; lastT = performance.now()/1000;
-    if(wasPlaying) video.play();
-    for(const ch of ["B","C","D"]) if(SRC[ch].mode==="file") SRC[ch].video.play();
+    if(wasPlaying){ try{ video.play().catch(()=>{}); }catch(_){} }
+    for(const ch of ["B","C","D"]){
+      if(SRC[ch].mode==="file"){ try{ SRC[ch].video.play().catch(()=>{}); }catch(_){} }
+    }
   }
 }
 

@@ -11867,7 +11867,12 @@ async function offlineRender(){
       const res = await fetch(audioSrcUrl);
       if(res.ok){
         const ab = await res.arrayBuffer();
-        const actx = (typeof audioCtx !== "undefined" && audioCtx) ? audioCtx : (localActx = new (window.AudioContext || window.webkitAudioContext)());
+        if(ab.byteLength > 100 * 1024 * 1024){
+          console.warn("Audio file is large (" + (ab.byteLength/1048576).toFixed(1) + " MB), decoding may take significant memory.");
+        }
+        const actx = (typeof audioCtx !== "undefined" && audioCtx)
+          ? audioCtx
+          : (localActx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100));
         audioBuffer = await new Promise((resolve, reject)=>{
           actx.decodeAudioData(ab, resolve, reject);
         });
@@ -11876,28 +11881,43 @@ async function offlineRender(){
       console.warn("Offline audio decode failed, falling back to video only:", e);
       audioBuffer = null;
     }finally{
-      if(localActx){
+      if(localActx && localActx.close){
         try{ await localActx.close(); }catch(e){}
       }
     }
   }
 
   let hasAudio = false;
+  let aenc = null;
   if("AudioEncoder" in window && audioBuffer && audioBuffer.numberOfChannels > 0 && audioBuffer.length > 0){
-    try{
-      const aconf = {
-        codec: "mp4a.40.2",
-        numberOfChannels: audioBuffer.numberOfChannels,
-        sampleRate: audioBuffer.sampleRate,
-        bitrate: 192000,
-      };
-      const asup = await AudioEncoder.isConfigSupported(aconf);
-      if(asup && asup.supported){
-        hasAudio = true;
+    const standardRates = [32000, 44100, 48000];
+    if(audioBuffer.numberOfChannels > 2 || !standardRates.includes(audioBuffer.sampleRate)){
+      console.warn("Offline audio rendering requires 1 or 2 channels and 32k/44.1k/48kHz sample rate (found "+audioBuffer.numberOfChannels+"ch, "+audioBuffer.sampleRate+"Hz). Falling back to video only.");
+    } else {
+      try{
+        const aconf = {
+          codec: "mp4a.40.2",
+          numberOfChannels: audioBuffer.numberOfChannels,
+          sampleRate: audioBuffer.sampleRate,
+          bitrate: audioBuffer.numberOfChannels === 1 ? 96000 : 192000,
+        };
+        const asup = await AudioEncoder.isConfigSupported(aconf);
+        if(asup && asup.supported){
+          aenc = new AudioEncoder({
+            output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+            error: e => { console.error("Audio encoder error:", e); toast("Audio encoder error: "+e.message, true); renderCancel = true; },
+          });
+          aenc.configure(aconf);
+          hasAudio = true;
+        }
+      }catch(e){
+        console.warn("AudioEncoder initialization/configuration failed. Falling back to video only:", e);
+        hasAudio = false;
+        if(aenc){
+          try{ if(aenc.state !== "closed") aenc.close(); }catch(_){}
+          aenc = null;
+        }
       }
-    }catch(e){
-      console.warn("AudioEncoder config check failed:", e);
-      hasAudio = false;
     }
   }
 
@@ -11926,21 +11946,8 @@ async function offlineRender(){
   });
   enc.configure({codec, width:W, height:H, bitrate:bitrateFor(W,H,fps), framerate:fps});
 
-  let aenc = null;
-  if(hasAudio){
-    aenc = new AudioEncoder({
-      output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-      error: e => { console.error("Audio encoder error:", e); toast("Audio encoder error: "+e.message, true); renderCancel = true; },
-    });
-    aenc.configure({
-      codec: "mp4a.40.2",
-      numberOfChannels: audioBuffer.numberOfChannels,
-      sampleRate: audioBuffer.sampleRate,
-      bitrate: 192000,
-    });
-  }
-
-  const total = Math.max(1, Math.floor(video.duration*fps));
+  const duration = (video && !isNaN(video.duration) && video.duration > 0) ? video.duration : 1;
+  const total = Math.max(1, Math.floor(duration * fps));
 
   /* Progressive audio encoding: encode audio chunks incrementally alongside video frames
      so audio and video are properly interleaved in the output MP4 stream, avoiding memory spikes */
@@ -11951,6 +11958,7 @@ async function offlineRender(){
   let numChannels = 0;
   let sr = 0;
   let srcLen = 0;
+  let maxPlanarBuffer = null;
 
   if(hasAudio){
     const totalDurSec = total / fps;
@@ -11962,12 +11970,13 @@ async function offlineRender(){
     for(let ch = 0; ch < numChannels; ch++){
       channelData.push(audioBuffer.getChannelData(ch));
     }
+    maxPlanarBuffer = new Float32Array(CHUNK_SIZE * numChannels);
   }
 
   const encodeAudioUpTo = (targetFrames) => {
     while(audioOffset < targetFrames && !renderCancel){
       const framesInChunk = Math.min(CHUNK_SIZE, targetFrames - audioOffset);
-      const planar = new Float32Array(framesInChunk * numChannels);
+      const planar = maxPlanarBuffer.subarray(0, framesInChunk * numChannels);
       for(let ch = 0; ch < numChannels; ch++){
         const src = channelData[ch];
         const dstOffset = ch * framesInChunk;
@@ -12043,12 +12052,19 @@ async function offlineRender(){
       if(fileStream){ try{ await fileStream.abort(); }catch(e){} }
       toast("Render cancelled", true);
     }
+  } catch(e) {
+    console.error("Render finalization failed:", e);
+    if(fileStream){ try{ await fileStream.abort(); }catch(_){} }
+    toast("Render finalization failed: " + e.message, true);
   } finally {
     /* the encoder used to be closed only on the cancel path, so every
        completed render left one behind */
     try{ if(enc && enc.state !== "closed") enc.close(); }catch(e){}
     try{ if(aenc && aenc.state !== "closed") aenc.close(); }catch(e){}
     parts.length = 0;
+    audioBuffer = null;
+    channelData = null;
+    maxPlanarBuffer = null;
   }
   canvas.width = oldW; canvas.height = oldH;
   ov.style.display = "none";

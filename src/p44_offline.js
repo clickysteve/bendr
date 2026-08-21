@@ -58,7 +58,12 @@ async function offlineRender(){
       const res = await fetch(audioSrcUrl);
       if(res.ok){
         const ab = await res.arrayBuffer();
-        const actx = (typeof audioCtx !== "undefined" && audioCtx) ? audioCtx : (localActx = new (window.AudioContext || window.webkitAudioContext)());
+        if(ab.byteLength > 100 * 1024 * 1024){
+          console.warn("Audio file is large (" + (ab.byteLength/1048576).toFixed(1) + " MB), decoding may take significant memory.");
+        }
+        const actx = (typeof audioCtx !== "undefined" && audioCtx)
+          ? audioCtx
+          : (localActx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100));
         audioBuffer = await new Promise((resolve, reject)=>{
           actx.decodeAudioData(ab, resolve, reject);
         });
@@ -67,7 +72,7 @@ async function offlineRender(){
       console.warn("Offline audio decode failed, falling back to video only:", e);
       audioBuffer = null;
     }finally{
-      if(localActx){
+      if(localActx && localActx.close){
         try{ await localActx.close(); }catch(e){}
       }
     }
@@ -85,7 +90,7 @@ async function offlineRender(){
           codec: "mp4a.40.2",
           numberOfChannels: audioBuffer.numberOfChannels,
           sampleRate: audioBuffer.sampleRate,
-          bitrate: 192000,
+          bitrate: audioBuffer.numberOfChannels === 1 ? 96000 : 192000,
         };
         const asup = await AudioEncoder.isConfigSupported(aconf);
         if(asup && asup.supported){
@@ -132,7 +137,8 @@ async function offlineRender(){
   });
   enc.configure({codec, width:W, height:H, bitrate:bitrateFor(W,H,fps), framerate:fps});
 
-  const total = Math.max(1, Math.floor(video.duration*fps));
+  const duration = (video && !isNaN(video.duration) && video.duration > 0) ? video.duration : 1;
+  const total = Math.max(1, Math.floor(duration * fps));
 
   /* Progressive audio encoding: encode audio chunks incrementally alongside video frames
      so audio and video are properly interleaved in the output MP4 stream, avoiding memory spikes */
@@ -237,6 +243,10 @@ async function offlineRender(){
       if(fileStream){ try{ await fileStream.abort(); }catch(e){} }
       toast("Render cancelled", true);
     }
+  } catch(e) {
+    console.error("Render finalization failed:", e);
+    if(fileStream){ try{ await fileStream.abort(); }catch(_){} }
+    toast("Render finalization failed: " + e.message, true);
   } finally {
     /* the encoder used to be closed only on the cancel path, so every
        completed render left one behind */

@@ -586,6 +586,11 @@ function wireMic(){
   } else {
     micNode.connect(analyser);
   }
+  /* the live input reaches the recorder as well as the analyser, so a set
+     played into the interface is captured with the picture it was driving.
+     It is re-made here because wireMic disconnects everything first, and a
+     channel change mid-take must not silence the recording. */
+  if(recDest){ try{ micNode.connect(recDest); }catch(e){} }
   wireTaps();
 }
 /* Whichever input is selected also feeds the taps, split back out into its

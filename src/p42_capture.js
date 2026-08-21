@@ -17,9 +17,13 @@ function captureFps(){
 }
 function toggleRec(){
   if(recorder){ recorder.stop(); return; }
-  /* each recording used to add another live capture stream to the canvas and
-     never let go of it */
-  if(recStream){ try{ recStream.getTracks().forEach(t=>t.stop()); }catch(e){} }
+  /* Each recording used to add another live capture stream to the canvas and
+     never let go of it. Stopping the whole stream fixed that and introduced
+     something worse: the audio track belongs to recDest and is shared, and is
+     the same track object every time, so stopping it killed audio for the rest
+     of the session. The first recording had sound and every one after it was
+     silent. Only the video track is ours to stop. */
+  if(recStream){ try{ recStream.getVideoTracks().forEach(t=>t.stop()); }catch(e){} }
   /* The canvas backing store is normally sized to the window, so recording
      captured whatever the pane happened to be - about 900 x 500 with the panel
      open - and upscaled it. That is the softness. Pin it to the processing
@@ -31,8 +35,16 @@ function toggleRec(){
   recLocked = true;
   const capFps = captureFps();
   const stream = recStream = canvas.captureStream(capFps);
-  if(audioCtx && recDest && audioMode==="source"){
-    for(const tr of recDest.stream.getAudioTracks()) stream.addTrack(tr);
+  /* Whatever is being listened to goes into the recording: the soundtrack of
+     the clip, an audio file loaded for reactivity, or a live input. This used
+     to test for the soundtrack alone, so building a piece against a track and
+     then recording it handed back a silent video with nothing to say why.
+     All three sources already run into recDest; only the gate was wrong. */
+  let recAudio = false;
+  if(audioCtx && recDest && audioMode !== "off"){
+    const tracks = recDest.stream.getAudioTracks();
+    for(const tr of tracks) stream.addTrack(tr);
+    recAudio = tracks.length > 0;
   }
   let mime = "";
   for(const m of ["video/mp4;codecs=avc1.640028,mp4a.40.2","video/mp4;codecs=avc1.42E01E,mp4a.40.2",
@@ -51,11 +63,15 @@ function toggleRec(){
     const blob = new Blob(recChunks, {type: isMp4 ? "video/mp4" : "video/webm"});
     dl(URL.createObjectURL(blob), "bendr-"+stamp()+(isMp4?".mp4":".webm"));
     recorder=null; btnRec.classList.remove("rec-on"); btnRec.textContent="● REC";
-    if(recStream){ try{ recStream.getTracks().forEach(t=>t.stop()); }catch(e){} recStream=null; }
+    if(recStream){ try{ recStream.getVideoTracks().forEach(t=>t.stop()); }catch(e){} recStream=null; }
     recLocked = false;
     if(recSize){ canvas.width = recSize.w; canvas.height = recSize.h; recSize = null; markSizeDirty(); }
     recTime.style.display="none"; clearInterval(recTimer);
-    toast("Recording saved, "+procW+"\u00d7"+procH+" @"+capFps+"fps ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
+    /* say whether the sound made it, because a silent file discovered later is
+       the expensive way to find out that AUDIO REACT was set to OFF */
+    toast("Recording saved, "+procW+"\u00d7"+procH+" @"+capFps+"fps, "
+          + (recAudio ? "with audio" : "no audio — AUDIO REACT is OFF")
+          + " ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
   };
   recorder.start(250);
   recStart = performance.now();

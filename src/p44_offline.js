@@ -46,6 +46,7 @@ async function offlineRender(){
 
   let enc = null;
   let aenc = null;
+  let muxer = null;
   let audioBuffer = null;
   let channelData = null;
   const parts = [];
@@ -87,12 +88,15 @@ async function offlineRender(){
           }
         }
       }catch(e){
-        console.warn("Offline audio fetch/decode failed (possibly due to CORS on cross-origin assets). Falling back to video only:", e);
+        const isCross = audioSrcUrl && (audioSrcUrl.startsWith("http://") || audioSrcUrl.startsWith("https://"));
+        if(isCross) toast("Audio decode failed (likely CORS restricted on external URL) — exporting video only", false);
+        console.warn("Offline audio fetch/decode failed:", e);
         audioBuffer = null;
       }finally{
-        if(localActx && localActx.close){
+        if(localActx && typeof localActx.close === "function"){
           try{ await localActx.close(); }catch(e){}
         }
+        localActx = null;
       }
     }
 
@@ -100,22 +104,27 @@ async function offlineRender(){
     if(audioBuffer && audioBuffer.length > 0){
       const standardRates = [32000, 44100, 48000];
       if(!standardRates.includes(audioBuffer.sampleRate) || audioBuffer.numberOfChannels > 2){
-        try{
-          const targetChannels = Math.min(2, audioBuffer.numberOfChannels);
-          const targetRate = 44100;
-          const targetLength = Math.max(1, Math.round(audioBuffer.duration * targetRate));
-          const resampleCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
-            targetChannels,
-            targetLength,
-            targetRate
-          );
-          const source = resampleCtx.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(resampleCtx.destination);
-          source.start();
-          audioBuffer = await resampleCtx.startRendering();
-        }catch(e){
-          console.warn("Audio resampling failed, keeping original:", e);
+        if(audioBuffer.duration > 300){
+          console.warn("Audio track exceeds 5 minute limit for offline resampling (" + (audioBuffer.duration/60).toFixed(1) + " min). Falling back to video-only.");
+          audioBuffer = null;
+        } else {
+          try{
+            const targetChannels = Math.min(2, audioBuffer.numberOfChannels);
+            const targetRate = 44100;
+            const targetLength = Math.max(1, Math.round(audioBuffer.duration * targetRate));
+            const resampleCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
+              targetChannels,
+              targetLength,
+              targetRate
+            );
+            const source = resampleCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(resampleCtx.destination);
+            source.start();
+            audioBuffer = await resampleCtx.startRendering();
+          }catch(e){
+            console.warn("Audio resampling failed, keeping original:", e);
+          }
         }
       }
     }
@@ -139,7 +148,7 @@ async function offlineRender(){
         const asup = await AudioEncoder.isConfigSupported(aconf);
         if(asup && asup.supported){
           aenc = new AudioEncoder({
-            output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+            output: (chunk, meta) => muxer && muxer.addAudioChunk(chunk, meta),
             error: e => { console.error("Audio encoder error:", e); toast("Audio encoder error: "+e.message, true); renderCancel = true; },
           });
           aenc.configure(aconf);
@@ -161,7 +170,7 @@ async function offlineRender(){
           onData: (data, position) => { parts.push({position, data: data.slice()}); },
           chunked: true,
         });
-    const muxer = new Mp4Muxer.Muxer({
+    muxer = new Mp4Muxer.Muxer({
       target,
       video: {codec: mcodec, width: W, height: H},
       audio: hasAudio ? {
@@ -247,7 +256,10 @@ async function offlineRender(){
         v.removeEventListener("seeked", h);
         res();
       };
-      timeout = setTimeout(h, 1000);
+      timeout = setTimeout(()=>{
+        console.warn("Seek timeout reached at "+target.toFixed(3)+"s; proceeding");
+        h();
+      }, 1000);
       v.addEventListener("seeked", h);
       v.currentTime = target;
     });

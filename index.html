@@ -11890,9 +11890,13 @@ async function offlineRender(){
               reject(err);
             }
           });
+          if(audioBuffer && audioBuffer.duration > 600){
+            console.warn("Audio track exceeds 10 minute limit (" + (audioBuffer.duration/60).toFixed(1) + " min). Falling back to video-only to prevent OOM crash.");
+            audioBuffer = null;
+          }
         }
       }catch(e){
-        console.warn("Offline audio decode failed, falling back to video only:", e);
+        console.warn("Offline audio fetch/decode failed (possibly due to CORS on cross-origin assets). Falling back to video only:", e);
         audioBuffer = null;
       }finally{
         if(localActx && localActx.close){
@@ -11905,27 +11909,22 @@ async function offlineRender(){
     if(audioBuffer && audioBuffer.length > 0){
       const standardRates = [32000, 44100, 48000];
       if(!standardRates.includes(audioBuffer.sampleRate) || audioBuffer.numberOfChannels > 2){
-        if(audioBuffer.duration > 600){
-          console.warn("Audio track exceeds 10 minute limit for offline resampling. Falling back to video-only.");
-          audioBuffer = null;
-        } else {
-          try{
-            const targetChannels = Math.min(2, audioBuffer.numberOfChannels);
-            const targetRate = 44100;
-            const targetLength = Math.max(1, Math.round(audioBuffer.duration * targetRate));
-            const resampleCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
-              targetChannels,
-              targetLength,
-              targetRate
-            );
-            const source = resampleCtx.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(resampleCtx.destination);
-            source.start();
-            audioBuffer = await resampleCtx.startRendering();
-          }catch(e){
-            console.warn("Audio resampling failed, keeping original:", e);
-          }
+        try{
+          const targetChannels = Math.min(2, audioBuffer.numberOfChannels);
+          const targetRate = 44100;
+          const targetLength = Math.max(1, Math.round(audioBuffer.duration * targetRate));
+          const resampleCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
+            targetChannels,
+            targetLength,
+            targetRate
+          );
+          const source = resampleCtx.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(resampleCtx.destination);
+          source.start();
+          audioBuffer = await resampleCtx.startRendering();
+        }catch(e){
+          console.warn("Audio resampling failed, keeping original:", e);
         }
       }
     }
@@ -12015,9 +12014,13 @@ async function offlineRender(){
       maxPlanarBuffer = new Float32Array(CHUNK_SIZE * numChannels);
     }
 
-    const encodeAudioUpTo = (targetFrames) => {
+    const encodeAudioUpTo = (targetFrames, forceFlush = false) => {
       while(audioOffset < targetFrames && !renderCancel){
-        const framesInChunk = Math.min(CHUNK_SIZE, targetFrames - audioOffset);
+        const availableFrames = targetFrames - audioOffset;
+        if(availableFrames < CHUNK_SIZE && !forceFlush){
+          break;
+        }
+        const framesInChunk = Math.min(CHUNK_SIZE, availableFrames);
         const planar = maxPlanarBuffer.subarray(0, framesInChunk * numChannels);
         for(let ch = 0; ch < numChannels; ch++){
           const src = channelData[ch];
@@ -12043,15 +12046,33 @@ async function offlineRender(){
     };
 
     const seekTo = (v,t)=>new Promise(res=>{
-      const h = ()=>{ v.removeEventListener("seeked", h); res(); };
+      const target = Math.min(t, v.duration-0.001);
+      if(Math.abs(v.currentTime - target) < 0.001){
+        return res();
+      }
+      let timeout;
+      const h = ()=>{
+        clearTimeout(timeout);
+        v.removeEventListener("seeked", h);
+        res();
+      };
+      timeout = setTimeout(h, 1000);
       v.addEventListener("seeked", h);
-      v.currentTime = Math.min(t, v.duration-0.001);
+      v.currentTime = target;
     });
     const t0 = 1000;   // virtual clock offset so time-based effects behave
     for(let i=0; i<total && !renderCancel; i++){
       const t = i/fps;
       await seekTo(video, t);
-      for(const ch of ["B","C","D"]){ const v = SRC[ch].video; if(srcReady(ch) && v.duration) await seekTo(v, t % v.duration); }
+      if(renderCancel) break;
+      for(const ch of ["B","C","D"]){
+        const v = SRC[ch].video;
+        if(srcReady(ch) && v.duration){
+          await seekTo(v, t % v.duration);
+          if(renderCancel) break;
+        }
+      }
+      if(renderCancel) break;
       renderFrame(t0+t, 1/fps);
       const vf = new VideoFrame(canvas, {timestamp: Math.round(i*1e6/fps), duration: Math.round(1e6/fps)});
       enc.encode(vf, {keyFrame: i%(fps*2)===0});
@@ -12060,7 +12081,7 @@ async function offlineRender(){
       /* Progressively encode audio matching the current video frame progress to ensure interleaving */
       if(hasAudio){
         const targetFrames = Math.min(totalAudioFrames, Math.round(((i + 1) / total) * totalAudioFrames));
-        encodeAudioUpTo(targetFrames);
+        encodeAudioUpTo(targetFrames, false);
       }
 
       while((enc.encodeQueueSize > 6 || (aenc && aenc.encodeQueueSize > 30)) && !renderCancel){
@@ -12076,7 +12097,7 @@ async function offlineRender(){
     if(!renderCancel){
       ovTxt.textContent = "FINALIZING…";
       if(hasAudio){
-        encodeAudioUpTo(totalAudioFrames);
+        encodeAudioUpTo(totalAudioFrames, true);
         await aenc.flush();
       }
       await enc.flush();

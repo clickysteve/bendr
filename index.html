@@ -11877,11 +11877,18 @@ async function offlineRender(){
             throw new Error("Audio source file is too large (" + (parseInt(contentLength, 10)/1048576).toFixed(1) + " MB). Fallback to video-only to prevent crash.");
           }
           const ab = await res.arrayBuffer();
+          if(ab.byteLength > 100 * 1024 * 1024){
+            throw new Error("Audio buffer exceeds 100MB safety limit. Fallback to video-only.");
+          }
           const actx = (typeof audioCtx !== "undefined" && audioCtx)
             ? audioCtx
             : (localActx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100));
           audioBuffer = await new Promise((resolve, reject)=>{
-            actx.decodeAudioData(ab, resolve, reject);
+            try{
+              actx.decodeAudioData(ab, resolve, reject);
+            }catch(err){
+              reject(err);
+            }
           });
         }
       }catch(e){
@@ -11898,24 +11905,36 @@ async function offlineRender(){
     if(audioBuffer && audioBuffer.length > 0){
       const standardRates = [32000, 44100, 48000];
       if(!standardRates.includes(audioBuffer.sampleRate) || audioBuffer.numberOfChannels > 2){
-        try{
-          const targetChannels = Math.min(2, audioBuffer.numberOfChannels);
-          const targetRate = 44100;
-          const targetLength = Math.max(1, Math.round(audioBuffer.duration * targetRate));
-          const resampleCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
-            targetChannels,
-            targetLength,
-            targetRate
-          );
-          const source = resampleCtx.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(resampleCtx.destination);
-          source.start();
-          audioBuffer = await resampleCtx.startRendering();
-        }catch(e){
-          console.warn("Audio resampling failed, keeping original:", e);
+        if(audioBuffer.duration > 600){
+          console.warn("Audio track exceeds 10 minute limit for offline resampling. Falling back to video-only.");
+          audioBuffer = null;
+        } else {
+          try{
+            const targetChannels = Math.min(2, audioBuffer.numberOfChannels);
+            const targetRate = 44100;
+            const targetLength = Math.max(1, Math.round(audioBuffer.duration * targetRate));
+            const resampleCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
+              targetChannels,
+              targetLength,
+              targetRate
+            );
+            const source = resampleCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(resampleCtx.destination);
+            source.start();
+            audioBuffer = await resampleCtx.startRendering();
+          }catch(e){
+            console.warn("Audio resampling failed, keeping original:", e);
+          }
         }
       }
+    }
+
+    /* Verify audio format after possible resampling */
+    const standardRates = [32000, 44100, 48000];
+    if(audioBuffer && (audioBuffer.numberOfChannels > 2 || !standardRates.includes(audioBuffer.sampleRate))){
+      console.warn("Audio format unsupported after resampling. Falling back to video-only.");
+      audioBuffer = null;
     }
 
     let hasAudio = false;
@@ -11961,7 +11980,7 @@ async function offlineRender(){
         sampleRate: audioBuffer.sampleRate,
       } : undefined,
       /* seeking metadata has to go at the front, which needs a rewrite the
-         stream target cannot do, so it goes at the end when we are streaming */
+       stream target cannot do, so it goes at the end when we are streaming */
       fastStart: fileStream ? false : "in-memory",
     });
     enc = new VideoEncoder({
@@ -11981,6 +12000,7 @@ async function offlineRender(){
     let numChannels = 0;
     let sr = 0;
     let srcLen = 0;
+    let maxPlanarBuffer = null;
 
     if(hasAudio){
       const totalDurSec = total / fps;
@@ -11992,12 +12012,13 @@ async function offlineRender(){
       for(let ch = 0; ch < numChannels; ch++){
         channelData.push(audioBuffer.getChannelData(ch));
       }
+      maxPlanarBuffer = new Float32Array(CHUNK_SIZE * numChannels);
     }
 
     const encodeAudioUpTo = (targetFrames) => {
       while(audioOffset < targetFrames && !renderCancel){
         const framesInChunk = Math.min(CHUNK_SIZE, targetFrames - audioOffset);
-        const planar = new Float32Array(framesInChunk * numChannels);
+        const planar = maxPlanarBuffer.subarray(0, framesInChunk * numChannels);
         for(let ch = 0; ch < numChannels; ch++){
           const src = channelData[ch];
           const dstOffset = ch * framesInChunk;
@@ -12085,6 +12106,7 @@ async function offlineRender(){
     parts.length = 0;
     audioBuffer = null;
     channelData = null;
+    maxPlanarBuffer = null;
     canvas.width = oldW; canvas.height = oldH;
     ov.style.display = "none";
     offline = false; lastT = performance.now()/1000;

@@ -11862,6 +11862,7 @@ async function offlineRender(){
   let muxer = null;
   let audioBuffer = null;
   let channelData = null;
+  let maxPlanarBuffer = null;
   const parts = [];
 
   try {
@@ -11869,9 +11870,13 @@ async function offlineRender(){
        Priority 1: Dedicated audio file from the AUDIO tab (audioFileEl)
        Priority 2: Channel A video file soundtrack (SRC.A.video) */
     let localActx = null;
-    const audioSrcUrl = (audioFileEl && (audioFileEl.src || audioFileEl.dataset?.url))
+    const hasAudioFile = !!(audioFileEl && (audioFileEl.src || audioFileEl.dataset?.url));
+    const audioSrcUrl = hasAudioFile
       ? (audioFileEl.src || audioFileEl.dataset.url)
       : ((SRC.A.mode === "file" && (SRC.A.video.src || SRC.A.objUrl)) ? (SRC.A.video.src || SRC.A.objUrl) : null);
+    const audioLoop = hasAudioFile
+      ? !!(audioFileEl && audioFileEl.loop)
+      : !!(SRC.A.video && SRC.A.video.loop);
 
     if(audioSrcUrl){
       try{
@@ -12012,7 +12017,7 @@ async function offlineRender(){
     let numChannels = 0;
     let sr = 0;
     let srcLen = 0;
-    let maxPlanarBuffer = null;
+    maxPlanarBuffer = null;
 
     if(hasAudio){
       const totalDurSec = total / fps;
@@ -12039,7 +12044,8 @@ async function offlineRender(){
           const src = channelData[ch];
           const dstOffset = ch * framesInChunk;
           for(let f = 0; f < framesInChunk; f++){
-            const idx = audioOffset + f;
+            const frameIdx = audioOffset + f;
+            const idx = (audioLoop && srcLen > 0) ? (frameIdx % srcLen) : frameIdx;
             planar[dstOffset + f] = idx < srcLen ? src[idx] : 0.0;
           }
         }

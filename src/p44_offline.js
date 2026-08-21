@@ -5,6 +5,60 @@ document.getElementById("btnRender").onclick = ()=>{ offlineRender().catch(e=>{
   console.error(e); toast("Render failed: "+e.message, true);
   offline=false; document.getElementById("renderOv").style.display="none";
 }); };
+/* ---- audio for the offline render ----
+   REC can hand the recorder a live audio track because it runs in realtime.
+   This does not: it steps the clip frame by frame as fast or as slowly as the
+   machine manages, so there is no live graph to tap. The sound has to be
+   decoded to PCM up front and encoded alongside the picture.
+
+   What it lays down: the soundtrack of the clip in channel A, or the audio file
+   if one is loaded and AUDIO REACT is listening to it, because that is then the
+   piece's soundtrack rather than the clip's. A live input cannot be rendered
+   offline at all, and says so instead of quietly producing silence. */
+async function decodeRenderAudio(seconds){
+  if(!("AudioEncoder" in window)) return {buf:null, why:"this browser has no audio encoder"};
+  let url = "", label = "";
+  if(audioMode === "file" && audioFileEl && audioFileEl.src){
+    url = audioFileEl.src; label = audioFileName || "audio file";
+  } else if(audioMode === "mic"){
+    return {buf:null, why:"a live input cannot be rendered offline \u2014 use REC"};
+  } else if(SRC.A.objUrl || video.src){
+    url = SRC.A.objUrl || video.src; label = "the clip's soundtrack";
+  }
+  if(!url) return {buf:null, why:"nothing to take audio from"};
+  try{
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const src = await ac.decodeAudioData(await (await fetch(url)).arrayBuffer());
+    const sr = src.sampleRate, ch = Math.min(2, src.numberOfChannels);
+    const n = Math.max(1, Math.round(seconds * sr));
+    const out = ac.createBuffer(ch, n, sr);
+    for(let c=0; c<ch; c++){
+      const from = src.getChannelData(Math.min(c, src.numberOfChannels-1));
+      const to = out.getChannelData(c);
+      if(!from.length) continue;
+      /* a loaded track shorter than the render loops, the way it loops while
+         you are working against it; a clip's own soundtrack is exactly as long
+         as the render and simply runs out */
+      const loop = (audioMode === "file");
+      for(let i=0;i<n;i++) to[i] = loop ? from[i % from.length] : (i < from.length ? from[i] : 0);
+    }
+    ac.close();
+    /* Ask before promising. The muxer is built with an audio track declared up
+       front and cannot be told later that none is coming, so a browser that
+       decodes AAC happily but cannot encode it would leave an empty track in
+       the file. Probe with the real rate and channel count, and if the answer
+       is no, say so here and let the render carry on as it always did. */
+    try{
+      const ok = await AudioEncoder.isConfigSupported({
+        codec:"mp4a.40.2", sampleRate:out.sampleRate,
+        numberOfChannels:out.numberOfChannels, bitrate:192000});
+      if(!ok || !ok.supported) return {buf:null, why:"this browser cannot encode AAC"};
+    }catch(e){ return {buf:null, why:"this browser cannot encode AAC"}; }
+    return {buf:out, label};
+  }catch(e){
+    return {buf:null, why:"could not decode the audio (" + String(e.message||e).slice(0,50) + ")"};
+  }
+}
 async function offlineRender(){
   if(SRC.A.mode!=="file" || !SRC.A.video.duration){ toast("Load a video file into channel A first", true); return; }
   if(!("VideoEncoder" in window)){ toast("This browser has no WebCodecs — use Chrome", true); return; }
@@ -25,6 +79,12 @@ async function offlineRender(){
   const ovTxt = document.getElementById("renderTxt");
   const ovBar = document.getElementById("renderBar");
   ov.style.display = "flex";
+  /* the muxer wants its audio track declared at construction, so the sound is
+     decoded before anything else is built */
+  ovTxt.textContent = "PREPARING AUDIO\u2026";
+  await new Promise(r=>setTimeout(r,0));
+  const AU = await decodeRenderAudio(video.duration);
+  const aBuf = AU.buf;
   const wasPlaying = !video.paused;
   video.pause(); videoB.pause();
   const oldW = canvas.width, oldH = canvas.height;
@@ -53,6 +113,7 @@ async function offlineRender(){
   const muxer = new Mp4Muxer.Muxer({
     target,
     video: {codec: mcodec, width: W, height: H},
+    ...(aBuf ? {audio: {codec: "aac", sampleRate: aBuf.sampleRate, numberOfChannels: aBuf.numberOfChannels}} : {}),
     /* seeking metadata has to go at the front, which needs a rewrite the
        stream target cannot do, so it goes at the end when we are streaming */
     fastStart: fileStream ? false : "in-memory",
@@ -62,6 +123,43 @@ async function offlineRender(){
     error: e => { console.error(e); toast("Encoder error: "+e.message, true); renderCancel = true; },
   });
   enc.configure({codec, width:W, height:H, bitrate:bitrateFor(W,H,fps), framerate:fps});
+  /* The audio is fed a slice at a time, kept a second ahead of the picture
+     rather than all at the end, so the muxer receives both tracks in roughly
+     the order they play. A streaming target cannot go back and reorder. */
+  let aenc = null, aAt = 0, aFail = "";
+  const A_BLOCK = 4096;
+  if(aBuf){
+    try{
+      aenc = new AudioEncoder({
+        output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+        error: e => { console.error(e); aFail = e.message; },
+      });
+      aenc.configure({codec:"mp4a.40.2", sampleRate:aBuf.sampleRate,
+                      numberOfChannels:aBuf.numberOfChannels, bitrate:192000});
+    }catch(e){ aenc = null; aFail = String(e.message||e); }
+  }
+  const planar = aBuf ? new Float32Array(A_BLOCK * aBuf.numberOfChannels) : null;
+  function pumpAudio(uptoSec){
+    if(!aenc || aenc.state !== "configured") return;
+    const sr = aBuf.sampleRate, chs = aBuf.numberOfChannels;
+    const limit = Math.min(aBuf.length, Math.ceil(uptoSec * sr));
+    while(aAt < limit){
+      const n = Math.min(A_BLOCK, aBuf.length - aAt);
+      for(let c=0;c<chs;c++) planar.set(aBuf.getChannelData(c).subarray(aAt, aAt+n), c*n);
+      const ad = new AudioData({
+        format:"f32-planar", sampleRate:sr, numberOfFrames:n, numberOfChannels:chs,
+        timestamp: Math.round(aAt / sr * 1e6),
+        data: planar.subarray(0, n*chs),
+      });
+      aenc.encode(ad); ad.close();
+      aAt += n;
+    }
+  }
+  function audioNote(){
+    if(aenc && !aFail) return "with " + (AU.label || "audio");
+    if(aFail) return "video only \u2014 the audio encoder failed (" + aFail.slice(0,40) + ")";
+    return "video only \u2014 " + (AU.why || "no audio");
+  }
   const total = Math.max(1, Math.floor(video.duration*fps));
   const seekTo = (v,t)=>new Promise(res=>{
     const h = ()=>{ v.removeEventListener("seeked", h); res(); };
@@ -77,6 +175,7 @@ async function offlineRender(){
     const vf = new VideoFrame(canvas, {timestamp: Math.round(i*1e6/fps), duration: Math.round(1e6/fps)});
     enc.encode(vf, {keyFrame: i%(fps*2)===0});
     vf.close();
+    pumpAudio(t + 1);
     while(enc.encodeQueueSize > 6 && !renderCancel) await new Promise(r=>setTimeout(r,5));
     if(i%3===0){
       ovTxt.textContent = "RENDERING "+Math.round(i/total*100)+"%  ("+i+"/"+total+" frames, "+codec.split(".")[0].toUpperCase()+")";
@@ -87,16 +186,18 @@ async function offlineRender(){
   try{
     if(!renderCancel){
       ovTxt.textContent = "FINALIZING…";
+      pumpAudio(video.duration + 1);       /* whatever the loop did not reach */
       await enc.flush();
+      if(aenc && aenc.state === "configured") await aenc.flush();
       muxer.finalize();
       if(fileStream){
         await fileStream.close();
-        toast("Rendered "+total+" frames \u2192 "+fileHandle.name+" (video only \u2014 REC captures audio)");
+        toast("Rendered "+total+" frames \u2192 "+fileHandle.name+" "+audioNote());
       } else {
         parts.sort((a,b)=>a.position-b.position);
         const blob = new Blob(parts.map(x=>x.data), {type:"video/mp4"});
         dl(URL.createObjectURL(blob), suggested);
-        toast("Rendered "+total+" frames \u2192 MP4, "+(blob.size/1048576).toFixed(1)+" MB (video only \u2014 REC captures audio)");
+        toast("Rendered "+total+" frames \u2192 MP4, "+(blob.size/1048576).toFixed(1)+" MB "+audioNote());
       }
     } else {
       if(fileStream){ try{ await fileStream.abort(); }catch(e){} }
@@ -106,6 +207,7 @@ async function offlineRender(){
     /* the encoder used to be closed only on the cancel path, so every
        completed render left one behind */
     try{ if(enc.state !== "closed") enc.close(); }catch(e){}
+    try{ if(aenc && aenc.state !== "closed") aenc.close(); }catch(e){}
     parts.length = 0;
   }
   canvas.width = oldW; canvas.height = oldH;

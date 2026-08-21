@@ -1105,7 +1105,7 @@ audio,video{display:none;}
     <div class="menupanel">
       <div class="mrow2">
         <button id="btnSnap" data-tip="Save the current frame as a PNG at the processing resolution, not at whatever size the window happens to be — a patch running at 1080p saves 1920x1080 even from a narrow pane. Keyboard: S.">SNAP</button>
-        <button id="btnRender" data-tip="Offline render: steps channel A through the file frame by frame and encodes every frame at full quality regardless of realtime speed. Video only - use REC if you need the audio.">RENDER</button>
+        <button id="btnRender" data-tip="Offline render: steps channel A through the file frame by frame and encodes every frame at full quality regardless of realtime speed. Carries the clip's soundtrack, or the audio file if AUDIO REACT is set to FILE. A live input cannot be rendered offline — use REC for that.">RENDER</button>
       </div>
       <div class="mlabel">WHERE IT GOES</div>
       <div class="mrow2">
@@ -1443,7 +1443,7 @@ audio,video{display:none;}
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
   <h3>SOURCES</h3>
   <p>Each channel takes a video file or a still image (clips stream from disk, so file size does not matter), a camera, a screen, a generated pattern, the pattern synth, a text page, or re-entry from elsewhere in the rig. Stills load through <b>FILE</b> like clips do and read STILL on the timecode; the transport greys out and everything else behaves normally. <b>CAM</b> opens whatever is chosen in the device list above it: a built-in webcam, a USB one, an HDMI capture stick, or a virtual camera from streaming software. Device names only appear once camera access has been granted, so the list reads DEVICE 1, DEVICE 2 until the first time you press CAM. <b>SCREEN</b> captures a screen, a window or a browser tab, which is the general way to bring in anything that is not a camera.</p>
-  <p>The audio-reactive modulators listen on the <b>AUDIO</b> tab of the dock: the soundtrack of the video in channel A, a live input (with device and channel selection for interfaces), or an audio file you load there and play. Loading a file is how you build a piece against the track it will actually be shown with. The three band ranges, their gains and the response speed are on the same tab, and the tempo used by synced modulators is the TAP button in the header, whose readout can also be typed into directly.</p>
+  <p>The audio-reactive modulators listen on the <b>AUDIO</b> tab of the dock: the soundtrack of the video in channel A, a live input (with device and channel selection for interfaces), or an audio file you load there and play. Loading a file is how you build a piece against the track it will actually be shown with. LOAD, PLAY, STOP and LOOP sit together: PLAY is a pause toggle and leaves the track where it stopped, STOP returns it to the top so the next take starts from the beginning. The three band ranges, their gains and the response speed are on the same tab, and the tempo used by synced modulators is the TAP button in the header, whose readout can also be typed into directly.</p>
   <p><b>CHANNEL TAPS</b> are how you use an interface properly. One analyser on whatever the input summed down to is fine for a laptop microphone and useless for a desk. A tap is a listener on <em>one input channel</em> narrowed to <em>one band</em>, and it becomes a modulation source of its own — patchable to any parameter on any channel, with its own gain and response, and usable as an envelope trigger. Send the kick to input 1 and the hats to input 3 and they drive different things. Nothing stops two taps sharing an input either, so one channel can push feedback zoom from its low end and dropout from its transients. Add them from the MOD page or the AUDIO tab; each tap's controls live on its own card on the MOD page, and the AUDIO tab shows the whole rack as meters. Taps are saved with the patch.</p>
 
   <h3>MIXER, MORPH, KEYER &amp; TIME BASE</h3>
@@ -1477,7 +1477,7 @@ audio,video{display:none;}
   <p>Hold <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd> for the six bend pads. <kbd>0</kbd> is the panic key: it empties every buffer that feeds itself &mdash; the feedback store, the flow stage, the phosphor and the frame ring &mdash; without touching a single control, which is the way out when a bad frame gets caught circulating.</p>
   <p>Your patch, your snapshots and your take are saved to this browser every few seconds, so a reload or a crash picks up where you left off. Press <kbd>Z</kbd> straight after opening if you would rather start clean.</p>
   <h3>OUTPUT</h3>
-  <p><b>STORE</b> under PATCH saves everything you have set up as a named preset, kept on this machine and listed under SAVED alongside the built-in ones; DELETE removes one. SAVE FILE and OPEN FILE move a patch between machines. <b>REC</b> captures the live output with whatever the audio-reactive modulators are listening to, so a piece built against a track records with that track on it: the clip's soundtrack, a loaded audio file, or a live input all go in. With AUDIO set to OFF the recording is silent, and the message when it saves says which you got. MP4 where the browser supports it, WebM otherwise. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops (video only; grab audio with REC or marry it in an editor). <b>SNAP</b> saves a PNG still at the processing resolution rather than at the size of the pane, so a patch running at 1080p gives a 1920x1080 file however narrow the window is. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
+  <p><b>STORE</b> under PATCH saves everything you have set up as a named preset, kept on this machine and listed under SAVED alongside the built-in ones; DELETE removes one. SAVE FILE and OPEN FILE move a patch between machines. <b>REC</b> captures the live output with whatever the audio-reactive modulators are listening to, so a piece built against a track records with that track on it: the clip's soundtrack, a loaded audio file, or a live input all go in. With AUDIO set to OFF the recording is silent, and the message when it saves says which you got. MP4 where the browser supports it, WebM otherwise. <b>RENDER</b> does a frame-accurate offline render of channel A to MP4 — every frame processed at full quality, no drops. It carries audio too: the soundtrack of the clip, or the audio file if AUDIO REACT is set to FILE, since that is then the piece's soundtrack. A live input cannot be rendered offline, because there is nothing to re-play; use REC for that. The message when it finishes says which it used. <b>SNAP</b> saves a PNG still at the processing resolution rather than at the size of the pane, so a patch running at 1080p gives a 1920x1080 file however narrow the window is. <b>FULL</b> gives a clean fullscreen feed. <b>POP OUT</b> opens a clean output window with no UI — point OBS at it, or drag it to a second display (double-click it for fullscreen).</p>
   </div>
   <p style="padding-top:10px; color:var(--dim);">Escape, the cross, or a click outside this panel closes it.</p>
 </div></div>
@@ -3484,7 +3484,7 @@ const FS_TILE = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v36.7";
+const BENDR_VERSION = "v36.8";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -7475,9 +7475,25 @@ function buildAudioSection(){
       if(el.paused){ try{ await el.play(); }catch(e){} } else el.pause();
       refreshAudioFileUI();
     };
+    /* PLAY is a pause toggle, which leaves the track wherever you stopped it.
+       Stopping and going back to the top is a different thing and there was no
+       way to ask for it: a piece built against a track wants to start from the
+       top of the track, not from wherever the last take ended. */
+    const st = document.createElement("button"); st.textContent = "STOP";
+    attachTip(st, "STOP", "Stops the track and returns it to the beginning, so the next PLAY starts from the top. PAUSE leaves it where it is.");
+    st.onclick = ()=>{
+      const el = ensureAudioFileEl();
+      el.pause();
+      try{ el.currentTime = 0; }catch(e){}
+      /* the meters are left to fall on their own. Zeroing them here looked
+         tidier and did nothing: updateAudio reads the analyser again on the
+         very next frame and writes over it, so all the line achieved was
+         appearing to do something. */
+      refreshAudioFileUI();
+    };
     const lp = document.createElement("button"); lp.textContent = "LOOP"; lp.classList.add("on");
     lp.onclick = ()=>{ const el = ensureAudioFileEl(); el.loop = !el.loop; lp.classList.toggle("on", el.loop); };
-    row.appendChild(lab); row.appendChild(ld); row.appendChild(pp); row.appendChild(lp);
+    row.appendChild(lab); row.appendChild(ld); row.appendChild(pp); row.appendChild(st); row.appendChild(lp);
     d.appendChild(row);
     const nrow = document.createElement("div"); nrow.className="prow";
     const nlab = document.createElement("label"); nlab.textContent = "POSITION";
@@ -11835,6 +11851,60 @@ document.getElementById("btnRender").onclick = ()=>{ offlineRender().catch(e=>{
   console.error(e); toast("Render failed: "+e.message, true);
   offline=false; document.getElementById("renderOv").style.display="none";
 }); };
+/* ---- audio for the offline render ----
+   REC can hand the recorder a live audio track because it runs in realtime.
+   This does not: it steps the clip frame by frame as fast or as slowly as the
+   machine manages, so there is no live graph to tap. The sound has to be
+   decoded to PCM up front and encoded alongside the picture.
+
+   What it lays down: the soundtrack of the clip in channel A, or the audio file
+   if one is loaded and AUDIO REACT is listening to it, because that is then the
+   piece's soundtrack rather than the clip's. A live input cannot be rendered
+   offline at all, and says so instead of quietly producing silence. */
+async function decodeRenderAudio(seconds){
+  if(!("AudioEncoder" in window)) return {buf:null, why:"this browser has no audio encoder"};
+  let url = "", label = "";
+  if(audioMode === "file" && audioFileEl && audioFileEl.src){
+    url = audioFileEl.src; label = audioFileName || "audio file";
+  } else if(audioMode === "mic"){
+    return {buf:null, why:"a live input cannot be rendered offline \u2014 use REC"};
+  } else if(SRC.A.objUrl || video.src){
+    url = SRC.A.objUrl || video.src; label = "the clip's soundtrack";
+  }
+  if(!url) return {buf:null, why:"nothing to take audio from"};
+  try{
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const src = await ac.decodeAudioData(await (await fetch(url)).arrayBuffer());
+    const sr = src.sampleRate, ch = Math.min(2, src.numberOfChannels);
+    const n = Math.max(1, Math.round(seconds * sr));
+    const out = ac.createBuffer(ch, n, sr);
+    for(let c=0; c<ch; c++){
+      const from = src.getChannelData(Math.min(c, src.numberOfChannels-1));
+      const to = out.getChannelData(c);
+      if(!from.length) continue;
+      /* a loaded track shorter than the render loops, the way it loops while
+         you are working against it; a clip's own soundtrack is exactly as long
+         as the render and simply runs out */
+      const loop = (audioMode === "file");
+      for(let i=0;i<n;i++) to[i] = loop ? from[i % from.length] : (i < from.length ? from[i] : 0);
+    }
+    ac.close();
+    /* Ask before promising. The muxer is built with an audio track declared up
+       front and cannot be told later that none is coming, so a browser that
+       decodes AAC happily but cannot encode it would leave an empty track in
+       the file. Probe with the real rate and channel count, and if the answer
+       is no, say so here and let the render carry on as it always did. */
+    try{
+      const ok = await AudioEncoder.isConfigSupported({
+        codec:"mp4a.40.2", sampleRate:out.sampleRate,
+        numberOfChannels:out.numberOfChannels, bitrate:192000});
+      if(!ok || !ok.supported) return {buf:null, why:"this browser cannot encode AAC"};
+    }catch(e){ return {buf:null, why:"this browser cannot encode AAC"}; }
+    return {buf:out, label};
+  }catch(e){
+    return {buf:null, why:"could not decode the audio (" + String(e.message||e).slice(0,50) + ")"};
+  }
+}
 async function offlineRender(){
   if(SRC.A.mode!=="file" || !SRC.A.video.duration){ toast("Load a video file into channel A first", true); return; }
   if(!("VideoEncoder" in window)){ toast("This browser has no WebCodecs — use Chrome", true); return; }
@@ -11855,6 +11925,12 @@ async function offlineRender(){
   const ovTxt = document.getElementById("renderTxt");
   const ovBar = document.getElementById("renderBar");
   ov.style.display = "flex";
+  /* the muxer wants its audio track declared at construction, so the sound is
+     decoded before anything else is built */
+  ovTxt.textContent = "PREPARING AUDIO\u2026";
+  await new Promise(r=>setTimeout(r,0));
+  const AU = await decodeRenderAudio(video.duration);
+  const aBuf = AU.buf;
   const wasPlaying = !video.paused;
   video.pause(); videoB.pause();
   const oldW = canvas.width, oldH = canvas.height;
@@ -11883,6 +11959,7 @@ async function offlineRender(){
   const muxer = new Mp4Muxer.Muxer({
     target,
     video: {codec: mcodec, width: W, height: H},
+    ...(aBuf ? {audio: {codec: "aac", sampleRate: aBuf.sampleRate, numberOfChannels: aBuf.numberOfChannels}} : {}),
     /* seeking metadata has to go at the front, which needs a rewrite the
        stream target cannot do, so it goes at the end when we are streaming */
     fastStart: fileStream ? false : "in-memory",
@@ -11892,6 +11969,43 @@ async function offlineRender(){
     error: e => { console.error(e); toast("Encoder error: "+e.message, true); renderCancel = true; },
   });
   enc.configure({codec, width:W, height:H, bitrate:bitrateFor(W,H,fps), framerate:fps});
+  /* The audio is fed a slice at a time, kept a second ahead of the picture
+     rather than all at the end, so the muxer receives both tracks in roughly
+     the order they play. A streaming target cannot go back and reorder. */
+  let aenc = null, aAt = 0, aFail = "";
+  const A_BLOCK = 4096;
+  if(aBuf){
+    try{
+      aenc = new AudioEncoder({
+        output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+        error: e => { console.error(e); aFail = e.message; },
+      });
+      aenc.configure({codec:"mp4a.40.2", sampleRate:aBuf.sampleRate,
+                      numberOfChannels:aBuf.numberOfChannels, bitrate:192000});
+    }catch(e){ aenc = null; aFail = String(e.message||e); }
+  }
+  const planar = aBuf ? new Float32Array(A_BLOCK * aBuf.numberOfChannels) : null;
+  function pumpAudio(uptoSec){
+    if(!aenc || aenc.state !== "configured") return;
+    const sr = aBuf.sampleRate, chs = aBuf.numberOfChannels;
+    const limit = Math.min(aBuf.length, Math.ceil(uptoSec * sr));
+    while(aAt < limit){
+      const n = Math.min(A_BLOCK, aBuf.length - aAt);
+      for(let c=0;c<chs;c++) planar.set(aBuf.getChannelData(c).subarray(aAt, aAt+n), c*n);
+      const ad = new AudioData({
+        format:"f32-planar", sampleRate:sr, numberOfFrames:n, numberOfChannels:chs,
+        timestamp: Math.round(aAt / sr * 1e6),
+        data: planar.subarray(0, n*chs),
+      });
+      aenc.encode(ad); ad.close();
+      aAt += n;
+    }
+  }
+  function audioNote(){
+    if(aenc && !aFail) return "with " + (AU.label || "audio");
+    if(aFail) return "video only \u2014 the audio encoder failed (" + aFail.slice(0,40) + ")";
+    return "video only \u2014 " + (AU.why || "no audio");
+  }
   const total = Math.max(1, Math.floor(video.duration*fps));
   const seekTo = (v,t)=>new Promise(res=>{
     const h = ()=>{ v.removeEventListener("seeked", h); res(); };
@@ -11907,6 +12021,7 @@ async function offlineRender(){
     const vf = new VideoFrame(canvas, {timestamp: Math.round(i*1e6/fps), duration: Math.round(1e6/fps)});
     enc.encode(vf, {keyFrame: i%(fps*2)===0});
     vf.close();
+    pumpAudio(t + 1);
     while(enc.encodeQueueSize > 6 && !renderCancel) await new Promise(r=>setTimeout(r,5));
     if(i%3===0){
       ovTxt.textContent = "RENDERING "+Math.round(i/total*100)+"%  ("+i+"/"+total+" frames, "+codec.split(".")[0].toUpperCase()+")";
@@ -11917,16 +12032,18 @@ async function offlineRender(){
   try{
     if(!renderCancel){
       ovTxt.textContent = "FINALIZING…";
+      pumpAudio(video.duration + 1);       /* whatever the loop did not reach */
       await enc.flush();
+      if(aenc && aenc.state === "configured") await aenc.flush();
       muxer.finalize();
       if(fileStream){
         await fileStream.close();
-        toast("Rendered "+total+" frames \u2192 "+fileHandle.name+" (video only \u2014 REC captures audio)");
+        toast("Rendered "+total+" frames \u2192 "+fileHandle.name+" "+audioNote());
       } else {
         parts.sort((a,b)=>a.position-b.position);
         const blob = new Blob(parts.map(x=>x.data), {type:"video/mp4"});
         dl(URL.createObjectURL(blob), suggested);
-        toast("Rendered "+total+" frames \u2192 MP4, "+(blob.size/1048576).toFixed(1)+" MB (video only \u2014 REC captures audio)");
+        toast("Rendered "+total+" frames \u2192 MP4, "+(blob.size/1048576).toFixed(1)+" MB "+audioNote());
       }
     } else {
       if(fileStream){ try{ await fileStream.abort(); }catch(e){} }
@@ -11936,6 +12053,7 @@ async function offlineRender(){
     /* the encoder used to be closed only on the cancel path, so every
        completed render left one behind */
     try{ if(enc.state !== "closed") enc.close(); }catch(e){}
+    try{ if(aenc && aenc.state !== "closed") aenc.close(); }catch(e){}
     parts.length = 0;
   }
   canvas.width = oldW; canvas.height = oldH;

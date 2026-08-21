@@ -2643,9 +2643,25 @@ function buildAudioSection(){
       if(el.paused){ try{ await el.play(); }catch(e){} } else el.pause();
       refreshAudioFileUI();
     };
+    /* PLAY is a pause toggle, which leaves the track wherever you stopped it.
+       Stopping and going back to the top is a different thing and there was no
+       way to ask for it: a piece built against a track wants to start from the
+       top of the track, not from wherever the last take ended. */
+    const st = document.createElement("button"); st.textContent = "STOP";
+    attachTip(st, "STOP", "Stops the track and returns it to the beginning, so the next PLAY starts from the top. PAUSE leaves it where it is.");
+    st.onclick = ()=>{
+      const el = ensureAudioFileEl();
+      el.pause();
+      try{ el.currentTime = 0; }catch(e){}
+      /* the meters are left to fall on their own. Zeroing them here looked
+         tidier and did nothing: updateAudio reads the analyser again on the
+         very next frame and writes over it, so all the line achieved was
+         appearing to do something. */
+      refreshAudioFileUI();
+    };
     const lp = document.createElement("button"); lp.textContent = "LOOP"; lp.classList.add("on");
     lp.onclick = ()=>{ const el = ensureAudioFileEl(); el.loop = !el.loop; lp.classList.toggle("on", el.loop); };
-    row.appendChild(lab); row.appendChild(ld); row.appendChild(pp); row.appendChild(lp);
+    row.appendChild(lab); row.appendChild(ld); row.appendChild(pp); row.appendChild(st); row.appendChild(lp);
     d.appendChild(row);
     const nrow = document.createElement("div"); nrow.className="prow";
     const nlab = document.createElement("label"); nlab.textContent = "POSITION";

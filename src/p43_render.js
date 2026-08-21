@@ -1052,13 +1052,33 @@ function updateScopes(now){
   }
   v.putImageData(vi,0,0);
 }
-const THUMB_W = 48, THUMB_H = 27;
+let THUMB_W = 48, THUMB_H = 27;
+/* the thumbnails follow the raster's shape too, or a portrait patch turns up
+   in the channel bar squashed flat */
+function setThumbSize(){
+  const ar = (typeof procAR === "number" && procAR > 0) ? procAR : 16/9;
+  const long = 48;
+  const w = ar >= 1 ? long : Math.max(12, Math.round(long*ar));
+  const h = ar >= 1 ? Math.max(12, Math.round(long/ar)) : long;
+  if(w === THUMB_W && h === THUMB_H) return;
+  THUMB_W = w; THUMB_H = h;
+  ATLAS_W = THUMB_W*2; ATLAS_H = THUMB_H*2;
+  thumbPix = new Uint8Array(ATLAS_W*ATLAS_H*4);
+  thumbImg = null;
+  if(thumbRT){ freeRT(thumbRT); thumbRT = null; }
+  if(typeof chanThumbs !== "undefined"){
+    for(const ch of CHANNELS){
+      const g = chanThumbs[ch];
+      if(g && g.canvas){ g.canvas.width = THUMB_W; g.canvas.height = THUMB_H; }
+    }
+  }
+}
 /* The four thumbnails used to be drawn and read back one at a time, so each
    readPixels stalled on the draw immediately before it and the pipeline emptied
    four times. They are packed into one 96x54 atlas now and read once. */
-const ATLAS_W = THUMB_W*2, ATLAS_H = THUMB_H*2;
+let ATLAS_W = THUMB_W*2, ATLAS_H = THUMB_H*2;
 const THUMB_SLOT = {A:[0,1], B:[1,1], C:[0,0], D:[1,0]};
-const thumbPix = new Uint8Array(ATLAS_W*ATLAS_H*4);
+let thumbPix = new Uint8Array(ATLAS_W*ATLAS_H*4);
 let thumbAt = 0, thumbRT = null, thumbImg = null;
 function updateThumbs(now){
   if(now - thumbAt < 0.5) return;

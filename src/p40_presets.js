@@ -475,6 +475,9 @@ function captureState(){
   /* the taps travel with the patch: which input each one listens to, the band,
      the gain and the response. The analyser nodes are rebuilt on load. */
   st.audioTaps = audioTaps.map(t=>({id:t.id, name:t.name, chan:t.chan, lo:t.lo, hi:t.hi, gain:t.gain, resp:t.resp}));
+  /* the shape of the frame is part of the piece, not a machine setting: a patch
+     built for a phone screen is not the same patch at 16:9 */
+  st.procAR = procAR; st.procRes = procRes;
   return st;
 }
 /* patches from before the mixer was split carry one combined value, where 13
@@ -582,6 +585,13 @@ function applyExtras(extra){
   if(extra.audioCfg){
     for(const k of ["bass","mid","high"]) if(extra.audioCfg[k]) Object.assign(audioCfg[k], extra.audioCfg[k]);
     if(extra.audioCfg.response !== undefined) audioCfg.response = extra.audioCfg.response;
+  }
+  if(extra.procAR && (extra.procAR !== procAR || (extra.procRes||procRes) !== procRes)){
+    if(setProcRes(extra.procRes || procRes, extra.procAR)){
+      const rs = document.getElementById("selRes"); if(rs) rs.value = String(procRes);
+      const asp = document.getElementById("selAspect"); if(asp) asp.value = String(procAR);
+      if(typeof sizeCanvas === "function") sizeCanvas();
+    }
   }
   if(extra.audioTaps){
     for(const id in audNodes){ try{ audNodes[id].an.disconnect(); }catch(e){} delete audNodes[id]; }

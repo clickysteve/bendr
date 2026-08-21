@@ -15,15 +15,16 @@ document.getElementById("btnRender").onclick = ()=>{ offlineRender().catch(e=>{
    if one is loaded and AUDIO REACT is listening to it, because that is then the
    piece's soundtrack rather than the clip's. A live input cannot be rendered
    offline at all, and says so instead of quietly producing silence. */
-async function decodeRenderAudio(seconds){
+async function decodeRenderAudio(seconds, clockCh){
   if(!("AudioEncoder" in window)) return {buf:null, why:"this browser has no audio encoder"};
   let url = "", label = "";
   if(audioMode === "file" && audioFileEl && audioFileEl.src){
     url = audioFileEl.src; label = audioFileName || "audio file";
   } else if(audioMode === "mic"){
     return {buf:null, why:"a live input cannot be rendered offline \u2014 use REC"};
-  } else if(SRC.A.objUrl || video.src){
-    url = SRC.A.objUrl || video.src; label = "the clip's soundtrack";
+  } else if(clockCh && (SRC[clockCh].objUrl || SRC[clockCh].video.src)){
+    url = SRC[clockCh].objUrl || SRC[clockCh].video.src;
+    label = "the soundtrack of the clip on " + clockCh;
   }
   if(!url) return {buf:null, why:"nothing to take audio from"};
   try{
@@ -59,8 +60,28 @@ async function decodeRenderAudio(seconds){
     return {buf:null, why:"could not decode the audio (" + String(e.message||e).slice(0,50) + ")"};
   }
 }
+/* Which clip the render steps through. It was channel A or nothing, which is a
+   strange rule once you can put a clip on any of four channels and mix them:
+   a patch running B against D would refuse to render at all. Any channel with a
+   timeline will do, and when more than one has one the longest wins, since that
+   is the one whose end is the end of the piece. */
+function renderClock(){
+  let best = null;
+  for(const ch of CHANNELS){
+    const S = SRC[ch];
+    if(S.mode !== "file" || S.still) continue;
+    const d = S.video.duration;
+    if(!d || !isFinite(d)) continue;
+    if(!best || d > best.dur) best = {ch, video:S.video, dur:d};
+  }
+  return best;
+}
 async function offlineRender(){
-  if(SRC.A.mode!=="file" || !SRC.A.video.duration){ toast("Load a video file into channel A first", true); return; }
+  const clock = renderClock();
+  if(!clock){
+    toast("Offline render needs a clip with a timeline on one of the channels \u2014 use REC to capture a live or generated patch", true);
+    return;
+  }
   if(!("VideoEncoder" in window)){ toast("This browser has no WebCodecs — use Chrome", true); return; }
   /* the render used to be hard-wired to 30, which is a poor fit for material
      that changes on every frame; the capture rate is a control now */
@@ -83,10 +104,11 @@ async function offlineRender(){
      decoded before anything else is built */
   ovTxt.textContent = "PREPARING AUDIO\u2026";
   await new Promise(r=>setTimeout(r,0));
-  const AU = await decodeRenderAudio(video.duration);
+  const AU = await decodeRenderAudio(clock.dur, clock.ch);
   const aBuf = AU.buf;
+  const video = clock.video;                 /* the clip that sets the length */
   const wasPlaying = !video.paused;
-  video.pause(); videoB.pause();
+  for(const ch of CHANNELS){ try{ SRC[ch].video.pause(); }catch(e){} }
   const oldW = canvas.width, oldH = canvas.height;
   canvas.width = W; canvas.height = H;
   /* This used to hold the whole file in one growing ArrayBuffer and then copy
@@ -160,7 +182,7 @@ async function offlineRender(){
     if(aFail) return "video only \u2014 the audio encoder failed (" + aFail.slice(0,40) + ")";
     return "video only \u2014 " + (AU.why || "no audio");
   }
-  const total = Math.max(1, Math.floor(video.duration*fps));
+  const total = Math.max(1, Math.floor(clock.dur*fps));
   const seekTo = (v,t)=>new Promise(res=>{
     const h = ()=>{ v.removeEventListener("seeked", h); res(); };
     v.addEventListener("seeked", h);
@@ -170,7 +192,11 @@ async function offlineRender(){
   for(let i=0; i<total && !renderCancel; i++){
     const t = i/fps;
     await seekTo(video, t);
-    for(const ch of ["B","C","D"]){ const v = SRC[ch].video; if(srcReady(ch) && v.duration) await seekTo(v, t % v.duration); }
+    for(const ch of CHANNELS){
+      const v = SRC[ch].video;
+      if(v === video || SRC[ch].mode !== "file" || SRC[ch].still) continue;
+      if(srcReady(ch) && v.duration && isFinite(v.duration)) await seekTo(v, t % v.duration);
+    }
     renderFrame(t0+t, 1/fps);
     const vf = new VideoFrame(canvas, {timestamp: Math.round(i*1e6/fps), duration: Math.round(1e6/fps)});
     enc.encode(vf, {keyFrame: i%(fps*2)===0});
@@ -186,7 +212,7 @@ async function offlineRender(){
   try{
     if(!renderCancel){
       ovTxt.textContent = "FINALIZING…";
-      pumpAudio(video.duration + 1);       /* whatever the loop did not reach */
+      pumpAudio(clock.dur + 1);       /* whatever the loop did not reach */
       await enc.flush();
       if(aenc && aenc.state === "configured") await aenc.flush();
       muxer.finalize();
@@ -214,7 +240,10 @@ async function offlineRender(){
   ov.style.display = "none";
   offline = false; lastT = performance.now()/1000;
   if(wasPlaying) video.play();
-  for(const ch of ["B","C","D"]) if(SRC[ch].mode==="file") SRC[ch].video.play();
+  for(const ch of CHANNELS){
+    const S = SRC[ch];
+    if(S.video !== video && S.mode === "file" && !S.still) S.video.play().catch(()=>{});
+  }
 }
 
 /* ---------------- init ---------------- */
@@ -412,10 +441,26 @@ if(OUTPUT_MODE){
     rs.onchange = ()=>{
       /* setProcRes refuses anything wider than the machine's maximum texture,
          and used to be congratulated for it anyway */
-      if(!setProcRes(parseInt(rs.value))){ rs.value = String(procH); return; }
+      if(!setProcRes(parseInt(rs.value))){ rs.value = String(procRes); return; }
       sizeCanvas();
       toast("Processing at "+procW+" \u00d7 "+procH);
     };
+    const asp = document.getElementById("selAspect");
+    if(asp){
+      for(const [label, ar] of ASPECTS){
+        const o = document.createElement("option");
+        o.value = String(ar); o.textContent = label;
+        asp.appendChild(o);
+      }
+      asp.value = String(procAR);
+      asp.onchange = ()=>{
+        const was = procAR;
+        if(!setProcRes(procRes, parseFloat(asp.value))){ asp.value = String(was); return; }
+        sizeCanvas();
+        const name = (ASPECTS.find(a=>Math.abs(a[1]-procAR) < 1e-6) || ["custom"])[0];
+        toast("Frame shape " + name + " \u2014 processing at " + procW + " \u00d7 " + procH);
+      };
+    }
   }
   /* the pane's own size changes drive the canvas fit, instead of measuring it
      every frame in case it moved */

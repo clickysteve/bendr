@@ -1,10 +1,31 @@
 /* ---------------- inputs: each channel owns its own source ---------------- */
+/* Patterns and text are drawn on their own 2D canvas and then fitted to the
+   raster, so that canvas has to be the raster's shape or everything generated
+   arrives letterboxed inside its own frame. It is sized by area rather than by
+   a fixed width, so a tall raster does not quietly cost four times the pixels
+   a wide one does. */
+function patSizeFor(){
+  const ar = (typeof procAR === "number" && procAR > 0) ? procAR : 16/9;
+  const area = 960*540;
+  const h = Math.max(64, Math.round(Math.sqrt(area/ar)/2)*2);
+  return {w: Math.max(64, Math.round(h*ar/2)*2), h};
+}
+function sizePatCanvases(){
+  const r = patSizeFor();
+  for(const ch of CHANNELS){
+    const S = SRC[ch];
+    if(!S || !S.patCanvas) continue;
+    if(S.patCanvas.width === r.w && S.patCanvas.height === r.h) continue;
+    S.patCanvas.width = r.w; S.patCanvas.height = r.h;
+  }
+}
 function newSource(ch){
   const v = document.createElement("video");
   v.playsInline = true; v.loop = true; v.crossOrigin = "anonymous";
   if(ch !== "A") v.muted = true;
   const pc = document.createElement("canvas");
-  pc.width = 960; pc.height = 540;
+  const pr0 = patSizeFor();
+  pc.width = pr0.w; pc.height = pr0.h;
   return {ch, video:v, mode:"pattern", pattern:"bars", cam:null,
           /* a still lives in the FILE slot alongside the clips: same button,
              same drag target, no transport */

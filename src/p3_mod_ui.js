@@ -2659,10 +2659,50 @@ function buildAudioSection(){
          appearing to do something. */
       refreshAudioFileUI();
     };
+    /* Cueing a track against a clip meant starting one and then catching the
+       other, which is never the same twice and is not something you can do at
+       all if you want the first frame to line up. This puts both back to zero
+       and releases them together, so a piece built against a track starts in
+       the same place every take. It cues every channel holding a clip, not just
+       A, because a patch can be running two of them against each other. */
+    const sy = document.createElement("button"); sy.textContent = "SYNC";
+    attachTip(sy, "SYNC START",
+      "Cues the audio file and every channel holding a clip back to zero and starts them together, so the track and the picture line up from the first frame.",
+      "Shift-click to cue everything to the top and leave it stopped, ready to release by hand.");
+    sy.onclick = async e=>{
+      const el = ensureAudioFileEl();
+      const clips = CHANNELS.map(c=>SRC[c]).filter(S=>S.mode === "file" && !S.still && S.video.src);
+      /* pause first, then rewind, then release: seeking a running element is
+         where the drift comes from */
+      for(const S of clips){ try{ S.video.pause(); }catch(e2){} }
+      el.pause();
+      for(const S of clips){ try{ S.video.currentTime = 0; }catch(e2){} }
+      try{ el.currentTime = 0; }catch(e2){}
+      if(e.shiftKey){
+        refreshAudioFileUI();
+        toast("Cued to the top \u2014 " + clips.length + " clip" + (clips.length===1?"":"s") + " and the track");
+        return;
+      }
+      ensureAudioCtx(); wireAudioFile();
+      /* everything let go inside one turn, so nothing has a frame's head start */
+      const go = [];
+      for(const S of clips) go.push(S.video.play().catch(()=>{}));
+      if(el.src) go.push(el.play().catch(()=>{}));
+      await Promise.all(go);
+      refreshAudioFileUI();
+      toast(clips.length ? "Started together: the track and " + clips.length + " clip" + (clips.length===1?"":"s")
+                         : "No clip loaded \u2014 started the track from the top");
+    };
     const lp = document.createElement("button"); lp.textContent = "LOOP"; lp.classList.add("on");
     lp.onclick = ()=>{ const el = ensureAudioFileEl(); el.loop = !el.loop; lp.classList.toggle("on", el.loop); };
     row.appendChild(lab); row.appendChild(ld); row.appendChild(pp); row.appendChild(st); row.appendChild(lp);
     d.appendChild(row);
+    /* below the transport it belongs to, not above it: appending the row to the
+       section before the transport row had been appended put it first */
+    const row1b = document.createElement("div"); row1b.className="prow";
+    const lab1b = document.createElement("label"); lab1b.textContent = "TOGETHER";
+    row1b.appendChild(lab1b); row1b.appendChild(sy);
+    d.appendChild(row1b);
     const nrow = document.createElement("div"); nrow.className="prow";
     const nlab = document.createElement("label"); nlab.textContent = "POSITION";
     const sk = document.createElement("input"); sk.type="range"; sk.min=0; sk.max=1; sk.step=0.0005; sk.value=0;

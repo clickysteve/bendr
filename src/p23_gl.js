@@ -225,25 +225,64 @@ function allocRTs(){
     const ladder = [360, 540, 720, 1080, 1440, 2160];
     const next = ladder[Math.max(0, ladder.indexOf(procH) - 1)] || 360;
     if(next < procH){
-      procH = next; procW = Math.round(next*16/9/2)*2;
-      RING_N = next >= 2160 ? 6 : next >= 1440 ? 12 : next >= 1080 ? 20 : 30;
+      const r2 = rasterFor(next, procAR);
+      procH = r2.h; procW = r2.w; procRes = next;
+      const big2 = Math.max(procW, procH);
+      RING_N = big2 >= 3840 ? 6 : big2 >= 2560 ? 12 : big2 >= 1920 ? 20 : 30;
       const rs = document.getElementById("selRes"); if(rs) rs.value = String(next);
       allocRTs();
     }
   }
 }
 const MAX_TEX = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-function setProcRes(h){
-  const w = Math.round(h*16/9/2)*2;
-  if(w > MAX_TEX){
-    if(typeof toast === "function") toast("This machine tops out at "+MAX_TEX+" pixels wide", true);
+/* The raster was 16:9 and nothing else, in one line of arithmetic, even though
+   every stage downstream already works from procW and procH rather than from
+   any assumption about their ratio. Broadcast is not the only shape a screen
+   comes in: a phone is 9:16, a CRT is 4:3, a projector wall might be 1:1, and
+   an installation can be any of them. */
+const ASPECTS = [
+  ["16:9",   16/9],
+  ["4:3",    4/3],
+  ["1:1",    1],
+  ["3:4",    3/4],
+  ["9:16",   9/16],
+  ["21:9",   64/27],
+  ["2.39:1", 2.39],
+];
+let procAR = 16/9, procRes = 1080;
+function evenPx(v){ return Math.max(2, Math.round(v/2)*2); }
+/* the resolution picks the height on a landscape or square raster and the
+   width on a portrait one, because "1080 vertical" means 1080 across and 1920
+   down to anyone who has ever posted a vertical video */
+function rasterFor(res, ar){
+  return ar >= 1 ? {w: evenPx(res*ar), h: evenPx(res)}
+                 : {w: evenPx(res),    h: evenPx(res/ar)};
+}
+function setProcRes(res, ar){
+  if(res === undefined) res = procRes;
+  if(ar === undefined) ar = procAR;
+  const r = rasterFor(res, ar);
+  if(r.w > MAX_TEX || r.h > MAX_TEX){
+    if(typeof toast === "function") toast("This machine tops out at "+MAX_TEX+" pixels a side", true);
     return false;
   }
-  procH = h; procW = w;
+  procW = r.w; procH = r.h; procRes = res; procAR = ar;
   /* the frame store is the one thing that scales badly: thirty 4K frames is
-     four gigabytes, so the ring gets shorter as the raster gets bigger */
-  RING_N = h >= 2160 ? 6 : h >= 1440 ? 12 : h >= 1080 ? 20 : 30;
+     four gigabytes, so the ring gets shorter as the raster gets bigger. It goes
+     on the long edge now, since a tall raster is just as many pixels. */
+  const big = Math.max(procW, procH);
+  RING_N = big >= 3840 ? 6 : big >= 2560 ? 12 : big >= 1920 ? 20 : 30;
   allocRTs();
+  /* The things sized to the raster's shape rather than to the raster: the
+     canvas patterns are drawn on, and the channel thumbnails. Both are declared
+     in parts that load after this one, and the first call to setProcRes happens
+     while this file is still being evaluated, so on that pass they are still in
+     the temporal dead zone and reaching them throws. Checking typeof does not
+     help, because that throws too for a const that has not been reached yet.
+     Nothing needs resizing on that pass anyway: the defaults are already the
+     shape they are being set to. */
+  try{ sizePatCanvases(); }catch(e){}
+  try{ setThumbSize(); }catch(e){}
   return true;
 }
 setProcRes(1080);

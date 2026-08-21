@@ -1,7 +1,7 @@
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v37.0";
+const BENDR_VERSION = "v37.1";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -65,9 +65,9 @@ const PDEF = [
   ["edgeSwirl","EDGE SWIRL","mixer",-1,1,0],
   ["edgeChroma","EDGE CHROMA","mixer",0,1,0.5],
   ["edgeCreep","EDGE CREEP","mixer",0,1,0.35],
-  ["meltZoom","MELT ZOOM","mixer",-1,1,0],
+  ["meltZoom","MELT ZOOM","mixer",-1,1,0.3],
   ["meltHue","MELT HUE","mixer",-1,1,0],
-  ["meltSoft","MELT SOFTEN","mixer",0,1,0],
+  ["meltSoft","MELT SOFTEN","mixer",0,1,0.35],
   ["wipeBord","BORDER WIPE","mixer",0,1,0],
   ["wipeBordCol","BORDER COLOUR","mixer",0,1,0],
   ["wipeRep","WIPE MULTI","mixer",1,4,1],
@@ -102,9 +102,9 @@ const PDEF = [
   ["edgeSwirl2","EDGE SWIRL","mixer2",-1,1,0],
   ["edgeChroma2","EDGE CHROMA","mixer2",0,1,0.5],
   ["edgeCreep2","EDGE CREEP","mixer2",0,1,0.35],
-  ["meltZoom2","MELT ZOOM","mixer2",-1,1,0],
+  ["meltZoom2","MELT ZOOM","mixer2",-1,1,0.3],
   ["meltHue2","MELT HUE","mixer2",-1,1,0],
-  ["meltSoft2","MELT SOFTEN","mixer2",0,1,0],
+  ["meltSoft2","MELT SOFTEN","mixer2",0,1,0.35],
   ["wipeBord2","BORDER WIPE","mixer2",0,1,0],
   ["wipeBordCol2","BORDER COLOUR","mixer2",0,1,0],
   ["wipeRep2","WIPE MULTI","mixer2",1,4,1],
@@ -139,9 +139,9 @@ const PDEF = [
   ["edgeSwirlM","EDGE SWIRL","mixerM",-1,1,0],
   ["edgeChromaM","EDGE CHROMA","mixerM",0,1,0.5],
   ["edgeCreepM","EDGE CREEP","mixerM",0,1,0.35],
-  ["meltZoomM","MELT ZOOM","mixerM",-1,1,0],
+  ["meltZoomM","MELT ZOOM","mixerM",-1,1,0.3],
   ["meltHueM","MELT HUE","mixerM",-1,1,0],
-  ["meltSoftM","MELT SOFTEN","mixerM",0,1,0],
+  ["meltSoftM","MELT SOFTEN","mixerM",0,1,0.35],
   ["wipeBordM","BORDER WIPE","mixerM",0,1,0],
   ["wipeBordColM","BORDER COLOUR","mixerM",0,1,0],
   ["wipeRepM","WIPE MULTI","mixerM",1,4,1],

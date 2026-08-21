@@ -519,6 +519,10 @@ function restoreState(st){
   for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbFlip","fbTap","outModel","osdMode","osdDate","fieldSrc","flowField","flowEdge","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM","mixKey","mixKey2","mixKeyM","meltMode","meltMode2","meltModeM","scanRevH","scanRevV","syncLatch","fbNoServo","ilMode","ilOrder","moshRecycle"]){
     if(st[k] !== undefined) eval(k+" = st."+k);
   }
+  /* a patch from before the melt had modes meant the edge one; without this it
+     would be reinterpreted as a full-frame feedback loop and look nothing like
+     it did when it was saved */
+  if(st.meltMode === undefined){ meltMode = meltMode2 = meltModeM = 0; }
   for(const k in secBypass) delete secBypass[k];
   if(st.secBypass) Object.assign(secBypass, st.secBypass);
   secBypassOn = Object.keys(secBypass).some(k=>secBypass[k]);
@@ -659,7 +663,12 @@ function resetGlobals(){
   outModel=0; fieldSrc=0; flowField=0; flowEdge=0;
   osdMode=1; osdDate=0;
   chainOrder = CHAIN_STAGES.slice();
-  meltMode = meltMode2 = meltModeM = 0;
+  /* FRAME, not EDGE. EDGE is the older behaviour and it is the right answer for
+     a seam that creeps, but it does nothing on a plain dissolve and nothing at
+     all on a single source, which is where most patches sit. Defaulting to it
+     meant turning MELT up and watching nothing happen, which is exactly the
+     complaint the modes were built to answer. */
+  meltMode = meltMode2 = meltModeM = 1;
   stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true, scan:true, dct:true, tdisp:true};
   scanRevH = false; scanRevV = false; syncLatch = false; fbNoServo = false;
   ilMode = 0; ilOrder = false; moshRecycle = false;

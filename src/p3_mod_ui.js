@@ -781,6 +781,51 @@ function updateAudio(dt){
   }
 }
 
+/* ---- the wheel steps a menu ----
+   Trying twenty-four blend modes against a moving picture meant opening a
+   menu, picking one, watching, opening it again: four actions per look, and
+   the picture is hidden behind the open menu for two of them. A wheel notch is
+   one action and the picture never goes away, which is the only way to judge
+   which of them is right.
+
+   The hazard is the parameter panel, which is a long scrolling column with
+   menus in it: scroll the panel, pass over a menu, change something you did
+   not mean to. What separates the two cases is that when you scroll a panel
+   the pointer is still and the content moves under it, so the menu arrives
+   fresh beneath the cursor, while a deliberate wheel over a menu has the
+   pointer resting on it first. A short dwell before the wheel counts tells
+   them apart, and costs nothing when you meant it. */
+const WHEEL_DWELL = 200;
+let wheelSel = null, wheelSince = 0, wheelAcc = 0;
+document.addEventListener("mouseover", e=>{
+  const s = e.target && e.target.closest ? e.target.closest("select") : null;
+  if(s === wheelSel) return;
+  wheelSel = s; wheelSince = performance.now(); wheelAcc = 0;
+}, true);
+document.addEventListener("wheel", e=>{
+  const s = e.target && e.target.closest ? e.target.closest("select") : null;
+  if(!s || s.disabled || s !== wheelSel) return;
+  if(performance.now() - wheelSince < WHEEL_DWELL) return;
+  const n = s.options.length;
+  /* the device pickers fill themselves when the menu opens, so there is
+     nothing to step through until it has been opened once */
+  if(n < 2) return;
+  e.preventDefault();
+  /* a mouse sends one large delta per notch and a trackpad sends a stream of
+     small ones, so they are accumulated to a notch's worth either way */
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1;
+  wheelAcc += e.deltaY * unit;
+  if(Math.abs(wheelAcc) < 40) return;
+  const dir = wheelAcc > 0 ? 1 : -1;
+  wheelAcc = 0;
+  /* clamped, not wrapped: falling off the end of twenty-four blend modes back
+     to the first reads as a glitch rather than a choice */
+  const i = Math.max(0, Math.min(n - 1, s.selectedIndex + dir));
+  if(i === s.selectedIndex) return;
+  s.selectedIndex = i;
+  s.dispatchEvent(new Event("change", {bubbles:true}));
+}, {passive:false});
+
 /* ---------------- UI build ---------------- */
 const panel = document.getElementById("panel");
 const uiRefs = {};   // id -> {slider, val, tick, row, label}

@@ -1465,6 +1465,8 @@ audio,video{display:none;}
   <p>The raster is not fixed at 16:9 and has nothing to do with your window. <b>FRAME SHAPE</b> under ENGINE offers 16:9, 4:3, 1:1, 3:4, 9:16, 21:9 and 2.39:1, and everything follows it: the CRT geometry, the scan processor, the overlay, the generated patterns and the channel thumbnails. Sources are fitted into whatever shape you pick exactly as any other mismatch is fitted, so a 16:9 clip in a 9:16 frame behaves the way you would expect. The resolution below it picks the height on a wide or square frame and the width on a tall one, so 9:16 at 1080 is 1080 across and 1920 down. The shape is saved with the patch, because a piece built for a phone screen is not the same piece at 16:9.</p>
   <h3>STARTING A TRACK WITH THE PICTURE</h3>
   <p>On the AUDIO tab, <b>SYNC</b> cues the audio file and every channel holding a clip back to zero and releases them together, so the track and the picture line up from the first frame and do so identically on every take. Shift-click cues everything to the top and leaves it stopped, ready to release by hand. <b>STOP</b> does the same rewind for the track alone; PLAY is a pause toggle and leaves it where it stopped.</p>
+  <h3>THE WHEEL STEPS A MENU</h3>
+  <p>Rest the pointer on any dropdown and roll the wheel: it steps through the options one at a time without opening, so you can run through twenty-four blend modes against a moving picture and watch each one, rather than opening a menu, choosing, watching, and opening it again. It stops at the ends instead of wrapping round. Scrolling a panel that happens to have menus in it does not disturb them, because a menu only answers the wheel once the pointer has been resting on it for a moment, and while a panel scrolls the menus are sliding under a pointer that has not moved.</p>
   <h3>TYPING A VALUE</h3>
   <p>Every number beside a slider is a field. Click it and type. <kbd>Enter</kbd> commits, <kbd>Esc</kbd> puts back what was there, and the up and down arrows nudge by a fortieth of the range, or a four-hundredth with <kbd>shift</kbd> held, which is one step of the slider. A typed value goes in exactly as typed rather than snapped to the slider's step, because the parameter underneath is continuous and the slider is only the usual way to reach it. The audio band edges take hertz the way you would write them down, so <b>1.2k</b> is understood as well as <b>1200</b>.</p>
   <h3>FINDING YOUR WAY AROUND</h3>
@@ -3564,7 +3566,7 @@ const FS_TILE = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v37.0";
+const BENDR_VERSION = "v37.1";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -3628,9 +3630,9 @@ const PDEF = [
   ["edgeSwirl","EDGE SWIRL","mixer",-1,1,0],
   ["edgeChroma","EDGE CHROMA","mixer",0,1,0.5],
   ["edgeCreep","EDGE CREEP","mixer",0,1,0.35],
-  ["meltZoom","MELT ZOOM","mixer",-1,1,0],
+  ["meltZoom","MELT ZOOM","mixer",-1,1,0.3],
   ["meltHue","MELT HUE","mixer",-1,1,0],
-  ["meltSoft","MELT SOFTEN","mixer",0,1,0],
+  ["meltSoft","MELT SOFTEN","mixer",0,1,0.35],
   ["wipeBord","BORDER WIPE","mixer",0,1,0],
   ["wipeBordCol","BORDER COLOUR","mixer",0,1,0],
   ["wipeRep","WIPE MULTI","mixer",1,4,1],
@@ -3665,9 +3667,9 @@ const PDEF = [
   ["edgeSwirl2","EDGE SWIRL","mixer2",-1,1,0],
   ["edgeChroma2","EDGE CHROMA","mixer2",0,1,0.5],
   ["edgeCreep2","EDGE CREEP","mixer2",0,1,0.35],
-  ["meltZoom2","MELT ZOOM","mixer2",-1,1,0],
+  ["meltZoom2","MELT ZOOM","mixer2",-1,1,0.3],
   ["meltHue2","MELT HUE","mixer2",-1,1,0],
-  ["meltSoft2","MELT SOFTEN","mixer2",0,1,0],
+  ["meltSoft2","MELT SOFTEN","mixer2",0,1,0.35],
   ["wipeBord2","BORDER WIPE","mixer2",0,1,0],
   ["wipeBordCol2","BORDER COLOUR","mixer2",0,1,0],
   ["wipeRep2","WIPE MULTI","mixer2",1,4,1],
@@ -3702,9 +3704,9 @@ const PDEF = [
   ["edgeSwirlM","EDGE SWIRL","mixerM",-1,1,0],
   ["edgeChromaM","EDGE CHROMA","mixerM",0,1,0.5],
   ["edgeCreepM","EDGE CREEP","mixerM",0,1,0.35],
-  ["meltZoomM","MELT ZOOM","mixerM",-1,1,0],
+  ["meltZoomM","MELT ZOOM","mixerM",-1,1,0.3],
   ["meltHueM","MELT HUE","mixerM",-1,1,0],
-  ["meltSoftM","MELT SOFTEN","mixerM",0,1,0],
+  ["meltSoftM","MELT SOFTEN","mixerM",0,1,0.35],
   ["wipeBordM","BORDER WIPE","mixerM",0,1,0],
   ["wipeBordColM","BORDER COLOUR","mixerM",0,1,0],
   ["wipeRepM","WIPE MULTI","mixerM",1,4,1],
@@ -5756,6 +5758,51 @@ function updateAudio(dt){
     modVal[t.id] = t.val;
   }
 }
+
+/* ---- the wheel steps a menu ----
+   Trying twenty-four blend modes against a moving picture meant opening a
+   menu, picking one, watching, opening it again: four actions per look, and
+   the picture is hidden behind the open menu for two of them. A wheel notch is
+   one action and the picture never goes away, which is the only way to judge
+   which of them is right.
+
+   The hazard is the parameter panel, which is a long scrolling column with
+   menus in it: scroll the panel, pass over a menu, change something you did
+   not mean to. What separates the two cases is that when you scroll a panel
+   the pointer is still and the content moves under it, so the menu arrives
+   fresh beneath the cursor, while a deliberate wheel over a menu has the
+   pointer resting on it first. A short dwell before the wheel counts tells
+   them apart, and costs nothing when you meant it. */
+const WHEEL_DWELL = 200;
+let wheelSel = null, wheelSince = 0, wheelAcc = 0;
+document.addEventListener("mouseover", e=>{
+  const s = e.target && e.target.closest ? e.target.closest("select") : null;
+  if(s === wheelSel) return;
+  wheelSel = s; wheelSince = performance.now(); wheelAcc = 0;
+}, true);
+document.addEventListener("wheel", e=>{
+  const s = e.target && e.target.closest ? e.target.closest("select") : null;
+  if(!s || s.disabled || s !== wheelSel) return;
+  if(performance.now() - wheelSince < WHEEL_DWELL) return;
+  const n = s.options.length;
+  /* the device pickers fill themselves when the menu opens, so there is
+     nothing to step through until it has been opened once */
+  if(n < 2) return;
+  e.preventDefault();
+  /* a mouse sends one large delta per notch and a trackpad sends a stream of
+     small ones, so they are accumulated to a notch's worth either way */
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1;
+  wheelAcc += e.deltaY * unit;
+  if(Math.abs(wheelAcc) < 40) return;
+  const dir = wheelAcc > 0 ? 1 : -1;
+  wheelAcc = 0;
+  /* clamped, not wrapped: falling off the end of twenty-four blend modes back
+     to the first reads as a glitch rather than a choice */
+  const i = Math.max(0, Math.min(n - 1, s.selectedIndex + dir));
+  if(i === s.selectedIndex) return;
+  s.selectedIndex = i;
+  s.dispatchEvent(new Event("change", {bubbles:true}));
+}, {passive:false});
 
 /* ---------------- UI build ---------------- */
 const panel = document.getElementById("panel");
@@ -8785,6 +8832,10 @@ function restoreState(st){
   for(const k of ["fbWrap","fbMirror","fbBlend","fbNL","fbFlip","fbTap","outModel","osdMode","osdDate","fieldSrc","flowField","flowEdge","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM","mixKey","mixKey2","mixKeyM","meltMode","meltMode2","meltModeM","scanRevH","scanRevV","syncLatch","fbNoServo","ilMode","ilOrder","moshRecycle"]){
     if(st[k] !== undefined) eval(k+" = st."+k);
   }
+  /* a patch from before the melt had modes meant the edge one; without this it
+     would be reinterpreted as a full-frame feedback loop and look nothing like
+     it did when it was saved */
+  if(st.meltMode === undefined){ meltMode = meltMode2 = meltModeM = 0; }
   for(const k in secBypass) delete secBypass[k];
   if(st.secBypass) Object.assign(secBypass, st.secBypass);
   secBypassOn = Object.keys(secBypass).some(k=>secBypass[k]);
@@ -8925,7 +8976,12 @@ function resetGlobals(){
   outModel=0; fieldSrc=0; flowField=0; flowEdge=0;
   osdMode=1; osdDate=0;
   chainOrder = CHAIN_STAGES.slice();
-  meltMode = meltMode2 = meltModeM = 0;
+  /* FRAME, not EDGE. EDGE is the older behaviour and it is the right answer for
+     a seam that creeps, but it does nothing on a plain dissolve and nothing at
+     all on a single source, which is where most patches sit. Defaulting to it
+     meant turning MELT up and watching nothing happen, which is exactly the
+     complaint the modes were built to answer. */
+  meltMode = meltMode2 = meltModeM = 1;
   stageEnabled = {sig:true, col:true, glitch:true, lab:true, flow:true, scan:true, dct:true, tdisp:true};
   scanRevH = false; scanRevV = false; syncLatch = false; fbNoServo = false;
   ilMode = 0; ilOrder = false; moshRecycle = false;

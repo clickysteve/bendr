@@ -696,19 +696,37 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 #layerdock .sec > h3 .caret{display:none;}
 #layerdock .secbody{display:grid; grid-template-columns:minmax(210px, 250px) 1fr; gap:14px; align-items:start;}
 #layerdock .layhead{grid-column:1; }
-#layerdock .laycols{grid-column:2; display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; align-items:start;}
-#layerdock .laycol{border:1px solid var(--line); border-radius:3px; padding:6px 8px 8px; background:rgba(255,255,255,.012);}
-#layerdock .laycol > .layname{
-  font-size:9px; letter-spacing:1.5px; color:var(--cyan); padding:0 0 5px;
-  display:flex; justify-content:space-between; align-items:baseline;
+#layerdock .laycols{grid-column:2; display:flex; flex-direction:column; gap:5px;}
+/* A layer is a strip across, not a column down. Four columns of five sliders
+   left each one about ninety pixels of travel, which is not a fader, it is a
+   nudge. Laid out this way the level gets whatever is left of the width. */
+#layerdock .layrow{
+  display:flex; gap:9px; align-items:flex-start; flex-wrap:wrap;
+  border:1px solid var(--line); border-radius:3px; padding:5px 9px 6px;
+  background:rgba(255,255,255,.012);
 }
-#layerdock .laycol > .layname small{color:var(--dim); letter-spacing:1px; font-size:8px;}
-#layerdock .laycol select{width:100%; margin-bottom:3px;}
-#layerdock .laycol .prow{grid-template-columns:78px 1fr 44px;}
+#layerdock .layid{
+  flex:0 0 116px; display:flex; flex-direction:column; justify-content:center;
+  min-height:24px; line-height:1.25;
+}
+#layerdock .layid b{font-size:9px; letter-spacing:1.5px; color:var(--cyan); font-weight:700;}
+#layerdock .layid small{font-size:8px; letter-spacing:1px; color:var(--dim);}
+#layerdock .layrow > select{flex:0 0 auto; min-width:0;}
+#layerdock .layrow > .layblend{flex:0 0 148px;}
+#layerdock .layrow > .laykey{flex:0 0 118px;}
+#layerdock .layparams{flex:1 1 300px; display:flex; flex-wrap:wrap; gap:0 18px; min-width:220px;}
+#layerdock .layparams .prow{flex:1 1 330px; min-width:220px;}
+#layerdock .layparams .prow label{width:84px; flex:0 0 84px;}
+/* A key that is switched out has nothing to set, so its controls are not drawn
+   at all. Jumping to one from the search reveals it, dimmed, because a search
+   that lands on nothing is worse than a control that is greyed. */
+#layerdock .layrow.key-off .keyprm{display:none;}
+#layerdock .layrow.key-luma .hueprm{display:none;}
+#layerdock .layrow.revealed .keyprm{display:flex; opacity:.5;}
 @media (max-width: 1100px){
   #layerdock .secbody{grid-template-columns:1fr;}
   #layerdock .layhead, #layerdock .laycols{grid-column:1;}
-  #layerdock .laycols{grid-template-columns:repeat(2, 1fr);}
+  #layerdock .layid{flex:0 0 100%;}
 }
 #dockBody > #audiodock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
 #dockBody > #outdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
@@ -744,9 +762,6 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 }
 .laycell:hover{border-color:var(--cyan); color:#55555f;}
 .laycell.on{background:var(--cyan); border-color:var(--cyan); color:#0b0b0e;}
-/* the layer name stays put while the column scrolls, or a dock dragged short
-   leaves you reading five sliders with nothing saying whose they are */
-#layerdock .laycol > .layname{position:sticky; top:-1px; background:var(--panel); z-index:2; margin:-6px -8px 0; padding:6px 8px 5px;}
 /* The transitions belong to the tree. In the stack they are still there and
    still hold their settings, but they are not what is deciding the picture,
    so the strip says so rather than leaving four dead dropdowns to be puzzled
@@ -1449,7 +1464,7 @@ audio,video{display:none;}
   <p>The faders live under the picture rather than in the sidebar because a crossfader wants to be horizontal and should never be hidden behind a tab \u2014 it is the one control you ride while looking at something else. The detail behind each transition (softness, wipe geometry, key threshold) lives on the MIX tab of the dock, where it is setup rather than performance. INV only greys in when the transition is a wipe, since a fade, a key and a blend have no direction to reverse.</p>
   <h3>THE LAYER STACK</h3>
   <p>The three buses are a tree, and a tree is the wrong shape for building one picture out of four, because every source past the second has to arrive through a fader that is already carrying something else. So there is a second topology. The <b>LAYERS</b> tab on the dock has a <b>TOPOLOGY</b> selector and a four-by-four crosspoint matrix: four channels down the side, four layers across, and a cell where they meet. Switch it to <b>LAYERS</b> and the picture is built bottom to top instead, each layer landing on everything below it with its own blend mode, its own level and its own key. The same twenty-four blends the mixer uses are available on every layer, so a look you found on the strip transfers straight up. The same channel can feed more than one layer, which is how you put a picture over a treated copy of itself.</p>
-  <p>Each layer's key works on that layer's own picture rather than on the transition, which is the point of a stack: the thing on top can sit in front of what is under it instead of dissolving into it. <b>KEY WHITE</b> drops its bright parts, <b>KEY BLACK</b> its dark parts, <b>KEY CHROMA</b> one colour, and the threshold, softness and hue for each layer are in that layer's column. A layer at zero level costs nothing at all &mdash; the channel behind it stops rendering. The three transitions stay where they are and keep their settings while the stack is running; the strip dims to say so. The master melt still runs on the finished stack, so it can still feed back into itself.</p>
+  <p>Each layer's key works on that layer's own picture rather than on the transition, which is the point of a stack: the thing on top can sit in front of what is under it instead of dissolving into it. <b>KEY WHITE</b> drops its bright parts, <b>KEY BLACK</b> its dark parts, <b>KEY CHROMA</b> one colour, and the threshold, softness and hue appear in that layer's row as soon as a key is chosen, and stay out of the way when it is off. A layer at zero level costs nothing at all &mdash; the channel behind it stops rendering. The three transitions stay where they are and keep their settings while the stack is running; the strip dims to say so. The master melt still runs on the finished stack, so it can still feed back into itself.</p>
   <h3>MULTIVIEW</h3>
   <p><b>MULTI</b> (or <kbd>V</kbd>) shows all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors. The channel you are editing carries the hot border; channels that are not currently rendering are dimmed. It forces everything to render, so it costs more than the normal view \u2014 it is for setting up, not for performing.</p>
   <h3>PATTERN SYNTH</h3>
@@ -1497,7 +1512,7 @@ audio,video{display:none;}
   <p>Each route has its own <b>invert</b> and <b>response curve</b>, so one modulator can drive several parameters quite differently \u2014 one hard, one gently, one inverted, one in four steps. That is often worth more than adding another modulator.</p>
   <p><b>Right-click any parameter</b> to patch something onto it, or choose <b>ANIMATE</b> there to give it a new LFO of its own in one click. Each route in the matrix has a \u25ce that jumps to its modulator, and each modulator lists what it drives as links that jump back.</p>
   <h3>PERFORMANCE</h3>
-  <p>The dock under the picture has tabs across it: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b>, <b>SHADER</b>, <b>MIX</b>, <b>LAYERS</b>, <b>SCOPE</b>, <b>OUT</b>, <b>AUDIO</b> and <b>PERFORM</b>. MIX holds the detail behind each transition &mdash; wipe softness and geometry, the key levels, the melt &mdash; while the faders themselves stay on the strip. LAYERS is the crosspoint matrix and the four layer strips, and it has the whole width because a routing matrix and four sets of controls need it. AUDIO is where the audio-reactive modulators listen: the input, an audio file with its own transport, the three band ranges and the response. PERFORM holds the snapshot bank, the performance recorder and preset morph. The six bend pads are not on a tab at all: they have their own strip beside the faders, because you should never have to go looking for them. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
+  <p>The dock under the picture has tabs across it: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b>, <b>SHADER</b>, <b>MIX</b>, <b>LAYERS</b>, <b>SCOPE</b>, <b>OUT</b>, <b>AUDIO</b> and <b>PERFORM</b>. MIX holds the detail behind each transition &mdash; wipe softness and geometry, the key levels, the melt &mdash; while the faders themselves stay on the strip. LAYERS is the crosspoint matrix and the four layer strips, one to a row so the levels get the width. AUDIO is where the audio-reactive modulators listen: the input, an audio file with its own transport, the three band ranges and the response. PERFORM holds the snapshot bank, the performance recorder and preset morph. The six bend pads are not on a tab at all: they have their own strip beside the faders, because you should never have to go looking for them. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
   <h3>SOURCES</h3>
   <p>Each channel takes a video file or a still image (clips stream from disk, so file size does not matter), a camera, a screen, a generated pattern, the pattern synth, a text page, or re-entry from elsewhere in the rig. Stills load through <b>FILE</b> like clips do and read STILL on the timecode; the transport greys out and everything else behaves normally. <b>CAM</b> opens whatever is chosen in the device list above it: a built-in webcam, a USB one, an HDMI capture stick, or a virtual camera from streaming software. Device names only appear once camera access has been granted, so the list reads DEVICE 1, DEVICE 2 until the first time you press CAM. <b>SCREEN</b> captures a screen, a window or a browser tab, which is the general way to bring in anything that is not a camera.</p>
@@ -3752,7 +3767,7 @@ const FS_TILE = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v37.4";
+const BENDR_VERSION = "v37.5";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -4693,7 +4708,7 @@ for(const [suffix, note] of [["2"," (bus 2: channels C and D)"], ["M"," (master:
 
 /* ---------------- per-section help ---------------- */
 const SECHELP = {
-  layers:"The other way to wire four channels together. The mixer is a tree: two pictures into a bus, two buses into the master, everything arriving through a fader. That is how a bench mixer is built and it is the right shape for cutting and wiping between sources, but it is the wrong shape for building one picture out of four, because every layer past the second has to come in through a fader that is already carrying something else. The stack is the other topology. Four layers, bottom to top, each landing on everything under it with its own blend mode, its own level and its own key, and a crosspoint matrix deciding which channel feeds which layer. The same channel can feed more than one layer, which is how you put a picture over a treated copy of itself. Switching to LAYERS leaves the three transitions dimmed but intact: nothing is lost, and the master melt still runs on the finished stack, so the whole thing can still feed back into itself.",
+  layers:"The other way to wire four channels together. The mixer is a tree: two pictures into a bus, two buses into the master, everything arriving through a fader. That is how a bench mixer is built and it is the right shape for cutting and wiping between sources, but it is the wrong shape for building one picture out of four, because every layer past the second has to come in through a fader that is already carrying something else. The stack is the other topology. Four layers, bottom to top, each landing on everything under it with its own blend mode, its own level and its own key, and a crosspoint matrix deciding which channel feeds which layer. Each layer is a row: its blend, its key and its level, with the threshold, softness and hue appearing beside them only once a key is chosen. The same channel can feed more than one layer, which is how you put a picture over a treated copy of itself. Switching to LAYERS leaves the three transitions dimmed but intact: nothing is lost, and the master melt still runs on the finished stack, so the whole thing can still feed back into itself.",
   mixer:"Bus 1 of three. Combines the two finished channels A and B with a fader, twenty transition modes, a keyer and the melt stage that softens the seam between them.",
   mixer2:"Bus 2. Identical to bus 1 but for channels C and D. It only renders while the MASTER fader is above zero, so leaving it alone is free.",
   mixerM:"The master crossfade between the two buses, with the same twenty transitions one level up.",
@@ -7603,6 +7618,15 @@ function refreshLayerUI(){
     const ky=document.getElementById("selLayKey"+i);   if(ky) ky.value = layKeyMode[i]||0;
     const fr=document.getElementById("layFrom"+i);
     if(fr) fr.textContent = (i===0?"BASE \u00b7 ":"") + "CH " + (laySrc[i]||"\u2014");
+    /* a key that is off has nothing to shape, so its three controls are not
+       drawn: with all four off a layer is one line and its level gets the
+       whole width, which is the state you are in nearly all of the time */
+    const rw=document.getElementById("layRow"+i);
+    if(rw){
+      const km = layKeyMode[i]||0;
+      rw.classList.toggle("key-off", km === 0);
+      rw.classList.toggle("key-luma", km === 1 || km === 2);
+    }
   }
   const t=document.getElementById("selTopo"); if(t) t.value = mixTopo;
   document.body.classList.toggle("topo-layers", mixTopo===1);
@@ -7729,43 +7753,54 @@ function buildPerformDock(){
 /* anything that reads better underneath the section's own controls */
 function sectionExtrasAfter(id, d){
   if(id==="layers"){
-    /* Four columns, one per layer, left to right in the order the stack is
-       built. The parameter rows have already been made by the generic panel
-       builder, so they are moved into their column rather than rebuilt: they
-       keep their modulation menu, their readout, their reset and their place
-       in the search index, all of which a hand-rolled copy would lose. */
-    const cols = document.createElement("div"); cols.className = "laycols";
+    /* One row per layer, full width, rather than four narrow columns. Twenty
+       sliders side by side left each one about ninety pixels of travel, which
+       is not a fader, it is a nudge. So the layers run down the page and the
+       controls run across, and the key controls are only drawn when there is
+       a key to shape: with the keys off a layer is one line and its level has
+       the whole width, which is the case you are in almost all of the time.
+       The parameter rows are moved rather than rebuilt, so they keep their
+       modulation menu, their typed readout, their reset and their place in
+       the search index. */
+    const rows = document.createElement("div"); rows.className = "laycols";
     for(let i=0;i<4;i++){
       const n = i+1;
-      const col = document.createElement("div"); col.className = "laycol"; col.dataset.lay = i;
-      const nm = document.createElement("div"); nm.className = "layname";
-      const t1 = document.createElement("span"); t1.textContent = "LAYER "+n;
-      const t2 = document.createElement("small"); t2.id = "layFrom"+i;
-      nm.appendChild(t1); nm.appendChild(t2);
-      col.appendChild(nm);
+      const row = document.createElement("div"); row.className = "layrow"; row.dataset.lay = i;
+      row.id = "layRow"+i;
 
-      const bl = document.createElement("select"); bl.id="selLayBlend"+i;
+      const idb = document.createElement("div"); idb.className = "layid";
+      const t1 = document.createElement("b"); t1.textContent = "LAYER "+n;
+      const t2 = document.createElement("small"); t2.id = "layFrom"+i;
+      idb.appendChild(t1); idb.appendChild(t2);
+      row.appendChild(idb);
+
+      const bl = document.createElement("select"); bl.id="selLayBlend"+i; bl.className="layblend";
       attachTip(bl, "LAYER "+n+" BLEND",
         "How this layer lands on everything below it. The same twenty-four rules the mixer uses, so a look you found on the strip transfers straight up here. DISSOLVE with the level down is a plain fade; ADDITIVE and SCREEN pile light on; MULTIPLY and the burns take it away; DIFFERENCE and the two bit operations are where it stops behaving like film.");
       MIXBLENDS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; bl.appendChild(o); });
       bl.onchange = ()=>{ layBlend[i] = parseInt(bl.value); };
-      col.appendChild(bl);
+      row.appendChild(bl);
 
-      const ky = document.createElement("select"); ky.id="selLayKey"+i;
+      const ky = document.createElement("select"); ky.id="selLayKey"+i; ky.className="laykey";
       attachTip(ky, "LAYER "+n+" KEY",
         "Cuts part of this layer away before it lands, using the layer's own picture as the matte. WHITE drops its bright parts, BLACK drops its dark parts, CHROMA drops one colour. This is what a stack is for: the thing on top can sit in front of what is under it rather than dissolving into it.",
-        "THRESH, SOFT and HUE below shape whichever key is chosen.");
+        "Choosing a key brings out the amount, threshold and softness for this layer; CHROMA brings out the hue as well.");
       LAYKEYS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; ky.appendChild(o); });
-      ky.onchange = ()=>{ layKeyMode[i] = parseInt(ky.value); };
-      col.appendChild(ky);
+      ky.onchange = ()=>{ layKeyMode[i] = parseInt(ky.value); row.classList.remove("revealed"); refreshLayerUI(); };
+      row.appendChild(ky);
 
+      const prm = document.createElement("div"); prm.className = "layparams";
       for(const base of ["layOp","layKey","layKeyT","layKeyS","layKeyH"]){
         const r = uiRefs[base+n];
-        if(r && r.row) col.appendChild(r.row);
+        if(!r || !r.row) continue;
+        if(base !== "layOp") r.row.classList.add("keyprm");
+        if(base === "layKeyH") r.row.classList.add("hueprm");
+        prm.appendChild(r.row);
       }
-      cols.appendChild(col);
+      row.appendChild(prm);
+      rows.appendChild(row);
     }
-    d.appendChild(cols);
+    d.appendChild(rows);
   }
   if(id==="morph"){
     const tr2 = document.createElement("div"); tr2.className="trow";
@@ -8468,6 +8503,10 @@ function focusParam(pid){
   }
   /* a filter left running can be hiding the very row being jumped to */
   if(filterOn && typeof window.__clearFilter === "function") window.__clearFilter();
+  /* so can a layer whose key is switched off: the row is jumped to, so it is
+     shown, dimmed rather than enabled, until that layer's key changes */
+  { const lr = r.row && r.row.closest ? r.row.closest(".layrow") : null;
+    if(lr) lr.classList.add("revealed"); }
   const sec = secEls[p.sec];
   if(sec) sec.classList.remove("collapsed");
   r.row.scrollIntoView({block:"center", behavior:"smooth"});
@@ -9997,6 +10036,10 @@ function setDock(t){
     t = dockTab === "glsl" ? "matrix" : dockTab;
   }
   dockTab = t;
+  /* a layer control revealed by a search jump stays revealed only as long as
+     you are looking at it: leaving the tab and coming back puts the row back
+     to showing what its key actually needs */
+  document.querySelectorAll(".layrow.revealed").forEach(e=>e.classList.remove("revealed"));
   const map = {mix:"mixdock", layers:"layerdock", matrix:"matrix", mod:"modgrid", text:"textdock", glsl:"glsldock", out:"outdock", scope:"scopedock", audio:"audiodock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);

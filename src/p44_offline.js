@@ -568,6 +568,15 @@ if(OUTPUT_MODE){
     apply();
   }
   {
+    /* the topology switch is on the strip as well as on the LAYERS tab,
+       because the strip is where you find out the faders are not in the path */
+    const tb = document.getElementById("btnTopo");
+    if(tb) tb.onclick = ()=>setTopology(mixTopo === 1 ? 0 : 1);
+    const bk = document.getElementById("btnTopoBack");
+    if(bk) bk.onclick = ()=>setTopology(0);
+    refreshLayerUI();
+  }
+  {
     const bb = document.getElementById("bendCollapse");
     let bopen = true;
     try{ const v = localStorage.getItem("bendr.bendstrip"); if(v !== null) bopen = v === "1"; }catch(e){}

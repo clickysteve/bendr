@@ -2344,7 +2344,24 @@ function mkToggle(parent, id, labelFn, onClick, tip, options){
   toggleRefs[id] = {btn:b, labelFn};
   return b;
 }
+/* One switch, reachable from either place it matters: the dock tab where the
+   stack is built, and the strip where the faders are. Whichever you touch,
+   both redraw, because the failure this is fixing is the panel claiming one
+   topology while the engine runs the other. */
+function setTopology(v){
+  mixTopo = v ? 1 : 0;
+  refreshLayerUI();
+  toast(mixTopo === 1 ? "LAYER STACK \u2014 four layers, bottom to top. The bus faders are out of the path."
+                      : "BUS TREE \u2014 two buses into master. The layer stack is out of the path.");
+}
 function refreshLayerUI(){
+  const onStack = mixTopo === 1;
+  document.body.classList.toggle("topo-layers", onStack);
+  const tb = document.getElementById("btnTopo");
+  if(tb){
+    tb.textContent = onStack ? "LAYERS" : "BUSES";
+    tb.classList.toggle("on", onStack);
+  }
   for(const b of document.querySelectorAll(".laycell")){
     b.classList.toggle("on", laySrc[+b.dataset.lay] === b.dataset.ch);
   }
@@ -2353,9 +2370,17 @@ function refreshLayerUI(){
     const ky=document.getElementById("selLayKey"+i);   if(ky) ky.value = layKeyMode[i]||0;
     const fr=document.getElementById("layFrom"+i);
     if(fr) fr.textContent = (i===0?"BASE \u00b7 ":"") + "CH " + (laySrc[i]||"\u2014");
+    /* a key that is off has nothing to shape, so its three controls are not
+       drawn: with all four off a layer is one line and its level gets the
+       whole width, which is the state you are in nearly all of the time */
+    const rw=document.getElementById("layRow"+i);
+    if(rw){
+      const km = layKeyMode[i]||0;
+      rw.classList.toggle("key-off", km === 0);
+      rw.classList.toggle("key-luma", km === 1 || km === 2);
+    }
   }
   const t=document.getElementById("selTopo"); if(t) t.value = mixTopo;
-  document.body.classList.toggle("topo-layers", mixTopo===1);
 }
 function refreshBusUI(){
   for(const key of ["b1","b2"]) for(const side of [0,1]){
@@ -2479,43 +2504,54 @@ function buildPerformDock(){
 /* anything that reads better underneath the section's own controls */
 function sectionExtrasAfter(id, d){
   if(id==="layers"){
-    /* Four columns, one per layer, left to right in the order the stack is
-       built. The parameter rows have already been made by the generic panel
-       builder, so they are moved into their column rather than rebuilt: they
-       keep their modulation menu, their readout, their reset and their place
-       in the search index, all of which a hand-rolled copy would lose. */
-    const cols = document.createElement("div"); cols.className = "laycols";
+    /* One row per layer, full width, rather than four narrow columns. Twenty
+       sliders side by side left each one about ninety pixels of travel, which
+       is not a fader, it is a nudge. So the layers run down the page and the
+       controls run across, and the key controls are only drawn when there is
+       a key to shape: with the keys off a layer is one line and its level has
+       the whole width, which is the case you are in almost all of the time.
+       The parameter rows are moved rather than rebuilt, so they keep their
+       modulation menu, their typed readout, their reset and their place in
+       the search index. */
+    const rows = document.createElement("div"); rows.className = "laycols";
     for(let i=0;i<4;i++){
       const n = i+1;
-      const col = document.createElement("div"); col.className = "laycol"; col.dataset.lay = i;
-      const nm = document.createElement("div"); nm.className = "layname";
-      const t1 = document.createElement("span"); t1.textContent = "LAYER "+n;
-      const t2 = document.createElement("small"); t2.id = "layFrom"+i;
-      nm.appendChild(t1); nm.appendChild(t2);
-      col.appendChild(nm);
+      const row = document.createElement("div"); row.className = "layrow"; row.dataset.lay = i;
+      row.id = "layRow"+i;
 
-      const bl = document.createElement("select"); bl.id="selLayBlend"+i;
+      const idb = document.createElement("div"); idb.className = "layid";
+      const t1 = document.createElement("b"); t1.textContent = "LAYER "+n;
+      const t2 = document.createElement("small"); t2.id = "layFrom"+i;
+      idb.appendChild(t1); idb.appendChild(t2);
+      row.appendChild(idb);
+
+      const bl = document.createElement("select"); bl.id="selLayBlend"+i; bl.className="layblend";
       attachTip(bl, "LAYER "+n+" BLEND",
         "How this layer lands on everything below it. The same twenty-four rules the mixer uses, so a look you found on the strip transfers straight up here. DISSOLVE with the level down is a plain fade; ADDITIVE and SCREEN pile light on; MULTIPLY and the burns take it away; DIFFERENCE and the two bit operations are where it stops behaving like film.");
       MIXBLENDS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; bl.appendChild(o); });
       bl.onchange = ()=>{ layBlend[i] = parseInt(bl.value); };
-      col.appendChild(bl);
+      row.appendChild(bl);
 
-      const ky = document.createElement("select"); ky.id="selLayKey"+i;
+      const ky = document.createElement("select"); ky.id="selLayKey"+i; ky.className="laykey";
       attachTip(ky, "LAYER "+n+" KEY",
         "Cuts part of this layer away before it lands, using the layer's own picture as the matte. WHITE drops its bright parts, BLACK drops its dark parts, CHROMA drops one colour. This is what a stack is for: the thing on top can sit in front of what is under it rather than dissolving into it.",
-        "THRESH, SOFT and HUE below shape whichever key is chosen.");
+        "Choosing a key brings out the amount, threshold and softness for this layer; CHROMA brings out the hue as well.");
       LAYKEYS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; ky.appendChild(o); });
-      ky.onchange = ()=>{ layKeyMode[i] = parseInt(ky.value); };
-      col.appendChild(ky);
+      ky.onchange = ()=>{ layKeyMode[i] = parseInt(ky.value); row.classList.remove("revealed"); refreshLayerUI(); };
+      row.appendChild(ky);
 
+      const prm = document.createElement("div"); prm.className = "layparams";
       for(const base of ["layOp","layKey","layKeyT","layKeyS","layKeyH"]){
         const r = uiRefs[base+n];
-        if(r && r.row) col.appendChild(r.row);
+        if(!r || !r.row) continue;
+        if(base !== "layOp") r.row.classList.add("keyprm");
+        if(base === "layKeyH") r.row.classList.add("hueprm");
+        prm.appendChild(r.row);
       }
-      cols.appendChild(col);
+      row.appendChild(prm);
+      rows.appendChild(row);
     }
-    d.appendChild(cols);
+    d.appendChild(rows);
   }
   if(id==="morph"){
     const tr2 = document.createElement("div"); tr2.className="trow";
@@ -2557,7 +2593,7 @@ function sectionExtras(id, d){
       "The mixer strip's transitions belong to BUSES and keep their settings while the stack runs. The master melt still runs on the finished stack, so it can feed back into itself.");
     TOPOLOGIES.forEach((t,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent="TOPOLOGY: "+t; tsel.appendChild(o); });
     tsel.value = mixTopo;
-    tsel.onchange = ()=>{ mixTopo = parseInt(tsel.value); document.body.classList.toggle("topo-layers", mixTopo===1); toast(mixTopo===1 ? "LAYER STACK \u2014 four layers, bottom to top" : "BUS TREE \u2014 two buses into master"); };
+    tsel.onchange = ()=>{ setTopology(parseInt(tsel.value)); };
     tr.appendChild(tsel);
     head.appendChild(tr);
 
@@ -2586,6 +2622,14 @@ function sectionExtras(id, d){
       mx.appendChild(row);
     }
     head.appendChild(mx);
+    const tn = document.createElement("div"); tn.className = "topoNote layersOff";
+    tn.innerHTML = "<span>THE BUS TREE IS DRIVING THE PICTURE.<br>Nothing on this tab is in the path.</span>";
+    const tb = document.createElement("button");
+    tb.textContent = "USE THE STACK";
+    attachTip(tb, "SWITCH TO THE STACK", "Puts the layer stack in the signal path in place of the three buses. The transitions keep their settings and come back exactly as they were when you switch again.");
+    tb.onclick = ()=>setTopology(1);
+    tn.appendChild(tb);
+    head.appendChild(tn);
     d.appendChild(head);
   }
   if(id==="mixer" || id==="mixer2" || id==="mixerM"){
@@ -3218,6 +3262,10 @@ function focusParam(pid){
   }
   /* a filter left running can be hiding the very row being jumped to */
   if(filterOn && typeof window.__clearFilter === "function") window.__clearFilter();
+  /* so can a layer whose key is switched off: the row is jumped to, so it is
+     shown, dimmed rather than enabled, until that layer's key changes */
+  { const lr = r.row && r.row.closest ? r.row.closest(".layrow") : null;
+    if(lr) lr.classList.add("revealed"); }
   const sec = secEls[p.sec];
   if(sec) sec.classList.remove("collapsed");
   r.row.scrollIntoView({block:"center", behavior:"smooth"});

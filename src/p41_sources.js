@@ -470,6 +470,10 @@ function setDock(t){
     t = dockTab === "glsl" ? "matrix" : dockTab;
   }
   dockTab = t;
+  /* a layer control revealed by a search jump stays revealed only as long as
+     you are looking at it: leaving the tab and coming back puts the row back
+     to showing what its key actually needs */
+  document.querySelectorAll(".layrow.revealed").forEach(e=>e.classList.remove("revealed"));
   const map = {mix:"mixdock", layers:"layerdock", matrix:"matrix", mod:"modgrid", text:"textdock", glsl:"glsldock", out:"outdock", scope:"scopedock", audio:"audiodock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);

@@ -689,6 +689,10 @@ function resetGlobals(){
   probeMode = 0;
   busSrc.b1 = ["A","B"]; busSrc.b2 = ["C","D"];
   mixTopo = 0; laySrc = ["A","B","C","D"]; layBlend = [0,0,0,0]; layKeyMode = [0,0,0,0];
+  /* the selector and the strip have to agree with this, or the panel says one
+     topology while the engine runs the other, which is how a working mixer
+     comes to look broken */
+  if(typeof refreshLayerUI === "function") refreshLayerUI();
   for(const ch of CHANNELS) genMode[ch] = {shape:0, wave:0, col:1};
   copyDest = BUSPAIR[activeChan];
   { const lb=document.getElementById("btnLinkChans"); if(lb) lb.classList.remove("on"); }

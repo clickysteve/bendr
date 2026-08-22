@@ -1061,7 +1061,7 @@ const STRIP_PARAMS = new Set(["abMix","cdMix","busMix"]);
    rather than a stage, so there is nothing underneath it to fall through to,
    and PRESET MORPH is a tool that moves other controls rather than a thing in
    the signal path. */
-const BYPASS_SECS = new Set(["mixer","mixer2","mixerM","frame","time","feedback",
+const BYPASS_SECS = new Set(["mixer","mixer2","mixerM","layers","frame","time","feedback",
                              "keyer","field","codec","crt","overlay"]);
 /* For most sections the default IS the neutral, because an effect defaults to
    an amount of zero and everything else in it is only a shape. The display is
@@ -1214,7 +1214,7 @@ function buildMixStrip(){
     uiRefs[p.id] = {slider:sl, val, tick, row:el, label:h};
     host.appendChild(el);
   }
-  refreshBusUI(); refreshToggles();
+  refreshBusUI(); refreshLayerUI(); refreshToggles();
 }
 const stripInvBtns = {};
 /* the melt faders are a second view of parameters the MIX tab also draws,
@@ -2344,6 +2344,17 @@ function mkToggle(parent, id, labelFn, onClick, tip, options){
   toggleRefs[id] = {btn:b, labelFn};
   return b;
 }
+function refreshLayerUI(){
+  for(const b of document.querySelectorAll(".laycell")){
+    b.classList.toggle("on", laySrc[+b.dataset.lay] === b.dataset.ch);
+  }
+  for(let i=0;i<4;i++){
+    const bl=document.getElementById("selLayBlend"+i); if(bl) bl.value = layBlend[i]||0;
+    const ky=document.getElementById("selLayKey"+i);   if(ky) ky.value = layKeyMode[i]||0;
+  }
+  const t=document.getElementById("selTopo"); if(t) t.value = mixTopo;
+  document.body.classList.toggle("topo-layers", mixTopo===1);
+}
 function refreshBusUI(){
   for(const key of ["b1","b2"]) for(const side of [0,1]){
     const el = document.getElementById("busSrc"+key+side);
@@ -2485,6 +2496,75 @@ function sectionExtrasAfter(id, d){
   }
 }
 function sectionExtras(id, d){
+  if(id==="layers"){
+    /* ---- the crosspoint ----
+       Four channels down the side, four layers across, and a cell where they
+       meet. It is the oldest routing control there is and it is still the
+       clearest: you can see the whole wiring at once instead of reading four
+       dropdowns and holding the answer in your head. One channel per layer,
+       so the cells behave like a row of interlocked buttons. */
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Four channels, four layers, bottom to top. BUSES is the mixer tree: two pictures a bus, two buses to master. LAYERS stacks all four instead, each landing on everything below it with its own blend, level and key.";
+    d.appendChild(note);
+
+    const tr = document.createElement("div"); tr.className="trow";
+    const tsel = document.createElement("select"); tsel.id = "selTopo";
+    attachTip(tsel, "MIX TOPOLOGY",
+      "How the four channels are wired together. BUSES is the bench mixer: channels into bus 1 and bus 2, the two buses into the master, everything arriving through a fader. LAYERS is a stack: four layers bottom to top, each landing on everything under it with its own blend mode, level and key, and the matrix below deciding which channel feeds which layer. The tree is better for cutting and wiping between sources; the stack is better for building one picture out of all four at once.",
+      "The mixer strip's transitions belong to BUSES. In LAYERS the master melt still runs, so the stack can still feed back into itself.");
+    TOPOLOGIES.forEach((t,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent="TOPOLOGY: "+t; tsel.appendChild(o); });
+    tsel.value = mixTopo;
+    tsel.onchange = ()=>{ mixTopo = parseInt(tsel.value); document.body.classList.toggle("topo-layers", mixTopo===1); toast(mixTopo===1 ? "LAYER STACK \u2014 four layers, bottom to top" : "BUS TREE \u2014 two buses into master"); };
+    tr.appendChild(tsel);
+    d.appendChild(tr);
+
+    const mx = document.createElement("div"); mx.className = "laymx";
+    const head = document.createElement("div"); head.className = "laymxhead";
+    head.appendChild(document.createElement("span"));
+    for(const ch of CHANNELS){ const c=document.createElement("span"); c.textContent="CH "+ch; head.appendChild(c); }
+    mx.appendChild(head);
+    /* drawn top layer first, because that is the order they are stacked on
+       screen and a routing grid that reads upside down is worse than none */
+    for(let i=3;i>=0;i--){
+      const row = document.createElement("div"); row.className="laymxrow";
+      const lab = document.createElement("span"); lab.textContent = (i===0?"L1 BASE":"L"+(i+1));
+      row.appendChild(lab);
+      for(const ch of CHANNELS){
+        const cell = document.createElement("button");
+        cell.className = "laycell"; cell.dataset.lay = i; cell.dataset.ch = ch;
+        cell.textContent = "\u25cf";
+        cell.setAttribute("aria-label", "route channel "+ch+" to layer "+(i+1));
+        attachTip(cell, "LAYER "+(i+1)+" \u2190 CHANNEL "+ch,
+          "Routes channel "+ch+" into layer "+(i+1)+". A layer takes one channel, so choosing another in the same row replaces it. The same channel can feed more than one layer, which is how you stack a picture over a treated copy of itself.");
+        cell.onclick = ()=>{ laySrc[i] = ch; refreshLayerUI(); };
+        row.appendChild(cell);
+      }
+      mx.appendChild(row);
+    }
+    d.appendChild(mx);
+
+    /* per layer: how it lands and what is cut out of it */
+    for(let i=3;i>=0;i--){
+      const r = document.createElement("div"); r.className="mixrow";
+      const tag = document.createElement("span");
+      tag.style.cssText="color:var(--dim); font-size:8.5px; min-width:18px; align-self:center;";
+      tag.textContent = "L"+(i+1);
+      const bl = document.createElement("select"); bl.id="selLayBlend"+i;
+      attachTip(bl, "LAYER "+(i+1)+" BLEND",
+        "How this layer lands on everything below it. The same twenty-four rules the mixer uses, so a look you found on the strip transfers straight up here. DISSOLVE with the level down is a plain fade; ADDITIVE and SCREEN pile light on; MULTIPLY and the burns take it away; DIFFERENCE and the two bit operations are where it stops behaving like film.");
+      MIXBLENDS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; bl.appendChild(o); });
+      bl.onchange = ()=>{ layBlend[i] = parseInt(bl.value); };
+      const ky = document.createElement("select"); ky.id="selLayKey"+i;
+      attachTip(ky, "LAYER "+(i+1)+" KEY",
+        "Cuts part of this layer away before it lands, using the layer's own picture as the matte. WHITE drops its bright parts, BLACK drops its dark parts, CHROMA drops one colour. This is what a stack is for: the thing on top can sit in front of what is under it rather than dissolving into it.",
+        "THRESH, SOFT and HUE for this layer are the sliders below.");
+      LAYKEYS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; ky.appendChild(o); });
+      ky.onchange = ()=>{ layKeyMode[i] = parseInt(ky.value); };
+      r.appendChild(tag); r.appendChild(bl); r.appendChild(ky);
+      d.appendChild(r);
+    }
+  }
   if(id==="mixer" || id==="mixer2" || id==="mixerM"){
     const which = id==="mixer" ? 1 : (id==="mixer2" ? 2 : 3);
     const note = document.createElement("div");

@@ -295,7 +295,8 @@ function snapCapture(){
        mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
        osdMode, osdDate, fbWrap, fbMirror, fbBlend,
        fbNL, fbInvert, fbTrailMode, rescanMode, keyChroma, edgeMode, fieldSrc, flowField, flowEdge,
-       outModel, b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
+       outModel, b1:busSrc.b1.slice(), b2:busSrc.b2.slice(),
+       mixTopo, lsrc:laySrc.slice(), lbl:layBlend.slice(), lky:layKeyMode.slice()},
     chain: chainOrder.slice(), stages: {...stageEnabled}};
 }
 function snapStore(i){
@@ -311,6 +312,11 @@ function snapRecall(i){
   const g = st.g || {};
   if(g.b1) busSrc.b1 = g.b1.slice();
   if(g.b2) busSrc.b2 = g.b2.slice();
+  if(g.lsrc) laySrc = g.lsrc.slice();
+  if(g.lbl)  layBlend = g.lbl.slice();
+  if(g.lky)  layKeyMode = g.lky.slice();
+  if(g.mixTopo !== undefined) mixTopo = g.mixTopo;
+  if(typeof refreshLayerUI === "function") refreshLayerUI();
   for(const k of ["mixMode","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM",
                   "mixKey","mixKey2","mixKeyM","osdMode","osdDate","fbWrap","fbMirror","fbBlend","fbNL",
                   "edgeMode","fieldSrc","flowField","flowEdge","outModel"]){

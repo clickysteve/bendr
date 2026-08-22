@@ -705,6 +705,28 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 }
 .secbypass.off{color:#0b0b0e; background:var(--amber); border-color:var(--amber);}
 .secbypass svg{display:block;}
+/* ---- the routing crosspoint ----
+   A grid of cells rather than four dropdowns, because the whole point of a
+   matrix is that you can see the wiring at once. The lit cell carries the
+   accent, so a row reads as "this channel, that layer" at a glance. */
+.laymx{display:flex; flex-direction:column; gap:2px; padding:3px 0 5px;}
+.laymxhead, .laymxrow{display:grid; grid-template-columns:44px repeat(4, 1fr); gap:2px; align-items:center;}
+.laymxhead span{font-size:8px; color:var(--dim); text-align:center; letter-spacing:.5px;}
+.laymxrow > span{font-size:8.5px; color:var(--dim); letter-spacing:.5px;}
+.laycell{
+  border:1px solid var(--line); background:#0d0d11; color:#2a2a33;
+  font-size:9px; line-height:1; padding:5px 0; cursor:pointer; border-radius:2px;
+}
+.laycell:hover{border-color:var(--cyan); color:#55555f;}
+.laycell.on{background:var(--cyan); border-color:var(--cyan); color:#0b0b0e;}
+/* The transitions belong to the tree. In the stack they are still there and
+   still hold their settings, but they are not what is deciding the picture,
+   so the strip says so rather than leaving four dead dropdowns to be puzzled
+   over. Dimmed, not hidden: hiding them would lose the settings from view. */
+#mixbuses{transition:opacity .12s;}
+body.topo-layers #mixbuses{opacity:.42;}
+body.topo-layers #mixCollapse .mixhint{color:var(--cyan);}
+body.topo-layers #mixCollapse .mixhint::after{content:" \2192 LAYER STACK";}
 /* every section the hovered bypass would take out with it */
 .sec.stagehover > h3{background:rgba(255,122,24,.16); box-shadow:inset 2px 0 0 var(--amber);}
 .sec.bypassed > h3{opacity:.55;}
@@ -1395,6 +1417,9 @@ audio,video{display:none;}
   <p>The <b>KEYER</b> has a full set of levels: THRESH and SOFT set where the matte turns over, GAIN how hard, DENSITY how opaque it is ever allowed to get. KEY BORDER grows the matte outward and fills the growth with one of the eight standard back colours, and KEY SHADOW offsets a darkened copy underneath - the outline and drop-shadow treatments a bench mixer offers for titles. Wipes get the same treatment: BORDER WIPE lays a coloured rule along the join, and WIPE MULTI tiles the whole pattern four or sixteen times. There are twenty-four mix types, from the usual dissolve, additive and non-additive through the photographic blends to wrap-add and bitwise XOR, which are not photographic at all.</p>
   <p>The channels meet in three mixers, laid out as a strip directly under the picture: bus 1, bus 2, and a master crossfade between them. Each strip has its own two input selectors, so the pairings are not fixed \u2014 bus 1 can mix <b>A against C</b>, bus 2 can mix <b>D against B</b>. To get all four in at once, set both bus faders part-way and put the master on ADD, SCREEN or LIGHTEN rather than FADE, so the buses sum instead of crossfading. The strip sits just under the transport bar, and folds away with <b>MIX</b> on its left when you want the height back.</p>
   <p>The faders live under the picture rather than in the sidebar because a crossfader wants to be horizontal and should never be hidden behind a tab \u2014 it is the one control you ride while looking at something else. The detail behind each transition (softness, wipe geometry, key threshold) lives on the MIX tab of the dock, where it is setup rather than performance. INV only greys in when the transition is a wipe, since a fade, a key and a blend have no direction to reverse.</p>
+  <h3>THE LAYER STACK</h3>
+  <p>The three buses are a tree, and a tree is the wrong shape for building one picture out of four, because every source past the second has to arrive through a fader that is already carrying something else. So there is a second topology. On the <b>MIX</b> tab, <b>LAYER STACK</b> has a <b>TOPOLOGY</b> selector and a four-by-four crosspoint matrix: four channels down the side, four layers across, and a cell where they meet. Switch it to <b>LAYERS</b> and the picture is built bottom to top instead, each layer landing on everything below it with its own blend mode, its own level and its own key. The same twenty-four blends the mixer uses are available on every layer, so a look you found on the strip transfers straight up. The same channel can feed more than one layer, which is how you put a picture over a treated copy of itself.</p>
+  <p>Each layer's key works on that layer's own picture rather than on the transition, which is the point of a stack: the thing on top can sit in front of what is under it instead of dissolving into it. <b>KEY WHITE</b> drops its bright parts, <b>KEY BLACK</b> its dark parts, <b>KEY CHROMA</b> one colour, and the threshold, softness and hue for each layer are the sliders under the matrix. A layer at zero level costs nothing at all &mdash; the channel behind it stops rendering. The three transitions stay where they are and keep their settings while the stack is running; the strip dims to say so. The master melt still runs on the finished stack, so it can still feed back into itself.</p>
   <h3>MULTIVIEW</h3>
   <p><b>MULTI</b> (or <kbd>V</kbd>) shows all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors. The channel you are editing carries the hot border; channels that are not currently rendering are dimmed. It forces everything to render, so it costs more than the normal view \u2014 it is for setting up, not for performing.</p>
   <h3>PATTERN SYNTH</h3>
@@ -1418,6 +1443,7 @@ audio,video{display:none;}
   <p>Feedback → composite/NTSC encode-decode → sync &amp; tape damage → bent enhancer → colour stage → CRT. The <b>BENT ENHANCER</b> section is the circuit-bent video enhancer core: RAINBOW MAP replaces luma with hot posterized rainbows, EDGE RING is the sharpness circuit driven into oscillation (repeating ghost edges), RGB SPLIT tears the channels apart, LUMA HUE makes colour chase brightness, INV FLICKER strobes inversions.</p>
   <h3>CONTOUR / PALETTE</h3>
   <p>The bent-enhancer signature: <b>CONTOUR</b> draws the isolines between brightness bands, giving those repeated outlines that trace the shape of a face or a body. BANDS sets how many, LINE WIDTH how heavy, LINE HUE colours them by band, KEEP FILL decides how much of the picture survives between the lines (drop it to zero for lines on black). <b>FLATTEN</b> quantises brightness into hard LEVELS for solid poster-like colour fields, and <b>DITHER</b> breaks the steps into speckle.</p>
+  <p><b>MOD LINES</b> is a one-bit modulator run along the scanline. The picture drives a comparator, the error the comparator makes is fed back into its own input, and the sweep carries on across the line, so where the picture is bright the comparator fires more often and the density and width of the lines is the only thing carrying the image. It is the same circuit as a delta-sigma converter and the same idea as the line-modulator boxes that sat in front of a scan processor, and it reads as an engraving rather than as a dither because the error is diffused rather than compared against a fixed pattern. <b>LINE PITCH</b> coarsens the lines, <b>MOD DRIVE</b> and <b>MOD BIAS</b> decide whether the picture is drawn in its shadows or its highlights, <b>ERROR FEED</b> is how much the modulator remembers its own mistakes &mdash; at the top it is textbook error diffusion and the lines organise into long even runs, at the bottom there is no diffusion left and it is a bare comparator. <b>RGB SEPARATE</b> runs three modulators instead of one and mixes them optically, which is how you get colour out of a one-bit process. <b>SERPENTINE</b> sweeps alternate rows the other way, without which every row lays the same diagonal and the picture grows a corduroy that is not in it.</p>
   <h3>THE MIXER EFFECT FAMILY</h3>
   <p>In the colour stage: <b>NEGATIVE</b> with three modes (invert brightness, colour, or both), <b>MONOCOLOR</b> to put the whole picture through one colour, <b>COLORPASS</b> to keep a single hue and drop everything else to monochrome, <b>SILHOUETTE</b> to threshold the picture into a flat shape, <b>FIND EDGE</b> for coloured outlines on a dark ground, and <b>EMBOSS</b> to light it from one side as relief.</p>
   <p>In frame and position: <b>FLIP</b> turns the picture over, <b>MIRROR</b> reflects one half onto the other, and <b>MULTI</b> tiles it into a grid with alternate cells mirrored so the tiles meet. All three act on the picture before the framing, and all three are modulation destinations \u2014 an LFO into FLIP is a switch, an LFO into MULTI is a grid that grows.</p>

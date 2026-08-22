@@ -211,7 +211,65 @@ const FS_FB = COMMON + KEYFN +
    separate compositing stage on top — luminance, chroma or picture-in-picture.
    Splitting them means you can run a circle wipe AND a key at the same time,
    which one combined dropdown could never express. */
-const FS_MIX = COMMON + KEYFN +
+/* The blend set, the colour-space helpers it needs and the bit operations,
+   kept apart from the mixer because the layer stack combines pictures with
+   exactly the same twenty-four rules and there is no sense in two copies
+   of them drifting apart. */
+const BLENDFN =
+"vec3 rgb2hsvM(vec3 c){\n" +
+"  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);\n" +
+"  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));\n" +
+"  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));\n" +
+"  float d = q.x - min(q.w, q.y);\n" +
+"  return vec3(abs(q.z + (q.w - q.y)/(6.0*d + 1e-10)), d/(q.x + 1e-10), q.x);\n}\n" +
+"vec3 hsv2rgbM(vec3 c){\n" +
+"  vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0))*6.0 - 3.0);\n" +
+"  return c.z * mix(vec3(1.0), clamp(p-1.0, 0.0, 1.0), c.y);\n}\n" +
+"float bits(float x, float y, float mode){\n" +
+"  int ix = int(clamp(x,0.0,1.0)*255.0), iy = int(clamp(y,0.0,1.0)*255.0);\n" +
+"  int r = (mode<0.5) ? (ix ^ iy) : (ix & iy);\n" +
+"  return float(r)/255.0;\n}\n" +
+"/* Twenty-four ways for two pictures to meet. The first six keep the indices\n" +
+"   they have always had so old patches still load. */\n" +
+"vec3 combine(vec3 a, vec3 b, float m, float blend){\n" +
+"  if(blend<0.5) return mix(a, b, m);\n" +                 /* DISSOLVE */
+"  if(blend<1.5) return a + b*m;\n" +                      /* ADDITIVE  (FAM) */
+"  if(blend<2.5) return mix(a, max(a,b), m);\n" +          /* NON-ADD   (NAM) */
+"  if(blend<3.5) return mix(a, abs(a-b), m);\n" +          /* DIFFERENCE */
+"  if(blend<4.5) return mix(a, a*b*1.6, m);\n" +           /* MULTIPLY */
+"  if(blend<5.5) return mix(a, 1.0-(1.0-a)*(1.0-b), m);\n" +   /* SCREEN */
+"  if(blend<6.5) return mix(a, min(a,b), m);\n" +          /* DARKEN */
+"  if(blend<7.5) return mix(a, a+b-2.0*a*b, m);\n" +       /* EXCLUSION */
+"  if(blend<8.5) return mix(a, a-b, m);\n" +              /* SUBTRACT */
+"  if(blend<9.5){                                     \n" +   /* OVERLAY */
+"    vec3 r = mix(2.0*a*b, 1.0-2.0*(1.0-a)*(1.0-b), step(0.5,a));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<10.5){                                    \n" +   /* HARD LIGHT */
+"    vec3 r = mix(2.0*a*b, 1.0-2.0*(1.0-a)*(1.0-b), step(0.5,b));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<11.5){                                    \n" +   /* SOFT LIGHT */
+"    vec3 r = mix(2.0*a*b + a*a*(1.0-2.0*b), sqrt(max(a,0.0))*(2.0*b-1.0) + 2.0*a*(1.0-b), step(0.5,b));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<12.5){                                    \n" +   /* VIVID LIGHT */
+"    vec3 r = mix(1.0 - (1.0-a)/max(2.0*b, 0.001), a/max(1.0-2.0*(b-0.5), 0.001), step(0.5,b));\n" +
+"    return mix(a, clamp(r,0.0,1.6), m); }\n" +
+"  if(blend<13.5){                                    \n" +   /* PIN LIGHT */
+"    vec3 r = mix(min(a, 2.0*b), max(a, 2.0*(b-0.5)), step(0.5,b));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<14.5) return mix(a, clamp(a/max(1.0-b, 0.004), 0.0, 1.6), m);\n" +   /* COLOUR DODGE */
+"  if(blend<15.5) return mix(a, 1.0-clamp((1.0-a)/max(b, 0.004), 0.0, 1.6), m);\n" + /* COLOUR BURN */
+"  if(blend<16.5) return mix(a, clamp(a/max(b, 0.004), 0.0, 1.6), m);\n" +      /* DIVIDE */
+"  if(blend<17.5) return mix(a, fract(a + b*1.5), m);\n" +   /* WRAP ADD: the analogue overflow */
+"  if(blend<18.5) return mix(a, vec3(bits(a.r,b.r,0.0), bits(a.g,b.g,0.0), bits(a.b,b.b,0.0)), m);\n" +
+"  if(blend<19.5) return mix(a, vec3(bits(a.r,b.r,1.0), bits(a.g,b.g,1.0), bits(a.b,b.b,1.0)), m);\n" +
+"  vec3 ha = rgb2hsvM(clamp(a,0.0,1.0)), hb = rgb2hsvM(clamp(b,0.0,1.0));\n" +
+"  if(blend<20.5) return mix(a, hsv2rgbM(vec3(hb.x, ha.y, ha.z)), m);\n" +   /* HUE */
+"  if(blend<21.5) return mix(a, hsv2rgbM(vec3(ha.x, hb.y, ha.z)), m);\n" +   /* SATURATION */
+"  if(blend<22.5) return mix(a, hsv2rgbM(vec3(hb.x, hb.y, ha.z)), m);\n" +   /* COLOUR */
+"  return mix(a, hsv2rgbM(vec3(ha.x, ha.y, hb.z)), m);\n}\n" +               /* LUMINOSITY */
+"";
+
+const FS_MIX = COMMON + KEYFN + BLENDFN +
 "uniform sampler2D u_texA; uniform sampler2D u_texB;\n" +
 "uniform float u_mixMode,u_mixBlend,u_mixKey,u_hasB,u_abMix,u_time;\n" +
 "uniform float u_wipeSoft,u_wipeDetail,u_wipeX,u_wipeY,u_wipeInv;\n" +
@@ -235,19 +293,6 @@ const FS_MIX = COMMON + KEYFN +
 "  if(k==5) return vec3(1.0,0.0,0.0);\n" +
 "  if(k==6) return vec3(0.0,0.0,1.0);\n" +
 "  return vec3(0.0);\n}\n" +
-"vec3 rgb2hsvM(vec3 c){\n" +
-"  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);\n" +
-"  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));\n" +
-"  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));\n" +
-"  float d = q.x - min(q.w, q.y);\n" +
-"  return vec3(abs(q.z + (q.w - q.y)/(6.0*d + 1e-10)), d/(q.x + 1e-10), q.x);\n}\n" +
-"vec3 hsv2rgbM(vec3 c){\n" +
-"  vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0))*6.0 - 3.0);\n" +
-"  return c.z * mix(vec3(1.0), clamp(p-1.0, 0.0, 1.0), c.y);\n}\n" +
-"float bits(float x, float y, float mode){\n" +
-"  int ix = int(clamp(x,0.0,1.0)*255.0), iy = int(clamp(y,0.0,1.0)*255.0);\n" +
-"  int r = (mode<0.5) ? (ix ^ iy) : (ix & iy);\n" +
-"  return float(r)/255.0;\n}\n" +
 "float wipeField(vec2 uv, float mode, float outA){\n" +
 "  /* MULTI tiles the whole pattern, the way a bench mixer's x4 / x16 does */\n" +
 "  float rep = max(1.0, floor(u_wipeRep + 0.5));\n" +
@@ -323,44 +368,6 @@ const FS_MIX = COMMON + KEYFN +
 "    }\n" +
 "  }\n" +
 "  return clamp(m, 0.0, 1.0);\n}\n" +
-"/* Twenty-four ways for two pictures to meet. The first six keep the indices\n" +
-"   they have always had so old patches still load. */\n" +
-"vec3 combine(vec3 a, vec3 b, float m, float blend){\n" +
-"  if(blend<0.5) return mix(a, b, m);\n" +                 /* DISSOLVE */
-"  if(blend<1.5) return a + b*m;\n" +                      /* ADDITIVE  (FAM) */
-"  if(blend<2.5) return mix(a, max(a,b), m);\n" +          /* NON-ADD   (NAM) */
-"  if(blend<3.5) return mix(a, abs(a-b), m);\n" +          /* DIFFERENCE */
-"  if(blend<4.5) return mix(a, a*b*1.6, m);\n" +           /* MULTIPLY */
-"  if(blend<5.5) return mix(a, 1.0-(1.0-a)*(1.0-b), m);\n" +   /* SCREEN */
-"  if(blend<6.5) return mix(a, min(a,b), m);\n" +          /* DARKEN */
-"  if(blend<7.5) return mix(a, a+b-2.0*a*b, m);\n" +       /* EXCLUSION */
-"  if(blend<8.5) return mix(a, a-b, m);\n" +              /* SUBTRACT */
-"  if(blend<9.5){                                     \n" +   /* OVERLAY */
-"    vec3 r = mix(2.0*a*b, 1.0-2.0*(1.0-a)*(1.0-b), step(0.5,a));\n" +
-"    return mix(a, r, m); }\n" +
-"  if(blend<10.5){                                    \n" +   /* HARD LIGHT */
-"    vec3 r = mix(2.0*a*b, 1.0-2.0*(1.0-a)*(1.0-b), step(0.5,b));\n" +
-"    return mix(a, r, m); }\n" +
-"  if(blend<11.5){                                    \n" +   /* SOFT LIGHT */
-"    vec3 r = mix(2.0*a*b + a*a*(1.0-2.0*b), sqrt(max(a,0.0))*(2.0*b-1.0) + 2.0*a*(1.0-b), step(0.5,b));\n" +
-"    return mix(a, r, m); }\n" +
-"  if(blend<12.5){                                    \n" +   /* VIVID LIGHT */
-"    vec3 r = mix(1.0 - (1.0-a)/max(2.0*b, 0.001), a/max(1.0-2.0*(b-0.5), 0.001), step(0.5,b));\n" +
-"    return mix(a, clamp(r,0.0,1.6), m); }\n" +
-"  if(blend<13.5){                                    \n" +   /* PIN LIGHT */
-"    vec3 r = mix(min(a, 2.0*b), max(a, 2.0*(b-0.5)), step(0.5,b));\n" +
-"    return mix(a, r, m); }\n" +
-"  if(blend<14.5) return mix(a, clamp(a/max(1.0-b, 0.004), 0.0, 1.6), m);\n" +   /* COLOUR DODGE */
-"  if(blend<15.5) return mix(a, 1.0-clamp((1.0-a)/max(b, 0.004), 0.0, 1.6), m);\n" + /* COLOUR BURN */
-"  if(blend<16.5) return mix(a, clamp(a/max(b, 0.004), 0.0, 1.6), m);\n" +      /* DIVIDE */
-"  if(blend<17.5) return mix(a, fract(a + b*1.5), m);\n" +   /* WRAP ADD: the analogue overflow */
-"  if(blend<18.5) return mix(a, vec3(bits(a.r,b.r,0.0), bits(a.g,b.g,0.0), bits(a.b,b.b,0.0)), m);\n" +
-"  if(blend<19.5) return mix(a, vec3(bits(a.r,b.r,1.0), bits(a.g,b.g,1.0), bits(a.b,b.b,1.0)), m);\n" +
-"  vec3 ha = rgb2hsvM(clamp(a,0.0,1.0)), hb = rgb2hsvM(clamp(b,0.0,1.0));\n" +
-"  if(blend<20.5) return mix(a, hsv2rgbM(vec3(hb.x, ha.y, ha.z)), m);\n" +   /* HUE */
-"  if(blend<21.5) return mix(a, hsv2rgbM(vec3(ha.x, hb.y, ha.z)), m);\n" +   /* SATURATION */
-"  if(blend<22.5) return mix(a, hsv2rgbM(vec3(hb.x, hb.y, ha.z)), m);\n" +   /* COLOUR */
-"  return mix(a, hsv2rgbM(vec3(ha.x, ha.y, hb.z)), m);\n}\n" +               /* LUMINOSITY */
 /* The melt is a feedback loop on this stage's own output, so it is a
    function rather than a passage inside the mix: the mixer takes a short
    cut when there is only one picture to show, and the melt still has to
@@ -1124,6 +1131,7 @@ const FS_COL = COMMON + KEYFN +
 "uniform float u_rGain,u_gGain,u_bGain;\n" +
 "uniform float u_contour,u_contourBands,u_contourWidth,u_contourHue,u_contourFill;\n" +
 "uniform float u_lumaSteps,u_stepCount,u_dither;\n" +
+"uniform float u_mline,u_mlineScale,u_mlineGain,u_mlineBias,u_mlineFb,u_mlineWin,u_mlineTint,u_mlineCol,u_mlineSerp;\n" +
 "uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx,u_showKey;\n" +
 "uniform float u_negative,u_negMode,u_monoCol,u_monoHue,u_colorPass,u_passHue,u_passWidth;\n" +
 "uniform float u_silhouette,u_silThresh,u_silHue,u_findEdge,u_edgeHue,u_emboss,u_embossDir;\n" +
@@ -1191,6 +1199,36 @@ const FS_COL = COMMON + KEYFN +
 "    float Lq = floor((L0+dth)*N + 0.5)/N;\n" +
 "    vec3 flat_ = (L0 > 0.001) ? c*(Lq/max(L0,0.001)) : vec3(Lq);\n" +
 "    c = mix(c, clamp(flat_,0.0,1.6), u_lumaSteps);\n" +
+"  }\n" +
+/* One-bit modulation lines. A comparator with its own quantising error fed
+   back into it, swept along the scanline: where the picture is bright the
+   comparator fires more often, so the density and width of the lines carries
+   the picture and nothing else does. That is a delta-sigma modulator, and it
+   is also what a line-modulator box did to a luminance signal, which is why
+   the result reads as an engraving rather than as a dither pattern.
+   The sweep is bounded rather than run from the start of the line. The error
+   of a one-bit modulator is chaotic and its memory is short: thirty-odd
+   samples back gives the same picture as five hundred and costs a fifteenth,
+   and a fragment shader cannot carry state across a row in any case. */
+"  if(u_mline > 0.003){\n" +
+"    float stp = (1.0/u_res.x) * u_mlineScale;\n" +
+"    int W = int(clamp(u_mlineWin, 4.0, 64.0));\n" +
+"    /* alternate rows sweep the other way, or the error lays the same diagonal\n" +
+"       down every line and the picture grows a corduroy that is not in it */\n" +
+"    float dir = (u_mlineSerp > 0.5 && mod(floor(gl_FragCoord.y), 2.0) > 0.5) ? -1.0 : 1.0;\n" +
+"    vec3 q = vec3(0.0), err = vec3(0.0);\n" +
+"    for(int i=0;i<64;i++){\n" +
+"      if(i > W) break;\n" +
+"      vec2 su = clamp(vec2(uv.x - dir*float(W-i)*stp, uv.y), 0.0, 1.0);\n" +
+"      vec3 sc = texture(u_tex, su).rgb;\n" +
+"      if(u_mlineCol < 0.5) sc = vec3(dot(sc, vec3(0.299,0.587,0.114)));\n" +
+"      vec3 v = sc*u_mlineGain + u_mlineBias + err;\n" +
+"      q = step(vec3(0.5), v);\n" +
+"      err = (v - q) * u_mlineFb;\n" +
+"    }\n" +
+"    /* the lines can be struck in white or in the colour that was there, which\n" +
+"       is the difference between an engraving and a screen print */\n" +
+"    c = mix(c, q * mix(vec3(1.0), c, u_mlineTint), u_mline);\n" +
 "  }\n" +
 "  /* ---- contour: draw the isolines between luma bands (bent-enhancer outlines) ---- */\n" +
 "  if(u_contour>0.003){\n" +
@@ -2095,6 +2133,37 @@ const FS_COPY = COMMON +
 "void main(){ O = texture(u_tex, gl_FragCoord.xy/u_res); }\n";
 /* the same copy, but told where in a larger target it is being drawn, so the
    four channel thumbnails can be packed into one atlas and read back once */
+/* ---- one step of the layer stack ----
+   The mixer is a tree: two pictures into a bus, two buses into the master.
+   That is how a bench mixer is wired and it is the right shape for cutting
+   between sources, but it is the wrong shape for building a picture out of
+   four of them, because every layer past the second has to come in through a
+   fader that is already carrying something else. So the stack is the other
+   topology: four layers, bottom to top, each landing on everything below it
+   with its own blend, its own level and its own key. This program is one of
+   those landings, run four times into a pair of buffers. */
+const FS_LAYER = COMMON + KEYFN + BLENDFN +
+"uniform sampler2D u_texA; uniform sampler2D u_texB;\n" +
+"uniform float u_layOp,u_layBlend,u_layKey,u_layKeyMode,u_layKeyT,u_layKeyS,u_layKeyHue;\n" +
+"void main(){\n" +
+"  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  vec4 base = texture(u_texA, uv);\n" +
+"  vec4 lay  = texture(u_texB, uv);\n" +
+"  float m = clamp(u_layOp, 0.0, 1.0);\n" +
+"  /* the key is per layer and works on the layer's own picture, which is what\n" +
+"     makes a stack useful: the thing on top can be cut out of its background\n" +
+"     rather than dissolved into it */\n" +
+"  if(u_layKeyMode > 0.5 && u_layKey > 0.003){\n" +
+"    float mode = (u_layKeyMode > 2.5) ? 1.0 : 0.0;\n" +
+"    float inv  = (u_layKeyMode > 1.5 && u_layKeyMode < 2.5) ? 1.0 : 0.0;\n" +
+"    float k = keyOf(lay.rgb, mode, u_layKeyHue, u_layKeyT, u_layKeyS, inv);\n" +
+"    m *= mix(1.0, k, u_layKey);\n" +
+"  }\n" +
+"  /* the coverage matte is carried the same way the mixer carries it, so the\n" +
+"     display stage still knows which parts of the raster were never painted */\n" +
+"  O = vec4(combine(base.rgb, lay.rgb, m, u_layBlend), max(base.a, lay.a*m));\n" +
+"}\n";
+
 const FS_TILE = COMMON +
 "uniform sampler2D u_tex; uniform vec2 u_ofs;\n" +
 "void main(){ O = texture(u_tex, (gl_FragCoord.xy-u_ofs)/u_res); }\n";

@@ -18,6 +18,26 @@ const PHELP = {
   pipY:"Vertical position of the subscreen.",
   pipSize:"How large the subscreen is, from a small inset to most of the frame.",
   pipBorder:"Width of the border drawn around the subscreen. Zero for none.",
+  layOp1:"How much of layer 1 arrives. On the bottom layer this is a plain fade to black; further up it is the amount of that picture that lands on the ones under it, which for most blend modes is the same thing as opacity and for the additive ones is how hard it is driven. Zero costs nothing at all: the channel behind it stops rendering.",
+  layKey1:"How much of layer 1's key is applied. The key itself is chosen on the selector beside the blend: WHITE drops the layer's bright parts, BLACK its dark parts, CHROMA one colour. This control fades between the layer landing whole and the layer landing cut out, so partial settings give you a ghost rather than a hole.",
+  layKeyT1:"Where layer 1's key breaks. On a luma key this is the brightness that counts as background; on a chroma key it is how close to the chosen hue a pixel has to be. Every keyed picture wants its own value and there is no default that suits two of them.",
+  layKeyS1:"How wide the edge of layer 1's key is. This is a real keyer edge, not a blur: a high-gain amplifier driven into its rails, so the edge is made of a percentage of the picture itself and grain in the source becomes grain in the edge. Hard settings cut like a stencil, soft ones let the layer breathe into what is under it.",
+  layKeyH1:"Which hue layer 1's chroma key looks for. Does nothing unless that layer's key is set to CHROMA. The old blue and the modern green are at either end of the same wheel; anything between is fair game and much more interesting on a picture that was never shot against a screen.",
+  layOp2:"How much of layer 2 arrives. On the bottom layer this is a plain fade to black; further up it is the amount of that picture that lands on the ones under it, which for most blend modes is the same thing as opacity and for the additive ones is how hard it is driven. Zero costs nothing at all: the channel behind it stops rendering.",
+  layKey2:"How much of layer 2's key is applied. The key itself is chosen on the selector beside the blend: WHITE drops the layer's bright parts, BLACK its dark parts, CHROMA one colour. This control fades between the layer landing whole and the layer landing cut out, so partial settings give you a ghost rather than a hole.",
+  layKeyT2:"Where layer 2's key breaks. On a luma key this is the brightness that counts as background; on a chroma key it is how close to the chosen hue a pixel has to be. Every keyed picture wants its own value and there is no default that suits two of them.",
+  layKeyS2:"How wide the edge of layer 2's key is. This is a real keyer edge, not a blur: a high-gain amplifier driven into its rails, so the edge is made of a percentage of the picture itself and grain in the source becomes grain in the edge. Hard settings cut like a stencil, soft ones let the layer breathe into what is under it.",
+  layKeyH2:"Which hue layer 2's chroma key looks for. Does nothing unless that layer's key is set to CHROMA. The old blue and the modern green are at either end of the same wheel; anything between is fair game and much more interesting on a picture that was never shot against a screen.",
+  layOp3:"How much of layer 3 arrives. On the bottom layer this is a plain fade to black; further up it is the amount of that picture that lands on the ones under it, which for most blend modes is the same thing as opacity and for the additive ones is how hard it is driven. Zero costs nothing at all: the channel behind it stops rendering.",
+  layKey3:"How much of layer 3's key is applied. The key itself is chosen on the selector beside the blend: WHITE drops the layer's bright parts, BLACK its dark parts, CHROMA one colour. This control fades between the layer landing whole and the layer landing cut out, so partial settings give you a ghost rather than a hole.",
+  layKeyT3:"Where layer 3's key breaks. On a luma key this is the brightness that counts as background; on a chroma key it is how close to the chosen hue a pixel has to be. Every keyed picture wants its own value and there is no default that suits two of them.",
+  layKeyS3:"How wide the edge of layer 3's key is. This is a real keyer edge, not a blur: a high-gain amplifier driven into its rails, so the edge is made of a percentage of the picture itself and grain in the source becomes grain in the edge. Hard settings cut like a stencil, soft ones let the layer breathe into what is under it.",
+  layKeyH3:"Which hue layer 3's chroma key looks for. Does nothing unless that layer's key is set to CHROMA. The old blue and the modern green are at either end of the same wheel; anything between is fair game and much more interesting on a picture that was never shot against a screen.",
+  layOp4:"How much of layer 4 arrives. On the bottom layer this is a plain fade to black; further up it is the amount of that picture that lands on the ones under it, which for most blend modes is the same thing as opacity and for the additive ones is how hard it is driven. Zero costs nothing at all: the channel behind it stops rendering.",
+  layKey4:"How much of layer 4's key is applied. The key itself is chosen on the selector beside the blend: WHITE drops the layer's bright parts, BLACK its dark parts, CHROMA one colour. This control fades between the layer landing whole and the layer landing cut out, so partial settings give you a ghost rather than a hole.",
+  layKeyT4:"Where layer 4's key breaks. On a luma key this is the brightness that counts as background; on a chroma key it is how close to the chosen hue a pixel has to be. Every keyed picture wants its own value and there is no default that suits two of them.",
+  layKeyS4:"How wide the edge of layer 4's key is. This is a real keyer edge, not a blur: a high-gain amplifier driven into its rails, so the edge is made of a percentage of the picture itself and grain in the source becomes grain in the edge. Hard settings cut like a stencil, soft ones let the layer breathe into what is under it.",
+  layKeyH4:"Which hue layer 4's chroma key looks for. Does nothing unless that layer's key is set to CHROMA. The old blue and the modern green are at either end of the same wheel; anything between is fair game and much more interesting on a picture that was never shot against a screen.",
   edgeAmt:"How much of the melt there is. What it melts depends on MELT MODE beside the fader, and the modes fall into two halves. EDGE, FRAME and MOTION act on the composite once it has been made: EDGE works only on the seam between the two pictures, which is why it looks dead on a plain dissolve, a dissolve having no seam to stand on; FRAME feeds the whole picture back through itself, turned and scaled a little on every pass, which is video feedback and trails like it; MOTION does the same only where the picture is changing, so a still shot stays clean and anything moving drags a tail. MELD, DRIP and BLEED act on the mix instead, and are the ones that let the two layers melt into each other rather than sit one on top of the other. On those three this control sets how far into each other they go, and MELT HOLD sets the trail on its own. The travel past 1.0 is headroom rather than a different behaviour. Zero switches the stage off and costs nothing, including the frame of history it would otherwise keep.",
   meltZoom:"How much the fed-back picture is scaled on each pass. Positive pulls it inward and the trail runs away into the middle, which is the tunnel; negative pushes it out and the trail grows towards the edges. It is a fraction of a percent per pass, but at sixty passes a second a fraction of a percent is a tunnel. Does nothing on EDGE.",
   meltHue:"How far the colour wheel turns on each pass, so the trail changes hue as it ages. This is where feedback gets its rainbows: the picture is one colour, what it left behind a second ago is another. Small amounts read as a warm or cold wake; large ones cycle. Does nothing on EDGE.",
@@ -90,6 +110,15 @@ const PHELP = {
   lumaSteps:"Quantises brightness into hard levels, turning gradients into flat poster-like colour fields. Crossfades against the original.",
   stepCount:"How many brightness levels FLATTEN quantises to. Low numbers give big graphic blocks of colour.",
   dither:"Breaks the quantisation steps with an ordered dither pattern, so the bands dissolve into speckle instead of hard edges.",
+  mline:"A one-bit modulator run along the scanline. The picture drives a comparator, the error the comparator makes is fed back into its own input, and the sweep carries on across the line, so where the picture is bright the comparator fires more often and the density of the lines is the only thing carrying the image. It is the same circuit as a delta-sigma converter and the same idea as the line-modulator boxes that sat in front of a scan processor. It reads as an engraving rather than as a dither because the error is diffused rather than compared against a fixed pattern.",
+  mlineScale:"How far apart the modulator takes its samples, which sets the pitch of the lines. At 1 it steps a pixel at a time and the lines are as fine as the raster allows. Wound up it steps further and the lines coarsen into something closer to a woodcut. Fine pitches on a low raster will alias, which is not a fault so much as a look.",
+  mlineGain:"How hard the picture is driven into the comparator. Under 1 the modulator only fires in the highlights and the picture is mostly black; over 1 it fires nearly everywhere and the picture is mostly white with the shadows drawn in. The interesting settings are close to 1, where the whole range is in play.",
+  mlineBias:"Shifts the comparator's threshold, which moves where the lines break rather than how many there are. Small amounts either way are the difference between a picture drawn in its shadows and the same picture drawn in its highlights.",
+  mlineFb:"How much of the quantiser's error is carried into the next sample. At 1 it is textbook error diffusion and the lines organise themselves into the long even runs that make it look drawn. Lower and the error leaks away, the modulator forgets, and the lines break into something closer to noise. Below about a third there is no diffusion left and it is a bare comparator.",
+  mlineWin:"How far back along the line the modulator remembers. A fragment shader cannot carry state across a row, so the sweep is restarted a fixed distance behind every pixel. Thirty-odd samples is already indistinguishable from running the whole line and it is what everything above about half a megapixel can afford; short settings make the lines restart visibly and stipple.",
+  mlineTint:"What the lines are struck in. At zero they are white, which is the engraving. Wound up they take the colour that was under them, which is closer to a screen print: the same modulation, but the picture keeps its palette.",
+  mlineCol:"Runs three modulators instead of one, on red, green and blue separately. The three sets of lines land in different places and mix optically, which gives you colour out of a one-bit process. It costs three times as much and is worth it at least once.",
+  mlineSerp:"Sweeps alternate rows in opposite directions. Without it every row diffuses its error the same way and the picture grows a diagonal corduroy that is not in the source. It is close to free and there is very little reason to switch it off, except to see the corduroy.",
 
   /* ---- signal lab ---- */
   sparseJit:"Displaces whole scanlines sideways, but only the ones past the gate — so most of the picture holds still and a few lines snap hard out of place.",
@@ -390,6 +419,7 @@ for(const [suffix, note] of [["2"," (bus 2: channels C and D)"], ["M"," (master:
 
 /* ---------------- per-section help ---------------- */
 const SECHELP = {
+  layers:"The other way to wire four channels together. The mixer is a tree: two pictures into a bus, two buses into the master, everything arriving through a fader. That is how a bench mixer is built and it is the right shape for cutting and wiping between sources, but it is the wrong shape for building one picture out of four, because every layer past the second has to come in through a fader that is already carrying something else. The stack is the other topology. Four layers, bottom to top, each landing on everything under it with its own blend mode, its own level and its own key, and a crosspoint matrix deciding which channel feeds which layer. The same channel can feed more than one layer, which is how you put a picture over a treated copy of itself. Switching to LAYERS leaves the three transitions dimmed but intact: nothing is lost, and the master melt still runs on the finished stack, so the whole thing can still feed back into itself.",
   mixer:"Bus 1 of three. Combines the two finished channels A and B with a fader, twenty transition modes, a keyer and the melt stage that softens the seam between them.",
   mixer2:"Bus 2. Identical to bus 1 but for channels C and D. It only renders while the MASTER fader is above zero, so leaving it alone is free.",
   mixerM:"The master crossfade between the two buses, with the same twenty transitions one level up.",
@@ -423,7 +453,7 @@ const SECHELP = {
 };
 
 /* Master sections are single-instance; everything else exists once per channel. */
-const MASTER_SECS = new Set(["mixer","mixer2","mixerM","field","codec","crt","overlay","morph"]);
+const MASTER_SECS = new Set(["mixer","mixer2","mixerM","layers","field","codec","crt","overlay","morph"]);
 const CHANNELS = ["A","B","C","D"];
 const BUSPAIR = {A:"B", B:"A", C:"D", D:"C"};   // each channel's partner on its mixer bus
 /* COPY / SWAP are free routing: any channel to any other. The bus partner is
@@ -503,6 +533,22 @@ let mixModeM = 0, wipeInvM = false;   // MASTER (bus 1 / bus 2)
    rather than meeting at a line. All three feed their own result back, which
    is what keeps the boundary moving once it has started. */
 const MELTMODES = ["EDGE", "FRAME", "MOTION", "MELD", "DRIP", "BLEED"];
+/* ---- the two ways four channels can be wired together ----
+   BUSES is the bench mixer: two pictures into bus 1, two into bus 2, the two
+   buses into the master. It is the right shape for cutting and for wiping,
+   and it is what every control on the mixer strip was built around.
+   LAYERS is the other shape. Four layers, bottom to top, each landing on
+   everything under it with its own blend, its own level and its own key, and
+   a crosspoint matrix deciding which channel feeds which layer. Nothing is
+   stuck behind a fader that is already carrying something else, which is what
+   the tree costs you the moment you want all four pictures at once. */
+const TOPOLOGIES = ["BUSES", "LAYERS"];
+let mixTopo = 0;
+/* the crosspoint: which channel arrives at which layer, and how it lands */
+let laySrc   = ["A","B","C","D"];
+let layBlend = [0, 0, 0, 0];
+let layKeyMode = [0, 0, 0, 0];      /* 0 none, 1 luma white, 2 luma black, 3 chroma */
+const LAYKEYS = ["KEY OFF", "KEY WHITE", "KEY BLACK", "KEY CHROMA"];
 let meltMode = 0, meltMode2 = 0, meltModeM = 0;
 /* transition, mix type and key are three independent choices per bus */
 let mixBlend = 0, mixBlend2 = 0, mixBlendM = 0;

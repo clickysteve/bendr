@@ -671,13 +671,25 @@ function renderFrame(now, dt){
 
   /* a channel only costs anything when its fader can actually let it through */
   const b1 = busSrc.b1, b2 = busSrc.b2;
-  const masterLive = mCur.busMix > 0.0005 || multiView;
+  const layers = mixTopo === 1;
+  const masterLive = layers ? true : (mCur.busMix > 0.0005 || multiView);
   const live = {A:false, B:false, C:false, D:false};
-  live[b1[0]] = true;
-  if(srcReady(b1[1]) && (mCur.abMix > 0.0005 || multiView)) live[b1[1]] = true;
-  if(masterLive){
-    if(srcReady(b2[0])) live[b2[0]] = true;
-    if(srcReady(b2[1]) && (mCur.cdMix > 0.0005 || multiView)) live[b2[1]] = true;
+  if(layers){
+    /* a layer costs nothing at zero level, and the bottom one is always drawn
+       so that the stack has something to stand on even with everything down */
+    for(let i=0;i<4;i++){
+      const ch = laySrc[i];
+      if(!ch || CHANNELS.indexOf(ch) < 0) continue;
+      if(i === 0 || (mCur["layOp"+(i+1)] > 0.0005 && srcReady(ch))) live[ch] = true;
+    }
+    if(multiView) for(const ch of CHANNELS) if(srcReady(ch)) live[ch] = true;
+  } else {
+    live[b1[0]] = true;
+    if(srcReady(b1[1]) && (mCur.abMix > 0.0005 || multiView)) live[b1[1]] = true;
+    if(masterLive){
+      if(srcReady(b2[0])) live[b2[0]] = true;
+      if(srcReady(b2[1]) && (mCur.cdMix > 0.0005 || multiView)) live[b2[1]] = true;
+    }
   }
   /* a re-entry source only works if the channel it is reading is still rendering */
   for(let pass=0; pass<3; pass++){
@@ -741,7 +753,43 @@ function renderFrame(now, dt){
   const mMode1 = byp1 ? 0 : mixMode,  mBl1 = byp1 ? 0 : mixBlend,  mKy1 = byp1 ? 0 : mixKey,  mMl1 = byp1 ? 0 : meltMode;
   const mMode2 = byp2 ? 0 : mixMode2, mBl2 = byp2 ? 0 : mixBlend2, mKy2 = byp2 ? 0 : mixKey2, mMl2 = byp2 ? 0 : meltMode2;
   const mModeM = bypM ? 0 : mixModeM, mBlM = bypM ? 0 : mixBlendM, mKyM = bypM ? 0 : mixKeyM, mMlM = bypM ? 0 : meltModeM;
-  if(masterLive){
+  if(layers){
+    /* ---- the layer stack ----
+       Four landings, bottom to top, ping-ponging through the two bus buffers
+       so the stack costs no memory the tree was not already spending. The
+       bottom layer lands on black rather than on the channel itself, so its
+       level and its blend mean the same thing there as they do further up. */
+    ensureShared("busOut1"); ensureShared("busOut2");
+    const bypL = !!secBypass["layers"];
+    let src = busOut2, dst = busOut1;
+    clearRT(src);
+    for(let i=0;i<4;i++){
+      const ch = laySrc[i];
+      const tex = (ch && live[ch]) ? chanOutTex(ch) : blackTex;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+      gl.viewport(0,0,procW,procH);
+      gl.useProgram(progLAYER.prog);
+      gl.uniform2f(U(progLAYER,"u_res"), procW, procH);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src.tex);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.uniform1i(U(progLAYER,"u_texA"), 0);
+      gl.uniform1i(U(progLAYER,"u_texB"), 1);
+      const n = i+1;
+      gl.uniform1f(U(progLAYER,"u_layOp"), (ch && live[ch]) ? mCur["layOp"+n] : 0);
+      gl.uniform1f(U(progLAYER,"u_layBlend"), bypL ? 0 : (layBlend[i]||0));
+      gl.uniform1f(U(progLAYER,"u_layKeyMode"), bypL ? 0 : (layKeyMode[i]||0));
+      gl.uniform1f(U(progLAYER,"u_layKey"), mCur["layKey"+n]);
+      gl.uniform1f(U(progLAYER,"u_layKeyT"), mCur["layKeyT"+n]);
+      gl.uniform1f(U(progLAYER,"u_layKeyS"), mCur["layKeyS"+n]);
+      gl.uniform1f(U(progLAYER,"u_layKeyHue"), mCur["layKeyH"+n]);
+      draw();
+      const t = src; src = dst; dst = t;
+    }
+    /* the master transition still gets its pass, with one picture on it, so
+       the master melt and the master bus keep working in this topology too */
+    if(edgeLive(MIXBUS.bM)){ ensureShared("mixHist"); const t = mixOut; mixOut = mixHist; mixHist = t; pM = mixHist.tex; }
+    mixPass(mixOut, src.tex, src.tex, false, MIXBUS.bM, 0, false, 0, 0, pM, mMlM);
+  } else if(masterLive){
     ensureShared("busOut1"); ensureShared("busOut2");
     if(edgeLive(MIXBUS.b1)){ ensureShared("busHist1"); const t = busOut1; busOut1 = busHist1; busHist1 = t; p1 = busHist1.tex; }
     if(edgeLive(MIXBUS.b2)){ ensureShared("busHist2"); const t = busOut2; busOut2 = busHist2; busHist2 = t; p2t = busHist2.tex; }

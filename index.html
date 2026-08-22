@@ -705,6 +705,28 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 }
 .secbypass.off{color:#0b0b0e; background:var(--amber); border-color:var(--amber);}
 .secbypass svg{display:block;}
+/* ---- the routing crosspoint ----
+   A grid of cells rather than four dropdowns, because the whole point of a
+   matrix is that you can see the wiring at once. The lit cell carries the
+   accent, so a row reads as "this channel, that layer" at a glance. */
+.laymx{display:flex; flex-direction:column; gap:2px; padding:3px 0 5px;}
+.laymxhead, .laymxrow{display:grid; grid-template-columns:44px repeat(4, 1fr); gap:2px; align-items:center;}
+.laymxhead span{font-size:8px; color:var(--dim); text-align:center; letter-spacing:.5px;}
+.laymxrow > span{font-size:8.5px; color:var(--dim); letter-spacing:.5px;}
+.laycell{
+  border:1px solid var(--line); background:#0d0d11; color:#2a2a33;
+  font-size:9px; line-height:1; padding:5px 0; cursor:pointer; border-radius:2px;
+}
+.laycell:hover{border-color:var(--cyan); color:#55555f;}
+.laycell.on{background:var(--cyan); border-color:var(--cyan); color:#0b0b0e;}
+/* The transitions belong to the tree. In the stack they are still there and
+   still hold their settings, but they are not what is deciding the picture,
+   so the strip says so rather than leaving four dead dropdowns to be puzzled
+   over. Dimmed, not hidden: hiding them would lose the settings from view. */
+#mixbuses{transition:opacity .12s;}
+body.topo-layers #mixbuses{opacity:.42;}
+body.topo-layers #mixCollapse .mixhint{color:var(--cyan);}
+body.topo-layers #mixCollapse .mixhint::after{content:" \2192 LAYER STACK";}
 /* every section the hovered bypass would take out with it */
 .sec.stagehover > h3{background:rgba(255,122,24,.16); box-shadow:inset 2px 0 0 var(--amber);}
 .sec.bypassed > h3{opacity:.55;}
@@ -1395,6 +1417,9 @@ audio,video{display:none;}
   <p>The <b>KEYER</b> has a full set of levels: THRESH and SOFT set where the matte turns over, GAIN how hard, DENSITY how opaque it is ever allowed to get. KEY BORDER grows the matte outward and fills the growth with one of the eight standard back colours, and KEY SHADOW offsets a darkened copy underneath - the outline and drop-shadow treatments a bench mixer offers for titles. Wipes get the same treatment: BORDER WIPE lays a coloured rule along the join, and WIPE MULTI tiles the whole pattern four or sixteen times. There are twenty-four mix types, from the usual dissolve, additive and non-additive through the photographic blends to wrap-add and bitwise XOR, which are not photographic at all.</p>
   <p>The channels meet in three mixers, laid out as a strip directly under the picture: bus 1, bus 2, and a master crossfade between them. Each strip has its own two input selectors, so the pairings are not fixed \u2014 bus 1 can mix <b>A against C</b>, bus 2 can mix <b>D against B</b>. To get all four in at once, set both bus faders part-way and put the master on ADD, SCREEN or LIGHTEN rather than FADE, so the buses sum instead of crossfading. The strip sits just under the transport bar, and folds away with <b>MIX</b> on its left when you want the height back.</p>
   <p>The faders live under the picture rather than in the sidebar because a crossfader wants to be horizontal and should never be hidden behind a tab \u2014 it is the one control you ride while looking at something else. The detail behind each transition (softness, wipe geometry, key threshold) lives on the MIX tab of the dock, where it is setup rather than performance. INV only greys in when the transition is a wipe, since a fade, a key and a blend have no direction to reverse.</p>
+  <h3>THE LAYER STACK</h3>
+  <p>The three buses are a tree, and a tree is the wrong shape for building one picture out of four, because every source past the second has to arrive through a fader that is already carrying something else. So there is a second topology. On the <b>MIX</b> tab, <b>LAYER STACK</b> has a <b>TOPOLOGY</b> selector and a four-by-four crosspoint matrix: four channels down the side, four layers across, and a cell where they meet. Switch it to <b>LAYERS</b> and the picture is built bottom to top instead, each layer landing on everything below it with its own blend mode, its own level and its own key. The same twenty-four blends the mixer uses are available on every layer, so a look you found on the strip transfers straight up. The same channel can feed more than one layer, which is how you put a picture over a treated copy of itself.</p>
+  <p>Each layer's key works on that layer's own picture rather than on the transition, which is the point of a stack: the thing on top can sit in front of what is under it instead of dissolving into it. <b>KEY WHITE</b> drops its bright parts, <b>KEY BLACK</b> its dark parts, <b>KEY CHROMA</b> one colour, and the threshold, softness and hue for each layer are the sliders under the matrix. A layer at zero level costs nothing at all &mdash; the channel behind it stops rendering. The three transitions stay where they are and keep their settings while the stack is running; the strip dims to say so. The master melt still runs on the finished stack, so it can still feed back into itself.</p>
   <h3>MULTIVIEW</h3>
   <p><b>MULTI</b> (or <kbd>V</kbd>) shows all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors. The channel you are editing carries the hot border; channels that are not currently rendering are dimmed. It forces everything to render, so it costs more than the normal view \u2014 it is for setting up, not for performing.</p>
   <h3>PATTERN SYNTH</h3>
@@ -1418,6 +1443,7 @@ audio,video{display:none;}
   <p>Feedback → composite/NTSC encode-decode → sync &amp; tape damage → bent enhancer → colour stage → CRT. The <b>BENT ENHANCER</b> section is the circuit-bent video enhancer core: RAINBOW MAP replaces luma with hot posterized rainbows, EDGE RING is the sharpness circuit driven into oscillation (repeating ghost edges), RGB SPLIT tears the channels apart, LUMA HUE makes colour chase brightness, INV FLICKER strobes inversions.</p>
   <h3>CONTOUR / PALETTE</h3>
   <p>The bent-enhancer signature: <b>CONTOUR</b> draws the isolines between brightness bands, giving those repeated outlines that trace the shape of a face or a body. BANDS sets how many, LINE WIDTH how heavy, LINE HUE colours them by band, KEEP FILL decides how much of the picture survives between the lines (drop it to zero for lines on black). <b>FLATTEN</b> quantises brightness into hard LEVELS for solid poster-like colour fields, and <b>DITHER</b> breaks the steps into speckle.</p>
+  <p><b>MOD LINES</b> is a one-bit modulator run along the scanline. The picture drives a comparator, the error the comparator makes is fed back into its own input, and the sweep carries on across the line, so where the picture is bright the comparator fires more often and the density and width of the lines is the only thing carrying the image. It is the same circuit as a delta-sigma converter and the same idea as the line-modulator boxes that sat in front of a scan processor, and it reads as an engraving rather than as a dither because the error is diffused rather than compared against a fixed pattern. <b>LINE PITCH</b> coarsens the lines, <b>MOD DRIVE</b> and <b>MOD BIAS</b> decide whether the picture is drawn in its shadows or its highlights, <b>ERROR FEED</b> is how much the modulator remembers its own mistakes &mdash; at the top it is textbook error diffusion and the lines organise into long even runs, at the bottom there is no diffusion left and it is a bare comparator. <b>RGB SEPARATE</b> runs three modulators instead of one and mixes them optically, which is how you get colour out of a one-bit process. <b>SERPENTINE</b> sweeps alternate rows the other way, without which every row lays the same diagonal and the picture grows a corduroy that is not in it.</p>
   <h3>THE MIXER EFFECT FAMILY</h3>
   <p>In the colour stage: <b>NEGATIVE</b> with three modes (invert brightness, colour, or both), <b>MONOCOLOR</b> to put the whole picture through one colour, <b>COLORPASS</b> to keep a single hue and drop everything else to monochrome, <b>SILHOUETTE</b> to threshold the picture into a flat shape, <b>FIND EDGE</b> for coloured outlines on a dark ground, and <b>EMBOSS</b> to light it from one side as relief.</p>
   <p>In frame and position: <b>FLIP</b> turns the picture over, <b>MIRROR</b> reflects one half onto the other, and <b>MULTI</b> tiles it into a grid with alternate cells mirrored so the tiles meet. All three act on the picture before the framing, and all three are modulation destinations \u2014 an LFO into FLIP is a switch, an LFO into MULTI is a grid that grows.</p>
@@ -1736,7 +1762,65 @@ const FS_FB = COMMON + KEYFN +
    separate compositing stage on top — luminance, chroma or picture-in-picture.
    Splitting them means you can run a circle wipe AND a key at the same time,
    which one combined dropdown could never express. */
-const FS_MIX = COMMON + KEYFN +
+/* The blend set, the colour-space helpers it needs and the bit operations,
+   kept apart from the mixer because the layer stack combines pictures with
+   exactly the same twenty-four rules and there is no sense in two copies
+   of them drifting apart. */
+const BLENDFN =
+"vec3 rgb2hsvM(vec3 c){\n" +
+"  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);\n" +
+"  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));\n" +
+"  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));\n" +
+"  float d = q.x - min(q.w, q.y);\n" +
+"  return vec3(abs(q.z + (q.w - q.y)/(6.0*d + 1e-10)), d/(q.x + 1e-10), q.x);\n}\n" +
+"vec3 hsv2rgbM(vec3 c){\n" +
+"  vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0))*6.0 - 3.0);\n" +
+"  return c.z * mix(vec3(1.0), clamp(p-1.0, 0.0, 1.0), c.y);\n}\n" +
+"float bits(float x, float y, float mode){\n" +
+"  int ix = int(clamp(x,0.0,1.0)*255.0), iy = int(clamp(y,0.0,1.0)*255.0);\n" +
+"  int r = (mode<0.5) ? (ix ^ iy) : (ix & iy);\n" +
+"  return float(r)/255.0;\n}\n" +
+"/* Twenty-four ways for two pictures to meet. The first six keep the indices\n" +
+"   they have always had so old patches still load. */\n" +
+"vec3 combine(vec3 a, vec3 b, float m, float blend){\n" +
+"  if(blend<0.5) return mix(a, b, m);\n" +                 /* DISSOLVE */
+"  if(blend<1.5) return a + b*m;\n" +                      /* ADDITIVE  (FAM) */
+"  if(blend<2.5) return mix(a, max(a,b), m);\n" +          /* NON-ADD   (NAM) */
+"  if(blend<3.5) return mix(a, abs(a-b), m);\n" +          /* DIFFERENCE */
+"  if(blend<4.5) return mix(a, a*b*1.6, m);\n" +           /* MULTIPLY */
+"  if(blend<5.5) return mix(a, 1.0-(1.0-a)*(1.0-b), m);\n" +   /* SCREEN */
+"  if(blend<6.5) return mix(a, min(a,b), m);\n" +          /* DARKEN */
+"  if(blend<7.5) return mix(a, a+b-2.0*a*b, m);\n" +       /* EXCLUSION */
+"  if(blend<8.5) return mix(a, a-b, m);\n" +              /* SUBTRACT */
+"  if(blend<9.5){                                     \n" +   /* OVERLAY */
+"    vec3 r = mix(2.0*a*b, 1.0-2.0*(1.0-a)*(1.0-b), step(0.5,a));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<10.5){                                    \n" +   /* HARD LIGHT */
+"    vec3 r = mix(2.0*a*b, 1.0-2.0*(1.0-a)*(1.0-b), step(0.5,b));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<11.5){                                    \n" +   /* SOFT LIGHT */
+"    vec3 r = mix(2.0*a*b + a*a*(1.0-2.0*b), sqrt(max(a,0.0))*(2.0*b-1.0) + 2.0*a*(1.0-b), step(0.5,b));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<12.5){                                    \n" +   /* VIVID LIGHT */
+"    vec3 r = mix(1.0 - (1.0-a)/max(2.0*b, 0.001), a/max(1.0-2.0*(b-0.5), 0.001), step(0.5,b));\n" +
+"    return mix(a, clamp(r,0.0,1.6), m); }\n" +
+"  if(blend<13.5){                                    \n" +   /* PIN LIGHT */
+"    vec3 r = mix(min(a, 2.0*b), max(a, 2.0*(b-0.5)), step(0.5,b));\n" +
+"    return mix(a, r, m); }\n" +
+"  if(blend<14.5) return mix(a, clamp(a/max(1.0-b, 0.004), 0.0, 1.6), m);\n" +   /* COLOUR DODGE */
+"  if(blend<15.5) return mix(a, 1.0-clamp((1.0-a)/max(b, 0.004), 0.0, 1.6), m);\n" + /* COLOUR BURN */
+"  if(blend<16.5) return mix(a, clamp(a/max(b, 0.004), 0.0, 1.6), m);\n" +      /* DIVIDE */
+"  if(blend<17.5) return mix(a, fract(a + b*1.5), m);\n" +   /* WRAP ADD: the analogue overflow */
+"  if(blend<18.5) return mix(a, vec3(bits(a.r,b.r,0.0), bits(a.g,b.g,0.0), bits(a.b,b.b,0.0)), m);\n" +
+"  if(blend<19.5) return mix(a, vec3(bits(a.r,b.r,1.0), bits(a.g,b.g,1.0), bits(a.b,b.b,1.0)), m);\n" +
+"  vec3 ha = rgb2hsvM(clamp(a,0.0,1.0)), hb = rgb2hsvM(clamp(b,0.0,1.0));\n" +
+"  if(blend<20.5) return mix(a, hsv2rgbM(vec3(hb.x, ha.y, ha.z)), m);\n" +   /* HUE */
+"  if(blend<21.5) return mix(a, hsv2rgbM(vec3(ha.x, hb.y, ha.z)), m);\n" +   /* SATURATION */
+"  if(blend<22.5) return mix(a, hsv2rgbM(vec3(hb.x, hb.y, ha.z)), m);\n" +   /* COLOUR */
+"  return mix(a, hsv2rgbM(vec3(ha.x, ha.y, hb.z)), m);\n}\n" +               /* LUMINOSITY */
+"";
+
+const FS_MIX = COMMON + KEYFN + BLENDFN +
 "uniform sampler2D u_texA; uniform sampler2D u_texB;\n" +
 "uniform float u_mixMode,u_mixBlend,u_mixKey,u_hasB,u_abMix,u_time;\n" +
 "uniform float u_wipeSoft,u_wipeDetail,u_wipeX,u_wipeY,u_wipeInv;\n" +
@@ -1760,19 +1844,6 @@ const FS_MIX = COMMON + KEYFN +
 "  if(k==5) return vec3(1.0,0.0,0.0);\n" +
 "  if(k==6) return vec3(0.0,0.0,1.0);\n" +
 "  return vec3(0.0);\n}\n" +
-"vec3 rgb2hsvM(vec3 c){\n" +
-"  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);\n" +
-"  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));\n" +
-"  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));\n" +
-"  float d = q.x - min(q.w, q.y);\n" +
-"  return vec3(abs(q.z + (q.w - q.y)/(6.0*d + 1e-10)), d/(q.x + 1e-10), q.x);\n}\n" +
-"vec3 hsv2rgbM(vec3 c){\n" +
-"  vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0))*6.0 - 3.0);\n" +
-"  return c.z * mix(vec3(1.0), clamp(p-1.0, 0.0, 1.0), c.y);\n}\n" +
-"float bits(float x, float y, float mode){\n" +
-"  int ix = int(clamp(x,0.0,1.0)*255.0), iy = int(clamp(y,0.0,1.0)*255.0);\n" +
-"  int r = (mode<0.5) ? (ix ^ iy) : (ix & iy);\n" +
-"  return float(r)/255.0;\n}\n" +
 "float wipeField(vec2 uv, float mode, float outA){\n" +
 "  /* MULTI tiles the whole pattern, the way a bench mixer's x4 / x16 does */\n" +
 "  float rep = max(1.0, floor(u_wipeRep + 0.5));\n" +
@@ -1848,44 +1919,6 @@ const FS_MIX = COMMON + KEYFN +
 "    }\n" +
 "  }\n" +
 "  return clamp(m, 0.0, 1.0);\n}\n" +
-"/* Twenty-four ways for two pictures to meet. The first six keep the indices\n" +
-"   they have always had so old patches still load. */\n" +
-"vec3 combine(vec3 a, vec3 b, float m, float blend){\n" +
-"  if(blend<0.5) return mix(a, b, m);\n" +                 /* DISSOLVE */
-"  if(blend<1.5) return a + b*m;\n" +                      /* ADDITIVE  (FAM) */
-"  if(blend<2.5) return mix(a, max(a,b), m);\n" +          /* NON-ADD   (NAM) */
-"  if(blend<3.5) return mix(a, abs(a-b), m);\n" +          /* DIFFERENCE */
-"  if(blend<4.5) return mix(a, a*b*1.6, m);\n" +           /* MULTIPLY */
-"  if(blend<5.5) return mix(a, 1.0-(1.0-a)*(1.0-b), m);\n" +   /* SCREEN */
-"  if(blend<6.5) return mix(a, min(a,b), m);\n" +          /* DARKEN */
-"  if(blend<7.5) return mix(a, a+b-2.0*a*b, m);\n" +       /* EXCLUSION */
-"  if(blend<8.5) return mix(a, a-b, m);\n" +              /* SUBTRACT */
-"  if(blend<9.5){                                     \n" +   /* OVERLAY */
-"    vec3 r = mix(2.0*a*b, 1.0-2.0*(1.0-a)*(1.0-b), step(0.5,a));\n" +
-"    return mix(a, r, m); }\n" +
-"  if(blend<10.5){                                    \n" +   /* HARD LIGHT */
-"    vec3 r = mix(2.0*a*b, 1.0-2.0*(1.0-a)*(1.0-b), step(0.5,b));\n" +
-"    return mix(a, r, m); }\n" +
-"  if(blend<11.5){                                    \n" +   /* SOFT LIGHT */
-"    vec3 r = mix(2.0*a*b + a*a*(1.0-2.0*b), sqrt(max(a,0.0))*(2.0*b-1.0) + 2.0*a*(1.0-b), step(0.5,b));\n" +
-"    return mix(a, r, m); }\n" +
-"  if(blend<12.5){                                    \n" +   /* VIVID LIGHT */
-"    vec3 r = mix(1.0 - (1.0-a)/max(2.0*b, 0.001), a/max(1.0-2.0*(b-0.5), 0.001), step(0.5,b));\n" +
-"    return mix(a, clamp(r,0.0,1.6), m); }\n" +
-"  if(blend<13.5){                                    \n" +   /* PIN LIGHT */
-"    vec3 r = mix(min(a, 2.0*b), max(a, 2.0*(b-0.5)), step(0.5,b));\n" +
-"    return mix(a, r, m); }\n" +
-"  if(blend<14.5) return mix(a, clamp(a/max(1.0-b, 0.004), 0.0, 1.6), m);\n" +   /* COLOUR DODGE */
-"  if(blend<15.5) return mix(a, 1.0-clamp((1.0-a)/max(b, 0.004), 0.0, 1.6), m);\n" + /* COLOUR BURN */
-"  if(blend<16.5) return mix(a, clamp(a/max(b, 0.004), 0.0, 1.6), m);\n" +      /* DIVIDE */
-"  if(blend<17.5) return mix(a, fract(a + b*1.5), m);\n" +   /* WRAP ADD: the analogue overflow */
-"  if(blend<18.5) return mix(a, vec3(bits(a.r,b.r,0.0), bits(a.g,b.g,0.0), bits(a.b,b.b,0.0)), m);\n" +
-"  if(blend<19.5) return mix(a, vec3(bits(a.r,b.r,1.0), bits(a.g,b.g,1.0), bits(a.b,b.b,1.0)), m);\n" +
-"  vec3 ha = rgb2hsvM(clamp(a,0.0,1.0)), hb = rgb2hsvM(clamp(b,0.0,1.0));\n" +
-"  if(blend<20.5) return mix(a, hsv2rgbM(vec3(hb.x, ha.y, ha.z)), m);\n" +   /* HUE */
-"  if(blend<21.5) return mix(a, hsv2rgbM(vec3(ha.x, hb.y, ha.z)), m);\n" +   /* SATURATION */
-"  if(blend<22.5) return mix(a, hsv2rgbM(vec3(hb.x, hb.y, ha.z)), m);\n" +   /* COLOUR */
-"  return mix(a, hsv2rgbM(vec3(ha.x, ha.y, hb.z)), m);\n}\n" +               /* LUMINOSITY */
 /* The melt is a feedback loop on this stage's own output, so it is a
    function rather than a passage inside the mix: the mixer takes a short
    cut when there is only one picture to show, and the melt still has to
@@ -2649,6 +2682,7 @@ const FS_COL = COMMON + KEYFN +
 "uniform float u_rGain,u_gGain,u_bGain;\n" +
 "uniform float u_contour,u_contourBands,u_contourWidth,u_contourHue,u_contourFill;\n" +
 "uniform float u_lumaSteps,u_stepCount,u_dither;\n" +
+"uniform float u_mline,u_mlineScale,u_mlineGain,u_mlineBias,u_mlineFb,u_mlineWin,u_mlineTint,u_mlineCol,u_mlineSerp;\n" +
 "uniform float u_keyMode,u_keyThresh,u_keySoft,u_keyInv,u_keyHue,u_keyFx,u_showKey;\n" +
 "uniform float u_negative,u_negMode,u_monoCol,u_monoHue,u_colorPass,u_passHue,u_passWidth;\n" +
 "uniform float u_silhouette,u_silThresh,u_silHue,u_findEdge,u_edgeHue,u_emboss,u_embossDir;\n" +
@@ -2716,6 +2750,36 @@ const FS_COL = COMMON + KEYFN +
 "    float Lq = floor((L0+dth)*N + 0.5)/N;\n" +
 "    vec3 flat_ = (L0 > 0.001) ? c*(Lq/max(L0,0.001)) : vec3(Lq);\n" +
 "    c = mix(c, clamp(flat_,0.0,1.6), u_lumaSteps);\n" +
+"  }\n" +
+/* One-bit modulation lines. A comparator with its own quantising error fed
+   back into it, swept along the scanline: where the picture is bright the
+   comparator fires more often, so the density and width of the lines carries
+   the picture and nothing else does. That is a delta-sigma modulator, and it
+   is also what a line-modulator box did to a luminance signal, which is why
+   the result reads as an engraving rather than as a dither pattern.
+   The sweep is bounded rather than run from the start of the line. The error
+   of a one-bit modulator is chaotic and its memory is short: thirty-odd
+   samples back gives the same picture as five hundred and costs a fifteenth,
+   and a fragment shader cannot carry state across a row in any case. */
+"  if(u_mline > 0.003){\n" +
+"    float stp = (1.0/u_res.x) * u_mlineScale;\n" +
+"    int W = int(clamp(u_mlineWin, 4.0, 64.0));\n" +
+"    /* alternate rows sweep the other way, or the error lays the same diagonal\n" +
+"       down every line and the picture grows a corduroy that is not in it */\n" +
+"    float dir = (u_mlineSerp > 0.5 && mod(floor(gl_FragCoord.y), 2.0) > 0.5) ? -1.0 : 1.0;\n" +
+"    vec3 q = vec3(0.0), err = vec3(0.0);\n" +
+"    for(int i=0;i<64;i++){\n" +
+"      if(i > W) break;\n" +
+"      vec2 su = clamp(vec2(uv.x - dir*float(W-i)*stp, uv.y), 0.0, 1.0);\n" +
+"      vec3 sc = texture(u_tex, su).rgb;\n" +
+"      if(u_mlineCol < 0.5) sc = vec3(dot(sc, vec3(0.299,0.587,0.114)));\n" +
+"      vec3 v = sc*u_mlineGain + u_mlineBias + err;\n" +
+"      q = step(vec3(0.5), v);\n" +
+"      err = (v - q) * u_mlineFb;\n" +
+"    }\n" +
+"    /* the lines can be struck in white or in the colour that was there, which\n" +
+"       is the difference between an engraving and a screen print */\n" +
+"    c = mix(c, q * mix(vec3(1.0), c, u_mlineTint), u_mline);\n" +
 "  }\n" +
 "  /* ---- contour: draw the isolines between luma bands (bent-enhancer outlines) ---- */\n" +
 "  if(u_contour>0.003){\n" +
@@ -3620,6 +3684,37 @@ const FS_COPY = COMMON +
 "void main(){ O = texture(u_tex, gl_FragCoord.xy/u_res); }\n";
 /* the same copy, but told where in a larger target it is being drawn, so the
    four channel thumbnails can be packed into one atlas and read back once */
+/* ---- one step of the layer stack ----
+   The mixer is a tree: two pictures into a bus, two buses into the master.
+   That is how a bench mixer is wired and it is the right shape for cutting
+   between sources, but it is the wrong shape for building a picture out of
+   four of them, because every layer past the second has to come in through a
+   fader that is already carrying something else. So the stack is the other
+   topology: four layers, bottom to top, each landing on everything below it
+   with its own blend, its own level and its own key. This program is one of
+   those landings, run four times into a pair of buffers. */
+const FS_LAYER = COMMON + KEYFN + BLENDFN +
+"uniform sampler2D u_texA; uniform sampler2D u_texB;\n" +
+"uniform float u_layOp,u_layBlend,u_layKey,u_layKeyMode,u_layKeyT,u_layKeyS,u_layKeyHue;\n" +
+"void main(){\n" +
+"  vec2 uv = gl_FragCoord.xy/u_res;\n" +
+"  vec4 base = texture(u_texA, uv);\n" +
+"  vec4 lay  = texture(u_texB, uv);\n" +
+"  float m = clamp(u_layOp, 0.0, 1.0);\n" +
+"  /* the key is per layer and works on the layer's own picture, which is what\n" +
+"     makes a stack useful: the thing on top can be cut out of its background\n" +
+"     rather than dissolved into it */\n" +
+"  if(u_layKeyMode > 0.5 && u_layKey > 0.003){\n" +
+"    float mode = (u_layKeyMode > 2.5) ? 1.0 : 0.0;\n" +
+"    float inv  = (u_layKeyMode > 1.5 && u_layKeyMode < 2.5) ? 1.0 : 0.0;\n" +
+"    float k = keyOf(lay.rgb, mode, u_layKeyHue, u_layKeyT, u_layKeyS, inv);\n" +
+"    m *= mix(1.0, k, u_layKey);\n" +
+"  }\n" +
+"  /* the coverage matte is carried the same way the mixer carries it, so the\n" +
+"     display stage still knows which parts of the raster were never painted */\n" +
+"  O = vec4(combine(base.rgb, lay.rgb, m, u_layBlend), max(base.a, lay.a*m));\n" +
+"}\n";
+
 const FS_TILE = COMMON +
 "uniform sampler2D u_tex; uniform vec2 u_ofs;\n" +
 "void main(){ O = texture(u_tex, (gl_FragCoord.xy-u_ofs)/u_res); }\n";
@@ -3627,7 +3722,7 @@ const FS_TILE = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v37.2";
+const BENDR_VERSION = "v37.3";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -3637,6 +3732,7 @@ const SECTIONS = [
   {id:"mixer",    name:"BUS 1 \u00b7 TRANSITION",  cls:"mag",  zone:"mix"},
   {id:"mixer2",   name:"BUS 2 \u00b7 TRANSITION",  cls:"mag",  zone:"mix"},
   {id:"mixerM",   name:"MASTER \u00b7 TRANSITION", cls:"mag",  zone:"mix"},
+  {id:"layers",   name:"LAYER STACK",          cls:"cyan", zone:"mix"},
 
   {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan", zone:"chain"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag",  zone:"chain"},
@@ -3694,6 +3790,26 @@ const PDEF = [
   ["meltZoom","MELT ZOOM","mixer",-1,1,0.3],
   ["meltHue","MELT HUE","mixer",-1,1,0],
   ["meltSoft","MELT SOFTEN","mixer",0,1,0.35],
+  ["layOp1","L1 LEVEL","layers",0,1,1],
+  ["layKey1","L1 KEY","layers",0,1,0],
+  ["layKeyT1","L1 KEY THRESH","layers",0,1,0.5],
+  ["layKeyS1","L1 KEY SOFT","layers",0.01,1,0.2],
+  ["layKeyH1","L1 KEY HUE","layers",0,1,0.33],
+  ["layOp2","L2 LEVEL","layers",0,1,0],
+  ["layKey2","L2 KEY","layers",0,1,0],
+  ["layKeyT2","L2 KEY THRESH","layers",0,1,0.5],
+  ["layKeyS2","L2 KEY SOFT","layers",0.01,1,0.2],
+  ["layKeyH2","L2 KEY HUE","layers",0,1,0.33],
+  ["layOp3","L3 LEVEL","layers",0,1,0],
+  ["layKey3","L3 KEY","layers",0,1,0],
+  ["layKeyT3","L3 KEY THRESH","layers",0,1,0.5],
+  ["layKeyS3","L3 KEY SOFT","layers",0.01,1,0.2],
+  ["layKeyH3","L3 KEY HUE","layers",0,1,0.33],
+  ["layOp4","L4 LEVEL","layers",0,1,0],
+  ["layKey4","L4 KEY","layers",0,1,0],
+  ["layKeyT4","L4 KEY THRESH","layers",0,1,0.5],
+  ["layKeyS4","L4 KEY SOFT","layers",0.01,1,0.2],
+  ["layKeyH4","L4 KEY HUE","layers",0,1,0.33],
   ["wipeBord","BORDER WIPE","mixer",0,1,0],
   ["wipeBordCol","BORDER COLOUR","mixer",0,1,0],
   ["wipeRep","WIPE MULTI","mixer",1,4,1],
@@ -3836,6 +3952,15 @@ const PDEF = [
   ["lumaSteps","FLATTEN","contour",0,1,0],
   ["stepCount","LEVELS","contour",2,16,5],
   ["dither","DITHER","contour",0,1,0],
+  ["mline","MOD LINES","contour",0,1,0],
+  ["mlineScale","LINE PITCH","contour",0.25,6,1],
+  ["mlineGain","MOD DRIVE","contour",0,3,1.15],
+  ["mlineBias","MOD BIAS","contour",-0.5,0.5,0],
+  ["mlineFb","ERROR FEED","contour",0,1,0.92],
+  ["mlineWin","MOD MEMORY","contour",4,64,32],
+  ["mlineTint","KEEP COLOUR","contour",0,1,0],
+  ["mlineCol","RGB SEPARATE","contour",0,1,0],
+  ["mlineSerp","SERPENTINE","contour",0,1,1],
 
   ["sparseJit","SPARSE JITTER","lab",0,1,0],
   ["jitThresh","JITTER GATE","lab",0,1,0.7],
@@ -4137,6 +4262,26 @@ const PHELP = {
   pipY:"Vertical position of the subscreen.",
   pipSize:"How large the subscreen is, from a small inset to most of the frame.",
   pipBorder:"Width of the border drawn around the subscreen. Zero for none.",
+  layOp1:"How much of layer 1 arrives. On the bottom layer this is a plain fade to black; further up it is the amount of that picture that lands on the ones under it, which for most blend modes is the same thing as opacity and for the additive ones is how hard it is driven. Zero costs nothing at all: the channel behind it stops rendering.",
+  layKey1:"How much of layer 1's key is applied. The key itself is chosen on the selector beside the blend: WHITE drops the layer's bright parts, BLACK its dark parts, CHROMA one colour. This control fades between the layer landing whole and the layer landing cut out, so partial settings give you a ghost rather than a hole.",
+  layKeyT1:"Where layer 1's key breaks. On a luma key this is the brightness that counts as background; on a chroma key it is how close to the chosen hue a pixel has to be. Every keyed picture wants its own value and there is no default that suits two of them.",
+  layKeyS1:"How wide the edge of layer 1's key is. This is a real keyer edge, not a blur: a high-gain amplifier driven into its rails, so the edge is made of a percentage of the picture itself and grain in the source becomes grain in the edge. Hard settings cut like a stencil, soft ones let the layer breathe into what is under it.",
+  layKeyH1:"Which hue layer 1's chroma key looks for. Does nothing unless that layer's key is set to CHROMA. The old blue and the modern green are at either end of the same wheel; anything between is fair game and much more interesting on a picture that was never shot against a screen.",
+  layOp2:"How much of layer 2 arrives. On the bottom layer this is a plain fade to black; further up it is the amount of that picture that lands on the ones under it, which for most blend modes is the same thing as opacity and for the additive ones is how hard it is driven. Zero costs nothing at all: the channel behind it stops rendering.",
+  layKey2:"How much of layer 2's key is applied. The key itself is chosen on the selector beside the blend: WHITE drops the layer's bright parts, BLACK its dark parts, CHROMA one colour. This control fades between the layer landing whole and the layer landing cut out, so partial settings give you a ghost rather than a hole.",
+  layKeyT2:"Where layer 2's key breaks. On a luma key this is the brightness that counts as background; on a chroma key it is how close to the chosen hue a pixel has to be. Every keyed picture wants its own value and there is no default that suits two of them.",
+  layKeyS2:"How wide the edge of layer 2's key is. This is a real keyer edge, not a blur: a high-gain amplifier driven into its rails, so the edge is made of a percentage of the picture itself and grain in the source becomes grain in the edge. Hard settings cut like a stencil, soft ones let the layer breathe into what is under it.",
+  layKeyH2:"Which hue layer 2's chroma key looks for. Does nothing unless that layer's key is set to CHROMA. The old blue and the modern green are at either end of the same wheel; anything between is fair game and much more interesting on a picture that was never shot against a screen.",
+  layOp3:"How much of layer 3 arrives. On the bottom layer this is a plain fade to black; further up it is the amount of that picture that lands on the ones under it, which for most blend modes is the same thing as opacity and for the additive ones is how hard it is driven. Zero costs nothing at all: the channel behind it stops rendering.",
+  layKey3:"How much of layer 3's key is applied. The key itself is chosen on the selector beside the blend: WHITE drops the layer's bright parts, BLACK its dark parts, CHROMA one colour. This control fades between the layer landing whole and the layer landing cut out, so partial settings give you a ghost rather than a hole.",
+  layKeyT3:"Where layer 3's key breaks. On a luma key this is the brightness that counts as background; on a chroma key it is how close to the chosen hue a pixel has to be. Every keyed picture wants its own value and there is no default that suits two of them.",
+  layKeyS3:"How wide the edge of layer 3's key is. This is a real keyer edge, not a blur: a high-gain amplifier driven into its rails, so the edge is made of a percentage of the picture itself and grain in the source becomes grain in the edge. Hard settings cut like a stencil, soft ones let the layer breathe into what is under it.",
+  layKeyH3:"Which hue layer 3's chroma key looks for. Does nothing unless that layer's key is set to CHROMA. The old blue and the modern green are at either end of the same wheel; anything between is fair game and much more interesting on a picture that was never shot against a screen.",
+  layOp4:"How much of layer 4 arrives. On the bottom layer this is a plain fade to black; further up it is the amount of that picture that lands on the ones under it, which for most blend modes is the same thing as opacity and for the additive ones is how hard it is driven. Zero costs nothing at all: the channel behind it stops rendering.",
+  layKey4:"How much of layer 4's key is applied. The key itself is chosen on the selector beside the blend: WHITE drops the layer's bright parts, BLACK its dark parts, CHROMA one colour. This control fades between the layer landing whole and the layer landing cut out, so partial settings give you a ghost rather than a hole.",
+  layKeyT4:"Where layer 4's key breaks. On a luma key this is the brightness that counts as background; on a chroma key it is how close to the chosen hue a pixel has to be. Every keyed picture wants its own value and there is no default that suits two of them.",
+  layKeyS4:"How wide the edge of layer 4's key is. This is a real keyer edge, not a blur: a high-gain amplifier driven into its rails, so the edge is made of a percentage of the picture itself and grain in the source becomes grain in the edge. Hard settings cut like a stencil, soft ones let the layer breathe into what is under it.",
+  layKeyH4:"Which hue layer 4's chroma key looks for. Does nothing unless that layer's key is set to CHROMA. The old blue and the modern green are at either end of the same wheel; anything between is fair game and much more interesting on a picture that was never shot against a screen.",
   edgeAmt:"How much of the melt there is. What it melts depends on MELT MODE beside the fader, and the modes fall into two halves. EDGE, FRAME and MOTION act on the composite once it has been made: EDGE works only on the seam between the two pictures, which is why it looks dead on a plain dissolve, a dissolve having no seam to stand on; FRAME feeds the whole picture back through itself, turned and scaled a little on every pass, which is video feedback and trails like it; MOTION does the same only where the picture is changing, so a still shot stays clean and anything moving drags a tail. MELD, DRIP and BLEED act on the mix instead, and are the ones that let the two layers melt into each other rather than sit one on top of the other. On those three this control sets how far into each other they go, and MELT HOLD sets the trail on its own. The travel past 1.0 is headroom rather than a different behaviour. Zero switches the stage off and costs nothing, including the frame of history it would otherwise keep.",
   meltZoom:"How much the fed-back picture is scaled on each pass. Positive pulls it inward and the trail runs away into the middle, which is the tunnel; negative pushes it out and the trail grows towards the edges. It is a fraction of a percent per pass, but at sixty passes a second a fraction of a percent is a tunnel. Does nothing on EDGE.",
   meltHue:"How far the colour wheel turns on each pass, so the trail changes hue as it ages. This is where feedback gets its rainbows: the picture is one colour, what it left behind a second ago is another. Small amounts read as a warm or cold wake; large ones cycle. Does nothing on EDGE.",
@@ -4209,6 +4354,15 @@ const PHELP = {
   lumaSteps:"Quantises brightness into hard levels, turning gradients into flat poster-like colour fields. Crossfades against the original.",
   stepCount:"How many brightness levels FLATTEN quantises to. Low numbers give big graphic blocks of colour.",
   dither:"Breaks the quantisation steps with an ordered dither pattern, so the bands dissolve into speckle instead of hard edges.",
+  mline:"A one-bit modulator run along the scanline. The picture drives a comparator, the error the comparator makes is fed back into its own input, and the sweep carries on across the line, so where the picture is bright the comparator fires more often and the density of the lines is the only thing carrying the image. It is the same circuit as a delta-sigma converter and the same idea as the line-modulator boxes that sat in front of a scan processor. It reads as an engraving rather than as a dither because the error is diffused rather than compared against a fixed pattern.",
+  mlineScale:"How far apart the modulator takes its samples, which sets the pitch of the lines. At 1 it steps a pixel at a time and the lines are as fine as the raster allows. Wound up it steps further and the lines coarsen into something closer to a woodcut. Fine pitches on a low raster will alias, which is not a fault so much as a look.",
+  mlineGain:"How hard the picture is driven into the comparator. Under 1 the modulator only fires in the highlights and the picture is mostly black; over 1 it fires nearly everywhere and the picture is mostly white with the shadows drawn in. The interesting settings are close to 1, where the whole range is in play.",
+  mlineBias:"Shifts the comparator's threshold, which moves where the lines break rather than how many there are. Small amounts either way are the difference between a picture drawn in its shadows and the same picture drawn in its highlights.",
+  mlineFb:"How much of the quantiser's error is carried into the next sample. At 1 it is textbook error diffusion and the lines organise themselves into the long even runs that make it look drawn. Lower and the error leaks away, the modulator forgets, and the lines break into something closer to noise. Below about a third there is no diffusion left and it is a bare comparator.",
+  mlineWin:"How far back along the line the modulator remembers. A fragment shader cannot carry state across a row, so the sweep is restarted a fixed distance behind every pixel. Thirty-odd samples is already indistinguishable from running the whole line and it is what everything above about half a megapixel can afford; short settings make the lines restart visibly and stipple.",
+  mlineTint:"What the lines are struck in. At zero they are white, which is the engraving. Wound up they take the colour that was under them, which is closer to a screen print: the same modulation, but the picture keeps its palette.",
+  mlineCol:"Runs three modulators instead of one, on red, green and blue separately. The three sets of lines land in different places and mix optically, which gives you colour out of a one-bit process. It costs three times as much and is worth it at least once.",
+  mlineSerp:"Sweeps alternate rows in opposite directions. Without it every row diffuses its error the same way and the picture grows a diagonal corduroy that is not in the source. It is close to free and there is very little reason to switch it off, except to see the corduroy.",
 
   /* ---- signal lab ---- */
   sparseJit:"Displaces whole scanlines sideways, but only the ones past the gate — so most of the picture holds still and a few lines snap hard out of place.",
@@ -4509,6 +4663,7 @@ for(const [suffix, note] of [["2"," (bus 2: channels C and D)"], ["M"," (master:
 
 /* ---------------- per-section help ---------------- */
 const SECHELP = {
+  layers:"The other way to wire four channels together. The mixer is a tree: two pictures into a bus, two buses into the master, everything arriving through a fader. That is how a bench mixer is built and it is the right shape for cutting and wiping between sources, but it is the wrong shape for building one picture out of four, because every layer past the second has to come in through a fader that is already carrying something else. The stack is the other topology. Four layers, bottom to top, each landing on everything under it with its own blend mode, its own level and its own key, and a crosspoint matrix deciding which channel feeds which layer. The same channel can feed more than one layer, which is how you put a picture over a treated copy of itself. Switching to LAYERS leaves the three transitions dimmed but intact: nothing is lost, and the master melt still runs on the finished stack, so the whole thing can still feed back into itself.",
   mixer:"Bus 1 of three. Combines the two finished channels A and B with a fader, twenty transition modes, a keyer and the melt stage that softens the seam between them.",
   mixer2:"Bus 2. Identical to bus 1 but for channels C and D. It only renders while the MASTER fader is above zero, so leaving it alone is free.",
   mixerM:"The master crossfade between the two buses, with the same twenty transitions one level up.",
@@ -4542,7 +4697,7 @@ const SECHELP = {
 };
 
 /* Master sections are single-instance; everything else exists once per channel. */
-const MASTER_SECS = new Set(["mixer","mixer2","mixerM","field","codec","crt","overlay","morph"]);
+const MASTER_SECS = new Set(["mixer","mixer2","mixerM","layers","field","codec","crt","overlay","morph"]);
 const CHANNELS = ["A","B","C","D"];
 const BUSPAIR = {A:"B", B:"A", C:"D", D:"C"};   // each channel's partner on its mixer bus
 /* COPY / SWAP are free routing: any channel to any other. The bus partner is
@@ -4622,6 +4777,22 @@ let mixModeM = 0, wipeInvM = false;   // MASTER (bus 1 / bus 2)
    rather than meeting at a line. All three feed their own result back, which
    is what keeps the boundary moving once it has started. */
 const MELTMODES = ["EDGE", "FRAME", "MOTION", "MELD", "DRIP", "BLEED"];
+/* ---- the two ways four channels can be wired together ----
+   BUSES is the bench mixer: two pictures into bus 1, two into bus 2, the two
+   buses into the master. It is the right shape for cutting and for wiping,
+   and it is what every control on the mixer strip was built around.
+   LAYERS is the other shape. Four layers, bottom to top, each landing on
+   everything under it with its own blend, its own level and its own key, and
+   a crosspoint matrix deciding which channel feeds which layer. Nothing is
+   stuck behind a fader that is already carrying something else, which is what
+   the tree costs you the moment you want all four pictures at once. */
+const TOPOLOGIES = ["BUSES", "LAYERS"];
+let mixTopo = 0;
+/* the crosspoint: which channel arrives at which layer, and how it lands */
+let laySrc   = ["A","B","C","D"];
+let layBlend = [0, 0, 0, 0];
+let layKeyMode = [0, 0, 0, 0];      /* 0 none, 1 luma white, 2 luma black, 3 chroma */
+const LAYKEYS = ["KEY OFF", "KEY WHITE", "KEY BLACK", "KEY CHROMA"];
 let meltMode = 0, meltMode2 = 0, meltModeM = 0;
 /* transition, mix type and key are three independent choices per bus */
 let mixBlend = 0, mixBlend2 = 0, mixBlendM = 0;
@@ -4739,6 +4910,7 @@ function U(pr, name){
 const progFB = makeProg(FS_FB), progSIG = makeProg(FS_SIG), progCOL = makeProg(FS_COL), progCRT = makeProg(FS_CRT);
 const progGLITCH = makeProg(FS_GLITCH), progFLOW = makeProg(FS_FLOW), progCOPY = makeProg(FS_COPY);
 const progMIX = makeProg(FS_MIX);
+const progLAYER = makeProg(FS_LAYER);
 const progTILE = makeProg(FS_TILE);
 const progMULTI = makeProg(FS_MULTI);
 const progGEN = makeProg(FS_GEN);
@@ -6109,7 +6281,7 @@ const STRIP_PARAMS = new Set(["abMix","cdMix","busMix"]);
    rather than a stage, so there is nothing underneath it to fall through to,
    and PRESET MORPH is a tool that moves other controls rather than a thing in
    the signal path. */
-const BYPASS_SECS = new Set(["mixer","mixer2","mixerM","frame","time","feedback",
+const BYPASS_SECS = new Set(["mixer","mixer2","mixerM","layers","frame","time","feedback",
                              "keyer","field","codec","crt","overlay"]);
 /* For most sections the default IS the neutral, because an effect defaults to
    an amount of zero and everything else in it is only a shape. The display is
@@ -6262,7 +6434,7 @@ function buildMixStrip(){
     uiRefs[p.id] = {slider:sl, val, tick, row:el, label:h};
     host.appendChild(el);
   }
-  refreshBusUI(); refreshToggles();
+  refreshBusUI(); refreshLayerUI(); refreshToggles();
 }
 const stripInvBtns = {};
 /* the melt faders are a second view of parameters the MIX tab also draws,
@@ -7392,6 +7564,17 @@ function mkToggle(parent, id, labelFn, onClick, tip, options){
   toggleRefs[id] = {btn:b, labelFn};
   return b;
 }
+function refreshLayerUI(){
+  for(const b of document.querySelectorAll(".laycell")){
+    b.classList.toggle("on", laySrc[+b.dataset.lay] === b.dataset.ch);
+  }
+  for(let i=0;i<4;i++){
+    const bl=document.getElementById("selLayBlend"+i); if(bl) bl.value = layBlend[i]||0;
+    const ky=document.getElementById("selLayKey"+i);   if(ky) ky.value = layKeyMode[i]||0;
+  }
+  const t=document.getElementById("selTopo"); if(t) t.value = mixTopo;
+  document.body.classList.toggle("topo-layers", mixTopo===1);
+}
 function refreshBusUI(){
   for(const key of ["b1","b2"]) for(const side of [0,1]){
     const el = document.getElementById("busSrc"+key+side);
@@ -7533,6 +7716,75 @@ function sectionExtrasAfter(id, d){
   }
 }
 function sectionExtras(id, d){
+  if(id==="layers"){
+    /* ---- the crosspoint ----
+       Four channels down the side, four layers across, and a cell where they
+       meet. It is the oldest routing control there is and it is still the
+       clearest: you can see the whole wiring at once instead of reading four
+       dropdowns and holding the answer in your head. One channel per layer,
+       so the cells behave like a row of interlocked buttons. */
+    const note = document.createElement("div");
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
+    note.textContent = "Four channels, four layers, bottom to top. BUSES is the mixer tree: two pictures a bus, two buses to master. LAYERS stacks all four instead, each landing on everything below it with its own blend, level and key.";
+    d.appendChild(note);
+
+    const tr = document.createElement("div"); tr.className="trow";
+    const tsel = document.createElement("select"); tsel.id = "selTopo";
+    attachTip(tsel, "MIX TOPOLOGY",
+      "How the four channels are wired together. BUSES is the bench mixer: channels into bus 1 and bus 2, the two buses into the master, everything arriving through a fader. LAYERS is a stack: four layers bottom to top, each landing on everything under it with its own blend mode, level and key, and the matrix below deciding which channel feeds which layer. The tree is better for cutting and wiping between sources; the stack is better for building one picture out of all four at once.",
+      "The mixer strip's transitions belong to BUSES. In LAYERS the master melt still runs, so the stack can still feed back into itself.");
+    TOPOLOGIES.forEach((t,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent="TOPOLOGY: "+t; tsel.appendChild(o); });
+    tsel.value = mixTopo;
+    tsel.onchange = ()=>{ mixTopo = parseInt(tsel.value); document.body.classList.toggle("topo-layers", mixTopo===1); toast(mixTopo===1 ? "LAYER STACK \u2014 four layers, bottom to top" : "BUS TREE \u2014 two buses into master"); };
+    tr.appendChild(tsel);
+    d.appendChild(tr);
+
+    const mx = document.createElement("div"); mx.className = "laymx";
+    const head = document.createElement("div"); head.className = "laymxhead";
+    head.appendChild(document.createElement("span"));
+    for(const ch of CHANNELS){ const c=document.createElement("span"); c.textContent="CH "+ch; head.appendChild(c); }
+    mx.appendChild(head);
+    /* drawn top layer first, because that is the order they are stacked on
+       screen and a routing grid that reads upside down is worse than none */
+    for(let i=3;i>=0;i--){
+      const row = document.createElement("div"); row.className="laymxrow";
+      const lab = document.createElement("span"); lab.textContent = (i===0?"L1 BASE":"L"+(i+1));
+      row.appendChild(lab);
+      for(const ch of CHANNELS){
+        const cell = document.createElement("button");
+        cell.className = "laycell"; cell.dataset.lay = i; cell.dataset.ch = ch;
+        cell.textContent = "\u25cf";
+        cell.setAttribute("aria-label", "route channel "+ch+" to layer "+(i+1));
+        attachTip(cell, "LAYER "+(i+1)+" \u2190 CHANNEL "+ch,
+          "Routes channel "+ch+" into layer "+(i+1)+". A layer takes one channel, so choosing another in the same row replaces it. The same channel can feed more than one layer, which is how you stack a picture over a treated copy of itself.");
+        cell.onclick = ()=>{ laySrc[i] = ch; refreshLayerUI(); };
+        row.appendChild(cell);
+      }
+      mx.appendChild(row);
+    }
+    d.appendChild(mx);
+
+    /* per layer: how it lands and what is cut out of it */
+    for(let i=3;i>=0;i--){
+      const r = document.createElement("div"); r.className="mixrow";
+      const tag = document.createElement("span");
+      tag.style.cssText="color:var(--dim); font-size:8.5px; min-width:18px; align-self:center;";
+      tag.textContent = "L"+(i+1);
+      const bl = document.createElement("select"); bl.id="selLayBlend"+i;
+      attachTip(bl, "LAYER "+(i+1)+" BLEND",
+        "How this layer lands on everything below it. The same twenty-four rules the mixer uses, so a look you found on the strip transfers straight up here. DISSOLVE with the level down is a plain fade; ADDITIVE and SCREEN pile light on; MULTIPLY and the burns take it away; DIFFERENCE and the two bit operations are where it stops behaving like film.");
+      MIXBLENDS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; bl.appendChild(o); });
+      bl.onchange = ()=>{ layBlend[i] = parseInt(bl.value); };
+      const ky = document.createElement("select"); ky.id="selLayKey"+i;
+      attachTip(ky, "LAYER "+(i+1)+" KEY",
+        "Cuts part of this layer away before it lands, using the layer's own picture as the matte. WHITE drops its bright parts, BLACK drops its dark parts, CHROMA drops one colour. This is what a stack is for: the thing on top can sit in front of what is under it rather than dissolving into it.",
+        "THRESH, SOFT and HUE for this layer are the sliders below.");
+      LAYKEYS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; ky.appendChild(o); });
+      ky.onchange = ()=>{ layKeyMode[i] = parseInt(ky.value); };
+      r.appendChild(tag); r.appendChild(bl); r.appendChild(ky);
+      d.appendChild(r);
+    }
+  }
   if(id==="mixer" || id==="mixer2" || id==="mixerM"){
     const which = id==="mixer" ? 1 : (id==="mixer2" ? 2 : 3);
     const note = document.createElement("div");
@@ -8630,6 +8882,10 @@ PRESETS.push(["MELT · COMET TRAILS", {"chan": {"A": {"genFreqX": 0.4, "genFreqY
 PRESETS.push(["MELT \u00b7 LAYERS MELD", {"chan": {"A": {"genFreqX": 0.26, "genFreqY": 0.09, "genRate": 0.07, "genHue": 0.02, "genSpread": 0.5, "genSat": 0.95, "saturation": 1.2}, "B": {"genFreqX": 0.11, "genFreqY": 0.31, "genRate": -0.05, "genHue": 0.58, "genSpread": 0.6, "genSat": 0.95, "saturation": 1.2}}, "master": {"abMix": 0.5, "edgeAmt": 1.5, "edgeHold": 0.72, "edgeWidth": 0.55, "meltZoom": 0.25, "edgeSwirl": 0.06, "meltHue": 0.12, "meltSoft": 0.4, "edgeChroma": 0.5, "scanlines": 0.2, "curvature": 0.3, "vignette": 0.4, "bloom": 0.3, "halation": 0.25}, "routes": [], "mixMode": 0, "meltMode": 3, "meltMode2": 0, "meltModeM": 0, "mixBlend": 0, "mixKey": 0, "wipeInv": false, "activeChan": "A", "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}}, "genMode": {"A": {"shape": 2, "wave": 0, "col": 2}, "B": {"shape": 4, "wave": 1, "col": 2}}}, null]);
 PRESETS.push(["MELT \u00b7 WET PAINT", {"chan": {"A": {"genFreqX": 0.3, "genFreqY": 0.05, "genRate": 0.03, "genHue": 0.12, "genSpread": 0.4, "genSat": 1.0, "genBright": 1.1}, "B": {"genFreqX": 0.07, "genFreqY": 0.22, "genRate": 0.09, "genHue": 0.72, "genSpread": 0.8, "genSat": 1.0}}, "master": {"abMix": 0.45, "edgeAmt": 1.8, "edgeHold": 0.86, "edgeWidth": 0.15, "meltZoom": 0.1, "edgeSwirl": 0.0, "meltHue": -0.2, "meltSoft": 0.55, "edgeChroma": 0.65, "scanlines": 0.24, "curvature": 0.28, "vignette": 0.45, "bloom": 0.35, "halation": 0.3, "phosphor": 0.3}, "routes": [], "mixMode": 0, "meltMode": 4, "meltMode2": 0, "meltModeM": 0, "mixBlend": 0, "mixKey": 0, "wipeInv": false, "activeChan": "A", "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}}, "genMode": {"A": {"shape": 1, "wave": 0, "col": 2}, "B": {"shape": 3, "wave": 2, "col": 2}}}, null]);
 PRESETS.push(["MELT \u00b7 BLEED THROUGH", {"chan": {"A": {"genFreqX": 0.18, "genFreqY": 0.18, "genRate": 0.12, "genFM": 0.4, "genHue": 0.45, "genSpread": 1.2, "genSat": 0.9}, "B": {"genFreqX": 0.42, "genFreqY": 0.06, "genRate": -0.08, "genHue": 0.05, "genSpread": 0.9, "genSat": 1.0}}, "master": {"abMix": 0.5, "edgeAmt": 2.0, "edgeHold": 0.62, "edgeWidth": 1.1, "meltZoom": 0.5, "edgeSwirl": -0.18, "meltHue": 0.3, "meltSoft": 0.3, "edgeChroma": 0.55, "scanlines": 0.18, "curvature": 0.26, "vignette": 0.38, "bloom": 0.4, "defocus": 0.12}, "routes": [], "mixMode": 0, "meltMode": 5, "meltMode2": 0, "meltModeM": 0, "mixBlend": 0, "mixKey": 0, "wipeInv": false, "activeChan": "A", "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}}, "genMode": {"A": {"shape": 5, "wave": 1, "col": 2}, "B": {"shape": 2, "wave": 0, "col": 2}}}, null]);
+PRESETS.push(["STACK \u00b7 FOUR UP", {"chan": {"A": {"genFreqX": 0.14, "genFreqY": 0.05, "genRate": 0.03, "genHue": 0.02, "genSpread": 0.3, "genSat": 1.0, "genBright": 0.555}, "B": {"genFreqX": 0.31, "genFreqY": 0.09, "genRate": -0.05, "genHue": 0.33, "genSpread": 0.3, "genSat": 1.0, "genBright": 0.65}, "C": {"genFreqX": 0.08, "genFreqY": 0.27, "genRate": 0.07, "genHue": 0.6, "genSpread": 0.3, "genSat": 1.0, "genBright": 0.65}, "D": {"genFreqX": 0.44, "genFreqY": 0.44, "genRate": 0.11, "genHue": 0.85, "genSpread": 0.3, "genSat": 1.0, "genBright": 0.55}}, "master": {"busMix": 0, "layOp1": 1, "layOp2": 0.55, "layOp3": 0.42, "layOp4": 0.3, "scanlines": 0.2, "curvature": 0.3, "vignette": 0.4, "bloom": 0.35, "halation": 0.25, "phosphor": 0.2}, "routes": [], "mixTopo": 1, "laySrc": ["A", "B", "C", "D"], "layBlend": [0, 1, 2, 3], "layKeyMode": [0, 0, 0, 0], "mixMode": 0, "meltMode": 3, "meltMode2": 0, "meltModeM": 1, "mixBlend": 0, "mixKey": 0, "wipeInv": false, "activeChan": "A", "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "C": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "D": {"mode": "synth", "pattern": "bars", "feed": "PGM"}}, "genMode": {"A": {"shape": 2, "wave": 0, "col": 2}, "B": {"shape": 4, "wave": 1, "col": 2}, "C": {"shape": 1, "wave": 2, "col": 2}, "D": {"shape": 5, "wave": 0, "col": 2}}}, null]);
+PRESETS.push(["STACK \u00b7 KEYED OVER", {"chan": {"A": {"genFreqX": 0.09, "genFreqY": 0.09, "genRate": 0.02, "genHue": 0.58, "genSpread": 1.4, "genSat": 0.8, "genBright": 0.7}, "B": {"genFreqX": 0.36, "genFreqY": 0.04, "genRate": 0.14, "genHue": 0.1, "genSpread": 0.2, "genSat": 1.0, "genBright": 1.2, "genComp": 0.7, "genThresh": 0.55}, "C": {"genFreqX": 0.2, "genFreqY": 0.2, "genRate": -0.09, "genHue": 0.42, "genSpread": 0.6, "genSat": 1.0}}, "master": {"busMix": 0, "layOp1": 1, "layOp2": 1, "layOp3": 0.7, "layOp4": 0, "layKey2": 1, "layKeyT2": 0.28, "layKeyS2": 0.12, "layKey3": 1, "layKeyT3": 0.4, "layKeyS3": 0.3, "scanlines": 0.24, "curvature": 0.28, "vignette": 0.42, "bloom": 0.3, "halation": 0.3}, "routes": [], "mixTopo": 1, "laySrc": ["A", "B", "C", "D"], "layBlend": [0, 0, 0, 0], "layKeyMode": [0, 2, 2, 0], "mixMode": 0, "meltMode": 3, "meltMode2": 0, "meltModeM": 1, "mixBlend": 0, "mixKey": 0, "wipeInv": false, "activeChan": "A", "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "C": {"mode": "synth", "pattern": "bars", "feed": "PGM"}}, "genMode": {"A": {"shape": 3, "wave": 1, "col": 2}, "B": {"shape": 0, "wave": 0, "col": 1}, "C": {"shape": 2, "wave": 2, "col": 2}}}, null]);
+PRESETS.push(["LINES \u00b7 ENGRAVING", {"chan": {"A": {"genFreqX": 0.16, "genFreqY": 0.11, "genRate": 0.05, "genSpread": 0.8, "genSat": 0.4, "contrast": 1.25, "mline": 1, "mlineGain": 1.2, "mlineScale": 1, "mlineFb": 0.95, "mlineWin": 40, "mlineTint": 0, "mlineSerp": 1}}, "master": {"abMix": 0, "busMix": 0, "scanlines": 0.16, "curvature": 0.26, "vignette": 0.35, "outContrast": 1.1}, "routes": [], "mixMode": 0, "meltMode": 3, "meltMode2": 0, "meltModeM": 0, "mixBlend": 0, "mixKey": 0, "wipeInv": false, "activeChan": "A", "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}}, "genMode": {"A": {"shape": 2, "wave": 0, "col": 0}}}, null]);
+PRESETS.push(["LINES \u00b7 THREE COLOUR", {"chan": {"A": {"genFreqX": 0.22, "genFreqY": 0.07, "genRate": 0.09, "genFM": 0.35, "genHue": 0.3, "genSpread": 1.6, "genSat": 1.0, "mline": 1, "mlineGain": 1.35, "mlineScale": 1.6, "mlineFb": 0.9, "mlineWin": 32, "mlineCol": 1, "mlineTint": 0, "mlineSerp": 1}}, "master": {"abMix": 0, "busMix": 0, "scanlines": 0.2, "curvature": 0.3, "vignette": 0.4, "bloom": 0.3, "halation": 0.28}, "routes": [], "mixMode": 0, "meltMode": 3, "meltMode2": 0, "meltModeM": 0, "mixBlend": 0, "mixKey": 0, "wipeInv": false, "activeChan": "A", "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}}, "genMode": {"A": {"shape": 5, "wave": 1, "col": 2}}}, null]);
 PRESETS.push(["MELT \u00b7 CIRCLE BLEED", {"chan": {"A": {"genFreqX": 0.09, "genFreqY": 0.06, "genRate": 0.05, "genHue": 0.08, "genSpread": 1.2, "genSat": 0.85, "chromaBleed": 0.35, "saturation": 1.15, "glow": 0.35}, "B": {"genFreqX": 0.34, "genFreqY": 0.2, "genRate": 0.09, "genFM": 0.55, "genHue": 0.62, "genSpread": 1.5, "contour": 0.35, "contourBands": 8, "chromaBleed": 0.5, "chromaDelay": 0.2, "saturation": 1.3, "glow": 0.4}}, "master": {"abMix": 0.52, "wipeSoft": 0.06, "edgeAmt": 0.62, "edgeHold": 0.86, "edgeSwirl": 0.25, "edgeChroma": 0.65, "edgeCreep": 0.7, "scanlines": 0.28, "curvature": 0.28, "bloom": 0.25, "halation": 0.2}, "routes": [{"ch": "A", "src": "lfo1", "dst": "wipeX", "amt": 0.35}, {"ch": "A", "src": "lfo3", "dst": "edgeSwirl", "amt": 0.5}, {"ch": "A", "src": "lfo2", "dst": "abMix", "amt": 0.12}], "audioCfg": {"bass": {"lo": 30, "hi": 150, "gain": 1}, "mid": {"lo": 300, "hi": 2200, "gain": 1}, "high": {"lo": 4000, "hi": 11000, "gain": 1}, "response": 0.5}, "fbTrailMode": false, "rescanMode": false, "keyChroma": false, "mixMode": 5, "edgeMode": 0, "wipeInv": false, "activeChan": "A", "linkChans": false, "mixMode2": 0, "wipeInv2": false, "mixModeM": 0, "wipeInvM": false, "mixBlend": 0, "mixBlend2": 0, "mixBlendM": 0, "mixKey": 0, "mixKey2": 0, "mixKeyM": 0, "fbWrap": 0, "fbMirror": 0, "fbBlend": 0, "fbNL": 0, "fbInvert": false, "fbTap": 0, "outModel": 0, "fieldSrc": 0, "flowField": 0, "flowEdge": 0, "chainOrder": ["sig", "col", "glitch", "lab", "flow"], "stageEnabled": {"sig": true, "col": true, "glitch": true, "lab": true, "flow": true}, "busSrc": {"b1": ["A", "B"], "b2": ["C", "D"]}, "genMode": {"A": {"shape": 1, "wave": 0, "col": 2}, "B": {"shape": 2, "wave": 2, "col": 1}, "C": {"shape": 0, "wave": 0, "col": 1}, "D": {"shape": 0, "wave": 0, "col": 1}}, "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "C": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}, "D": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}}, "srcText": {"A": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "B": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "C": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "D": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}}, "mods": [{"id": "lfo1", "type": "lfo", "name": "LFO 1", "rate": 0.05, "shape": "sine", "phase": 0.46354626282197164, "snh": 0, "sync": 0}, {"id": "lfo2", "type": "lfo", "name": "LFO 2", "rate": 0.11, "shape": "tri", "phase": 0.9169826661389351, "snh": 0, "sync": 0}, {"id": "lfo3", "type": "lfo", "name": "LFO 3", "rate": 0.037, "shape": "sine2", "phase": 0.4304286177016956, "snh": 0, "sync": 0}, {"id": "lfo4", "type": "lfo", "name": "LFO 4", "rate": 5.495408738576246, "shape": "sine", "phase": 0.055445735688429365, "snh": 0, "sync": 0}, {"id": "lfo5", "type": "lfo", "name": "LFO 5", "rate": 0.016982436524617443, "shape": "tri", "phase": 0.0670557549083246, "snh": 0, "sync": 0}, {"id": "lfo6", "type": "lfo", "name": "LFO 6", "rate": 0.8912509381337456, "shape": "saw", "phase": 0.5590496733908549, "snh": 0, "sync": 0}, {"id": "lfo7", "type": "lfo", "name": "LFO 7", "rate": 3.0902954325135905, "shape": "sqr", "phase": 0.08658904215108909, "snh": 0, "sync": 0}, {"id": "lfo8", "type": "lfo", "name": "LFO 8", "rate": 0.1288249551693134, "shape": "drift", "phase": 0.38726246081341276, "snh": 0, "sync": 0}]}, null]);
 
 PRESETS.push(["DIRTY MIXER \u00b7 CROSSBAR FAULT", {"chan": {"A": {"genFreqX": 0.14, "genFreqY": 0.07, "genHue": 0.12, "genSpread": 1.25, "chromaBleed": 0.55, "chromaDelay": 0.3, "rainbow": 0.25, "saturation": 1.2, "glow": 0.3}, "B": {"genFreqX": 0.3, "genFreqY": 0.22, "genHue": 0.62, "genBands": 7, "contour": 0.3, "saturation": 1.25}}, "master": {"abMix": 0.5, "wipeSoft": 0.05, "edgeAmt": 0.3, "edgeWidth": 0.22, "edgeHold": 0.7, "edgeCreep": 0.5, "wipeBord": 0.3, "wipeBordCol": 0.14, "mixDirt": 0.7, "mixDirtRate": 0.45, "mixDirtDrop": 0.8, "mixDirtCut": 0.55, "mixDirtKnock": 0.7, "mixDirtNoise": 0.5, "scanlines": 0.32, "vignette": 0.4, "bloom": 0.3, "halation": 0.25, "grain": 0.2, "lensCA": 0.3, "lightLeak": 0.2, "osdShow": 0.9, "osdGlow": 0.6}, "routes": [{"ch": "A", "src": "lfo1", "dst": "abMix", "amt": 0.45}, {"ch": "A", "src": "lfo4", "dst": "mixDirt", "amt": 0.3}], "audioCfg": {"bass": {"lo": 30, "hi": 150, "gain": 1}, "mid": {"lo": 300, "hi": 2200, "gain": 1}, "high": {"lo": 4000, "hi": 11000, "gain": 1}, "response": 0.5}, "fbTrailMode": false, "rescanMode": false, "keyChroma": false, "mixMode": 1, "edgeMode": 0, "wipeInv": false, "activeChan": "A", "linkChans": false, "mixMode2": 0, "wipeInv2": false, "mixModeM": 0, "wipeInvM": false, "mixBlend": 2, "mixBlend2": 0, "mixBlendM": 0, "mixKey": 0, "mixKey2": 0, "mixKeyM": 0, "fbWrap": 0, "fbMirror": 0, "fbBlend": 0, "fbNL": 0, "fbInvert": false, "fbTap": 0, "outModel": 0, "osdMode": 0, "osdDate": 2, "fieldSrc": 0, "flowField": 0, "flowEdge": 0, "chainOrder": ["sig", "col", "glitch", "lab", "flow"], "stageEnabled": {"sig": true, "col": true, "glitch": true, "lab": true, "flow": true}, "busSrc": {"b1": ["A", "B"], "b2": ["C", "D"]}, "genMode": {"A": {"shape": 0, "wave": 0, "col": 2}, "B": {"shape": 7, "wave": 3, "col": 4}, "C": {"shape": 0, "wave": 0, "col": 1}, "D": {"shape": 0, "wave": 0, "col": 1}}, "srcMode": {"A": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "B": {"mode": "synth", "pattern": "bars", "feed": "PGM"}, "C": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}, "D": {"mode": "pattern", "pattern": "bars", "feed": "PGM"}}, "srcText": {"A": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "B": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "C": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}, "D": {"body": "BENDR", "font": "mono", "size": 0.2, "track": 0, "x": 0.5, "y": 0.5, "rot": 0, "scrollX": 0, "scrollY": 0, "repeat": 1, "ink": "#ffffff", "bg": "#000000", "outline": 0, "shape": "none", "shpCount": 1, "shpSize": 0.3, "shpX": 0.5, "shpY": 0.5, "shpSpin": 0, "shpFill": "#ff2fa0", "shpStroke": 0, "shpPulse": 0}}, "mods": [{"id": "lfo1", "type": "lfo", "name": "LFO 1", "rate": 0.06, "shape": "tri", "phase": 0.8253412995992825, "snh": 0, "sync": 0}, {"id": "lfo2", "type": "lfo", "name": "LFO 2", "rate": 1.6982436524617444, "shape": "snh", "phase": 0.12453162469815826, "snh": 0, "sync": 0}, {"id": "lfo3", "type": "lfo", "name": "LFO 3", "rate": 0.0707945784384138, "shape": "tri", "phase": 0.9578821927416256, "snh": 0, "sync": 0}, {"id": "lfo4", "type": "lfo", "name": "LFO 4", "rate": 0.13, "shape": "snh", "phase": 0.32377943033823176, "snh": 0, "sync": 0}, {"id": "lfo5", "type": "lfo", "name": "LFO 5", "rate": 0.016982436524617443, "shape": "tri", "phase": 0.6386992951546443, "snh": 0, "sync": 0}, {"id": "lfo6", "type": "lfo", "name": "LFO 6", "rate": 0.8912509381337456, "shape": "saw", "phase": 0.27703329526621123, "snh": 0, "sync": 0}, {"id": "lfo7", "type": "lfo", "name": "LFO 7", "rate": 3.0902954325135905, "shape": "sqr", "phase": 0.18160376469231443, "snh": 0, "sync": 0}, {"id": "lfo8", "type": "lfo", "name": "LFO 8", "rate": 0.1288249551693134, "shape": "drift", "phase": 0.2055807543055579, "snh": 0, "sync": 0}]}, null]);
@@ -8915,6 +9171,7 @@ function captureState(){
     scanRevH, scanRevV, syncLatch, fbNoServo, ilMode, ilOrder, moshRecycle,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}, secBypass: {...secBypass},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
+    mixTopo, laySrc: laySrc.slice(), layBlend: layBlend.slice(), layKeyMode: layKeyMode.slice(),
     genMode: JSON.parse(JSON.stringify(genMode)),
     srcMode: (()=>{ const o={}; for(const ch of CHANNELS){
       const m = SRC[ch].mode;
@@ -9001,6 +9258,12 @@ function restoreState(st){
   }
   if(st.srcText){ for(const ch of CHANNELS) if(st.srcText[ch]) Object.assign(SRC[ch].text, st.srcText[ch]); }
   if(st.busSrc){ if(st.busSrc.b1) busSrc.b1 = st.busSrc.b1.slice(); if(st.busSrc.b2) busSrc.b2 = st.busSrc.b2.slice(); refreshBusUI(); }
+  /* a patch saved before the stack existed is a tree, and has to stay one */
+  mixTopo = (st.mixTopo === undefined) ? 0 : st.mixTopo;
+  if(st.laySrc)     laySrc     = st.laySrc.slice();
+  if(st.layBlend)   layBlend   = st.layBlend.slice();
+  if(st.layKeyMode) layKeyMode = st.layKeyMode.slice();
+  if(typeof refreshLayerUI === "function") refreshLayerUI();
   if(st.genMode) for(const ch of CHANNELS) if(st.genMode[ch]) genMode[ch] = {...st.genMode[ch]};
   if(st.srcMode) for(const ch of CHANNELS){
     const m = st.srcMode[ch];
@@ -9125,6 +9388,7 @@ function resetGlobals(){
   ilMode = 0; ilOrder = false; moshRecycle = false;
   probeMode = 0;
   busSrc.b1 = ["A","B"]; busSrc.b2 = ["C","D"];
+  mixTopo = 0; laySrc = ["A","B","C","D"]; layBlend = [0,0,0,0]; layKeyMode = [0,0,0,0];
   for(const ch of CHANNELS) genMode[ch] = {shape:0, wave:0, col:1};
   copyDest = BUSPAIR[activeChan];
   { const lb=document.getElementById("btnLinkChans"); if(lb) lb.classList.remove("on"); }
@@ -9166,6 +9430,7 @@ document.getElementById("btnSave").onclick = ()=>{
     fbWrap, fbMirror, fbBlend, fbNL, fbInvert, fbFlip, fbTap, outModel, osdMode, osdDate, fieldSrc, flowField, flowEdge,
     chainOrder: chainOrder.slice(), stageEnabled: {...stageEnabled}, secBypass: {...secBypass},
     busSrc: {b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
+    mixTopo, laySrc: laySrc.slice(), layBlend: layBlend.slice(), layKeyMode: layKeyMode.slice(),
     genMode: JSON.parse(JSON.stringify(genMode)),
     snapSlots, snapGlide, perfTake: perfRec.data, perfLen: perfRec.len,
     srcMode: (()=>{ const o={}; for(const ch of CHANNELS){
@@ -10542,7 +10807,8 @@ function snapCapture(){
        mixBlend, mixBlend2, mixBlendM, mixKey, mixKey2, mixKeyM,
        osdMode, osdDate, fbWrap, fbMirror, fbBlend,
        fbNL, fbInvert, fbTrailMode, rescanMode, keyChroma, edgeMode, fieldSrc, flowField, flowEdge,
-       outModel, b1:busSrc.b1.slice(), b2:busSrc.b2.slice()},
+       outModel, b1:busSrc.b1.slice(), b2:busSrc.b2.slice(),
+       mixTopo, lsrc:laySrc.slice(), lbl:layBlend.slice(), lky:layKeyMode.slice()},
     chain: chainOrder.slice(), stages: {...stageEnabled}};
 }
 function snapStore(i){
@@ -10558,6 +10824,11 @@ function snapRecall(i){
   const g = st.g || {};
   if(g.b1) busSrc.b1 = g.b1.slice();
   if(g.b2) busSrc.b2 = g.b2.slice();
+  if(g.lsrc) laySrc = g.lsrc.slice();
+  if(g.lbl)  layBlend = g.lbl.slice();
+  if(g.lky)  layKeyMode = g.lky.slice();
+  if(g.mixTopo !== undefined) mixTopo = g.mixTopo;
+  if(typeof refreshLayerUI === "function") refreshLayerUI();
   for(const k of ["mixMode","mixMode2","mixModeM","mixBlend","mixBlend2","mixBlendM",
                   "mixKey","mixKey2","mixKeyM","osdMode","osdDate","fbWrap","fbMirror","fbBlend","fbNL",
                   "edgeMode","fieldSrc","flowField","flowEdge","outModel"]){
@@ -11751,13 +12022,25 @@ function renderFrame(now, dt){
 
   /* a channel only costs anything when its fader can actually let it through */
   const b1 = busSrc.b1, b2 = busSrc.b2;
-  const masterLive = mCur.busMix > 0.0005 || multiView;
+  const layers = mixTopo === 1;
+  const masterLive = layers ? true : (mCur.busMix > 0.0005 || multiView);
   const live = {A:false, B:false, C:false, D:false};
-  live[b1[0]] = true;
-  if(srcReady(b1[1]) && (mCur.abMix > 0.0005 || multiView)) live[b1[1]] = true;
-  if(masterLive){
-    if(srcReady(b2[0])) live[b2[0]] = true;
-    if(srcReady(b2[1]) && (mCur.cdMix > 0.0005 || multiView)) live[b2[1]] = true;
+  if(layers){
+    /* a layer costs nothing at zero level, and the bottom one is always drawn
+       so that the stack has something to stand on even with everything down */
+    for(let i=0;i<4;i++){
+      const ch = laySrc[i];
+      if(!ch || CHANNELS.indexOf(ch) < 0) continue;
+      if(i === 0 || (mCur["layOp"+(i+1)] > 0.0005 && srcReady(ch))) live[ch] = true;
+    }
+    if(multiView) for(const ch of CHANNELS) if(srcReady(ch)) live[ch] = true;
+  } else {
+    live[b1[0]] = true;
+    if(srcReady(b1[1]) && (mCur.abMix > 0.0005 || multiView)) live[b1[1]] = true;
+    if(masterLive){
+      if(srcReady(b2[0])) live[b2[0]] = true;
+      if(srcReady(b2[1]) && (mCur.cdMix > 0.0005 || multiView)) live[b2[1]] = true;
+    }
   }
   /* a re-entry source only works if the channel it is reading is still rendering */
   for(let pass=0; pass<3; pass++){
@@ -11821,7 +12104,43 @@ function renderFrame(now, dt){
   const mMode1 = byp1 ? 0 : mixMode,  mBl1 = byp1 ? 0 : mixBlend,  mKy1 = byp1 ? 0 : mixKey,  mMl1 = byp1 ? 0 : meltMode;
   const mMode2 = byp2 ? 0 : mixMode2, mBl2 = byp2 ? 0 : mixBlend2, mKy2 = byp2 ? 0 : mixKey2, mMl2 = byp2 ? 0 : meltMode2;
   const mModeM = bypM ? 0 : mixModeM, mBlM = bypM ? 0 : mixBlendM, mKyM = bypM ? 0 : mixKeyM, mMlM = bypM ? 0 : meltModeM;
-  if(masterLive){
+  if(layers){
+    /* ---- the layer stack ----
+       Four landings, bottom to top, ping-ponging through the two bus buffers
+       so the stack costs no memory the tree was not already spending. The
+       bottom layer lands on black rather than on the channel itself, so its
+       level and its blend mean the same thing there as they do further up. */
+    ensureShared("busOut1"); ensureShared("busOut2");
+    const bypL = !!secBypass["layers"];
+    let src = busOut2, dst = busOut1;
+    clearRT(src);
+    for(let i=0;i<4;i++){
+      const ch = laySrc[i];
+      const tex = (ch && live[ch]) ? chanOutTex(ch) : blackTex;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+      gl.viewport(0,0,procW,procH);
+      gl.useProgram(progLAYER.prog);
+      gl.uniform2f(U(progLAYER,"u_res"), procW, procH);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src.tex);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.uniform1i(U(progLAYER,"u_texA"), 0);
+      gl.uniform1i(U(progLAYER,"u_texB"), 1);
+      const n = i+1;
+      gl.uniform1f(U(progLAYER,"u_layOp"), (ch && live[ch]) ? mCur["layOp"+n] : 0);
+      gl.uniform1f(U(progLAYER,"u_layBlend"), bypL ? 0 : (layBlend[i]||0));
+      gl.uniform1f(U(progLAYER,"u_layKeyMode"), bypL ? 0 : (layKeyMode[i]||0));
+      gl.uniform1f(U(progLAYER,"u_layKey"), mCur["layKey"+n]);
+      gl.uniform1f(U(progLAYER,"u_layKeyT"), mCur["layKeyT"+n]);
+      gl.uniform1f(U(progLAYER,"u_layKeyS"), mCur["layKeyS"+n]);
+      gl.uniform1f(U(progLAYER,"u_layKeyHue"), mCur["layKeyH"+n]);
+      draw();
+      const t = src; src = dst; dst = t;
+    }
+    /* the master transition still gets its pass, with one picture on it, so
+       the master melt and the master bus keep working in this topology too */
+    if(edgeLive(MIXBUS.bM)){ ensureShared("mixHist"); const t = mixOut; mixOut = mixHist; mixHist = t; pM = mixHist.tex; }
+    mixPass(mixOut, src.tex, src.tex, false, MIXBUS.bM, 0, false, 0, 0, pM, mMlM);
+  } else if(masterLive){
     ensureShared("busOut1"); ensureShared("busOut2");
     if(edgeLive(MIXBUS.b1)){ ensureShared("busHist1"); const t = busOut1; busOut1 = busHist1; busHist1 = t; p1 = busHist1.tex; }
     if(edgeLive(MIXBUS.b2)){ ensureShared("busHist2"); const t = busOut2; busOut2 = busHist2; busHist2 = t; p2t = busHist2.tex; }

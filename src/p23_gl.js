@@ -51,6 +51,7 @@ function U(pr, name){
 const progFB = makeProg(FS_FB), progSIG = makeProg(FS_SIG), progCOL = makeProg(FS_COL), progCRT = makeProg(FS_CRT);
 const progGLITCH = makeProg(FS_GLITCH), progFLOW = makeProg(FS_FLOW), progCOPY = makeProg(FS_COPY);
 const progMIX = makeProg(FS_MIX);
+const progLAYER = makeProg(FS_LAYER);
 const progTILE = makeProg(FS_TILE);
 const progMULTI = makeProg(FS_MULTI);
 const progGEN = makeProg(FS_GEN);

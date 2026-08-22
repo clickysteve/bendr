@@ -1,7 +1,7 @@
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v37.2";
+const BENDR_VERSION = "v37.3";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -11,6 +11,7 @@ const SECTIONS = [
   {id:"mixer",    name:"BUS 1 \u00b7 TRANSITION",  cls:"mag",  zone:"mix"},
   {id:"mixer2",   name:"BUS 2 \u00b7 TRANSITION",  cls:"mag",  zone:"mix"},
   {id:"mixerM",   name:"MASTER \u00b7 TRANSITION", cls:"mag",  zone:"mix"},
+  {id:"layers",   name:"LAYER STACK",          cls:"cyan", zone:"mix"},
 
   {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan", zone:"chain"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag",  zone:"chain"},
@@ -68,6 +69,26 @@ const PDEF = [
   ["meltZoom","MELT ZOOM","mixer",-1,1,0.3],
   ["meltHue","MELT HUE","mixer",-1,1,0],
   ["meltSoft","MELT SOFTEN","mixer",0,1,0.35],
+  ["layOp1","L1 LEVEL","layers",0,1,1],
+  ["layKey1","L1 KEY","layers",0,1,0],
+  ["layKeyT1","L1 KEY THRESH","layers",0,1,0.5],
+  ["layKeyS1","L1 KEY SOFT","layers",0.01,1,0.2],
+  ["layKeyH1","L1 KEY HUE","layers",0,1,0.33],
+  ["layOp2","L2 LEVEL","layers",0,1,0],
+  ["layKey2","L2 KEY","layers",0,1,0],
+  ["layKeyT2","L2 KEY THRESH","layers",0,1,0.5],
+  ["layKeyS2","L2 KEY SOFT","layers",0.01,1,0.2],
+  ["layKeyH2","L2 KEY HUE","layers",0,1,0.33],
+  ["layOp3","L3 LEVEL","layers",0,1,0],
+  ["layKey3","L3 KEY","layers",0,1,0],
+  ["layKeyT3","L3 KEY THRESH","layers",0,1,0.5],
+  ["layKeyS3","L3 KEY SOFT","layers",0.01,1,0.2],
+  ["layKeyH3","L3 KEY HUE","layers",0,1,0.33],
+  ["layOp4","L4 LEVEL","layers",0,1,0],
+  ["layKey4","L4 KEY","layers",0,1,0],
+  ["layKeyT4","L4 KEY THRESH","layers",0,1,0.5],
+  ["layKeyS4","L4 KEY SOFT","layers",0.01,1,0.2],
+  ["layKeyH4","L4 KEY HUE","layers",0,1,0.33],
   ["wipeBord","BORDER WIPE","mixer",0,1,0],
   ["wipeBordCol","BORDER COLOUR","mixer",0,1,0],
   ["wipeRep","WIPE MULTI","mixer",1,4,1],
@@ -210,6 +231,15 @@ const PDEF = [
   ["lumaSteps","FLATTEN","contour",0,1,0],
   ["stepCount","LEVELS","contour",2,16,5],
   ["dither","DITHER","contour",0,1,0],
+  ["mline","MOD LINES","contour",0,1,0],
+  ["mlineScale","LINE PITCH","contour",0.25,6,1],
+  ["mlineGain","MOD DRIVE","contour",0,3,1.15],
+  ["mlineBias","MOD BIAS","contour",-0.5,0.5,0],
+  ["mlineFb","ERROR FEED","contour",0,1,0.92],
+  ["mlineWin","MOD MEMORY","contour",4,64,32],
+  ["mlineTint","KEEP COLOUR","contour",0,1,0],
+  ["mlineCol","RGB SEPARATE","contour",0,1,0],
+  ["mlineSerp","SERPENTINE","contour",0,1,1],
 
   ["sparseJit","SPARSE JITTER","lab",0,1,0],
   ["jitThresh","JITTER GATE","lab",0,1,0.7],

@@ -470,7 +470,7 @@ function setDock(t){
     t = dockTab === "glsl" ? "matrix" : dockTab;
   }
   dockTab = t;
-  const map = {mix:"mixdock", matrix:"matrix", mod:"modgrid", text:"textdock", glsl:"glsldock", out:"outdock", scope:"scopedock", audio:"audiodock", perform:"performdock"};
+  const map = {mix:"mixdock", layers:"layerdock", matrix:"matrix", mod:"modgrid", text:"textdock", glsl:"glsldock", out:"outdock", scope:"scopedock", audio:"audiodock", perform:"performdock"};
   for(const k in map){
     const el = document.getElementById(map[k]);
     if(el) el.classList.toggle("on", k===t);
@@ -481,6 +481,7 @@ function setDock(t){
                             : t==="text" ? "typing here never triggers shortcuts"
                             : t==="perform" ? "shift and a number recalls a snapshot \u00b7 Q W E R T Y hold the pads"
                             : t==="mix" ? "the faders themselves are on the strip under the picture"
+                            : t==="layers" ? "the crosspoint decides which channel feeds which layer \u00b7 bottom layer first"
                             : t==="audio" ? "band ranges decide what each modulator is listening for"
                             : t==="out" ? "the display and the glass in front of it, shared by every channel"
                             : t==="scope" ? "what the signal actually looks like, and what is inside the machine"

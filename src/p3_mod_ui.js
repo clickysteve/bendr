@@ -1546,7 +1546,7 @@ function buildPanel(){
     sectionExtrasAfter(sec.id, body);
     /* the transition sections live on the dock's MIX tab and preset morph on
        PERFORM; only the channel path and the master out are in the sidebar */
-    const DOCKZONE = {mix:"mixdock", perform:"performdock", outdock:"outdock"};
+    const DOCKZONE = {mix:"mixdock", layerdock:"layerdock", perform:"performdock", outdock:"outdock"};
     const host = DOCKZONE[sec.zone] ? document.getElementById(DOCKZONE[sec.zone])
                                     : (zoneEls[sec.zone] || zoneEls.chain);
     host.appendChild(d);
@@ -2351,6 +2351,8 @@ function refreshLayerUI(){
   for(let i=0;i<4;i++){
     const bl=document.getElementById("selLayBlend"+i); if(bl) bl.value = layBlend[i]||0;
     const ky=document.getElementById("selLayKey"+i);   if(ky) ky.value = layKeyMode[i]||0;
+    const fr=document.getElementById("layFrom"+i);
+    if(fr) fr.textContent = (i===0?"BASE \u00b7 ":"") + "CH " + (laySrc[i]||"\u2014");
   }
   const t=document.getElementById("selTopo"); if(t) t.value = mixTopo;
   document.body.classList.toggle("topo-layers", mixTopo===1);
@@ -2476,6 +2478,45 @@ function buildPerformDock(){
 
 /* anything that reads better underneath the section's own controls */
 function sectionExtrasAfter(id, d){
+  if(id==="layers"){
+    /* Four columns, one per layer, left to right in the order the stack is
+       built. The parameter rows have already been made by the generic panel
+       builder, so they are moved into their column rather than rebuilt: they
+       keep their modulation menu, their readout, their reset and their place
+       in the search index, all of which a hand-rolled copy would lose. */
+    const cols = document.createElement("div"); cols.className = "laycols";
+    for(let i=0;i<4;i++){
+      const n = i+1;
+      const col = document.createElement("div"); col.className = "laycol"; col.dataset.lay = i;
+      const nm = document.createElement("div"); nm.className = "layname";
+      const t1 = document.createElement("span"); t1.textContent = "LAYER "+n;
+      const t2 = document.createElement("small"); t2.id = "layFrom"+i;
+      nm.appendChild(t1); nm.appendChild(t2);
+      col.appendChild(nm);
+
+      const bl = document.createElement("select"); bl.id="selLayBlend"+i;
+      attachTip(bl, "LAYER "+n+" BLEND",
+        "How this layer lands on everything below it. The same twenty-four rules the mixer uses, so a look you found on the strip transfers straight up here. DISSOLVE with the level down is a plain fade; ADDITIVE and SCREEN pile light on; MULTIPLY and the burns take it away; DIFFERENCE and the two bit operations are where it stops behaving like film.");
+      MIXBLENDS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; bl.appendChild(o); });
+      bl.onchange = ()=>{ layBlend[i] = parseInt(bl.value); };
+      col.appendChild(bl);
+
+      const ky = document.createElement("select"); ky.id="selLayKey"+i;
+      attachTip(ky, "LAYER "+n+" KEY",
+        "Cuts part of this layer away before it lands, using the layer's own picture as the matte. WHITE drops its bright parts, BLACK drops its dark parts, CHROMA drops one colour. This is what a stack is for: the thing on top can sit in front of what is under it rather than dissolving into it.",
+        "THRESH, SOFT and HUE below shape whichever key is chosen.");
+      LAYKEYS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; ky.appendChild(o); });
+      ky.onchange = ()=>{ layKeyMode[i] = parseInt(ky.value); };
+      col.appendChild(ky);
+
+      for(const base of ["layOp","layKey","layKeyT","layKeyS","layKeyH"]){
+        const r = uiRefs[base+n];
+        if(r && r.row) col.appendChild(r.row);
+      }
+      cols.appendChild(col);
+    }
+    d.appendChild(cols);
+  }
   if(id==="morph"){
     const tr2 = document.createElement("div"); tr2.className="trow";
     const sa = document.createElement("button"); sa.textContent="STORE A"; sa.id="morphBtnA";
@@ -2503,32 +2544,34 @@ function sectionExtras(id, d){
        clearest: you can see the whole wiring at once instead of reading four
        dropdowns and holding the answer in your head. One channel per layer,
        so the cells behave like a row of interlocked buttons. */
+    const head = document.createElement("div"); head.className = "layhead";
     const note = document.createElement("div");
-    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0;";
-    note.textContent = "Four channels, four layers, bottom to top. BUSES is the mixer tree: two pictures a bus, two buses to master. LAYERS stacks all four instead, each landing on everything below it with its own blend, level and key.";
-    d.appendChild(note);
+    note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0 4px; line-height:1.5;";
+    note.textContent = "BUSES is the mixer tree. LAYERS stacks all four channels instead, bottom to top. The matrix decides which channel feeds which layer.";
+    head.appendChild(note);
 
     const tr = document.createElement("div"); tr.className="trow";
     const tsel = document.createElement("select"); tsel.id = "selTopo";
     attachTip(tsel, "MIX TOPOLOGY",
       "How the four channels are wired together. BUSES is the bench mixer: channels into bus 1 and bus 2, the two buses into the master, everything arriving through a fader. LAYERS is a stack: four layers bottom to top, each landing on everything under it with its own blend mode, level and key, and the matrix below deciding which channel feeds which layer. The tree is better for cutting and wiping between sources; the stack is better for building one picture out of all four at once.",
-      "The mixer strip's transitions belong to BUSES. In LAYERS the master melt still runs, so the stack can still feed back into itself.");
+      "The mixer strip's transitions belong to BUSES and keep their settings while the stack runs. The master melt still runs on the finished stack, so it can feed back into itself.");
     TOPOLOGIES.forEach((t,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent="TOPOLOGY: "+t; tsel.appendChild(o); });
     tsel.value = mixTopo;
     tsel.onchange = ()=>{ mixTopo = parseInt(tsel.value); document.body.classList.toggle("topo-layers", mixTopo===1); toast(mixTopo===1 ? "LAYER STACK \u2014 four layers, bottom to top" : "BUS TREE \u2014 two buses into master"); };
     tr.appendChild(tsel);
-    d.appendChild(tr);
+    head.appendChild(tr);
 
     const mx = document.createElement("div"); mx.className = "laymx";
-    const head = document.createElement("div"); head.className = "laymxhead";
-    head.appendChild(document.createElement("span"));
-    for(const ch of CHANNELS){ const c=document.createElement("span"); c.textContent="CH "+ch; head.appendChild(c); }
-    mx.appendChild(head);
+    const hd = document.createElement("div"); hd.className = "laymxhead";
+    hd.appendChild(document.createElement("span"));
+    for(const ch of CHANNELS){ const c=document.createElement("span"); c.textContent="CH "+ch; hd.appendChild(c); }
+    mx.appendChild(hd);
     /* drawn top layer first, because that is the order they are stacked on
        screen and a routing grid that reads upside down is worse than none */
     for(let i=3;i>=0;i--){
       const row = document.createElement("div"); row.className="laymxrow";
-      const lab = document.createElement("span"); lab.textContent = (i===0?"L1 BASE":"L"+(i+1));
+      const lab = document.createElement("span");
+      lab.textContent = (i===3 ? "L4 TOP" : i===0 ? "L1 BASE" : "L"+(i+1));
       row.appendChild(lab);
       for(const ch of CHANNELS){
         const cell = document.createElement("button");
@@ -2542,28 +2585,8 @@ function sectionExtras(id, d){
       }
       mx.appendChild(row);
     }
-    d.appendChild(mx);
-
-    /* per layer: how it lands and what is cut out of it */
-    for(let i=3;i>=0;i--){
-      const r = document.createElement("div"); r.className="mixrow";
-      const tag = document.createElement("span");
-      tag.style.cssText="color:var(--dim); font-size:8.5px; min-width:18px; align-self:center;";
-      tag.textContent = "L"+(i+1);
-      const bl = document.createElement("select"); bl.id="selLayBlend"+i;
-      attachTip(bl, "LAYER "+(i+1)+" BLEND",
-        "How this layer lands on everything below it. The same twenty-four rules the mixer uses, so a look you found on the strip transfers straight up here. DISSOLVE with the level down is a plain fade; ADDITIVE and SCREEN pile light on; MULTIPLY and the burns take it away; DIFFERENCE and the two bit operations are where it stops behaving like film.");
-      MIXBLENDS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; bl.appendChild(o); });
-      bl.onchange = ()=>{ layBlend[i] = parseInt(bl.value); };
-      const ky = document.createElement("select"); ky.id="selLayKey"+i;
-      attachTip(ky, "LAYER "+(i+1)+" KEY",
-        "Cuts part of this layer away before it lands, using the layer's own picture as the matte. WHITE drops its bright parts, BLACK drops its dark parts, CHROMA drops one colour. This is what a stack is for: the thing on top can sit in front of what is under it rather than dissolving into it.",
-        "THRESH, SOFT and HUE for this layer are the sliders below.");
-      LAYKEYS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; ky.appendChild(o); });
-      ky.onchange = ()=>{ layKeyMode[i] = parseInt(ky.value); };
-      r.appendChild(tag); r.appendChild(bl); r.appendChild(ky);
-      d.appendChild(r);
-    }
+    head.appendChild(mx);
+    d.appendChild(head);
   }
   if(id==="mixer" || id==="mixer2" || id==="mixerM"){
     const which = id==="mixer" ? 1 : (id==="mixer2" ? 2 : 3);
@@ -3190,7 +3213,7 @@ function focusParam(pid){
   if(STRIP_PARAMS.has(pid)) document.body.classList.remove("nomix");
   else {
     const sd = SECTIONS.find(x=>x.id === p.sec);
-    const tab = sd ? {mix:"mix", outdock:"out", perform:"perform"}[sd.zone] : null;
+    const tab = sd ? {mix:"mix", layerdock:"layers", outdock:"out", perform:"perform"}[sd.zone] : null;
     if(tab) setDock(tab);
   }
   /* a filter left running can be hiding the very row being jumped to */

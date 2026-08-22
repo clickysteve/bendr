@@ -1,7 +1,7 @@
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v37.3";
+const BENDR_VERSION = "v37.4";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -11,7 +11,7 @@ const SECTIONS = [
   {id:"mixer",    name:"BUS 1 \u00b7 TRANSITION",  cls:"mag",  zone:"mix"},
   {id:"mixer2",   name:"BUS 2 \u00b7 TRANSITION",  cls:"mag",  zone:"mix"},
   {id:"mixerM",   name:"MASTER \u00b7 TRANSITION", cls:"mag",  zone:"mix"},
-  {id:"layers",   name:"LAYER STACK",          cls:"cyan", zone:"mix"},
+  {id:"layers",   name:"LAYER STACK",          cls:"cyan", zone:"layerdock"},
 
   {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan", zone:"chain"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag",  zone:"chain"},

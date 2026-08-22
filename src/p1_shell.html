@@ -696,37 +696,19 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 #layerdock .sec > h3 .caret{display:none;}
 #layerdock .secbody{display:grid; grid-template-columns:minmax(210px, 250px) 1fr; gap:14px; align-items:start;}
 #layerdock .layhead{grid-column:1; }
-#layerdock .laycols{grid-column:2; display:flex; flex-direction:column; gap:5px;}
-/* A layer is a strip across, not a column down. Four columns of five sliders
-   left each one about ninety pixels of travel, which is not a fader, it is a
-   nudge. Laid out this way the level gets whatever is left of the width. */
-#layerdock .layrow{
-  display:flex; gap:9px; align-items:flex-start; flex-wrap:wrap;
-  border:1px solid var(--line); border-radius:3px; padding:5px 9px 6px;
-  background:rgba(255,255,255,.012);
+#layerdock .laycols{grid-column:2; display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; align-items:start;}
+#layerdock .laycol{border:1px solid var(--line); border-radius:3px; padding:6px 8px 8px; background:rgba(255,255,255,.012);}
+#layerdock .laycol > .layname{
+  font-size:9px; letter-spacing:1.5px; color:var(--cyan); padding:0 0 5px;
+  display:flex; justify-content:space-between; align-items:baseline;
 }
-#layerdock .layid{
-  flex:0 0 116px; display:flex; flex-direction:column; justify-content:center;
-  min-height:24px; line-height:1.25;
-}
-#layerdock .layid b{font-size:9px; letter-spacing:1.5px; color:var(--cyan); font-weight:700;}
-#layerdock .layid small{font-size:8px; letter-spacing:1px; color:var(--dim);}
-#layerdock .layrow > select{flex:0 0 auto; min-width:0;}
-#layerdock .layrow > .layblend{flex:0 0 148px;}
-#layerdock .layrow > .laykey{flex:0 0 118px;}
-#layerdock .layparams{flex:1 1 300px; display:flex; flex-wrap:wrap; gap:0 18px; min-width:220px;}
-#layerdock .layparams .prow{flex:1 1 330px; min-width:220px;}
-#layerdock .layparams .prow label{width:84px; flex:0 0 84px;}
-/* A key that is switched out has nothing to set, so its controls are not drawn
-   at all. Jumping to one from the search reveals it, dimmed, because a search
-   that lands on nothing is worse than a control that is greyed. */
-#layerdock .layrow.key-off .keyprm{display:none;}
-#layerdock .layrow.key-luma .hueprm{display:none;}
-#layerdock .layrow.revealed .keyprm{display:flex; opacity:.5;}
+#layerdock .laycol > .layname small{color:var(--dim); letter-spacing:1px; font-size:8px;}
+#layerdock .laycol select{width:100%; margin-bottom:3px;}
+#layerdock .laycol .prow{grid-template-columns:78px 1fr 44px;}
 @media (max-width: 1100px){
   #layerdock .secbody{grid-template-columns:1fr;}
   #layerdock .layhead, #layerdock .laycols{grid-column:1;}
-  #layerdock .layid{flex:0 0 100%;}
+  #layerdock .laycols{grid-template-columns:repeat(2, 1fr);}
 }
 #dockBody > #audiodock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
 #dockBody > #outdock.on{display:flex; gap:14px; padding:10px 12px; align-items:flex-start; flex-wrap:wrap; overflow-y:auto;}
@@ -762,6 +744,9 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 }
 .laycell:hover{border-color:var(--cyan); color:#55555f;}
 .laycell.on{background:var(--cyan); border-color:var(--cyan); color:#0b0b0e;}
+/* the layer name stays put while the column scrolls, or a dock dragged short
+   leaves you reading five sliders with nothing saying whose they are */
+#layerdock .laycol > .layname{position:sticky; top:-1px; background:var(--panel); z-index:2; margin:-6px -8px 0; padding:6px 8px 5px;}
 /* The transitions belong to the tree. In the stack they are still there and
    still hold their settings, but they are not what is deciding the picture,
    so the strip says so rather than leaving four dead dropdowns to be puzzled
@@ -1464,7 +1449,7 @@ audio,video{display:none;}
   <p>The faders live under the picture rather than in the sidebar because a crossfader wants to be horizontal and should never be hidden behind a tab \u2014 it is the one control you ride while looking at something else. The detail behind each transition (softness, wipe geometry, key threshold) lives on the MIX tab of the dock, where it is setup rather than performance. INV only greys in when the transition is a wipe, since a fade, a key and a blend have no direction to reverse.</p>
   <h3>THE LAYER STACK</h3>
   <p>The three buses are a tree, and a tree is the wrong shape for building one picture out of four, because every source past the second has to arrive through a fader that is already carrying something else. So there is a second topology. The <b>LAYERS</b> tab on the dock has a <b>TOPOLOGY</b> selector and a four-by-four crosspoint matrix: four channels down the side, four layers across, and a cell where they meet. Switch it to <b>LAYERS</b> and the picture is built bottom to top instead, each layer landing on everything below it with its own blend mode, its own level and its own key. The same twenty-four blends the mixer uses are available on every layer, so a look you found on the strip transfers straight up. The same channel can feed more than one layer, which is how you put a picture over a treated copy of itself.</p>
-  <p>Each layer's key works on that layer's own picture rather than on the transition, which is the point of a stack: the thing on top can sit in front of what is under it instead of dissolving into it. <b>KEY WHITE</b> drops its bright parts, <b>KEY BLACK</b> its dark parts, <b>KEY CHROMA</b> one colour, and the threshold, softness and hue appear in that layer's row as soon as a key is chosen, and stay out of the way when it is off. A layer at zero level costs nothing at all &mdash; the channel behind it stops rendering. The three transitions stay where they are and keep their settings while the stack is running; the strip dims to say so. The master melt still runs on the finished stack, so it can still feed back into itself.</p>
+  <p>Each layer's key works on that layer's own picture rather than on the transition, which is the point of a stack: the thing on top can sit in front of what is under it instead of dissolving into it. <b>KEY WHITE</b> drops its bright parts, <b>KEY BLACK</b> its dark parts, <b>KEY CHROMA</b> one colour, and the threshold, softness and hue for each layer are in that layer's column. A layer at zero level costs nothing at all &mdash; the channel behind it stops rendering. The three transitions stay where they are and keep their settings while the stack is running; the strip dims to say so. The master melt still runs on the finished stack, so it can still feed back into itself.</p>
   <h3>MULTIVIEW</h3>
   <p><b>MULTI</b> (or <kbd>V</kbd>) shows all four channel outputs, bus 1 and the programme at once, like a vision mixer's preview monitors. The channel you are editing carries the hot border; channels that are not currently rendering are dimmed. It forces everything to render, so it costs more than the normal view \u2014 it is for setting up, not for performing.</p>
   <h3>PATTERN SYNTH</h3>
@@ -1512,7 +1497,7 @@ audio,video{display:none;}
   <p>Each route has its own <b>invert</b> and <b>response curve</b>, so one modulator can drive several parameters quite differently \u2014 one hard, one gently, one inverted, one in four steps. That is often worth more than adding another modulator.</p>
   <p><b>Right-click any parameter</b> to patch something onto it, or choose <b>ANIMATE</b> there to give it a new LFO of its own in one click. Each route in the matrix has a \u25ce that jumps to its modulator, and each modulator lists what it drives as links that jump back.</p>
   <h3>PERFORMANCE</h3>
-  <p>The dock under the picture has tabs across it: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b>, <b>SHADER</b>, <b>MIX</b>, <b>LAYERS</b>, <b>SCOPE</b>, <b>OUT</b>, <b>AUDIO</b> and <b>PERFORM</b>. MIX holds the detail behind each transition &mdash; wipe softness and geometry, the key levels, the melt &mdash; while the faders themselves stay on the strip. LAYERS is the crosspoint matrix and the four layer strips, one to a row so the levels get the width. AUDIO is where the audio-reactive modulators listen: the input, an audio file with its own transport, the three band ranges and the response. PERFORM holds the snapshot bank, the performance recorder and preset morph. The six bend pads are not on a tab at all: they have their own strip beside the faders, because you should never have to go looking for them. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
+  <p>The dock under the picture has tabs across it: <b>MATRIX</b>, <b>MOD</b>, <b>TEXT</b>, <b>SHADER</b>, <b>MIX</b>, <b>LAYERS</b>, <b>SCOPE</b>, <b>OUT</b>, <b>AUDIO</b> and <b>PERFORM</b>. MIX holds the detail behind each transition &mdash; wipe softness and geometry, the key levels, the melt &mdash; while the faders themselves stay on the strip. LAYERS is the crosspoint matrix and the four layer strips, and it has the whole width because a routing matrix and four sets of controls need it. AUDIO is where the audio-reactive modulators listen: the input, an audio file with its own transport, the three band ranges and the response. PERFORM holds the snapshot bank, the performance recorder and preset morph. The six bend pads are not on a tab at all: they have their own strip beside the faders, because you should never have to go looking for them. Each tab gets the full width, and the dock resizes by dragging the bar above it.</p>
   <p>The six <b>BEND</b> pads are momentary — mash and hold them (<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> <kbd>Y</kbd>). <b>MIDI</b>: click MIDI, click a parameter name, move a hardware knob to map it.</p>
   <h3>SOURCES</h3>
   <p>Each channel takes a video file or a still image (clips stream from disk, so file size does not matter), a camera, a screen, a generated pattern, the pattern synth, a text page, or re-entry from elsewhere in the rig. Stills load through <b>FILE</b> like clips do and read STILL on the timecode; the transport greys out and everything else behaves normally. <b>CAM</b> opens whatever is chosen in the device list above it: a built-in webcam, a USB one, an HDMI capture stick, or a virtual camera from streaming software. Device names only appear once camera access has been granted, so the list reads DEVICE 1, DEVICE 2 until the first time you press CAM. <b>SCREEN</b> captures a screen, a window or a browser tab, which is the general way to bring in anything that is not a camera.</p>

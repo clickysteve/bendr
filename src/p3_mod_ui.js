@@ -2353,15 +2353,6 @@ function refreshLayerUI(){
     const ky=document.getElementById("selLayKey"+i);   if(ky) ky.value = layKeyMode[i]||0;
     const fr=document.getElementById("layFrom"+i);
     if(fr) fr.textContent = (i===0?"BASE \u00b7 ":"") + "CH " + (laySrc[i]||"\u2014");
-    /* a key that is off has nothing to shape, so its three controls are not
-       drawn: with all four off a layer is one line and its level gets the
-       whole width, which is the state you are in nearly all of the time */
-    const rw=document.getElementById("layRow"+i);
-    if(rw){
-      const km = layKeyMode[i]||0;
-      rw.classList.toggle("key-off", km === 0);
-      rw.classList.toggle("key-luma", km === 1 || km === 2);
-    }
   }
   const t=document.getElementById("selTopo"); if(t) t.value = mixTopo;
   document.body.classList.toggle("topo-layers", mixTopo===1);
@@ -2488,54 +2479,43 @@ function buildPerformDock(){
 /* anything that reads better underneath the section's own controls */
 function sectionExtrasAfter(id, d){
   if(id==="layers"){
-    /* One row per layer, full width, rather than four narrow columns. Twenty
-       sliders side by side left each one about ninety pixels of travel, which
-       is not a fader, it is a nudge. So the layers run down the page and the
-       controls run across, and the key controls are only drawn when there is
-       a key to shape: with the keys off a layer is one line and its level has
-       the whole width, which is the case you are in almost all of the time.
-       The parameter rows are moved rather than rebuilt, so they keep their
-       modulation menu, their typed readout, their reset and their place in
-       the search index. */
-    const rows = document.createElement("div"); rows.className = "laycols";
+    /* Four columns, one per layer, left to right in the order the stack is
+       built. The parameter rows have already been made by the generic panel
+       builder, so they are moved into their column rather than rebuilt: they
+       keep their modulation menu, their readout, their reset and their place
+       in the search index, all of which a hand-rolled copy would lose. */
+    const cols = document.createElement("div"); cols.className = "laycols";
     for(let i=0;i<4;i++){
       const n = i+1;
-      const row = document.createElement("div"); row.className = "layrow"; row.dataset.lay = i;
-      row.id = "layRow"+i;
-
-      const idb = document.createElement("div"); idb.className = "layid";
-      const t1 = document.createElement("b"); t1.textContent = "LAYER "+n;
+      const col = document.createElement("div"); col.className = "laycol"; col.dataset.lay = i;
+      const nm = document.createElement("div"); nm.className = "layname";
+      const t1 = document.createElement("span"); t1.textContent = "LAYER "+n;
       const t2 = document.createElement("small"); t2.id = "layFrom"+i;
-      idb.appendChild(t1); idb.appendChild(t2);
-      row.appendChild(idb);
+      nm.appendChild(t1); nm.appendChild(t2);
+      col.appendChild(nm);
 
-      const bl = document.createElement("select"); bl.id="selLayBlend"+i; bl.className="layblend";
+      const bl = document.createElement("select"); bl.id="selLayBlend"+i;
       attachTip(bl, "LAYER "+n+" BLEND",
         "How this layer lands on everything below it. The same twenty-four rules the mixer uses, so a look you found on the strip transfers straight up here. DISSOLVE with the level down is a plain fade; ADDITIVE and SCREEN pile light on; MULTIPLY and the burns take it away; DIFFERENCE and the two bit operations are where it stops behaving like film.");
       MIXBLENDS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; bl.appendChild(o); });
       bl.onchange = ()=>{ layBlend[i] = parseInt(bl.value); };
-      row.appendChild(bl);
+      col.appendChild(bl);
 
-      const ky = document.createElement("select"); ky.id="selLayKey"+i; ky.className="laykey";
+      const ky = document.createElement("select"); ky.id="selLayKey"+i;
       attachTip(ky, "LAYER "+n+" KEY",
         "Cuts part of this layer away before it lands, using the layer's own picture as the matte. WHITE drops its bright parts, BLACK drops its dark parts, CHROMA drops one colour. This is what a stack is for: the thing on top can sit in front of what is under it rather than dissolving into it.",
-        "Choosing a key brings out the amount, threshold and softness for this layer; CHROMA brings out the hue as well.");
+        "THRESH, SOFT and HUE below shape whichever key is chosen.");
       LAYKEYS.forEach((m,k)=>{ const o=document.createElement("option"); o.value=k; o.textContent=m; ky.appendChild(o); });
-      ky.onchange = ()=>{ layKeyMode[i] = parseInt(ky.value); row.classList.remove("revealed"); refreshLayerUI(); };
-      row.appendChild(ky);
+      ky.onchange = ()=>{ layKeyMode[i] = parseInt(ky.value); };
+      col.appendChild(ky);
 
-      const prm = document.createElement("div"); prm.className = "layparams";
       for(const base of ["layOp","layKey","layKeyT","layKeyS","layKeyH"]){
         const r = uiRefs[base+n];
-        if(!r || !r.row) continue;
-        if(base !== "layOp") r.row.classList.add("keyprm");
-        if(base === "layKeyH") r.row.classList.add("hueprm");
-        prm.appendChild(r.row);
+        if(r && r.row) col.appendChild(r.row);
       }
-      row.appendChild(prm);
-      rows.appendChild(row);
+      cols.appendChild(col);
     }
-    d.appendChild(rows);
+    d.appendChild(cols);
   }
   if(id==="morph"){
     const tr2 = document.createElement("div"); tr2.className="trow";
@@ -3238,10 +3218,6 @@ function focusParam(pid){
   }
   /* a filter left running can be hiding the very row being jumped to */
   if(filterOn && typeof window.__clearFilter === "function") window.__clearFilter();
-  /* so can a layer whose key is switched off: the row is jumped to, so it is
-     shown, dimmed rather than enabled, until that layer's key changes */
-  { const lr = r.row && r.row.closest ? r.row.closest(".layrow") : null;
-    if(lr) lr.classList.add("revealed"); }
   const sec = secEls[p.sec];
   if(sec) sec.classList.remove("collapsed");
   r.row.scrollIntoView({block:"center", behavior:"smooth"});

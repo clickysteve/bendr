@@ -794,11 +794,26 @@ body.topo-layers #mixCollapse .mixhint::after{content:" \2192\A0LAYER STACK";}
 #mixTopoNote > *{pointer-events:auto;}
 body.topo-layers #mixTopoNote{display:flex;}
 body.nomix #mixTopoNote{display:none;}
-/* and the same the other way round, on the tab where the stack is built */
-.topoNote.layersOff{flex-direction:column; gap:7px; padding:9px 4px 4px; line-height:1.5;}
-body:not(.topo-layers) #layerdock .topoNote.layersOff{display:flex;}
-body:not(.topo-layers) #layerdock .laycols{opacity:.45;}
-body:not(.topo-layers) #layerdock .laymx{opacity:.45;}
+/* and the same the other way round, over the tab where the stack is built.
+   The banner used to sit under the matrix, which meant the one thing that
+   explains why nothing on the tab does anything was below the fold. It is an
+   overlay now, the same as the strip's: the pane greys out behind it and the
+   switch is in the middle of what you are looking at. It is a sibling of the
+   pane rather than a child of it, so it covers the tab rather than joining
+   the queue of things inside it. */
+#dockBody{position:relative;}
+#layerdock{transition:opacity .12s, filter .12s;}
+body:not(.topo-layers) #layerdock.on{opacity:.2; filter:saturate(.25); pointer-events:none;}
+#layTopoNote{
+  position:absolute; inset:0; z-index:6; pointer-events:none;
+  flex-direction:column; gap:10px; line-height:1.6;
+  /* nudged above centre so it lands over the controls it is talking about
+     rather than in the empty space under them on a tall dock */
+  padding-bottom:min(28%, 90px);
+  background:linear-gradient(180deg, rgba(10,10,14,.55), rgba(10,10,14,.86));
+}
+#layTopoNote > *{pointer-events:auto;}
+body:not(.topo-layers) #dockBody > #layerdock.on ~ #layTopoNote{display:flex;}
 /* every section the hovered bypass would take out with it */
 .sec.stagehover > h3{background:rgba(255,122,24,.16); box-shadow:inset 2px 0 0 var(--amber);}
 .sec.bypassed > h3{opacity:.55;}
@@ -1371,6 +1386,10 @@ audio,video{display:none;}
         <div id="midimap"></div>
       </div>
       <div id="modgrid"></div>
+      <div id="layTopoNote" class="topoNote">
+        <span>THE BUS TREE IS DRIVING THE PICTURE.<br>Nothing on this tab is in the signal path.</span>
+        <button id="btnTopoStack" data-tip="Puts the layer stack in the signal path in place of the three buses. The transitions keep every setting they had and come back exactly as they were when you switch again.">USE THE STACK</button>
+      </div>
       <div id="glsldock">
         <div id="glslNeedsSrc" style="display:none; color:var(--dim); font-size:9.5px; padding:6px 0 10px;">This channel is not a shader source. Pick <b style="color:var(--amber)">SHADER</b> under SOURCE to switch it, and this comes alive.</div>
         <div class="edrow" id="glslBar">

@@ -2622,14 +2622,6 @@ function sectionExtras(id, d){
       mx.appendChild(row);
     }
     head.appendChild(mx);
-    const tn = document.createElement("div"); tn.className = "topoNote layersOff";
-    tn.innerHTML = "<span>THE BUS TREE IS DRIVING THE PICTURE.<br>Nothing on this tab is in the path.</span>";
-    const tb = document.createElement("button");
-    tb.textContent = "USE THE STACK";
-    attachTip(tb, "SWITCH TO THE STACK", "Puts the layer stack in the signal path in place of the three buses. The transitions keep their settings and come back exactly as they were when you switch again.");
-    tb.onclick = ()=>setTopology(1);
-    tn.appendChild(tb);
-    head.appendChild(tn);
     d.appendChild(head);
   }
   if(id==="mixer" || id==="mixer2" || id==="mixerM"){

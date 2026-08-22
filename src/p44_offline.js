@@ -574,6 +574,8 @@ if(OUTPUT_MODE){
     if(tb) tb.onclick = ()=>setTopology(mixTopo === 1 ? 0 : 1);
     const bk = document.getElementById("btnTopoBack");
     if(bk) bk.onclick = ()=>setTopology(0);
+    const bs = document.getElementById("btnTopoStack");
+    if(bs) bs.onclick = ()=>setTopology(1);
     refreshLayerUI();
   }
   {

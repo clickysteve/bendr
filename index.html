@@ -3820,7 +3820,7 @@ const FS_TILE = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v37.7";
+const BENDR_VERSION = "v37.8";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -12795,6 +12795,12 @@ function frame(){
 
 /* ---------------- offline MP4 render (WebCodecs) ---------------- */
 let renderCancel = false;
+/* The blob handed to the download used to be left for the garbage collector,
+   which cannot take it while a URL still refers to it. A session of renders
+   therefore held every file it had ever made until the tab closed. The link
+   has already been clicked by the time the next render starts, so releasing
+   it then is safe and is the last moment it can be done automatically. */
+let lastRenderUrl = null;
 document.getElementById("btnRenderCancel").onclick = ()=>{ renderCancel = true; };
 document.getElementById("btnRender").onclick = ()=>{ offlineRender().catch(e=>{
   console.error(e); toast("Render failed: "+e.message, true);
@@ -12878,6 +12884,7 @@ async function offlineRender(){
     return;
   }
   if(!("VideoEncoder" in window)){ toast("This browser has no WebCodecs — use Chrome", true); return; }
+  if(lastRenderUrl){ try{ URL.revokeObjectURL(lastRenderUrl); }catch(e){} lastRenderUrl = null; }
   /* the render used to be hard-wired to 30, which is a poor fit for material
      that changes on every frame; the capture rate is a control now */
   const fps = captureFps(), W = procW, H = procH;
@@ -12912,22 +12919,30 @@ async function offlineRender(){
      with it. Write to disk directly where the browser allows it, and otherwise
      keep the chunks as a list, which a Blob can take without a second copy. */
   let fileHandle = null, fileStream = null;
+  let enc = null, aenc = null, muxer = null;
+  const parts = [];
   const suggested = "bendr-"+stamp()+".mp4";
+  /* From here to the finally, everything is inside one guard. The cleanup used
+     to sit after the frame loop, so anything that threw inside the loop left
+     the canvas at the render size, both encoders open and every clip paused,
+     and the only sign was a line in the console. A render can fail for reasons
+     that are nobody's fault - a decoder giving up on a frame, the disk filling
+     - and it has to put the machine back the way it found it when it does. */
+  try{
   if(window.showSaveFilePicker){
     try{
       fileHandle = await window.showSaveFilePicker({suggestedName: suggested,
         types:[{description:"MP4 video", accept:{"video/mp4":[".mp4"]}}]});
       fileStream = await fileHandle.createWritable();
-    }catch(e){ if(e && e.name === "AbortError"){ offline=false; ov.style.display="none"; canvas.width=oldW; canvas.height=oldH; return; } }
+    }catch(e){ if(e && e.name === "AbortError") return; }
   }
-  const parts = [];
   const target = fileStream
     ? new Mp4Muxer.FileSystemWritableFileStreamTarget(fileStream, {chunked: true})
     : new Mp4Muxer.StreamTarget({
         onData: (data, position) => { parts.push({position, data: data.slice()}); },
         chunked: true,
       });
-  const muxer = new Mp4Muxer.Muxer({
+  muxer = new Mp4Muxer.Muxer({
     target,
     video: {codec: mcodec, width: W, height: H},
     ...(aBuf ? {audio: {codec: "aac", sampleRate: aBuf.sampleRate, numberOfChannels: aBuf.numberOfChannels}} : {}),
@@ -12935,20 +12950,20 @@ async function offlineRender(){
        stream target cannot do, so it goes at the end when we are streaming */
     fastStart: fileStream ? false : "in-memory",
   });
-  const enc = new VideoEncoder({
-    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+  enc = new VideoEncoder({
+    output: (chunk, meta) => { if(muxer) muxer.addVideoChunk(chunk, meta); },
     error: e => { console.error(e); toast("Encoder error: "+e.message, true); renderCancel = true; },
   });
   enc.configure({codec, width:W, height:H, bitrate:bitrateFor(W,H,fps), framerate:fps});
   /* The audio is fed a slice at a time, kept a second ahead of the picture
      rather than all at the end, so the muxer receives both tracks in roughly
      the order they play. A streaming target cannot go back and reorder. */
-  let aenc = null, aAt = 0, aFail = "";
+  let aAt = 0, aFail = "";
   const A_BLOCK = 4096;
   if(aBuf){
     try{
       aenc = new AudioEncoder({
-        output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+        output: (chunk, meta) => { if(muxer) muxer.addAudioChunk(chunk, meta); },
         error: e => { console.error(e); aFail = e.message; },
       });
       aenc.configure({codec:"mp4a.40.2", sampleRate:aBuf.sampleRate,
@@ -12978,11 +12993,41 @@ async function offlineRender(){
     return "video only \u2014 " + (AU.why || "no audio");
   }
   const total = Math.max(1, Math.floor(clock.dur*fps));
+  /* A seek that never fires "seeked" used to hang the render for good: nothing
+     settled the promise, so the loop never came back and CANCEL could not reach
+     it either - the flag was set and nothing was ever going to read it again.
+     It waits with a ceiling now, and polls the cancel flag while it waits so
+     the button works mid-seek. The ceiling is deliberately generous, because a
+     real seek into a large file on a slow disk is not quick and cutting one
+     short costs a frame. When it is hit the picture captured is whatever the
+     decoder happened to be showing, so those frames are counted and said out
+     loud at the end rather than passed off as a clean render. */
+  const SEEK_LIMIT_MS = 8000;
+  let seekOverruns = 0;
   const seekTo = (v,t)=>new Promise(res=>{
-    const h = ()=>{ v.removeEventListener("seeked", h); res(); };
+    const dur = v.duration;
+    const to = (dur && isFinite(dur)) ? Math.min(t, dur-0.001) : t;
+    if(renderCancel || Math.abs(v.currentTime - to) < 1e-4) return res();
+    let done = false, timer = 0, poll = 0;
+    const fin = late=>{
+      if(done) return;
+      done = true;
+      if(late) seekOverruns++;
+      clearTimeout(timer); clearInterval(poll);
+      v.removeEventListener("seeked", h);
+      res();
+    };
+    const h = ()=>fin(false);
     v.addEventListener("seeked", h);
-    v.currentTime = Math.min(t, v.duration-0.001);
+    timer = setTimeout(()=>fin(true), SEEK_LIMIT_MS);
+    poll = setInterval(()=>{ if(renderCancel) fin(false); }, 50);
+    try{ v.currentTime = to; }catch(e){ fin(false); }
   });
+  /* a render that limped is still a render, but you should be told it limped */
+  const seekNote = ()=> seekOverruns
+    ? "  \u00b7  " + seekOverruns + " frame" + (seekOverruns===1?"":"s")
+      + " captured before the seek finished"
+    : "";
   const t0 = 1000;   // virtual clock offset so time-based effects behave
   for(let i=0; i<total && !renderCancel; i++){
     const t = i/fps;
@@ -12997,14 +13042,17 @@ async function offlineRender(){
     enc.encode(vf, {keyFrame: i%(fps*2)===0});
     vf.close();
     pumpAudio(t + 1);
-    while(enc.encodeQueueSize > 6 && !renderCancel) await new Promise(r=>setTimeout(r,5));
+    /* waiting on the picture alone let the audio encoder build a backlog of its
+       own, which is memory nobody is watching */
+    while((enc.encodeQueueSize > 6
+           || (aenc && aenc.state === "configured" && aenc.encodeQueueSize > 30))
+          && !renderCancel) await new Promise(r=>setTimeout(r,5));
     if(i%3===0){
       ovTxt.textContent = "RENDERING "+Math.round(i/total*100)+"%  ("+i+"/"+total+" frames, "+codec.split(".")[0].toUpperCase()+")";
       ovBar.style.width = (i/total*100)+"%";
       await new Promise(r=>setTimeout(r,0));
     }
   }
-  try{
     if(!renderCancel){
       ovTxt.textContent = "FINALIZING…";
       pumpAudio(clock.dur + 1);       /* whatever the loop did not reach */
@@ -13013,31 +13061,39 @@ async function offlineRender(){
       muxer.finalize();
       if(fileStream){
         await fileStream.close();
-        toast("Rendered "+total+" frames \u2192 "+fileHandle.name+" "+audioNote());
+        toast("Rendered "+total+" frames \u2192 "+fileHandle.name+" "+audioNote()+seekNote());
       } else {
         parts.sort((a,b)=>a.position-b.position);
         const blob = new Blob(parts.map(x=>x.data), {type:"video/mp4"});
-        dl(URL.createObjectURL(blob), suggested);
-        toast("Rendered "+total+" frames \u2192 MP4, "+(blob.size/1048576).toFixed(1)+" MB "+audioNote());
+        lastRenderUrl = URL.createObjectURL(blob);
+        dl(lastRenderUrl, suggested);
+        toast("Rendered "+total+" frames \u2192 MP4, "+(blob.size/1048576).toFixed(1)+" MB "+audioNote()+seekNote());
       }
     } else {
       if(fileStream){ try{ await fileStream.abort(); }catch(e){} }
       toast("Render cancelled", true);
     }
-  } finally {
+  }catch(e){
+    console.error(e);
+    if(fileStream){ try{ await fileStream.abort(); }catch(_){} }
+    toast("Render failed: "+String((e && e.message) || e), true);
+  }finally{
     /* the encoder used to be closed only on the cancel path, so every
        completed render left one behind */
-    try{ if(enc.state !== "closed") enc.close(); }catch(e){}
+    try{ if(enc && enc.state !== "closed") enc.close(); }catch(e){}
     try{ if(aenc && aenc.state !== "closed") aenc.close(); }catch(e){}
     parts.length = 0;
-  }
-  canvas.width = oldW; canvas.height = oldH;
-  ov.style.display = "none";
-  offline = false; lastT = performance.now()/1000;
-  if(wasPlaying) video.play();
-  for(const ch of CHANNELS){
-    const S = SRC[ch];
-    if(S.video !== video && S.mode === "file" && !S.still) S.video.play().catch(()=>{});
+    canvas.width = oldW; canvas.height = oldH;
+    ov.style.display = "none";
+    offline = false; lastT = performance.now()/1000;
+    /* play() rejects rather than throws when the browser is not in the mood */
+    if(wasPlaying){ try{ video.play().catch(()=>{}); }catch(e){} }
+    for(const ch of CHANNELS){
+      const S = SRC[ch];
+      if(S.video !== video && S.mode === "file" && !S.still){
+        try{ S.video.play().catch(()=>{}); }catch(e){}
+      }
+    }
   }
 }
 

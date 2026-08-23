@@ -3832,7 +3832,7 @@ const FS_TILE = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v38.0";
+const BENDR_VERSION = "v38.1";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -5592,9 +5592,20 @@ function lfoOut(st, dt){
 }
 const LFO_SHAPES = ["sine","tri","saw","ramp","sqr","pulse","snh","exp","sine2","drift"];
 /* value = beats per cycle, so smaller is faster */
+/* Two ways of naming the same thing, because two kinds of people arrive here.
+   Anything a bar or longer is written the way a clock divider writes it - one
+   cycle every so many beats - because that is what it is and that is the
+   language it is asked for in. Anything shorter than a bar keeps its note
+   value, where 1/4 means a quarter note and not a division by four. The
+   annotation on every entry says which way round it is, so the two halves of
+   the menu cannot be misread for each other. */
 const SYNC_DIVS = [
-  ["0","FREE"], ["32","8 BAR"], ["16","4 BAR"], ["12","3 BAR"], ["8","2 BAR"],
-  ["6","1.5 BAR"], ["4","1 BAR"], ["3","1/2 DOT"], ["2.6667","1 BAR TRIP"], ["2","1/2"],
+  ["0","FREE"],
+  ["512","\u00f7512 \u00b7 128 BAR"], ["256","\u00f7256 \u00b7 64 BAR"],
+  ["128","\u00f7128 \u00b7 32 BAR"], ["64","\u00f764 \u00b7 16 BAR"],
+  ["32","\u00f732 \u00b7 8 BAR"], ["16","\u00f716 \u00b7 4 BAR"], ["12","\u00f712 \u00b7 3 BAR"],
+  ["8","\u00f78 \u00b7 2 BAR"], ["6","\u00f76 \u00b7 1.5 BAR"], ["4","\u00f74 \u00b7 1 BAR"],
+  ["3","1/2 DOT"], ["2.6667","1 BAR TRIP"], ["2","1/2"],
   ["1.5","1/4 DOT"], ["1.3333","1/2 TRIP"], ["1","1/4"], ["0.75","1/8 DOT"],
   ["0.6667","1/4 TRIP"], ["0.5","1/8"], ["0.3333","1/8 TRIP"], ["0.25","1/16"],
   ["0.1667","1/16 TRIP"], ["0.125","1/32"], ["0.0833","1/32 TRIP"],

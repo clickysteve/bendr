@@ -879,7 +879,19 @@ function renderMidiMap(){
   }
 }
 
-function fmt(p, v){ return (Math.abs(v)<10 ? v.toFixed(2) : v.toFixed(1)); }
+/* Two decimals is right for almost everything and wrong for the small end:
+   a rate of a ten-thousandth displayed as "0.00" reads as switched off, so
+   anyone who types one concludes the control does not go that low. Below a
+   hundredth the number gets the digits it needs, with the trailing zeros
+   taken off so it stays short. */
+function fmt(p, v){
+  const a = Math.abs(v);
+  if(a >= 10) return v.toFixed(1);
+  if(a > 0 && a < 0.01){
+    return v.toFixed(a < 0.0001 ? 6 : 5).replace(/0+$/, "").replace(/\.$/, "");
+  }
+  return v.toFixed(2);
+}
 /* ---- readouts you can type into ----
    A slider is a good way to find a value and a poor way to state one. Matching
    a setting you already know, or copying one from a patch you wrote down, meant
@@ -899,6 +911,60 @@ function setReadout(el, text){
     if(document.activeElement === el) return;
     el.value = text;
   } else el.textContent = text;
+}
+/* The panel's numbers became fields you can type into, and the modulation
+   cards were left as plain text, which is the wrong way round: an LFO rate is
+   exactly the sort of number you arrive with rather than hunt for. Same
+   behaviour as the panel's, without the parameter registry, because none of
+   these values live in it. */
+function makeNumField(el, o){
+  el.type = "text"; el.inputMode = "decimal";
+  el.autocomplete = "off"; el.spellcheck = false;
+  if(o.label) el.setAttribute("aria-label", o.label);
+  if(o.title) el.title = o.title;
+  let held = "", shown = "";
+  const show = ()=>{ el.value = shown = o.fmt(o.get()); if(o.after) o.after(); };
+  const commit = ()=>{
+    /* Only act on text a person changed. These fields are formatted with units
+       - 500ms, 4.0k - and a formatted string does not read back as the number
+       that produced it, so committing again on the way out turned 500ms into
+       500 seconds and 4.0k into 4Hz. Untouched text is left alone. */
+    if(el.value === shown) return;
+    const v = o.parse ? o.parse(el.value)
+                      : parseFloat(String(el.value).replace(/[^0-9.+\-eE]/g, ""));
+    if(isFinite(v)) o.set(Math.min(o.max, Math.max(o.min, v)));
+    show(); held = el.value;
+  };
+  el.addEventListener("focus", ()=>{ held = el.value; el.select(); });
+  el.addEventListener("pointerdown", ()=>{ if(typeof armGesture === "function") armGesture(); });
+  /* a card sits inside the app's keyboard shortcuts, so the letters typed here
+     have to stop before they reach them */
+  el.addEventListener("keydown", e=>{
+    e.stopPropagation();
+    if(e.key === "Enter"){ commit(); el.blur(); }
+    else if(e.key === "Escape"){ el.value = held; el.blur(); }
+  });
+  el.addEventListener("blur", commit);
+  show();
+  return show;
+}
+/* An LFO slow enough to be worth setting is easier to think about as a period
+   than as a frequency: nobody pictures a ten-thousandth of a hertz, everybody
+   pictures three hours. The field stays in hertz, because that is the number
+   being set and a field that changes its unit cannot be typed into safely, and
+   the period is said beside it. */
+function lfoHz(hz){
+  if(hz >= 1) return hz.toFixed(2);
+  if(hz >= 0.01) return hz.toFixed(3);
+  return hz.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+}
+function lfoPeriod(hz){
+  if(!(hz > 0)) return "";
+  const sec = 1/hz;
+  if(sec < 4) return "";
+  if(sec < 90) return sec.toFixed(1) + "s / cycle";
+  if(sec < 5400) return (sec/60).toFixed(1) + "min / cycle";
+  return (sec/3600).toFixed(2) + "h / cycle";
 }
 function makeReadoutField(p, el, slider){
   el.type = "text"; el.inputMode = "decimal";
@@ -1731,11 +1797,28 @@ function buildModPage(){
 
       const loS = document.createElement("input");
       loS.type="range"; loS.step=0.001; loS.min=Math.log10(20); loS.max=Math.log10(16000); loS.value=Math.log10(tp.lo);
-      const loV = document.createElement("span"); loV.className="mcval";
+      const loV = document.createElement("input"); loV.className="mcval";
       const hiS = document.createElement("input");
       hiS.type="range"; hiS.step=0.001; hiS.min=Math.log10(20); hiS.max=Math.log10(16000); hiS.value=Math.log10(tp.hi);
-      const hiV = document.createElement("span"); hiV.className="mcval";
-      const updHz = ()=>{ loV.textContent = hzFmt(tp.lo); hiV.textContent = hzFmt(tp.hi); matchBand(); };
+      const hiV = document.createElement("input"); hiV.className="mcval";
+      /* the two ends of the band are typeable as well, with the same rule the
+         sliders enforce between them: neither may cross the other */
+      /* 4k means four thousand here, the way the readout writes it */
+      const hzParse = t=>{
+        const n = parseFloat(String(t).replace(/[^0-9.+\-eE]/g, ""));
+        return /k/i.test(String(t)) ? n*1000 : n;
+      };
+      const showLo = makeNumField(loV, {label:"band low edge in hertz", min:20, max:16000, parse:hzParse,
+        get:()=>tp.lo,
+        set:v=>{ tp.lo = Math.min(Math.max(20, v), tp.hi-5); tp.peak = 0.05;
+                 loS.value = Math.log10(tp.lo); },
+        fmt:hzFmt});
+      const showHi = makeNumField(hiV, {label:"band high edge in hertz", min:20, max:16000, parse:hzParse,
+        get:()=>tp.hi,
+        set:v=>{ tp.hi = Math.max(Math.min(16000, v), tp.lo+5); tp.peak = 0.05;
+                 hiS.value = Math.log10(tp.hi); },
+        fmt:hzFmt});
+      const updHz = ()=>{ showLo(); showHi(); matchBand(); };
       loS.addEventListener("input", ()=>{
         tp.lo = Math.min(Math.pow(10, parseFloat(loS.value)), tp.hi-5); tp.peak = 0.05; updHz(); });
       hiS.addEventListener("input", ()=>{
@@ -1746,28 +1829,52 @@ function buildModPage(){
 
       const gS = document.createElement("input");
       gS.type="range"; gS.min=0; gS.max=3; gS.step=0.01; gS.value=tp.gain;
-      const gV = document.createElement("span"); gV.className="mcval";
-      const updG = ()=>{ tp.gain = parseFloat(gS.value); gV.textContent = tp.gain.toFixed(2); };
-      gS.addEventListener("input", updG); updG();
+      const gV = document.createElement("input"); gV.className="mcval";
+      const showG = makeNumField(gV, {label:"tap gain", min:0, max:3,
+        get:()=>tp.gain, set:v=>{ tp.gain = v; gS.value = v; }, fmt:v=>v.toFixed(2)});
+      const updG = ()=>{ tp.gain = parseFloat(gS.value); showG(); };
+      gS.addEventListener("input", updG); showG();
       { const r = mkrow("GAIN", gS); r.appendChild(gV); }
 
       const rS = document.createElement("input");
       rS.type="range"; rS.min=0; rS.max=1; rS.step=0.01; rS.value=tp.resp;
-      const rV = document.createElement("span"); rV.className="mcval";
-      const updR = ()=>{ tp.resp = parseFloat(rS.value); rV.textContent = tp.resp.toFixed(2); };
-      rS.addEventListener("input", updR); updR();
+      const rV = document.createElement("input"); rV.className="mcval";
+      const showR = makeNumField(rV, {label:"tap response", min:0, max:1,
+        get:()=>tp.resp, set:v=>{ tp.resp = v; rS.value = v; }, fmt:v=>v.toFixed(2)});
+      const updR = ()=>{ tp.resp = parseFloat(rS.value); showR(); };
+      rS.addEventListener("input", updR); showR();
       { const r = mkrow("RESPONSE", rS); r.appendChild(rV); }
     }
     if(m && m.type === "lfo"){
       const r1 = document.createElement("div"); r1.className = "mcrow";
       const l1 = document.createElement("label"); l1.textContent = "RATE";
       const s1 = document.createElement("input");
-      s1.type = "range"; s1.min = -2; s1.max = 1.2; s1.step = 0.01; s1.value = Math.log10(m.rate);
-      const v1 = document.createElement("span"); v1.className = "mcval";
-      const upd1 = ()=>{ m.rate = Math.pow(10, parseFloat(s1.value)); v1.textContent = m.rate.toFixed(2)+"Hz"; };
-      s1.addEventListener("input", upd1); upd1();
+      /* The floor was a hundredth of a hertz, which is a cycle every hundred
+         seconds: fast, for anything meant to drift across an evening. It goes
+         four decades lower now, to roughly one cycle every three hours. */
+      const LFO_LO = -4, LFO_HI = 1.2;
+      s1.type = "range"; s1.min = LFO_LO; s1.max = LFO_HI; s1.step = 0.005;
+      s1.value = Math.log10(Math.max(Math.pow(10, LFO_LO), m.rate));
+      const v1 = document.createElement("input"); v1.className = "mcval";
+      const per = document.createElement("span"); per.className = "mcunit";
+      const showRate = makeNumField(v1, {
+        label: "LFO rate in hertz",
+        title: "Rate in hertz. Type one if you know it \u2014 0.0001 is about a cycle every three hours.",
+        min: Math.pow(10, LFO_LO), max: Math.pow(10, LFO_HI),
+        get: ()=>m.rate,
+        set: v=>{ m.rate = v; s1.value = Math.log10(v); },
+        fmt: lfoHz,
+        after: ()=>{ per.textContent = lfoPeriod(m.rate) || "Hz"; },
+      });
+      const upd1 = ()=>{ m.rate = Math.pow(10, parseFloat(s1.value)); showRate(); };
+      /* show what is stored rather than running the slider's handler: doing the
+         latter reads the slider back, which rounds a typed rate to its step */
+      s1.addEventListener("input", upd1); showRate();
       r1.appendChild(l1); r1.appendChild(s1); r1.appendChild(v1);
       card.appendChild(r1);
+      { const rp = document.createElement("div"); rp.className = "mcrow mcnote";
+        rp.appendChild(document.createElement("label"));
+        rp.appendChild(per); card.appendChild(rp); }
       const r2 = document.createElement("div"); r2.className = "mcrow";
       const l2 = document.createElement("label"); l2.textContent = "SHAPE";
       const sh = document.createElement("select");
@@ -1777,8 +1884,8 @@ function buildModPage(){
       const sy = document.createElement("select");
       for(const [v,n] of SYNC_DIVS){ const op = document.createElement("option"); op.value = v; op.textContent = n; sy.appendChild(op); }
       sy.value = String(m.sync || 0);
-      sy.onchange = ()=>{ m.sync = parseFloat(sy.value); s1.disabled = m.sync > 0; };
-      s1.disabled = (m.sync || 0) > 0;
+      sy.onchange = ()=>{ m.sync = parseFloat(sy.value); s1.disabled = v1.disabled = m.sync > 0; };
+      s1.disabled = v1.disabled = (m.sync || 0) > 0;
       r2.appendChild(l2); r2.appendChild(sh); r2.appendChild(sy);
       card.appendChild(r2);
     }
@@ -1790,9 +1897,17 @@ function buildModPage(){
         const sl = document.createElement("input");
         sl.type = "range"; sl.min = Math.log10(lo); sl.max = Math.log10(hi); sl.step = 0.01;
         sl.value = Math.log10(Math.max(lo, m[key]));
-        const vv = document.createElement("span"); vv.className = "mcval";
-        const upd = ()=>{ m[key] = Math.pow(10, parseFloat(sl.value)); vv.textContent = fmtT(m[key]); };
-        sl.addEventListener("input", upd); upd();
+        const vv = document.createElement("input"); vv.className = "mcval";
+        const showT = makeNumField(vv, {
+          label: label.toLowerCase() + " in seconds",
+          title: "Time in seconds. Type one if you know it.",
+          min: lo, max: hi,
+          get: ()=>m[key],
+          set: v=>{ m[key] = v; sl.value = Math.log10(Math.max(lo, v)); },
+          fmt: v=> v < 1 ? (v*1000).toFixed(0) + "ms" : v.toFixed(2) + "s",
+        });
+        const upd = ()=>{ m[key] = Math.pow(10, parseFloat(sl.value)); showT(); };
+        sl.addEventListener("input", upd); showT();
         r.appendChild(l); r.appendChild(sl); r.appendChild(vv);
         card.appendChild(r);
       }

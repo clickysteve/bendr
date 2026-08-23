@@ -3832,7 +3832,7 @@ const FS_TILE = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v37.9";
+const BENDR_VERSION = "v38.0";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -5597,7 +5597,15 @@ const SYNC_DIVS = [
   ["6","1.5 BAR"], ["4","1 BAR"], ["3","1/2 DOT"], ["2.6667","1 BAR TRIP"], ["2","1/2"],
   ["1.5","1/4 DOT"], ["1.3333","1/2 TRIP"], ["1","1/4"], ["0.75","1/8 DOT"],
   ["0.6667","1/4 TRIP"], ["0.5","1/8"], ["0.3333","1/8 TRIP"], ["0.25","1/16"],
-  ["0.1667","1/16 TRIP"], ["0.125","1/32"],
+  ["0.1667","1/16 TRIP"], ["0.125","1/32"], ["0.0833","1/32 TRIP"],
+  /* Past a thirty-second the divisions are asking for more cycles per second
+     than the render can draw, and what comes out is an alias rather than the
+     rate on the label: at 120 BPM a 1/128 wants sixty-four hertz and sixty
+     frames a second can carry thirty. That is not a reason to leave them out
+     of a machine like this one - a wheel filmed through a shutter turning the
+     wrong way is the same effect and it is worth having - but it is a reason
+     to say so, which the card does underneath the selector. */
+  ["0.0625","1/64"], ["0.0417","1/64 TRIP"], ["0.03125","1/128"],
 ];
 /* per-route shaping: the same source can drive two destinations differently */
 const ROUTE_CURVES = ["LIN","EXP","LOG","S","STEP"];
@@ -6287,6 +6295,22 @@ function lfoHz(hz){
   if(hz >= 1) return hz.toFixed(2);
   if(hz >= 0.01) return hz.toFixed(3);
   return hz.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+}
+/* Under the rate: the period when it is free-running, and when it is locked to
+   the tempo the frequency that lock actually works out at, since a division is
+   only meaningful once you know the tempo. Above half the frame rate it says
+   what is really going to happen. */
+function lfoNote(m){
+  const hz = m.rate;
+  if(!(hz > 0)) return "Hz";
+  if(m.sync > 0){
+    let lim = 30;
+    try{ lim = (engineRate > 0 ? engineRate : 60) / 2; }catch(e){}
+    const base = hz >= 1 ? hz.toFixed(2) + "Hz  \u00b7  " + Math.round(bpm) + " BPM"
+                         : (lfoPeriod(hz) || hz.toFixed(3) + "Hz");
+    return base + (hz > lim ? "  \u00b7  faster than the frame rate can draw: aliases" : "");
+  }
+  return lfoPeriod(hz) || "Hz";
 }
 function lfoPeriod(hz){
   if(!(hz > 0)) return "";
@@ -7194,7 +7218,7 @@ function buildModPage(){
         get: ()=>m.rate,
         set: v=>{ m.rate = v; s1.value = Math.log10(v); },
         fmt: lfoHz,
-        after: ()=>{ per.textContent = lfoPeriod(m.rate) || "Hz"; },
+        after: ()=>{ per.textContent = lfoNote(m); },
       });
       const upd1 = ()=>{ m.rate = Math.pow(10, parseFloat(s1.value)); showRate(); };
       /* show what is stored rather than running the slider's handler: doing the
@@ -7204,7 +7228,7 @@ function buildModPage(){
       card.appendChild(r1);
       { const rp = document.createElement("div"); rp.className = "mcrow mcnote";
         rp.appendChild(document.createElement("label"));
-        rp.appendChild(per); card.appendChild(rp); }
+        rp.appendChild(per); card.appendChild(rp); card.__lfoNote = per; }
       const r2 = document.createElement("div"); r2.className = "mcrow";
       const l2 = document.createElement("label"); l2.textContent = "SHAPE";
       const sh = document.createElement("select");
@@ -7214,7 +7238,26 @@ function buildModPage(){
       const sy = document.createElement("select");
       for(const [v,n] of SYNC_DIVS){ const op = document.createElement("option"); op.value = v; op.textContent = n; sy.appendChild(op); }
       sy.value = String(m.sync || 0);
-      sy.onchange = ()=>{ m.sync = parseFloat(sy.value); s1.disabled = v1.disabled = m.sync > 0; };
+      attachTip(sy, "TEMPO LOCK",
+        "Locks this LFO to the tempo instead of to its own rate, in note divisions: 1 BAR is one cycle every four beats, 1/16 is four cycles a beat. The tempo comes from TAP or from MIDI clock, so everything locked moves together and stays together when the tempo changes. FREE gives the rate control back.",
+        "Below a thirty-second the division asks for more cycles a second than the render can draw and you get an alias rather than the rate on the label \u2014 a fast strobe reading as a slow crawl. The line under the rate says when that is happening, and it is worth hearing out: it is the same effect as a wheel filmed through a shutter appearing to turn backwards.");
+      sy.onchange = ()=>{
+        const was = m.sync || 0;
+        m.sync = parseFloat(sy.value);
+        s1.disabled = v1.disabled = m.sync > 0;
+        if(m.sync > 0){
+          /* keep the free rate for when it is let go again, so switching to a
+             division and back is not a way to lose the rate you had set */
+          if(!(was > 0)) m.freeRate = m.rate;
+          m.rate = (bpm/60)/m.sync;
+        } else {
+          const lo = Math.pow(10, LFO_LO), hi = Math.pow(10, LFO_HI);
+          const back = (m.freeRate > 0) ? m.freeRate : m.rate;
+          m.rate = Math.min(hi, Math.max(lo, back));
+          s1.value = Math.log10(m.rate);
+        }
+        showRate();
+      };
       s1.disabled = v1.disabled = (m.sync || 0) > 0;
       r2.appendChild(l2); r2.appendChild(sh); r2.appendChild(sy);
       card.appendChild(r2);
@@ -7290,7 +7333,8 @@ function buildModPage(){
     }, "PATCH " + src.name.toUpperCase() + " TO");
     card.appendChild(pk);
     grid.appendChild(card);
-    modCards[id] = {cv, ctx:cv.getContext("2d"), val, dests, card};
+    modCards[id] = {cv, ctx:cv.getContext("2d"), val, dests, card,
+                    lfoNoteEl: card.__lfoNote || null, lfoMod: (m && m.type === "lfo") ? m : null};
   }
 }
 const modMacroRefs = {};
@@ -7317,6 +7361,12 @@ function drawModPage(){
     }
     g.stroke();
     c.val.textContent = (modVal[id]||0).toFixed(2);
+    /* a tapped tempo moves every locked rate, so the note is redrawn with the
+       rest of the card rather than only when the selector is touched */
+    if(c.lfoNoteEl && c.lfoMod){
+      const want = lfoNote(c.lfoMod);
+      if(c.lfoNoteEl.textContent !== want) c.lfoNoteEl.textContent = want;
+    }
     const rs = routes.filter(r=>r.src===id);
     c.dests.innerHTML = rs.length
       ? rs.map(r=>"<b>"+(P[r.dst]?P[r.dst].name:r.dst)+"</b> "+(P[r.dst]&&P[r.dst].master?"":r.ch||"A")+" "+r.amt.toFixed(2)).join(" &nbsp; ")

@@ -486,6 +486,14 @@ function captureState(){
   /* the taps travel with the patch: which input each one listens to, the band,
      the gain and the response. The analyser nodes are rebuilt on load. */
   st.audioTaps = audioTaps.map(t=>({id:t.id, name:t.name, chan:t.chan, lo:t.lo, hi:t.hi, gain:t.gain, resp:t.resp}));
+  /* The audio itself cannot travel in a patch: it is tens of megabytes of
+     decoded samples and it belongs to the person who has the files. What can
+     travel is the shape of the set - which stems there were, what they were
+     called, how loud each sat - and that is enough for the routes patched to
+     them to survive, so a reloaded patch comes back wired up and waiting for
+     the files rather than quietly missing half its modulation. */
+  st.stems = stems.map(x=>({id:x.id, name:x.name, level:x.level}));
+  st.stemLoop = stemLoop; st.stemResp = stemResp;
   /* the shape of the frame is part of the piece, not a machine setting: a patch
      built for a phone screen is not the same patch at 16:9 */
   st.procAR = procAR; st.procRes = procRes;
@@ -551,7 +559,7 @@ function restoreState(st){
       if(st.chan[ch][p.id] !== undefined) chanBase[ch][p.id] = st.chan[ch][p.id];
     if(st.master) for(const p of MLIST) if(st.master[p.id] !== undefined) mBase[p.id] = st.master[p.id];
     routes = (st.routes||[]).map(r=>({ch:"A", ...r}));
-    if(st.mods || st.lfo1 || st.audioCfg || st.audioTaps) applyExtras(st);
+    if(st.mods || st.lfo1 || st.audioCfg || st.audioTaps || st.stems) applyExtras(st);
     refreshUI(); renderRoutes(); refreshLfoUI(); refreshAudioUI();
   } else {
     applyState(st.bases||{}, st.routes||[], st);   /* legacy single-channel state */
@@ -624,6 +632,38 @@ function applyExtras(extra){
     rebuildMODSRC();
     if(typeof buildAudTapList === "function") buildAudTapList();
     buildModPage();
+  }
+  if(extra.stems){
+    /* An undo is a restore, and restoring should not throw away a couple of
+       hundred megabytes of decoded audio to put a level back. If the set that
+       is loaded is the set being restored, only the levels move. */
+    const same = stems.length === extra.stems.length &&
+                 stems.every((x,i)=>x.id === extra.stems[i].id);
+    if(same){
+      extra.stems.forEach((x,i)=>{
+        stems[i].level = (x.level === undefined) ? 1 : x.level;
+        if(stems[i].lv) stems[i].lv.gain.value = stems[i].level;
+      });
+      if(extra.stemLoop !== undefined) stemLoop = extra.stemLoop;
+      if(extra.stemResp !== undefined) stemResp = extra.stemResp;
+      if(typeof buildStemList === "function"){ buildStemList(); refreshStemUI(); }
+    } else {
+    if(typeof stemsClear === "function") stemsClear();
+    /* empty slots: named, patchable, silent until the files are dropped back on
+       the panel, which fills them in the order they were saved */
+    stems = extra.stems.map(x=>({id:x.id, name:x.name, level:(x.level===undefined?1:x.level),
+                                 buf:null, missing:true, val:0, raw:0, peak:0.05, avg:0.02, hit:0,
+                                 src:null, lv:null, an:null, data:null}));
+    let hiS = stems.length;
+    for(const x of stems){ const n = parseInt(String(x.id).replace(/^\D+/, ""), 10); if(n > hiS) hiS = n; }
+    stemSeq = Math.max(stemSeq, hiS);
+    if(extra.stemLoop !== undefined) stemLoop = extra.stemLoop;
+    if(extra.stemResp !== undefined) stemResp = extra.stemResp;
+    stemDur = 0; stemPlaying = false; stemStartOff = 0;
+    rebuildMODSRC();
+    if(typeof buildStemList === "function"){ buildStemList(); refreshStemUI(); }
+    buildModPage();
+    }
   }
   if(extra.fbTrailMode !== undefined) fbTrailMode = extra.fbTrailMode;
 }

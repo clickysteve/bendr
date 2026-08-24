@@ -51,6 +51,9 @@ fileIn.onchange = ()=>{ if(fileIn.files[0]) handleFile(fileIn.files[0], fileIn.d
 {
   const afi = document.getElementById("audioFileIn");
   if(afi) afi.onchange = ()=>{ if(afi.files[0]) loadAudioFile(afi.files[0]); afi.value=""; };
+  /* stems arrive several at a time, which is the only way anybody has them */
+  const sfi = document.getElementById("stemFileIn");
+  if(sfi) sfi.onchange = ()=>{ if(sfi.files && sfi.files.length) addStemFiles(sfi.files); sfi.value=""; };
 }
 
 const IMG_RE = /\.(jpe?g|png|gif|webp|bmp|avif|apng|svg)$/i;

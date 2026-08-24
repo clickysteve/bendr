@@ -446,6 +446,34 @@ button.patchpick{width:100%; text-align:left;}
 .modcard .mcunit{font-size:8px; letter-spacing:1px; color:var(--dim);}
 .modcard .mcrow.mcnote{padding:0 0 3px; margin-top:-2px;}
 .modcard .mcrow.mcnote label{width:38px;}
+/* ---- stems ----
+   A row a stem: what it is, how loud, and what it is doing. The meter is the
+   part you actually read while something is playing, so it is wide enough to
+   see from where you are sitting rather than a token five pixels. */
+.stemrow{display:flex; align-items:center; gap:7px; padding:3px 0;}
+.stemrow .stemname{
+  flex:0 0 104px; font-size:9px; letter-spacing:0.5px; color:var(--txt);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.stemrow input[type=range]{flex:1 1 90px; min-width:60px; height:20px;}
+.stemrow .stemmeter{
+  flex:0 0 62px; height:7px; background:#0d0d11; border:1px solid var(--line);
+  border-radius:2px; overflow:hidden;
+}
+.stemrow .stemmeter i{display:block; height:100%; width:0; background:var(--cyan); transition:width .05s linear;}
+.stemrow .stemx{
+  flex:0 0 auto; padding:1px 5px; font-size:9px; line-height:1;
+  color:var(--dim); border-color:transparent; background:transparent;
+}
+.stemrow .stemx:hover{color:var(--amber); border-color:var(--amber);}
+#audiodock .sec.dropping{outline:1px dashed var(--cyan); outline-offset:2px;}
+/* The stems section is a list of rows rather than a column of sliders, so it
+   wants width the way the others want height. It takes twice the share and
+   its transport wraps rather than squeezing the labels down to two letters. */
+#audiodock .sec.stems{flex:2 1 380px; min-width:320px;}
+#audiodock .sec.stems .trow{flex-wrap:wrap; row-gap:4px;}
+#audiodock .sec.stems .trow button{flex:0 0 auto;}
+#audiodock .sec.stems #stemPos{flex:0 0 auto;}
 .modcard .dests{font-size:8.5px; color:var(--dim); padding-top:5px; line-height:1.5; border-top:1px solid #1e1e26; margin-top:6px;}
 .modcard .dests b{color:var(--cyan); font-weight:400;}
 /* text / shape editor */
@@ -1184,11 +1212,12 @@ audio,video{display:none;}
     <button class="menubtn" data-tip="Processing resolution, audio input, modulation and MIDI.">ENGINE <i>&#9662;</i></button>
     <div class="menupanel">
       <div class="mlabel">AUDIO REACT</div>
-      <select id="selAudio" data-tip="Where the audio-reactive mod sources listen. VIDEO analyses the loaded video's own soundtrack, INPUT uses a microphone or audio interface, and FILE plays an audio file you load - which is how you build a piece against the track it will be shown with. The band ranges and response are on the AUDIO tab of the dock.">
+      <select id="selAudio" data-tip="Where the audio-reactive mod sources listen. VIDEO analyses the loaded video's own soundtrack, INPUT uses a microphone or audio interface, FILE plays an audio file you load - which is how you build a piece against the track it will be shown with - and STEMS plays several files locked together so each part of a track can drive something different. The band ranges and response are on the AUDIO tab of the dock.">
         <option value="off">AUDIO OFF</option>
         <option value="source">AUD: VIDEO</option>
         <option value="mic">AUD: INPUT</option>
         <option value="file">AUD: FILE</option>
+        <option value="stems">AUD: STEMS</option>
       </select>
       <div class="mlabel">FRAME SHAPE</div>
       <select id="selAspect" data-tip="The shape of the raster everything is processed at. It is not tied to your window or to the source: a 16:9 clip in a 9:16 frame is fitted the same way any other mismatch is, and the CRT geometry, the scan processor and the overlay all follow. The resolution below picks the height on a wide or square frame and the width on a tall one, so 9:16 at 1080 is 1080 across and 1920 down."></select>
@@ -1591,6 +1620,10 @@ audio,video{display:none;}
   <h3>MODULATION</h3>
   <p><b>Right-click any parameter</b> to patch a modulator straight onto it, adjust the amount, or remove it. The sources are grouped by family — the modulators you have made, then the audio taps, the three audio bands, the picture-derived ones and the internal signals — so you can see at a glance what is on offer and what is already spoken for. The <b>MOD</b> button (or <kbd>D</kbd>) opens the modulation page: every source drawn live, LFO rate/shape/sync editable in place, and each card lists what it's driving. Every number on those cards is a field you can type into, which matters most at the slow end: the rate goes down to a ten-thousandth of a hertz, about one cycle every three hours, and the card says the period beside it because nobody pictures a ten-thousandth of a hertz but everybody pictures three hours. A drift that slow is the difference between a patch that loops and an installation that never quite repeats.</p>
   <p>Going the other way — picking a destination from the route row, or PATCH TO on a modulator card — opens a search field rather than a dropdown, because there are over four hundred parameters and a list that long is not a control. Type a few letters of the name, or the name of a section, and it narrows: "wobb" finds every wobble, "tape transport" gives you that whole section. Arrows move, Enter takes the highlighted one, Escape backs out. The full list is still there to scroll if you would rather browse, grouped by section, with anything already patched marked as such, and the help for whatever is highlighted along the bottom.</p>
+  <h3>STEMS</h3>
+  <p>Under <b>LISTEN TO</b> on the AUDIO tab, <b>STEMS</b> takes several audio files at once &mdash; the separated parts of one track &mdash; and plays them as a set. Each becomes a modulation source of its own, so the kick can drive one parameter, the bass another and the vocal a third, all from the same song. Load them with the button or drop the files straight onto the panel, up to eight.</p>
+  <p>They start together and stay together. Every stem is decoded into memory and all of them are scheduled at one instant on the audio clock, rather than told to play at roughly the same moment and corrected afterwards, which is what drifts. Two identical stems with one of them inverted cancel to silence, which is the only proof worth having. The cost is memory, about a megabyte a second for a stereo stem, and the panel says what it is holding.</p>
+  <p>A stem has a level and nothing else. There is no band control because a band control exists to find the kick inside a finished mix, and a kick stem is already the kick. The level is only about what you hear: a part pulled all the way down still drives whatever it is patched to across its full range, which is how you use a stem nobody is meant to listen to &mdash; a click track, or a part that only exists to move something. <b>RESPONSE</b> is shared by the set, because stems out of one session want one answer. The audio itself cannot travel in a saved patch, but the shape of the set does: reopen one and the stems are there by name with their routes still wired, waiting for the files to be dropped back on.</p>
   <h3>TEMPO &amp; MIDI</h3>
   <p>TAP sets the tempo, or click the number beside it and type one — Enter commits, Escape reverts, and the arrow keys nudge by one beat, or a tenth with shift. LFOs with a SYNC division lock to it. MIDI clock (enable MIDI first) overrides tempo automatically; MIDI notes C1–F1 trigger the six bend pads; CC learn: click MIDI, click a parameter, move a knob.</p>
   <h3>REC OR RENDER</h3>
@@ -1644,6 +1677,7 @@ audio,video{display:none;}
 </div>
 <input type="file" id="fileIn" accept="video/*,image/*,.json" style="display:none">
 <input type="file" id="audioFileIn" accept="audio/*" style="display:none">
+<input type="file" id="stemFileIn" accept="audio/*" multiple style="display:none">
 <script>
 "use strict";
 /* ============================================================

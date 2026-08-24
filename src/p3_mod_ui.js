@@ -116,7 +116,8 @@ const ENV_MODES = [["once","ONE SHOT"],["gate","GATE"],["loop","LOOP"]];
 /* every tap is also a trigger, so an envelope can be fired by the kick on
    input 1 while a different envelope is fired by the hats on input 3 */
 function envTrigList(){
-  return ENV_TRIGS.concat(audioTaps.map(t=>["aud:"+t.id, t.name.toUpperCase()+" HIT"]));
+  return ENV_TRIGS.concat(audioTaps.map(t=>["aud:"+t.id, t.name.toUpperCase()+" HIT"]),
+                          stems.map(st=>["aud:"+st.id, st.name.toUpperCase()+" HIT"]));
 }
 let mods = [];
 let modSeq = 0;
@@ -144,6 +145,7 @@ function rebuildMODSRC(){
   MODSRC.length = 0;
   for(const m of mods) MODSRC.push({id:m.id, name:m.name, type:m.type});
   for(const t of audioTaps) MODSRC.push({id:t.id, name:t.name, type:"audtap"});
+  for(const st of stems) MODSRC.push({id:st.id, name:st.name, type:"stem"});
   for(const f of FIXED_SRC) MODSRC.push({id:f.id, name:f.name, type:"fixed"});
   for(const m of MODSRC){
     if(modVal[m.id] === undefined) modVal[m.id] = 0;
@@ -589,6 +591,172 @@ function mkAudTap(o){
   }, o || {});
 }
 function audTapById(id){ return audioTaps.find(t=>t.id===id); }
+
+/* ---- stems ----
+   A track pulled apart into its parts, all playing together, each part driving
+   something different. The kick moves one thing, the vocal moves another, and
+   because they came out of the same session they are already separated in a
+   way no amount of filtering a stereo mix can match.
+
+   They have to start together and stay together, which rules out the way the
+   single audio file works. Two <audio> elements told to play at the same
+   moment are audibly apart inside a minute, and stems that drift are worse
+   than no stems at all. So a stem is decoded to memory and played from a
+   buffer source, and every source in the set is scheduled at one instant on
+   the audio clock. That is sample-accurate at the start and stays that way,
+   because they are all running off the same clock rather than being nudged
+   towards each other. The price is that the audio is held in RAM: about a
+   megabyte a second for a stereo stem, so the panel says what it is using.
+
+   There is no EQ on a stem, and that is the point rather than an omission. A
+   tap needs a band control because it is trying to find the kick inside a
+   finished mix. A kick stem is already the kick. The only control left worth
+   having is how loud it plays, and even that is only about what you hear:
+   every stem drives across its full range whatever its level, because a part
+   mixed quietly is still a part you want to move something with. */
+const STEM_MAX = 8;
+let stems = [], stemSeq = 0;
+let stemBus = null, stemLoop = true, stemPlaying = false;
+let stemStartAt = 0, stemStartOff = 0, stemDur = 0, stemResp = 0.5;
+function stemById(id){ return stems.find(s=>s.id===id); }
+function stemBytes(){ let n=0; for(const s of stems) if(s.buf) n += s.buf.length*s.buf.numberOfChannels*4; return n; }
+function ensureStemBus(){
+  ensureAudioCtx();
+  if(!stemBus){
+    stemBus = audioCtx.createGain();
+    stemBus.connect(audioCtx.destination);
+    if(recDest) stemBus.connect(recDest);
+  }
+  return stemBus;
+}
+/* the analyser hangs off the source rather than off the level, so turning a
+   stem down in the monitor mix does not turn down what it is driving */
+function mkStemNodes(s){
+  ensureStemBus();
+  s.lv = audioCtx.createGain(); s.lv.gain.value = s.level;
+  s.lv.connect(stemBus);
+  s.an = audioCtx.createAnalyser();
+  s.an.fftSize = 1024; s.an.smoothingTimeConstant = 0.3;
+  s.data = new Uint8Array(s.an.fftSize);
+}
+/* The bus is what the three band readouts and the taps listen to while stems
+   are the source, so it has to reach the master analyser. Loading a set used to
+   set the mode without doing this, which left BASS, MID and HIGH reading zero
+   through a track that was plainly playing. */
+function wireStems(){
+  ensureStemBus();
+  try{ stemBus.disconnect(analyser); }catch(e){}
+  try{ stemBus.connect(analyser); }catch(e){}
+  wireTaps();
+}
+function stemsStopSources(){
+  for(const s of stems){
+    if(s.src){ try{ s.src.onended = null; s.src.stop(); }catch(e){} try{ s.src.disconnect(); }catch(e){} s.src = null; }
+  }
+}
+function stemsPos(){
+  if(!stemDur) return 0;
+  if(!stemPlaying) return stemStartOff;
+  const t = stemStartOff + Math.max(0, audioCtx.currentTime - stemStartAt);
+  return stemLoop ? (t % stemDur) : Math.min(t, stemDur);
+}
+function stemsPlay(from){
+  const live = stems.filter(s=>s.buf);
+  if(!live.length) return;
+  ensureAudioCtx();
+  if(audioCtx.state === "suspended") audioCtx.resume();
+  stemsStopSources();
+  const off = Math.max(0, Math.min(Math.max(0, stemDur-0.01),
+                                   from === undefined ? stemsPos() : from));
+  /* one instant, decided once, used by every source: this is the whole point */
+  const when = audioCtx.currentTime + 0.12;
+  for(const s of live){
+    const src = audioCtx.createBufferSource();
+    src.buffer = s.buf;
+    src.loop = stemLoop;
+    src.connect(s.lv); src.connect(s.an);
+    const o = Math.min(off, Math.max(0, s.buf.duration - 0.01));
+    try{ src.start(when, o); }catch(e){ continue; }
+    s.src = src;
+  }
+  stemStartAt = when; stemStartOff = off; stemPlaying = true;
+  refreshStemUI();
+}
+function stemsStop(){
+  const p = stemsPos();
+  stemsStopSources();
+  stemStartOff = p; stemPlaying = false;
+  for(const s of stems){ s.val = 0; modVal[s.id] = 0; }
+  refreshStemUI();
+}
+function stemsRewind(){
+  stemStartOff = 0;
+  if(stemPlaying) stemsPlay(0); else refreshStemUI();
+}
+function stemDrop(id){
+  const i = stems.findIndex(s=>s.id===id);
+  if(i < 0) return;
+  const s = stems[i];
+  if(s.src){ try{ s.src.stop(); }catch(e){} try{ s.src.disconnect(); }catch(e){} }
+  try{ s.lv && s.lv.disconnect(); }catch(e){}
+  try{ s.an && s.an.disconnect(); }catch(e){}
+  s.buf = null;
+  stems.splice(i,1);
+  delete modVal[s.id];
+  /* a route pointing at a stem that is gone would sit there driving nothing */
+  routes = routes.filter(r=>r.src !== s.id);
+  stemDur = stems.reduce((a,x)=>Math.max(a, x.buf ? x.buf.duration : 0), 0);
+  rebuildMODSRC(); renderRoutes(); buildStemList(); refreshStemUI();
+}
+function stemsClear(){
+  stemsStopSources();
+  for(const s of stems.slice()) stemDrop(s.id);
+  stemPlaying = false; stemStartOff = 0; stemDur = 0;
+}
+async function addStemFiles(list){
+  const ok = /\.(wav|mp3|m4a|aac|flac|ogg|oga|opus|aif|aiff|weba|webm)$/i;
+  const files = [...list].filter(f => (f.type && f.type.indexOf("audio") === 0) || ok.test(f.name));
+  if(!files.length){ toast("Nothing there this browser can decode as audio", true); return; }
+  ensureAudioCtx();
+  const room = STEM_MAX - stems.filter(x=>x.buf).length;
+  if(room <= 0){ toast(STEM_MAX + " stems is the limit \u2014 drop one first", true); return; }
+  const take = files.slice(0, room);
+  if(files.length > room) toast("Room for " + room + " more, so " + (files.length-room) + " were left out", true);
+  const wasPlaying = stemPlaying;
+  let added = 0;
+  for(const f of take){
+    try{
+      const buf = await audioCtx.decodeAudioData(await f.arrayBuffer());
+      /* a patch reloaded without its audio left named, empty slots behind, and
+         its routes are pointing at them: fill those before making new ones, so
+         dropping the same folder back puts the wiring straight */
+      const slot = stems.find(x=>x.missing && !x.buf);
+      const s = slot || {id: "stem" + (++stemSeq), level: 1,
+                         val: 0, raw: 0, peak: 0.05, avg: 0.02, hit: 0,
+                         src: null, lv: null, an: null, data: null};
+      s.buf = buf; s.missing = false;
+      if(!slot){ s.name = f.name.replace(/\.[^.]+$/, "").slice(0, 24); stems.push(s); }
+      mkStemNodes(s);
+      added++;
+    }catch(e){ toast("Could not decode " + f.name, true); }
+  }
+  if(!added) return;
+  stemDur = stems.reduce((a,x)=>Math.max(a, x.buf ? x.buf.duration : 0), 0);
+  /* stems of one track are the same length; anything else will part company at
+     the loop, and being told that now beats working it out later */
+  const lens = stems.filter(x=>x.buf).map(x=>x.buf.duration);
+  const spread = Math.max(...lens) - Math.min(...lens);
+  rebuildMODSRC(); buildStemList(); refreshStemUI(); buildModPage(); renderRoutes();
+  audioMode = "stems";
+  { const a = document.getElementById("selAudio"); if(a) a.value = "stems";
+    const b = document.getElementById("selAudioSrc"); if(b) b.value = "stems"; }
+  wireStems();
+  /* joining late means restarting the set, because a source that starts on its
+     own is a source that is not with the others */
+  stemsPlay(wasPlaying ? stemsPos() : 0);
+  toast(added + (added===1 ? " stem loaded" : " stems loaded") +
+        (spread > 0.25 ? " \u2014 they are not all the same length, so they will part at the loop" : ""));
+}
 /* audio input device + channel routing (for audio interfaces) */
 let audioDeviceId = "", audioChannel = -1, micSplitter = null;   // channel -1 = mix
 let tapSplitter = null, tapSrcNode = null, audInChannels = 2;
@@ -626,6 +794,9 @@ function currentAudioNode(){
   if(audioMode === "mic")    return micNode;
   if(audioMode === "file")   return audioFileNode;
   if(audioMode === "source") return srcNode;
+  /* the stem bus is the sum of the set, so the three band readouts and the
+     taps still have something to listen to while stems are the source */
+  if(audioMode === "stems")  return stemBus;
   return null;
 }
 /* An analyser with nothing hanging off its output is pulled by the graph
@@ -733,6 +904,7 @@ async function setAudioMode(m){
   if(m === "off"){
     if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; micNode=null; }
     if(audioFileEl) audioFileEl.pause();
+    if(stemPlaying) stemsStop();
     audioBands.bass=audioBands.mid=audioBands.high=0;
     for(const t of audioTaps){ t.val = 0; modVal[t.id] = 0; }
     wireTaps();
@@ -749,6 +921,14 @@ async function setAudioMode(m){
       try{ await audioFileEl.play(); }catch(e){}
     }
     refreshAudioFileUI();
+  }
+  if(m === "stems"){
+    wireStems();
+    if(!stems.length){
+      const fi = document.getElementById("stemFileIn");
+      if(fi) fi.click();
+    } else if(!stemPlaying) stemsPlay();
+    refreshStemUI();
   }
   if(m === "mic"){
     try{
@@ -771,7 +951,34 @@ function bandAvgOf(buf, n, nyq, lo, hi){
   let s=0; for(let i=a;i<b;i++) s+=buf[i];
   return s/(b-a)/255;
 }
+/* Each stem tracks its own running peak, so a part mixed quietly still reads
+   across the whole range rather than sitting at a tenth of the meter. That is
+   also what keeps the level fader honest as a monitor control: it changes what
+   you hear and leaves what it drives alone. */
+function updateStems(dt){
+  const sp = 4 + stemResp*36;
+  for(const s of stems){
+    if(!s.an || !stemPlaying || !s.buf){
+      s.val += (0 - s.val) * Math.min(1, dt*10);
+      s.hit = 0; modVal[s.id] = s.val;
+      continue;
+    }
+    s.an.getByteTimeDomainData(s.data);
+    let sum = 0;
+    for(let i=0;i<s.data.length;i++){ const v = (s.data[i]-128)/128; sum += v*v; }
+    const raw = Math.sqrt(sum/s.data.length);
+    s.raw = raw;
+    s.peak = Math.max(s.peak*(1-dt*0.08), raw, 0.05);
+    s.val += (Math.min(1.5, raw/s.peak) - s.val) * Math.min(1, dt*sp);
+    /* an onset rather than a level, so a stem can trigger an envelope */
+    s.hit = raw > Math.max(0.05, s.avg*1.7) ? 1 : 0;
+    s.avg = s.avg*0.92 + raw*0.08;
+    modVal[s.id] = s.val;
+  }
+  if(stems.length) paintStemMeters();
+}
 function updateAudio(dt){
+  if(stems.length) updateStems(dt);
   if(audioMode==="off" || !analyser) return;
   const nyq = audioCtx.sampleRate/2;
   analyser.getByteFrequencyData(fftBuf);
@@ -1661,6 +1868,7 @@ function buildPanel(){
     updateTempoUI();
   }
   buildAudioSection();
+  buildStemSection();
 }
 
 /* ---- MOD page: every source, live ---- */
@@ -3024,6 +3232,137 @@ function sectionExtras(id, d){
 const audioUIRefs = [];
 const meterEls = {};
 function hzFmt(v){ return v>=1000 ? (v/1000).toFixed(1)+"k" : Math.round(v); }
+/* ---- the stems panel ----
+   One row a stem, and the row is the name, the level and a meter. Everything
+   that would normally be on an audio strip is missing on purpose: there is no
+   EQ because the stem is the separation, no solo because level does it, and no
+   per-stem response because stems from one session sit at one response. What
+   is left is what you actually reach for while something is playing. */
+let refreshStemUI = ()=>{};
+let buildStemList = ()=>{};
+let paintStemMeters = ()=>{};
+function fmtClock(sec){
+  if(!isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec/60), r = Math.floor(sec%60);
+  return m + ":" + (r<10?"0":"") + r;
+}
+function buildStemSection(){
+  const dock = document.getElementById("audiodock");
+  const d = mkSection("stems", "cyan", "STEMS \u00b7 A TRACK IN PARTS", dock);
+  d.classList.add("stems");   /* a list of rows wants width, not height */
+  const note = document.createElement("div");
+  note.style.cssText = "color:var(--dim); font-size:8.5px; padding:2px 0 5px; line-height:1.5;";
+  note.textContent = "Load the stems of one track and they play as one, locked together on the audio clock rather than nudged into line. Each becomes a modulation source: right-click a parameter to patch one. Level is what you hear; every stem drives across its full range whatever its level.";
+  d.appendChild(note);
+
+  { const r = document.createElement("div"); r.className = "trow";
+    const ld = document.createElement("button"); ld.textContent = "LOAD STEMS"; ld.className = "cy";
+    attachTip(ld, "LOAD STEMS", "Pick several audio files at once, or drop them on this panel. Up to " + STEM_MAX + " of them. They are decoded into memory so they can be started on the same instant, which is what keeps them together; the panel says how much that is costing.");
+    ld.onclick = ()=>{ const fi = document.getElementById("stemFileIn"); if(fi){ fi.value = ""; fi.click(); } };
+    const pp = document.createElement("button"); pp.id = "stemPlay"; pp.textContent = "PLAY";
+    attachTip(pp, "PLAY / PAUSE THE SET", "Starts every stem on one scheduled instant. Pausing keeps the position, so starting again picks up where it left off with the set still locked.");
+    pp.onclick = ()=>{ if(stemPlaying) stemsStop(); else stemsPlay(); };
+    const rw = document.createElement("button"); rw.textContent = "\u21ba";
+    attachTip(rw, "BACK TO THE TOP", "Returns the whole set to zero.");
+    rw.onclick = ()=>stemsRewind();
+    const lp = document.createElement("button"); lp.id = "stemLoop"; lp.textContent = "LOOP";
+    attachTip(lp, "LOOP", "Runs the set round for as long as you leave it. Stems of one track are the same length, so they stay together across the loop; anything of a different length will part company there, and loading one says so.");
+    lp.onclick = ()=>{ stemLoop = !stemLoop; if(stemPlaying) stemsPlay(stemsPos()); refreshStemUI(); };
+    const cl = document.createElement("button"); cl.textContent = "CLEAR";
+    attachTip(cl, "CLEAR THE SET", "Drops every stem and the memory they were holding. Routes pointing at them go too.");
+    cl.onclick = ()=>{ stemsClear(); rebuildMODSRC(); renderRoutes(); buildStemList(); refreshStemUI(); buildModPage(); };
+    const pos = document.createElement("span"); pos.id = "stemPos";
+    pos.style.cssText = "color:var(--dim); font-size:9px; margin-left:auto; letter-spacing:1px;";
+    r.appendChild(ld); r.appendChild(pp); r.appendChild(rw); r.appendChild(lp); r.appendChild(cl); r.appendChild(pos);
+    d.appendChild(r);
+  }
+  { const row = document.createElement("div"); row.className = "prow";
+    const lab = document.createElement("label"); lab.textContent = "RESPONSE";
+    attachTip(lab, "STEM RESPONSE",
+      "How quickly every stem follows its own level. Slow gives you the shape of a part over bars; fast gives you the hits. One control for the set, because stems out of one session want one answer.");
+    const sl = document.createElement("input"); sl.type = "range";
+    sl.min = 0; sl.max = 1; sl.step = 0.01; sl.value = stemResp;
+    const wrap = document.createElement("div"); wrap.className = "sldwrap"; wrap.appendChild(sl);
+    const val = document.createElement("input"); val.className = "mval";
+    const show = makeNumField(val, {label:"stem response", min:0, max:1,
+      get:()=>stemResp, set:v=>{ stemResp = v; sl.value = v; }, fmt:v=>v.toFixed(2)});
+    sl.addEventListener("input", ()=>{ stemResp = parseFloat(sl.value); show(); });
+    row.appendChild(lab); row.appendChild(wrap); row.appendChild(val);
+    d.appendChild(row);
+  }
+  const list = document.createElement("div"); list.id = "stemList";
+  d.appendChild(list);
+  const foot = document.createElement("div"); foot.id = "stemFoot";
+  foot.style.cssText = "color:var(--dim); font-size:8.5px; padding:4px 0 0;";
+  d.appendChild(foot);
+
+  /* dropping the files on the panel is how anybody actually has them: in a
+     folder, selected, dragged across */
+  d.addEventListener("dragover", e=>{ e.preventDefault(); d.classList.add("dropping"); });
+  d.addEventListener("dragleave", ()=>d.classList.remove("dropping"));
+  d.addEventListener("drop", e=>{
+    e.preventDefault(); e.stopPropagation();
+    d.classList.remove("dropping");
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) addStemFiles(e.dataTransfer.files);
+  });
+
+  const meters = {};
+  buildStemList = ()=>{
+    list.innerHTML = ""; for(const k in meters) delete meters[k];
+    if(!stems.length){
+      const e = document.createElement("div");
+      e.style.cssText = "color:var(--dim); font-size:9px; padding:8px 0; text-align:center; border:1px dashed var(--line); border-radius:3px;";
+      e.textContent = "no stems \u2014 LOAD, or drop audio files here";
+      list.appendChild(e);
+      return;
+    }
+    for(const st of stems){
+      const r = document.createElement("div"); r.className = "stemrow";
+      const nm = document.createElement("span"); nm.className = "stemname";
+      nm.textContent = st.name; nm.title = st.name;
+      const sl = document.createElement("input"); sl.type = "range";
+      sl.min = 0; sl.max = 1.5; sl.step = 0.01; sl.value = st.level;
+      attachTip(sl, st.name.toUpperCase() + " LEVEL",
+        "How loud this stem plays. It does not change what the stem drives \u2014 that reads the part itself, so a stem you have pulled right down still moves whatever it is patched to. Pull it to zero for a part you want driving something but do not want to hear.");
+      sl.addEventListener("input", ()=>{
+        st.level = parseFloat(sl.value);
+        if(st.lv) st.lv.gain.value = st.level;
+      });
+      const mt = document.createElement("div"); mt.className = "stemmeter";
+      const fill = document.createElement("i"); mt.appendChild(fill);
+      meters[st.id] = fill;
+      const rm = document.createElement("button"); rm.className = "stemx"; rm.textContent = "\u2715";
+      attachTip(rm, "DROP THIS STEM", "Takes it out of the set and frees the memory. Anything patched to it loses that route.");
+      rm.onclick = ()=>stemDrop(st.id);
+      r.appendChild(nm); r.appendChild(sl); r.appendChild(mt); r.appendChild(rm);
+      list.appendChild(r);
+    }
+  };
+  paintStemMeters = ()=>{
+    if(!dock.classList.contains("on")) return;
+    for(const st of stems){
+      const f = meters[st.id];
+      if(f) f.style.width = Math.round(Math.min(1, st.val) * 100) + "%";
+    }
+    const p = document.getElementById("stemPos");
+    if(p) p.textContent = stems.length ? fmtClock(stemsPos()) + " / " + fmtClock(stemDur) : "";
+  };
+  refreshStemUI = ()=>{
+    const pp = document.getElementById("stemPlay");
+    if(pp){ pp.textContent = stemPlaying ? "PAUSE" : "PLAY"; pp.classList.toggle("on", stemPlaying); }
+    const lp = document.getElementById("stemLoop");
+    if(lp) lp.classList.toggle("on", stemLoop);
+    const mb = stemBytes()/1048576;
+    foot.textContent = stems.length
+      ? stems.length + (stems.length===1?" stem \u00b7 ":" stems \u00b7 ") + fmtClock(stemDur) +
+        " \u00b7 " + mb.toFixed(0) + " MB held in memory" +
+        (mb > 500 ? " \u2014 that is a lot; drop one if the tab gets unhappy" : "")
+      : "";
+    const p = document.getElementById("stemPos");
+    if(p) p.textContent = stems.length ? fmtClock(stemsPos()) + " / " + fmtClock(stemDur) : "";
+  };
+  buildStemList(); refreshStemUI();
+}
 function buildAudioSection(){
   const dock = document.getElementById("audiodock");
   const d = mkSection("audio", "cyan", "AUDIO REACT \u00b7 INPUT", dock);
@@ -3034,7 +3373,8 @@ function buildAudioSection(){
     const sel = document.createElement("select"); sel.id = "selAudioSrc"; sel.style.flex = "1";
     attachTip(sel, "AUDIO SOURCE",
       "Where the audio-reactive modulators listen. VIDEO taps the soundtrack of the clip loaded into channel A. INPUT opens a microphone, an audio interface or any capture device. FILE plays an audio file you load here, which is how you build a piece against the track it will be shown with.");
-    for(const [v,t] of [["off","OFF"],["source","VIDEO SOUNDTRACK"],["mic","LIVE INPUT"],["file","AUDIO FILE"]]){
+    for(const [v,t] of [["off","OFF"],["source","VIDEO SOUNDTRACK"],["mic","LIVE INPUT"],
+                        ["file","AUDIO FILE"],["stems","STEMS"]]){
       const o = document.createElement("option"); o.value=v; o.textContent=t; sel.appendChild(o);
     }
     sel.value = audioMode;

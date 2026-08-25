@@ -54,6 +54,15 @@ fileIn.onchange = ()=>{ if(fileIn.files[0]) handleFile(fileIn.files[0], fileIn.d
   /* stems arrive several at a time, which is the only way anybody has them */
   const sfi = document.getElementById("stemFileIn");
   if(sfi) sfi.onchange = ()=>{ if(sfi.files && sfi.files.length) addStemFiles(sfi.files); sfi.value=""; };
+  const mfi = document.getElementById("mapFileIn");
+  if(mfi) mfi.onchange = ()=>{ if(mfi.files[0]) loadMapFile(mfi.files[0], mfi.dataset.mode || "replace"); mfi.value=""; };
+  {
+    const pick = m => ()=>{ const e = document.getElementById("mapFileIn");
+                            if(e){ e.dataset.mode = m; e.value = ""; e.click(); } };
+    const sv = document.getElementById("btnMapSave"); if(sv) sv.onclick = saveMapFile;
+    const ld = document.getElementById("btnMapLoad"); if(ld) ld.onclick = pick("replace");
+    const mg = document.getElementById("btnMapMerge"); if(mg) mg.onclick = pick("merge");
+  }
 }
 
 const IMG_RE = /\.(jpe?g|png|gif|webp|bmp|avif|apng|svg)$/i;

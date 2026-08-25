@@ -1,5 +1,13 @@
 /* ---------------- record / snapshot / fullscreen ---------------- */
 let recorder=null, recChunks=[], recStart=0, recTimer=null;
+/* Every chunk the recorder produced was held in memory until you pressed stop,
+   which is fine for a minute and is a way to lose the tab at half an hour: at
+   the bitrate this thing records glitch material, thirty minutes is a couple
+   of gigabytes sitting in one array. Written straight to disk where the
+   browser allows it, and where it does not, watched and stopped with an
+   explanation rather than left to take the page down. */
+let recStream2 = null, recWriter = null, recBytes = 0, recHandle = null;
+const REC_MEM_CAP = 1200e6;      /* only applies when there is no file to write to */
 const btnRec = document.getElementById("btnRec"), recTime = document.getElementById("recTime");
 btnRec.onclick = toggleRec;
 let recStream = null, recSize = null, recLocked = false;
@@ -15,7 +23,7 @@ function captureFps(){
   const v = e ? parseInt(e.value) : 30;
   return (v >= 1 && v <= 120) ? v : 30;
 }
-function toggleRec(){
+async function toggleRec(){
   if(recorder){ recorder.stop(); return; }
   /* Each recording used to add another live capture stream to the canvas and
      never let go of it. Stopping the whole stream fixed that and introduced
@@ -53,15 +61,57 @@ function toggleRec(){
     if(MediaRecorder.isTypeSupported(m)){ mime=m; break; }
   }
   const isMp4 = mime.indexOf("mp4") >= 0;
-  recChunks = [];
+  recChunks = []; recBytes = 0; recWriter = null; recHandle = null;
+  /* Offer a file up front. Writing as it goes is the difference between a take
+     limited by the disk and a take limited by how much the tab can hold before
+     it dies, and half an hour of this material is a couple of gigabytes.
+     Declining is fine and lands on the old in-memory path with a ceiling. */
+  if(window.showSaveFilePicker){
+    try{
+      recHandle = await window.showSaveFilePicker({
+        suggestedName: "bendr-"+stamp()+(isMp4?".mp4":".webm"),
+        types:[{description: isMp4 ? "MP4 video" : "WebM video",
+                accept: isMp4 ? {"video/mp4":[".mp4"]} : {"video/webm":[".webm"]}}]});
+      recWriter = await recHandle.createWritable();
+    }catch(e){
+      recHandle = null; recWriter = null;
+      if(e && e.name === "AbortError"){
+        toast("Recording to memory instead \u2014 the take is capped at "
+              + Math.round(REC_MEM_CAP/1e6) + " MB", false);
+      }
+    }
+  }
   /* Glitch material is about the worst case an encoder ever sees: every frame
      is high-entropy and almost nothing survives between frames. A flat 16 Mbit
      was thin at 1080p and meaningless at 4K, so scale it with the pixel rate. */
   recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: bitrateFor(procW, procH, capFps)});
-  recorder.ondataavailable = e=>{ if(e.data.size) recChunks.push(e.data); };
-  recorder.onstop = ()=>{
-    const blob = new Blob(recChunks, {type: isMp4 ? "video/mp4" : "video/webm"});
-    dl(URL.createObjectURL(blob), "bendr-"+stamp()+(isMp4?".mp4":".webm"));
+  recorder.ondataavailable = e=>{
+    if(!e.data.size) return;
+    recBytes += e.data.size;
+    if(recWriter){
+      /* straight to the file: nothing accumulates and the length is whatever
+         the disk will take */
+      recWriter.write(e.data).catch(err=>{ console.warn(err); });
+      return;
+    }
+    recChunks.push(e.data);
+    if(recBytes > REC_MEM_CAP && recorder){
+      toast("Recording stopped at " + (recBytes/1048576).toFixed(0) + " MB \u2014 without a file to write to it "
+            + "has to be held in memory, and past this the tab is at risk. Record again to carry on, or use "
+            + "RENDER, which writes to disk.", true);
+      try{ recorder.stop(); }catch(e){}
+    }
+  };
+  recorder.onstop = async ()=>{
+    const size = recBytes;
+    if(recWriter){
+      try{ await recWriter.close(); }catch(e){ console.warn(e); }
+      recWriter = null;
+    } else {
+      const blob = new Blob(recChunks, {type: isMp4 ? "video/mp4" : "video/webm"});
+      dl(URL.createObjectURL(blob), "bendr-"+stamp()+(isMp4?".mp4":".webm"));
+    }
+    recChunks = [];
     recorder=null; btnRec.classList.remove("rec-on"); btnRec.textContent="● REC";
     if(recStream){ try{ recStream.getVideoTracks().forEach(t=>t.stop()); }catch(e){} recStream=null; }
     recLocked = false;
@@ -71,7 +121,9 @@ function toggleRec(){
        the expensive way to find out that AUDIO REACT was set to OFF */
     toast("Recording saved, "+procW+"\u00d7"+procH+" @"+capFps+"fps, "
           + (recAudio ? "with audio" : "no audio — AUDIO REACT is OFF")
-          + " ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
+          + " ("+(size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")
+          + (recHandle ? ", written to "+recHandle.name : "")+")");
+    recHandle = null;
   };
   recorder.start(250);
   recStart = performance.now();
@@ -79,7 +131,11 @@ function toggleRec(){
   recTime.style.display="inline";
   recTimer = setInterval(()=>{
     const s = Math.floor((performance.now()-recStart)/1000);
-    recTime.textContent = Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+    const mb = recBytes/1048576;
+    recTime.textContent = Math.floor(s/60)+":"+String(s%60).padStart(2,"0")
+      + (mb > 1 ? "  " + mb.toFixed(0) + "MB" : "");
+    /* held in memory and getting heavy: say so while there is still time to act */
+    recTime.classList.toggle("warn", !recWriter && recBytes > REC_MEM_CAP*0.6);
   }, 250);
 }
 /* the drawing buffer is only valid inside the frame callback now, so a still

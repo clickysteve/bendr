@@ -492,6 +492,11 @@ function captureState(){
      called, how loud each sat - and that is enough for the routes patched to
      them to survive, so a reloaded patch comes back wired up and waiting for
      the files rather than quietly missing half its modulation. */
+  /* The MIDI map was never in here. Somebody who had learned ninety
+     controllers, saved the patch and saved a file still lost every one of
+     them, because the only copy lived in a variable. It is part of the patch:
+     it is where your hands are. */
+  st.midiMap = {...midiMap};
   st.stems = stems.map(x=>({id:x.id, name:x.name, level:x.level}));
   st.stemLoop = stemLoop; st.stemResp = stemResp;
   /* the shape of the frame is part of the piece, not a machine setting: a patch
@@ -559,7 +564,7 @@ function restoreState(st){
       if(st.chan[ch][p.id] !== undefined) chanBase[ch][p.id] = st.chan[ch][p.id];
     if(st.master) for(const p of MLIST) if(st.master[p.id] !== undefined) mBase[p.id] = st.master[p.id];
     routes = (st.routes||[]).map(r=>({ch:"A", ...r}));
-    if(st.mods || st.lfo1 || st.audioCfg || st.audioTaps || st.stems) applyExtras(st);
+    if(st.mods || st.lfo1 || st.audioCfg || st.audioTaps || st.stems || st.midiMap) applyExtras(st);
     refreshUI(); renderRoutes(); refreshLfoUI(); refreshAudioUI();
   } else {
     applyState(st.bases||{}, st.routes||[], st);   /* legacy single-channel state */
@@ -632,6 +637,12 @@ function applyExtras(extra){
     rebuildMODSRC();
     if(typeof buildAudTapList === "function") buildAudTapList();
     buildModPage();
+  }
+  if(extra.midiMap){
+    for(const k in midiMap) delete midiMap[k];
+    Object.assign(midiMap, extra.midiMap);
+    if(typeof renderMidiMap === "function") renderMidiMap();
+    if(typeof markMappedLabels === "function") markMappedLabels();
   }
   if(extra.stems){
     /* An undo is a restore, and restoring should not throw away a couple of

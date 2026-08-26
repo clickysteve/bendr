@@ -11440,12 +11440,10 @@ async function startRec(){
 
     if(hasAudio){
       try{
-        let recFirstAudioTs = null;
         recAEnc = new AudioEncoder({
           output: (chunk, meta) => {
             if(recMuxer){
-              if(recFirstAudioTs === null) recFirstAudioTs = chunk.timestamp;
-              const tsUs = Math.max(0, chunk.timestamp - recFirstAudioTs);
+              const tsUs = Math.round(Math.max(0, chunk.timestamp - (recStart * 1000)));
               recMuxer.addAudioChunk(chunk, meta, tsUs);
             }
             recBytes += (chunk.byteLength || 0);

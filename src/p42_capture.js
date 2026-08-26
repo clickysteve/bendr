@@ -6,6 +6,13 @@ let recFps = 30, recFrameCount = 0, recLastFrameMs = 0, recDroppedFrames = 0;
 let lastRecUrl = null;
 const btnRec = document.getElementById("btnRec"), recTime = document.getElementById("recTime");
 btnRec.onclick = toggleRec;
+function recBeforeUnload(e){
+  if(recActive){
+    e.preventDefault();
+    e.returnValue = "";
+    return "";
+  }
+}
 let recSize = null, recLocked = false;
 /* about a quarter of a bit per pixel, which is generous for normal footage and
    merely adequate for this, bounded so a 4K recording does not ask for a gigabit */
@@ -97,10 +104,11 @@ async function startRec(){
       }
     });
     recEnc.configure({
-      codec, width: W, height: H, bitrate: bitrateFor(W, H, recFps), framerate: recFps
+      codec, width: W, height: H, bitrate: bitrateFor(W, H, recFps), framerate: recFps, hardwareAcceleration: "prefer-hardware"
     });
 
     recActive = true;
+    window.addEventListener("beforeunload", recBeforeUnload);
     recStarting = false;
     recFrameCount = 0;
     recDroppedFrames = 0;
@@ -159,6 +167,7 @@ async function startRec(){
     }, 250);
 
   }catch(e){
+    window.removeEventListener("beforeunload", recBeforeUnload);
     recStarting = false;
     recActive = false;
     console.error("Failed to start recording:", e);
@@ -205,6 +214,7 @@ async function stopRec(aborted){
     console.error("Error finalizing recording:", e);
     toast("Recording error: " + ((e && e.message) || e), true);
   }finally{
+    window.removeEventListener("beforeunload", recBeforeUnload);
     try{ if(recEnc && recEnc.state !== "closed") recEnc.close(); }catch(e){}
     try{ if(recAEnc && recAEnc.state !== "closed") recAEnc.close(); }catch(e){}
     recEnc = null; recAEnc = null; recMuxer = null; recTarget = null;
@@ -219,7 +229,7 @@ function recFramePush(){
   if(recLastFrameMs > 0 && (nowMs - recLastFrameMs) < interval - 2) return;
   recLastFrameMs = nowMs;
 
-  if(recEnc.encodeQueueSize > 5){
+  if(recEnc.encodeQueueSize > 10){
     recDroppedFrames++;
     return;
   }

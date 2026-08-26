@@ -27,6 +27,7 @@ async function run() {
   console.log('====================================================');
 
   const browser = await chromium.launch({
+    channel: 'chrome',
     args: [
       '--autoplay-policy=no-user-gesture-required',
       '--use-fake-ui-for-media-stream',

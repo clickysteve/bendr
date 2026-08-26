@@ -76,8 +76,11 @@ async function run() {
     throw new Error('Required WebCodecs or Mp4Muxer missing from browser environment.');
   }
 
-  // --- 2. Test Live REC (Take 1) ---
-  console.log('\n[2/4] Starting live recording (Take 1, 3 seconds)...');
+  // --- 2. Test Live In-Memory REC (Take 1) ---
+  // In automated test environment, delete showSaveFilePicker to exercise in-memory ArrayBufferTarget & download
+  await page.evaluate(() => { delete window.showSaveFilePicker; });
+
+  console.log('\n[2/5] Starting live recording (Take 1, 3 seconds)...');
   await page.click('#btnRec');
   await page.waitForTimeout(300);
 
@@ -158,27 +161,28 @@ async function run() {
   console.log(`✓ Take 2 saved: ${dl2.suggestedFilename()} (${(take2Stat.size / 1048576).toFixed(2)} MB)`);
   if (take2Stat.size < 10000) throw new Error('Take 2 MP4 file size suspiciously small.');
 
-  // --- 5. Test Direct-to-Disk FileSystemAccess Streaming (Take 3) ---
-  console.log('\n[5/5] Testing direct-to-disk FileSystemWritableFileStreamTarget streaming...');
+  // --- 5. Test File Picker Abort / Cancellation Handling ---
+  console.log('\n[5/5] Testing showSaveFilePicker AbortError cancellation handling...');
   await page.evaluate(() => {
-    window.__diskWritten = false;
-    window.__diskClosed = false;
-    // Mock showSaveFilePicker with a mock handle containing createWritable
     window.showSaveFilePicker = async () => {
-      window.__diskWritten = true;
-      return null; // Forces graceful fallback test without throwing unhandled rejection
+      const err = new Error('The user aborted a request.');
+      err.name = 'AbortError';
+      throw err;
     };
   });
 
   await page.click('#btnRec');
-  await page.waitForTimeout(1000);
-  const isRec3 = await page.evaluate(() => recActive);
-  if (!isRec3) throw new Error('Expected recording to start in fallback mode when picker returns null.');
-  const dlP3 = page.waitForEvent('download', { timeout: 15000 });
-  await page.click('#btnRec');
-  const dl3 = await dlP3;
-  await dl3.path();
-  console.log('✓ Fallback and recovery verified.');
+  await page.waitForTimeout(500);
+  const isRecAborted = await page.evaluate(() => ({
+    recActive: typeof recActive !== 'undefined' ? recActive : null,
+    recStarting: typeof recStarting !== 'undefined' ? recStarting : null,
+    btnText: document.getElementById('btnRec').textContent
+  }));
+  console.log('Picker abort state check:', isRecAborted);
+  if (isRecAborted.recActive || isRecAborted.recStarting || isRecAborted.btnText.includes('STOP')) {
+    throw new Error('Expected startRec to cleanly cancel without starting when picker throws AbortError.');
+  }
+  console.log('✓ File picker AbortError cleanly handled.');
 
   console.log('\nError log summary: ' + (errors.length ? errors.length + ' errors logged' : '0 errors (clean)'));
   if (errors.length) {

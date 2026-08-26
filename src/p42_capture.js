@@ -1,8 +1,12 @@
-/* ---------------- record / snapshot / fullscreen ---------------- */
-let recorder=null, recChunks=[], recStart=0, recTimer=null;
+/* ---------------- record (WebCodecs MP4) / snapshot / fullscreen ---------------- */
+let recActive = false, recStarting = false, recStopping = false, recStart = 0, recTimer = null;
+let recEnc = null, recAEnc = null, recMuxer = null, recFileStream = null, recFileHandle = null;
+let recAudioReader = null, recAudioTrack = null;
+let recParts = [], recFps = 30, recFrameCount = 0, recLastFrameMs = 0, recDroppedFrames = 0;
+let lastRecUrl = null;
 const btnRec = document.getElementById("btnRec"), recTime = document.getElementById("recTime");
 btnRec.onclick = toggleRec;
-let recStream = null, recSize = null, recLocked = false;
+let recSize = null, recLocked = false;
 /* about a quarter of a bit per pixel, which is generous for normal footage and
    merely adequate for this, bounded so a 4K recording does not ask for a gigabit */
 function bitrateFor(w, h, fps){
@@ -15,72 +19,224 @@ function captureFps(){
   const v = e ? parseInt(e.value) : 30;
   return (v >= 1 && v <= 120) ? v : 30;
 }
-function toggleRec(){
-  if(recorder){ recorder.stop(); return; }
-  /* Each recording used to add another live capture stream to the canvas and
-     never let go of it. Stopping the whole stream fixed that and introduced
-     something worse: the audio track belongs to recDest and is shared, and is
-     the same track object every time, so stopping it killed audio for the rest
-     of the session. The first recording had sound and every one after it was
-     silent. Only the video track is ours to stop. */
-  if(recStream){ try{ recStream.getVideoTracks().forEach(t=>t.stop()); }catch(e){} }
-  /* The canvas backing store is normally sized to the window, so recording
-     captured whatever the pane happened to be - about 900 x 500 with the panel
-     open - and upscaled it. That is the softness. Pin it to the processing
-     raster for the duration, the way the offline render already does, so 1080p
-     processing records 1080p and 4K records 4K. The CSS size does not change,
-     so nothing moves on screen. */
+async function toggleRec(){
+  if(recStarting || recStopping) return;
+  if(recActive){
+    recStopping = true;
+    try{ await stopRec(); } finally{ recStopping = false; }
+    return;
+  }
+  await startRec();
+}
+async function startRec(){
+  if(!("VideoEncoder" in window) || !("VideoFrame" in window)){
+    toast("Live recording requires WebCodecs (use Chrome or Edge)", true);
+    return;
+  }
+  if(lastRecUrl){ try{ URL.revokeObjectURL(lastRecUrl); }catch(e){} lastRecUrl = null; }
+
+  recFps = captureFps();
+  const W = procW, H = procH;
+  const candidates = [["avc1.640028","avc"],["avc1.42003e","avc"],["vp09.00.10.08","vp9"]];
+  let codec = null, mcodec = null;
+  for(const [c,m] of candidates){
+    try{
+      const s = await VideoEncoder.isConfigSupported({
+        codec: c, width: W, height: H, bitrate: bitrateFor(W, H, recFps), framerate: recFps
+      });
+      if(s.supported){ codec = c; mcodec = m; break; }
+    }catch(e){}
+  }
+  if(!codec){ toast("No supported video encoder found", true); return; }
+
+  /* Pin canvas backing store to processing raster so 1080p records 1080p and 4K records 4K */
   recSize = {w: canvas.width, h: canvas.height};
   canvas.width = procW; canvas.height = procH;
   recLocked = true;
-  const capFps = captureFps();
-  const stream = recStream = canvas.captureStream(capFps);
-  /* Whatever is being listened to goes into the recording: the soundtrack of
-     the clip, an audio file loaded for reactivity, or a live input. This used
-     to test for the soundtrack alone, so building a piece against a track and
-     then recording it handed back a silent video with nothing to say why.
-     All three sources already run into recDest; only the gate was wrong. */
-  let recAudio = false;
-  if(audioCtx && recDest && audioMode !== "off"){
-    const tracks = recDest.stream.getAudioTracks();
-    for(const tr of tracks) stream.addTrack(tr);
-    recAudio = tracks.length > 0;
-  }
-  let mime = "";
-  for(const m of ["video/mp4;codecs=avc1.640028,mp4a.40.2","video/mp4;codecs=avc1.42E01E,mp4a.40.2",
-                  "video/mp4;codecs=avc1.640028","video/mp4",
-                  "video/webm;codecs=vp9,opus","video/webm;codecs=vp9","video/webm;codecs=vp8,opus","video/webm"]){
-    if(MediaRecorder.isTypeSupported(m)){ mime=m; break; }
-  }
-  const isMp4 = mime.indexOf("mp4") >= 0;
-  recChunks = [];
-  /* Glitch material is about the worst case an encoder ever sees: every frame
-     is high-entropy and almost nothing survives between frames. A flat 16 Mbit
-     was thin at 1080p and meaningless at 4K, so scale it with the pixel rate. */
-  recorder = new MediaRecorder(stream, {mimeType:mime, videoBitsPerSecond: bitrateFor(procW, procH, capFps)});
-  recorder.ondataavailable = e=>{ if(e.data.size) recChunks.push(e.data); };
-  recorder.onstop = ()=>{
-    const blob = new Blob(recChunks, {type: isMp4 ? "video/mp4" : "video/webm"});
-    dl(URL.createObjectURL(blob), "bendr-"+stamp()+(isMp4?".mp4":".webm"));
-    recorder=null; btnRec.classList.remove("rec-on"); btnRec.textContent="● REC";
-    if(recStream){ try{ recStream.getVideoTracks().forEach(t=>t.stop()); }catch(e){} recStream=null; }
+  if(typeof markSizeDirty === "function") markSizeDirty();
+
+  recStarting = true;
+  recParts = [];
+  const suggested = "bendr-" + stamp() + ".mp4";
+
+  try{
+    const target = new Mp4Muxer.StreamTarget({
+      onData: (data, position) => { recParts.push({position, data: data.slice()}); },
+      chunked: true,
+    });
+
+    /* Whatever is being listened to goes into the recording: clip soundtrack, loaded audio file, or live mic */
+    let hasAudio = false;
+    recAudioTrack = null;
+    if(audioCtx && recDest && audioMode !== "off" && ("MediaStreamTrackProcessor" in window) && ("AudioEncoder" in window)){
+      const tracks = recDest.stream.getAudioTracks();
+      if(tracks.length > 0){
+        recAudioTrack = tracks[0];
+        try{
+          const ok = await AudioEncoder.isConfigSupported({
+            codec: "mp4a.40.2",
+            sampleRate: audioCtx.sampleRate,
+            numberOfChannels: 2,
+            bitrate: 192000
+          });
+          if(ok && ok.supported) hasAudio = true;
+        }catch(e){}
+      }
+    }
+
+    recMuxer = new Mp4Muxer.Muxer({
+      target,
+      video: {codec: mcodec, width: W, height: H},
+      ...(hasAudio ? {audio: {codec: "aac", sampleRate: audioCtx.sampleRate, numberOfChannels: 2}} : {}),
+      fastStart: "in-memory",
+      firstTimestampBehavior: "cross-track-offset",
+    });
+
+    recEnc = new VideoEncoder({
+      output: (chunk, meta) => { if(recMuxer) recMuxer.addVideoChunk(chunk, meta); },
+      error: e => {
+        console.error("Video encoder error:", e);
+        toast("Encoder error: " + (e && e.message ? e.message : e), true);
+        stopRec(true);
+      }
+    });
+    recEnc.configure({
+      codec, width: W, height: H, bitrate: bitrateFor(W, H, recFps), framerate: recFps
+    });
+
+    if(hasAudio){
+      try{
+        recAEnc = new AudioEncoder({
+          output: (chunk, meta) => { if(recMuxer) recMuxer.addAudioChunk(chunk, meta); },
+          error: e => { console.error("Audio encoder error:", e); }
+        });
+        recAEnc.configure({
+          codec: "mp4a.40.2",
+          sampleRate: audioCtx.sampleRate,
+          numberOfChannels: 2,
+          bitrate: 192000
+        });
+
+        const processor = new MediaStreamTrackProcessor({track: recAudioTrack});
+        recAudioReader = processor.readable.getReader();
+        (async () => {
+          try{
+            while(recActive && recAudioReader){
+              const {value: audioData, done} = await recAudioReader.read();
+              if(done || !recActive){
+                if(audioData) audioData.close();
+                break;
+              }
+              if(recAEnc && recAEnc.state === "configured"){
+                recAEnc.encode(audioData);
+              }
+              audioData.close();
+            }
+          }catch(err){}
+        })();
+      }catch(e){
+        recAEnc = null;
+      }
+    }
+
+    recActive = true;
+    recStarting = false;
+    recFrameCount = 0;
+    recDroppedFrames = 0;
+    recLastFrameMs = 0;
+    recStart = performance.now();
+
+    btnRec.classList.add("rec-on");
+    btnRec.textContent = "■ STOP";
+    recTime.style.display = "inline";
+    recTimer = setInterval(()=>{
+      const s = Math.floor((performance.now() - recStart)/1000);
+      recTime.textContent = Math.floor(s/60) + ":" + String(s%60).padStart(2, "0");
+    }, 250);
+
+  }catch(e){
+    recStarting = false;
+    recActive = false;
+    console.error("Failed to start recording:", e);
+    toast("Failed to start recording: " + ((e && e.message) || e), true);
+    if(recEnc && recEnc.state !== "closed"){ try{ recEnc.close(); }catch(_){} recEnc = null; }
+    if(recAEnc && recAEnc.state !== "closed"){ try{ recAEnc.close(); }catch(_){} recAEnc = null; }
+    recMuxer = null;
     recLocked = false;
     if(recSize){ canvas.width = recSize.w; canvas.height = recSize.h; recSize = null; markSizeDirty(); }
-    recTime.style.display="none"; clearInterval(recTimer);
-    /* say whether the sound made it, because a silent file discovered later is
-       the expensive way to find out that AUDIO REACT was set to OFF */
-    toast("Recording saved, "+procW+"\u00d7"+procH+" @"+capFps+"fps, "
-          + (recAudio ? "with audio" : "no audio — AUDIO REACT is OFF")
-          + " ("+(blob.size/1048576).toFixed(1)+" MB "+(isMp4?"MP4":"WebM — this browser can't record MP4; use RENDER for MP4")+")");
-  };
-  recorder.start(250);
-  recStart = performance.now();
-  btnRec.classList.add("rec-on"); btnRec.textContent="■ STOP";
-  recTime.style.display="inline";
-  recTimer = setInterval(()=>{
-    const s = Math.floor((performance.now()-recStart)/1000);
-    recTime.textContent = Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
-  }, 250);
+  }
+}
+async function stopRec(aborted){
+  if(!recActive && !recStarting) return;
+  recActive = false;
+  recStarting = false;
+  btnRec.classList.remove("rec-on");
+  btnRec.textContent = "● REC";
+  recTime.style.display = "none";
+  clearInterval(recTimer);
+
+  const W = procW, H = procH, fps = recFps;
+  const hadAudio = !!(recAEnc && recAEnc.state === "configured");
+
+  if(recAudioReader){
+    try{ await recAudioReader.cancel(); }catch(e){}
+    recAudioReader = null;
+  }
+
+  try{
+    if(!aborted && recEnc && recEnc.state === "configured"){
+      await recEnc.flush();
+      if(recAEnc && recAEnc.state === "configured") await recAEnc.flush();
+      if(recMuxer) recMuxer.finalize();
+
+      recParts.sort((a,b)=>a.position - b.position);
+      const blob = new Blob(recParts.map(x=>x.data), {type: "video/mp4"});
+      lastRecUrl = URL.createObjectURL(blob);
+      dl(lastRecUrl, "bendr-" + stamp() + ".mp4");
+      toast("Recording saved \u2192 MP4 (" + (blob.size/1048576).toFixed(1) + " MB, " + W + "\u00d7" + H + " @" + fps + "fps"
+            + (hadAudio ? ", with audio" : ", no audio \u2014 AUDIO REACT is OFF") + ")");
+    } else {
+      if(aborted) toast("Recording aborted", true);
+    }
+  }catch(e){
+    console.error("Error finalizing recording:", e);
+    toast("Recording error: " + ((e && e.message) || e), true);
+  }finally{
+    try{ if(recEnc && recEnc.state !== "closed") recEnc.close(); }catch(e){}
+    try{ if(recAEnc && recAEnc.state !== "closed") recAEnc.close(); }catch(e){}
+    recEnc = null; recAEnc = null; recMuxer = null;
+    recParts.length = 0;
+    recLocked = false;
+    if(recSize){ canvas.width = recSize.w; canvas.height = recSize.h; recSize = null; markSizeDirty(); }
+  }
+}
+function recFramePush(){
+  if(!recActive || !recEnc || recEnc.state !== "configured") return;
+  const nowMs = performance.now();
+  const interval = 1000 / recFps;
+  if(recLastFrameMs > 0 && (nowMs - recLastFrameMs) < interval - 2) return;
+  recLastFrameMs = nowMs;
+
+  if(recEnc.encodeQueueSize > 5){
+    recDroppedFrames++;
+    return;
+  }
+
+  const tsUs = Math.round(nowMs * 1000);
+  let vf = null;
+  try{
+    vf = new VideoFrame(canvas, {timestamp: tsUs, duration: Math.round(1e6 / recFps)});
+  }catch(e){ return; }
+
+  const isKey = (recFrameCount % (recFps * 2)) === 0;
+  try{
+    recEnc.encode(vf, {keyFrame: isKey});
+    recFrameCount++;
+  }catch(e){
+    console.error("VideoFrame encode error:", e);
+  }finally{
+    try{ vf.close(); }catch(_){}
+  }
 }
 /* the drawing buffer is only valid inside the frame callback now, so a still
    is a request that the next frame fulfils */
@@ -102,45 +258,18 @@ window.__grab = (type)=>new Promise(res=>grabCanvas(c=>res(c.toDataURL(type||"im
 
    While the recorder is running it takes the picture as it stands instead. It
    is already the right size, because REC pins the canvas to the same raster for
-   the duration, and both the recorder and the pop-out hold a captureStream off
-   this canvas: resizing it underneath a MediaRecorder mid-take is a good way to
-   end up with a broken file. */
+   the duration. */
 function snapStill(){
-  if(recorder){
-    grabCanvas(c=>c.toBlob(b=>{
-      if(!b) return;
+  grabCanvas(c=>{
+    const shot = document.createElement("canvas");
+    shot.width = c.width; shot.height = c.height;
+    try{ shot.getContext("2d").drawImage(c, 0, 0); }catch(e){ return; }
+    shot.toBlob(b=>{
+      if(!b){ toast("Still failed", true); return; }
       dl(URL.createObjectURL(b), "bendr-"+stamp()+".png");
-      toast("Still saved  " + c.width + "x" + c.height);
-    }, "image/png"));
-    return;
-  }
-  const W = procW, H = procH;
-  const oldW = canvas.width, oldH = canvas.height;
-  const wasLocked = recLocked;
-  let shot = null;
-  try{
-    recLocked = true;                  /* the same latch REC uses to own the size */
-    canvas.width = W; canvas.height = H;
-    renderFrame(performance.now()/1000, 1/Math.max(1, captureFps()));
-    /* copy it out in the same task as the draw: preserveDrawingBuffer is off,
-       so the buffer stops being readable the moment this one yields */
-    shot = document.createElement("canvas");
-    shot.width = W; shot.height = H;
-    shot.getContext("2d").drawImage(canvas, 0, 0);
-  }catch(e){
-    shot = null;
-    toast("Still failed: " + (e && e.message), true);
-  }finally{
-    canvas.width = oldW; canvas.height = oldH;
-    recLocked = wasLocked;
-    markSizeDirty();
-  }
-  if(!shot) return;
-  shot.toBlob(b=>{
-    if(!b){ toast("Still failed", true); return; }
-    dl(URL.createObjectURL(b), "bendr-"+stamp()+".png");
-    toast("Still saved  " + W + "x" + H);
-  }, "image/png");
+      toast("Still saved  " + shot.width + "x" + shot.height);
+    }, "image/png");
+  });
 }
 document.getElementById("btnSnap").onclick = snapStill;
 document.getElementById("btnFull").onclick = ()=>{

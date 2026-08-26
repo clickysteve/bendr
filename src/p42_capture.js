@@ -104,6 +104,13 @@ async function startRec(){
       codec, width: W, height: H, bitrate: bitrateFor(W, H, recFps), framerate: recFps
     });
 
+    recActive = true;
+    recStarting = false;
+    recFrameCount = 0;
+    recDroppedFrames = 0;
+    recLastFrameMs = 0;
+    recStart = performance.now();
+
     if(hasAudio){
       try{
         recAEnc = new AudioEncoder({
@@ -138,13 +145,6 @@ async function startRec(){
         recAEnc = null;
       }
     }
-
-    recActive = true;
-    recStarting = false;
-    recFrameCount = 0;
-    recDroppedFrames = 0;
-    recLastFrameMs = 0;
-    recStart = performance.now();
 
     btnRec.classList.add("rec-on");
     btnRec.textContent = "■ STOP";
@@ -222,7 +222,7 @@ function recFramePush(){
     return;
   }
 
-  const tsUs = Math.round(nowMs * 1000);
+  const tsUs = Math.round(Math.max(0, nowMs - recStart) * 1000);
   let vf = null;
   try{
     vf = new VideoFrame(canvas, {timestamp: tsUs, duration: Math.round(1e6 / recFps)});

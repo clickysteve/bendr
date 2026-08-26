@@ -11290,7 +11290,7 @@ function copySource(from, to){
 let recActive = false, recStarting = false, recStopping = false, recStart = 0, recTimer = null;
 let recEnc = null, recAEnc = null, recMuxer = null, recTarget = null, recFileStream = null, recFileHandle = null;
 let recAudioReader = null, recAudioTrack = null;
-let recFps = 30, recFrameCount = 0, recLastFrameMs = 0, recDroppedFrames = 0;
+let recFps = 30, recFrameCount = 0, recLastFrameMs = 0, recDroppedFrames = 0, recBytes = 0, recWarned2G = false;
 let lastRecUrl = null;
 const btnRec = document.getElementById("btnRec"), recTime = document.getElementById("recTime");
 btnRec.onclick = toggleRec;
@@ -11384,7 +11384,19 @@ async function startRec(){
     });
 
     recEnc = new VideoEncoder({
-      output: (chunk, meta) => { if(recMuxer) recMuxer.addVideoChunk(chunk, meta); },
+      output: (chunk, meta) => {
+        if(recMuxer) recMuxer.addVideoChunk(chunk, meta);
+        recBytes += (chunk.byteLength || 0);
+        if(!recFileStream && recActive){
+          if(recBytes > 3_800_000_000){
+            toast("Recording auto-stopped: 3.8 GB memory safety limit reached", true);
+            stopRec();
+          } else if(recBytes > 2_000_000_000 && !recWarned2G){
+            recWarned2G = true;
+            toast("Recording reached 2 GB (in-memory mode)", false);
+          }
+        }
+      },
       error: e => {
         console.error("Video encoder error:", e);
         toast("Encoder error: " + (e && e.message ? e.message : e), true);
@@ -11401,6 +11413,8 @@ async function startRec(){
     recFrameCount = 0;
     recDroppedFrames = 0;
     recLastFrameMs = 0;
+    recBytes = 0;
+    recWarned2G = false;
     recStart = performance.now();
 
     if(hasAudio){
@@ -11411,6 +11425,7 @@ async function startRec(){
               const tsUs = Math.max(0, chunk.timestamp - Math.round(recStart * 1000));
               recMuxer.addAudioChunk(chunk, meta, tsUs);
             }
+            recBytes += (chunk.byteLength || 0);
           },
           error: e => { console.error("Audio encoder error:", e); }
         });
@@ -11493,8 +11508,9 @@ async function stopRec(aborted){
       const blob = new Blob([recTarget.buffer], {type: "video/mp4"});
       lastRecUrl = URL.createObjectURL(blob);
       dl(lastRecUrl, "bendr-" + stamp() + ".mp4");
+      const dropNote = recDroppedFrames > 0 ? (", " + recDroppedFrames + " dropped frame" + (recDroppedFrames > 1 ? "s" : "")) : "";
       toast("Recording saved \u2192 MP4 (" + (blob.size/1048576).toFixed(1) + " MB, " + W + "\u00d7" + H + " @" + fps + "fps"
-            + (hadAudio ? ", with audio" : ", no audio \u2014 AUDIO REACT is OFF") + ")");
+            + (hadAudio ? ", with audio" : ", no audio \u2014 AUDIO REACT is OFF") + dropNote + ")");
     } else {
       if(aborted) toast("Recording aborted", true);
     }

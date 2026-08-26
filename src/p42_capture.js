@@ -29,8 +29,7 @@ function captureFps(){
 async function toggleRec(){
   if(recStarting || recStopping) return;
   if(recActive){
-    recStopping = true;
-    try{ await stopRec(); } finally{ recStopping = false; }
+    await stopRec();
     return;
   }
   await startRec();
@@ -153,10 +152,12 @@ async function startRec(){
 
     if(hasAudio){
       try{
+        let recFirstAudioTs = null;
         recAEnc = new AudioEncoder({
           output: (chunk, meta) => {
             if(recMuxer){
-              const tsUs = Math.max(0, chunk.timestamp - Math.round(recStart * 1000));
+              if(recFirstAudioTs === null) recFirstAudioTs = chunk.timestamp;
+              const tsUs = Math.max(0, chunk.timestamp - recFirstAudioTs);
               recMuxer.addAudioChunk(chunk, meta, tsUs);
             }
             recBytes += (chunk.byteLength || 0);
@@ -218,7 +219,8 @@ async function startRec(){
   }
 }
 async function stopRec(aborted){
-  if(!recActive && !recStarting) return;
+  if((!recActive && !recStarting) || recStopping) return;
+  recStopping = true;
   recActive = false;
   recStarting = false;
   btnRec.classList.remove("rec-on");
@@ -267,6 +269,7 @@ async function stopRec(aborted){
     recEnc = null; recAEnc = null; recMuxer = null; recTarget = null;
     recFileStream = null; recFileHandle = null;
     recLocked = false;
+    recStopping = false;
     if(recSize){ canvas.width = recSize.w; canvas.height = recSize.h; recSize = null; markSizeDirty(); }
   }
 }

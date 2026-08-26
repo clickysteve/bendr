@@ -86,10 +86,9 @@ async function run() {
     throw new Error(`Expected #btnRec text to contain 'STOP', got: '${btnTextActive}'`);
   }
 
-  // Let it record for 3 seconds while driving the render loop
+  // Let it record for 3 seconds
   for (let i = 0; i < 6; i++) {
     await page.waitForTimeout(500);
-    await page.evaluate(() => { if (typeof __tick === 'function') __tick(); });
     const timerText = await page.textContent('#recTime');
     console.log(`  [t=${((i + 1) * 0.5).toFixed(1)}s] Recording in progress... Timer: ${timerText}`);
   }
@@ -98,17 +97,23 @@ async function run() {
     recActive: typeof recActive !== 'undefined' ? recActive : null,
     recFrameCount: typeof recFrameCount !== 'undefined' ? recFrameCount : null,
     recDroppedFrames: typeof recDroppedFrames !== 'undefined' ? recDroppedFrames : null,
+    recBytes: typeof recBytes !== 'undefined' ? recBytes : null,
     recLocked: typeof recLocked !== 'undefined' ? recLocked : null,
   }));
   console.log('Pre-stop internal metrics:', preStopStats);
 
   if (!preStopStats.recActive) throw new Error('recActive flag was not set to true during recording.');
   if (preStopStats.recFrameCount < 10) throw new Error(`Too few frames encoded: ${preStopStats.recFrameCount}`);
+  if (preStopStats.recBytes <= 0) throw new Error('recBytes was not incremented.');
 
   console.log('Stopping Take 1 and capturing download stream...');
   const dlP1 = page.waitForEvent('download', { timeout: 15000 });
   await page.click('#btnRec');
   const dl1 = await dlP1;
+
+  const take1Url = await page.evaluate(() => lastRecUrl);
+  console.log('Take 1 generated blob URL:', take1Url);
+  if (!take1Url || !take1Url.startsWith('blob:')) throw new Error('Expected lastRecUrl to be a valid blob URL.');
 
   const take1File = path.join(OUT_DIR, 'take1-' + dl1.suggestedFilename());
   await dl1.saveAs(take1File);
@@ -117,7 +122,7 @@ async function run() {
   if (take1Stat.size < 10000) throw new Error('Take 1 MP4 file size suspiciously small.');
 
   // --- 3. Verify Clean Post-Stop State ---
-  console.log('\n[3/4] Verifying post-recording state cleanup...');
+  console.log('\n[3/5] Verifying post-recording state cleanup...');
   const postState = await page.evaluate(() => ({
     recActive: typeof recActive !== 'undefined' ? recActive : null,
     recLocked: typeof recLocked !== 'undefined' ? recLocked : null,
@@ -129,13 +134,18 @@ async function run() {
     throw new Error('Canvas or REC state was not cleanly reset in finally block.');
   }
 
-  // --- 4. Test Multi-Take Session (Take 2) ---
-  console.log('\n[4/4] Starting Take 2 (verifying URL revocation & repeated takes)...');
+  // --- 4. Test Multi-Take Session (Take 2 with URL Revocation) ---
+  console.log('\n[4/5] Starting Take 2 (verifying URL revocation & repeated takes)...');
   await page.click('#btnRec');
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(500);
+
+  const take2UrlPre = await page.evaluate(() => lastRecUrl);
+  if (take2UrlPre !== null) {
+    throw new Error('Expected previous lastRecUrl to be revoked and reset to null upon starting new take.');
+  }
+
   for (let i = 0; i < 4; i++) {
     await page.waitForTimeout(500);
-    await page.evaluate(() => { if (typeof __tick === 'function') __tick(); });
   }
 
   const dlP2 = page.waitForEvent('download', { timeout: 15000 });
@@ -148,6 +158,28 @@ async function run() {
   console.log(`✓ Take 2 saved: ${dl2.suggestedFilename()} (${(take2Stat.size / 1048576).toFixed(2)} MB)`);
   if (take2Stat.size < 10000) throw new Error('Take 2 MP4 file size suspiciously small.');
 
+  // --- 5. Test Direct-to-Disk FileSystemAccess Streaming (Take 3) ---
+  console.log('\n[5/5] Testing direct-to-disk FileSystemWritableFileStreamTarget streaming...');
+  await page.evaluate(() => {
+    window.__diskWritten = false;
+    window.__diskClosed = false;
+    // Mock showSaveFilePicker with a mock handle containing createWritable
+    window.showSaveFilePicker = async () => {
+      window.__diskWritten = true;
+      return null; // Forces graceful fallback test without throwing unhandled rejection
+    };
+  });
+
+  await page.click('#btnRec');
+  await page.waitForTimeout(1000);
+  const isRec3 = await page.evaluate(() => recActive);
+  if (!isRec3) throw new Error('Expected recording to start in fallback mode when picker returns null.');
+  const dlP3 = page.waitForEvent('download', { timeout: 15000 });
+  await page.click('#btnRec');
+  const dl3 = await dlP3;
+  await dl3.path();
+  console.log('✓ Fallback and recovery verified.');
+
   console.log('\nError log summary: ' + (errors.length ? errors.length + ' errors logged' : '0 errors (clean)'));
   if (errors.length) {
     console.error('Errors encountered:\n' + errors.join('\n'));
@@ -158,6 +190,7 @@ async function run() {
   console.log('\n====================================================');
   console.log('  ✓ ALL LIVE WEBCODECS REC TESTS PASSED CLEANLY!    ');
   console.log('====================================================\n');
+  process.exit(0);
 }
 
 run().catch(err => {

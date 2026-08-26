@@ -11353,8 +11353,23 @@ async function startRec(){
   recStarting = true;
   const suggested = "bendr-" + stamp() + ".mp4";
 
+  let fileHandle = null, fileStream = null;
+  if(window.showSaveFilePicker){
+    try{
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: suggested,
+        types: [{description: "MP4 video", accept: {"video/mp4": [".mp4"]}}]
+      });
+      fileStream = await fileHandle.createWritable();
+    }catch(e){}
+  }
+
   try{
-    recTarget = new Mp4Muxer.ArrayBufferTarget();
+    recFileStream = fileStream;
+    recFileHandle = fileHandle;
+    recTarget = fileStream
+      ? new Mp4Muxer.FileSystemWritableFileStreamTarget(fileStream, {chunked: true})
+      : new Mp4Muxer.ArrayBufferTarget();
 
     /* Whatever is being listened to goes into the recording: clip soundtrack, loaded audio file, or live mic */
     let hasAudio = false;
@@ -11379,7 +11394,7 @@ async function startRec(){
       target: recTarget,
       video: {codec: mcodec, width: W, height: H},
       ...(hasAudio ? {audio: {codec: "aac", sampleRate: audioCtx.sampleRate, numberOfChannels: 2}} : {}),
-      fastStart: "in-memory",
+      fastStart: fileStream ? false : "in-memory",
       firstTimestampBehavior: "cross-track-offset",
     });
 
@@ -11477,7 +11492,8 @@ async function startRec(){
     toast("Failed to start recording: " + ((e && e.message) || e), true);
     if(recEnc && recEnc.state !== "closed"){ try{ recEnc.close(); }catch(_){} recEnc = null; }
     if(recAEnc && recAEnc.state !== "closed"){ try{ recAEnc.close(); }catch(_){} recAEnc = null; }
-    recMuxer = null; recTarget = null;
+    if(recFileStream){ try{ await recFileStream.abort(); }catch(_){} }
+    recMuxer = null; recTarget = null; recFileStream = null; recFileHandle = null;
     recLocked = false;
     if(recSize){ canvas.width = recSize.w; canvas.height = recSize.h; recSize = null; markSizeDirty(); }
   }
@@ -11505,23 +11521,32 @@ async function stopRec(aborted){
       if(recAEnc && recAEnc.state === "configured") await recAEnc.flush();
       if(recMuxer) recMuxer.finalize();
 
-      const blob = new Blob([recTarget.buffer], {type: "video/mp4"});
-      lastRecUrl = URL.createObjectURL(blob);
-      dl(lastRecUrl, "bendr-" + stamp() + ".mp4");
       const dropNote = recDroppedFrames > 0 ? (", " + recDroppedFrames + " dropped frame" + (recDroppedFrames > 1 ? "s" : "")) : "";
-      toast("Recording saved \u2192 MP4 (" + (blob.size/1048576).toFixed(1) + " MB, " + W + "\u00d7" + H + " @" + fps + "fps"
-            + (hadAudio ? ", with audio" : ", no audio \u2014 AUDIO REACT is OFF") + dropNote + ")");
+      if(recFileStream){
+        await recFileStream.close();
+        toast("Recording saved \u2192 " + (recFileHandle ? recFileHandle.name : "disk") + " (" + (recBytes/1048576).toFixed(1) + " MB, " + W + "\u00d7" + H + " @" + fps + "fps"
+              + (hadAudio ? ", with audio" : ", no audio \u2014 AUDIO REACT is OFF") + dropNote + ")");
+      } else {
+        const blob = new Blob([recTarget.buffer], {type: "video/mp4"});
+        lastRecUrl = URL.createObjectURL(blob);
+        dl(lastRecUrl, "bendr-" + stamp() + ".mp4");
+        toast("Recording saved \u2192 MP4 (" + (blob.size/1048576).toFixed(1) + " MB, " + W + "\u00d7" + H + " @" + fps + "fps"
+              + (hadAudio ? ", with audio" : ", no audio \u2014 AUDIO REACT is OFF") + dropNote + ")");
+      }
     } else {
+      if(recFileStream){ try{ await recFileStream.abort(); }catch(e){} }
       if(aborted) toast("Recording aborted", true);
     }
   }catch(e){
     console.error("Error finalizing recording:", e);
+    if(recFileStream){ try{ await recFileStream.abort(); }catch(_){} }
     toast("Recording error: " + ((e && e.message) || e), true);
   }finally{
     window.removeEventListener("beforeunload", recBeforeUnload);
     try{ if(recEnc && recEnc.state !== "closed") recEnc.close(); }catch(e){}
     try{ if(recAEnc && recAEnc.state !== "closed") recAEnc.close(); }catch(e){}
     recEnc = null; recAEnc = null; recMuxer = null; recTarget = null;
+    recFileStream = null; recFileHandle = null;
     recLocked = false;
     if(recSize){ canvas.width = recSize.w; canvas.height = recSize.h; recSize = null; markSizeDirty(); }
   }

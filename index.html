@@ -11361,7 +11361,14 @@ async function startRec(){
         types: [{description: "MP4 video", accept: {"video/mp4": [".mp4"]}}]
       });
       fileStream = await fileHandle.createWritable();
-    }catch(e){}
+    }catch(e){
+      if(e && (e.name === "AbortError" || e.code === 20)){
+        recStarting = false;
+        recLocked = false;
+        if(recSize){ canvas.width = recSize.w; canvas.height = recSize.h; recSize = null; markSizeDirty(); }
+        return;
+      }
+    }
   }
 
   try{
@@ -11601,16 +11608,41 @@ window.__grab = (type)=>new Promise(res=>grabCanvas(c=>res(c.toDataURL(type||"im
    is already the right size, because REC pins the canvas to the same raster for
    the duration. */
 function snapStill(){
-  grabCanvas(c=>{
-    const shot = document.createElement("canvas");
-    shot.width = c.width; shot.height = c.height;
-    try{ shot.getContext("2d").drawImage(c, 0, 0); }catch(e){ return; }
-    shot.toBlob(b=>{
+  if(recActive){
+    grabCanvas(c=>c.toBlob(b=>{
       if(!b){ toast("Still failed", true); return; }
       dl(URL.createObjectURL(b), "bendr-"+stamp()+".png");
-      toast("Still saved  " + shot.width + "x" + shot.height);
-    }, "image/png");
-  });
+      toast("Still saved  " + c.width + "x" + c.height);
+    }, "image/png"));
+    return;
+  }
+  const W = procW, H = procH;
+  const oldW = canvas.width, oldH = canvas.height;
+  const wasLocked = recLocked;
+  let shot = null;
+  try{
+    recLocked = true;                  /* the same latch REC uses to own the size */
+    canvas.width = W; canvas.height = H;
+    renderFrame(performance.now()/1000, 1/Math.max(1, captureFps()));
+    /* copy it out in the same task as the draw: preserveDrawingBuffer is off,
+       so the buffer stops being readable the moment this one yields */
+    shot = document.createElement("canvas");
+    shot.width = W; shot.height = H;
+    shot.getContext("2d").drawImage(canvas, 0, 0);
+  }catch(e){
+    shot = null;
+    toast("Still failed: " + (e && e.message), true);
+  }finally{
+    canvas.width = oldW; canvas.height = oldH;
+    recLocked = wasLocked;
+    markSizeDirty();
+  }
+  if(!shot) return;
+  shot.toBlob(b=>{
+    if(!b){ toast("Still failed", true); return; }
+    dl(URL.createObjectURL(b), "bendr-"+stamp()+".png");
+    toast("Still saved  " + W + "x" + H);
+  }, "image/png");
 }
 document.getElementById("btnSnap").onclick = snapStill;
 document.getElementById("btnFull").onclick = ()=>{

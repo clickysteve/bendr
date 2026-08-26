@@ -1,8 +1,8 @@
 /* ---------------- record (WebCodecs MP4) / snapshot / fullscreen ---------------- */
 let recActive = false, recStarting = false, recStopping = false, recStart = 0, recTimer = null;
-let recEnc = null, recAEnc = null, recMuxer = null, recFileStream = null, recFileHandle = null;
+let recEnc = null, recAEnc = null, recMuxer = null, recTarget = null, recFileStream = null, recFileHandle = null;
 let recAudioReader = null, recAudioTrack = null;
-let recParts = [], recFps = 30, recFrameCount = 0, recLastFrameMs = 0, recDroppedFrames = 0;
+let recFps = 30, recFrameCount = 0, recLastFrameMs = 0, recDroppedFrames = 0;
 let lastRecUrl = null;
 const btnRec = document.getElementById("btnRec"), recTime = document.getElementById("recTime");
 btnRec.onclick = toggleRec;
@@ -56,14 +56,10 @@ async function startRec(){
   if(typeof markSizeDirty === "function") markSizeDirty();
 
   recStarting = true;
-  recParts = [];
   const suggested = "bendr-" + stamp() + ".mp4";
 
   try{
-    const target = new Mp4Muxer.StreamTarget({
-      onData: (data, position) => { recParts.push({position, data: data.slice()}); },
-      chunked: true,
-    });
+    recTarget = new Mp4Muxer.ArrayBufferTarget();
 
     /* Whatever is being listened to goes into the recording: clip soundtrack, loaded audio file, or live mic */
     let hasAudio = false;
@@ -85,7 +81,7 @@ async function startRec(){
     }
 
     recMuxer = new Mp4Muxer.Muxer({
-      target,
+      target: recTarget,
       video: {codec: mcodec, width: W, height: H},
       ...(hasAudio ? {audio: {codec: "aac", sampleRate: audioCtx.sampleRate, numberOfChannels: 2}} : {}),
       fastStart: "in-memory",
@@ -114,7 +110,12 @@ async function startRec(){
     if(hasAudio){
       try{
         recAEnc = new AudioEncoder({
-          output: (chunk, meta) => { if(recMuxer) recMuxer.addAudioChunk(chunk, meta); },
+          output: (chunk, meta) => {
+            if(recMuxer){
+              const tsUs = Math.max(0, chunk.timestamp - Math.round(recStart * 1000));
+              recMuxer.addAudioChunk(chunk, meta, tsUs);
+            }
+          },
           error: e => { console.error("Audio encoder error:", e); }
         });
         recAEnc.configure({
@@ -134,10 +135,13 @@ async function startRec(){
                 if(audioData) audioData.close();
                 break;
               }
-              if(recAEnc && recAEnc.state === "configured"){
-                recAEnc.encode(audioData);
+              try{
+                if(recAEnc && recAEnc.state === "configured"){
+                  recAEnc.encode(audioData);
+                }
+              }finally{
+                audioData.close();
               }
-              audioData.close();
             }
           }catch(err){}
         })();
@@ -161,7 +165,7 @@ async function startRec(){
     toast("Failed to start recording: " + ((e && e.message) || e), true);
     if(recEnc && recEnc.state !== "closed"){ try{ recEnc.close(); }catch(_){} recEnc = null; }
     if(recAEnc && recAEnc.state !== "closed"){ try{ recAEnc.close(); }catch(_){} recAEnc = null; }
-    recMuxer = null;
+    recMuxer = null; recTarget = null;
     recLocked = false;
     if(recSize){ canvas.width = recSize.w; canvas.height = recSize.h; recSize = null; markSizeDirty(); }
   }
@@ -189,8 +193,7 @@ async function stopRec(aborted){
       if(recAEnc && recAEnc.state === "configured") await recAEnc.flush();
       if(recMuxer) recMuxer.finalize();
 
-      recParts.sort((a,b)=>a.position - b.position);
-      const blob = new Blob(recParts.map(x=>x.data), {type: "video/mp4"});
+      const blob = new Blob([recTarget.buffer], {type: "video/mp4"});
       lastRecUrl = URL.createObjectURL(blob);
       dl(lastRecUrl, "bendr-" + stamp() + ".mp4");
       toast("Recording saved \u2192 MP4 (" + (blob.size/1048576).toFixed(1) + " MB, " + W + "\u00d7" + H + " @" + fps + "fps"
@@ -204,8 +207,7 @@ async function stopRec(aborted){
   }finally{
     try{ if(recEnc && recEnc.state !== "closed") recEnc.close(); }catch(e){}
     try{ if(recAEnc && recAEnc.state !== "closed") recAEnc.close(); }catch(e){}
-    recEnc = null; recAEnc = null; recMuxer = null;
-    recParts.length = 0;
+    recEnc = null; recAEnc = null; recMuxer = null; recTarget = null;
     recLocked = false;
     if(recSize){ canvas.width = recSize.w; canvas.height = recSize.h; recSize = null; markSizeDirty(); }
   }

@@ -28,10 +28,10 @@ PARTS = [
     "p43_render.js",    # sync model, render loop, deck display
     "p44_offline.js",   # offline MP4 render, MIDI, keyboard, init
 ]
-SIZE_BUDGET = 900_000          # fail rather than drift past this unnoticed
-# Raised from 700k at v35.8. The budget exists to catch drift, not to cap the
-# thing: the shader source, the codec stage, the scopes and the coverage matte
-# are all real weight added deliberately. It gzips to about 216k.
+SIZE_BUDGET = 950_000          # fail rather than drift past this unnoticed
+# Raised from 700k at v35.8, and 900k at v38.3. The budget exists to catch drift,
+# not to cap the thing: the shader source, the codec stage, the scopes and the
+# coverage matte are all real weight added deliberately. It gzips to about 216k.
 
 def read(name, where=None):
     with io.open(os.path.join(where or SRC, name), encoding="utf-8") as f:

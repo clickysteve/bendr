@@ -1222,6 +1222,7 @@ function frameEnd(now, dt){
   updateThumbs(now);
   updateScopes(now);
   if(offline) return;
+  if(typeof recFramePush === "function") recFramePush();
   const S = cur();
   if(S.mode==="file" && S.video.duration && !seeking){
     seek.value = S.video.currentTime/S.video.duration;
@@ -1231,7 +1232,7 @@ function frameEnd(now, dt){
   }
   fpsAcc += 1/Math.max(dt,1e-4); fpsN++;
   if(fpsN>=30){ fpsShow = Math.round(fpsAcc/fpsN); fpsAcc=0; fpsN=0;
-    osd.textContent = procH+"p \u00b7 "+fpsShow+" fps"+(" \u00b7 "+liveList)+(multiView?" \u00b7 MULTI":"")+(recorder?" \u00b7 REC":"")+(perfRec.mode!=="off"?" \u00b7 "+perfRec.mode.toUpperCase():"")+(audioMode!=="off"?" \u00b7 AUD":"")+(rescanMode?" \u00b7 RESCAN":"");
+    osd.textContent = procH+"p \u00b7 "+fpsShow+" fps"+(" \u00b7 "+liveList)+(multiView?" \u00b7 MULTI":"")+(recActive?" \u00b7 REC":"")+(perfRec.mode!=="off"?" \u00b7 "+perfRec.mode.toUpperCase():"")+(audioMode!=="off"?" \u00b7 AUD":"")+(rescanMode?" \u00b7 RESCAN":"");
     updateTempoUI();
   }
 }

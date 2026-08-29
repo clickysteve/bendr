@@ -470,7 +470,7 @@ button.patchpick{width:100%; text-align:left;}
 /* The stems section is a list of rows rather than a column of sliders, so it
    wants width the way the others want height. It takes twice the share and
    its transport wraps rather than squeezing the labels down to two letters. */
-#audiodock .sec.stems{flex:2 1 380px; min-width:320px;}
+#audiodock .sec.stems{flex:1 1 420px; min-width:300px;}
 #audiodock .sec.stems .trow{flex-wrap:wrap; row-gap:4px;}
 #audiodock .sec.stems .trow button{flex:0 0 auto;}
 #audiodock .sec.stems #stemPos{flex:0 0 auto;}
@@ -802,6 +802,8 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 }
 .laycell:hover{border-color:var(--cyan); color:#55555f;}
 .laycell.on{background:var(--cyan); border-color:var(--cyan); color:#0b0b0e;}
+/* the recorder's counter turns when what it is holding starts to matter */
+#recTime.warn{color:var(--amber); font-weight:700;}
 /* Only one topology drives the picture, and the one that does not has to say
    so where you are standing. A 42% dim was not enough: a fader that moves and
    changes nothing reads as a broken mixer, not as an inactive one. So the
@@ -859,6 +861,22 @@ body:not(.topo-layers) #dockBody > #layerdock.on ~ #layTopoNote{display:flex;}
 .sec.bypassed > h3{opacity:.55;}
 .sec.bypassed .secbody{opacity:.4;}
 #audiodock .sec{flex:1 1 0; min-width:250px; border-bottom:none; padding:0;}
+/* A row of buttons wider than the column it is in used to run straight out of
+   it and draw across its neighbour - LOOP landing on top of BASS HI - because
+   a flex row does not wrap unless it is told to and a flex column does not
+   clip. Telling the rows to wrap fixes it at every width, which widening the
+   columns would not: there is always a window narrow enough to put it back. */
+#audiodock .prow, #outdock .prow, #mixdock .prow, #performdock .prow,
+#audiodock .trow, #outdock .trow, #mixdock .trow, #performdock .trow{
+  flex-wrap:wrap; row-gap:3px;
+}
+/* wrapping is the safety net, not the normal case: the label gives back some
+   width in these columns and the slider asks for little, so a row still fits
+   on one line at the widths these panels actually get */
+#audiodock .prow > label, #outdock .prow > label,
+#mixdock .prow > label, #performdock .prow > label{flex:0 0 74px; width:74px;}
+#audiodock .prow > .sldwrap, #outdock .prow > .sldwrap,
+#mixdock .prow > .sldwrap, #performdock .prow > .sldwrap{flex:1 1 60px; min-width:44px;}
 #audiodock .sec h3{padding-top:0;}
 #performdock .sec{border-bottom:none; padding:0;}
 #btnHelpTop{padding:3px 9px; font-size:11px; line-height:1; margin-left:2px;}
@@ -908,6 +926,10 @@ body:not(.topo-layers) #dockBody > #layerdock.on ~ #layTopoNote{display:flex;}
 #mixdock .sec.collapsed .secbody, #outdock .sec.collapsed .secbody,
 #performdock .sec.collapsed .secbody{display:block;}
 #mixdock .sec h3{padding-top:0;}
+/* the same rule for the section headers: the title, the eye, the ? and RESET
+   are a flex row too, and at a narrow enough dock RESET was hanging off the end
+   of it. Let the header wrap rather than spill. */
+#dockBody .sec > h3{flex-wrap:wrap; row-gap:2px;}
 .pfcol{flex:0 0 auto; display:flex; flex-direction:column; gap:6px;}
 .pfcol .trow{width:100%;}
 .pfcol h4{font-size:8px; letter-spacing:2px; color:var(--dim); padding-bottom:3px;}
@@ -1423,7 +1445,11 @@ audio,video{display:none;}
       <div id="matrix">
         <h4>MOD MATRIX — PATCH SOURCES INTO ANY PARAMETER <button id="btnAddRoute" style="margin-left:8px; padding:2px 8px;" data-tip="Add a modulation route: pick a source, a channel, a destination parameter and an amount. Right-clicking a parameter does the same thing faster.">+ ROUTE</button></h4>
         <div id="routes"></div>
-        <h4 style="padding-top:12px;">MIDI CONTROL — WHAT IS MAPPED</h4>
+        <h4 style="padding-top:12px;">MIDI CONTROL &mdash; WHAT IS MAPPED
+          <button id="btnMapSave" style="margin-left:8px; padding:2px 8px;" data-tip="Saves the MIDI mapping and the modulation routes as a file of their own, without any of the picture settings. What you built with your hands is worth hours and belongs to you rather than to one look, so it moves between patches.">SAVE MAP</button>
+          <button id="btnMapLoad" style="padding:2px 8px;" data-tip="Loads a map file over what is here now: the mappings and the routes are replaced, and nothing about the picture is touched.">LOAD MAP</button>
+          <button id="btnMapMerge" style="padding:2px 8px;" data-tip="Loads a map file alongside what is here: existing mappings and routes are kept and the ones in the file are added on top. Use it to build one rig out of several.">MERGE</button>
+        </h4>
         <div id="midimap"></div>
       </div>
       <div id="modgrid"></div>
@@ -1678,6 +1704,7 @@ audio,video{display:none;}
 <input type="file" id="fileIn" accept="video/*,image/*,.json" style="display:none">
 <input type="file" id="audioFileIn" accept="audio/*" style="display:none">
 <input type="file" id="stemFileIn" accept="audio/*" multiple style="display:none">
+<input type="file" id="mapFileIn" accept="application/json,.json" style="display:none">
 <script>
 "use strict";
 /* ============================================================

@@ -347,6 +347,9 @@ function runStage(id, inTex, dstRT, now, ch){
     if(!C.hist || C.hist.w !== procW || C.hist.h !== procH){
       if(C.hist){ gl.deleteTexture(C.hist.tex); gl.deleteFramebuffer(C.hist.fbo); }
       C.hist = makeHistArray(procW, procH, TD_LAYERS);
+      /* refused: let the picture through untouched rather than drawing this
+         stage into a handle that points at nothing */
+      if(!C.hist){ if(typeof degradeRes === "function") degradeRes("time displace"); return inTex; }
       /* prime every layer with the live picture, or the stage fades up out of
          black for the first half second while the ring fills */
       const HP = C.hist;

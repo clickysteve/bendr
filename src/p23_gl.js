@@ -83,6 +83,15 @@ function makeHistArray(w,h,n){
   gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  /* a texture array of twelve full-raster layers is the largest single thing
+     this asks a driver for; if it was refused, say so rather than handing back
+     a handle to nothing and drawing into it for the rest of the session */
+  const err = gl.getError();
+  if(err !== gl.NO_ERROR){
+    gl.deleteTexture(tex);
+    if(typeof toast === "function") toast("Out of graphics memory for TIME DISPLACE at "+w+"\u00d7"+h, true);
+    return null;
+  }
   return {tex, fbo: gl.createFramebuffer(), w, h, n, head:0};
 }
 /* Additive accumulation is what produces the bright ridge where lines bunch,
@@ -157,7 +166,15 @@ function clearRing(c){
   c.ring=null; c.ringW=0; c.ringFilled=0;
 }
 function ensureRing(c){
-  if(!c.ring){ c.ring=[]; for(let i=0;i<RING_N;i++) c.ring.push(makeRT(procW,procH)); c.ringW=0; c.ringFilled=0; }
+  if(c.ring) return;
+  rtFailed = false;
+  const r = [];
+  for(let i=0;i<RING_N;i++){
+    const t = makeRT(procW,procH);
+    if(!t){ for(const x of r) freeRT(x); degradeRes("frame ring"); return; }
+    r.push(t);
+  }
+  c.ring = r; c.ringW = 0; c.ringFilled = 0;
 }
 /* fbPrev is gone: the feedback source is the channel's own out target, read
    before it is written again, so there was never anything to copy into a
@@ -166,6 +183,32 @@ const CH_RTS = ["fbNext","crt","flowA","flowB","flowSrc","gen","out"];
 /* A channel's eight render targets are only allocated once that channel is
    actually used. At 720p that hardly matters; at 2160p each one is 33 MB, so
    allocating all four channels up front would cost a gigabyte for nothing. */
+/* The shared targets already step the raster down when the driver refuses.
+   The per-channel ones are allocated later, when a stage that needs them is
+   switched on, and they are the expensive ones: at 2160p a channel's frame
+   ring alone is most of a gigabyte. If one of those is refused, makeRT hands
+   back null and whatever asked for it dereferences null on the next line,
+   which is a black picture and a console full of the same error sixty times a
+   second. Take the same way out the shared ones take: drop a step, free
+   everything, build it again smaller, and say so once. */
+let degrading = false;
+function degradeRes(why){
+  if(degrading) return false;
+  const ladder = [360, 540, 720, 1080, 1440, 2160];
+  const i = ladder.indexOf(procRes);
+  const next = i > 0 ? ladder[i-1] : 0;
+  if(!next){
+    if(typeof toast === "function") toast("Out of graphics memory at the lowest raster \u2014 switch some stages out", true);
+    return false;
+  }
+  degrading = true;
+  try{
+    if(typeof toast === "function")
+      toast("Out of graphics memory" + (why ? " ("+why+")" : "") + " \u2014 dropped to " + next + "p", true);
+    setProcRes(next, procAR);
+  } finally { degrading = false; }
+  return true;
+}
 function allocChan(ch){
   const c = chanRT[ch];
   for(const k of CH_RTS) freeRT(c[k]);
@@ -175,7 +218,9 @@ function allocChan(ch){
      another 33 MB each. It has to be dropped here so a resolution change does
      not leave a target of the wrong size behind. */
   freeRT(c.glslPrev); c.glslPrev = null;
+  rtFailed = false;
   for(const k of CH_RTS) c[k] = makeRT(procW, procH);
+  if(rtFailed){ c.allocated = false; degradeRes("channel "+ch); return; }
   c.allocated = true;
 }
 function ensureChanRT(ch){

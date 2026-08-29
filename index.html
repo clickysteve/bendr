@@ -470,7 +470,7 @@ button.patchpick{width:100%; text-align:left;}
 /* The stems section is a list of rows rather than a column of sliders, so it
    wants width the way the others want height. It takes twice the share and
    its transport wraps rather than squeezing the labels down to two letters. */
-#audiodock .sec.stems{flex:2 1 380px; min-width:320px;}
+#audiodock .sec.stems{flex:1 1 420px; min-width:300px;}
 #audiodock .sec.stems .trow{flex-wrap:wrap; row-gap:4px;}
 #audiodock .sec.stems .trow button{flex:0 0 auto;}
 #audiodock .sec.stems #stemPos{flex:0 0 auto;}
@@ -802,6 +802,8 @@ body.nobend #bendCollapse .mixhint{display:inline;}
 }
 .laycell:hover{border-color:var(--cyan); color:#55555f;}
 .laycell.on{background:var(--cyan); border-color:var(--cyan); color:#0b0b0e;}
+/* the recorder's counter turns when what it is holding starts to matter */
+#recTime.warn{color:var(--amber); font-weight:700;}
 /* Only one topology drives the picture, and the one that does not has to say
    so where you are standing. A 42% dim was not enough: a fader that moves and
    changes nothing reads as a broken mixer, not as an inactive one. So the
@@ -859,6 +861,22 @@ body:not(.topo-layers) #dockBody > #layerdock.on ~ #layTopoNote{display:flex;}
 .sec.bypassed > h3{opacity:.55;}
 .sec.bypassed .secbody{opacity:.4;}
 #audiodock .sec{flex:1 1 0; min-width:250px; border-bottom:none; padding:0;}
+/* A row of buttons wider than the column it is in used to run straight out of
+   it and draw across its neighbour - LOOP landing on top of BASS HI - because
+   a flex row does not wrap unless it is told to and a flex column does not
+   clip. Telling the rows to wrap fixes it at every width, which widening the
+   columns would not: there is always a window narrow enough to put it back. */
+#audiodock .prow, #outdock .prow, #mixdock .prow, #performdock .prow,
+#audiodock .trow, #outdock .trow, #mixdock .trow, #performdock .trow{
+  flex-wrap:wrap; row-gap:3px;
+}
+/* wrapping is the safety net, not the normal case: the label gives back some
+   width in these columns and the slider asks for little, so a row still fits
+   on one line at the widths these panels actually get */
+#audiodock .prow > label, #outdock .prow > label,
+#mixdock .prow > label, #performdock .prow > label{flex:0 0 74px; width:74px;}
+#audiodock .prow > .sldwrap, #outdock .prow > .sldwrap,
+#mixdock .prow > .sldwrap, #performdock .prow > .sldwrap{flex:1 1 60px; min-width:44px;}
 #audiodock .sec h3{padding-top:0;}
 #performdock .sec{border-bottom:none; padding:0;}
 #btnHelpTop{padding:3px 9px; font-size:11px; line-height:1; margin-left:2px;}
@@ -908,6 +926,10 @@ body:not(.topo-layers) #dockBody > #layerdock.on ~ #layTopoNote{display:flex;}
 #mixdock .sec.collapsed .secbody, #outdock .sec.collapsed .secbody,
 #performdock .sec.collapsed .secbody{display:block;}
 #mixdock .sec h3{padding-top:0;}
+/* the same rule for the section headers: the title, the eye, the ? and RESET
+   are a flex row too, and at a narrow enough dock RESET was hanging off the end
+   of it. Let the header wrap rather than spill. */
+#dockBody .sec > h3{flex-wrap:wrap; row-gap:2px;}
 .pfcol{flex:0 0 auto; display:flex; flex-direction:column; gap:6px;}
 .pfcol .trow{width:100%;}
 .pfcol h4{font-size:8px; letter-spacing:2px; color:var(--dim); padding-bottom:3px;}
@@ -1423,7 +1445,11 @@ audio,video{display:none;}
       <div id="matrix">
         <h4>MOD MATRIX — PATCH SOURCES INTO ANY PARAMETER <button id="btnAddRoute" style="margin-left:8px; padding:2px 8px;" data-tip="Add a modulation route: pick a source, a channel, a destination parameter and an amount. Right-clicking a parameter does the same thing faster.">+ ROUTE</button></h4>
         <div id="routes"></div>
-        <h4 style="padding-top:12px;">MIDI CONTROL — WHAT IS MAPPED</h4>
+        <h4 style="padding-top:12px;">MIDI CONTROL &mdash; WHAT IS MAPPED
+          <button id="btnMapSave" style="margin-left:8px; padding:2px 8px;" data-tip="Saves the MIDI mapping and the modulation routes as a file of their own, without any of the picture settings. What you built with your hands is worth hours and belongs to you rather than to one look, so it moves between patches.">SAVE MAP</button>
+          <button id="btnMapLoad" style="padding:2px 8px;" data-tip="Loads a map file over what is here now: the mappings and the routes are replaced, and nothing about the picture is touched.">LOAD MAP</button>
+          <button id="btnMapMerge" style="padding:2px 8px;" data-tip="Loads a map file alongside what is here: existing mappings and routes are kept and the ones in the file are added on top. Use it to build one rig out of several.">MERGE</button>
+        </h4>
         <div id="midimap"></div>
       </div>
       <div id="modgrid"></div>
@@ -1678,6 +1704,7 @@ audio,video{display:none;}
 <input type="file" id="fileIn" accept="video/*,image/*,.json" style="display:none">
 <input type="file" id="audioFileIn" accept="audio/*" style="display:none">
 <input type="file" id="stemFileIn" accept="audio/*" multiple style="display:none">
+<input type="file" id="mapFileIn" accept="application/json,.json" style="display:none">
 <script>/* mp4-muxer v5 (c) Vanilagy, MIT license — inlined for offline use */
 /**
  * Minified by jsDelivr using Terser v5.39.0.
@@ -3866,7 +3893,7 @@ const FS_TILE = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v38.2";
+const BENDR_VERSION = "v38.3";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and
@@ -5087,6 +5114,15 @@ function makeHistArray(w,h,n){
   gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  /* a texture array of twelve full-raster layers is the largest single thing
+     this asks a driver for; if it was refused, say so rather than handing back
+     a handle to nothing and drawing into it for the rest of the session */
+  const err = gl.getError();
+  if(err !== gl.NO_ERROR){
+    gl.deleteTexture(tex);
+    if(typeof toast === "function") toast("Out of graphics memory for TIME DISPLACE at "+w+"\u00d7"+h, true);
+    return null;
+  }
   return {tex, fbo: gl.createFramebuffer(), w, h, n, head:0};
 }
 /* Additive accumulation is what produces the bright ridge where lines bunch,
@@ -5161,7 +5197,15 @@ function clearRing(c){
   c.ring=null; c.ringW=0; c.ringFilled=0;
 }
 function ensureRing(c){
-  if(!c.ring){ c.ring=[]; for(let i=0;i<RING_N;i++) c.ring.push(makeRT(procW,procH)); c.ringW=0; c.ringFilled=0; }
+  if(c.ring) return;
+  rtFailed = false;
+  const r = [];
+  for(let i=0;i<RING_N;i++){
+    const t = makeRT(procW,procH);
+    if(!t){ for(const x of r) freeRT(x); degradeRes("frame ring"); return; }
+    r.push(t);
+  }
+  c.ring = r; c.ringW = 0; c.ringFilled = 0;
 }
 /* fbPrev is gone: the feedback source is the channel's own out target, read
    before it is written again, so there was never anything to copy into a
@@ -5170,6 +5214,32 @@ const CH_RTS = ["fbNext","crt","flowA","flowB","flowSrc","gen","out"];
 /* A channel's eight render targets are only allocated once that channel is
    actually used. At 720p that hardly matters; at 2160p each one is 33 MB, so
    allocating all four channels up front would cost a gigabyte for nothing. */
+/* The shared targets already step the raster down when the driver refuses.
+   The per-channel ones are allocated later, when a stage that needs them is
+   switched on, and they are the expensive ones: at 2160p a channel's frame
+   ring alone is most of a gigabyte. If one of those is refused, makeRT hands
+   back null and whatever asked for it dereferences null on the next line,
+   which is a black picture and a console full of the same error sixty times a
+   second. Take the same way out the shared ones take: drop a step, free
+   everything, build it again smaller, and say so once. */
+let degrading = false;
+function degradeRes(why){
+  if(degrading) return false;
+  const ladder = [360, 540, 720, 1080, 1440, 2160];
+  const i = ladder.indexOf(procRes);
+  const next = i > 0 ? ladder[i-1] : 0;
+  if(!next){
+    if(typeof toast === "function") toast("Out of graphics memory at the lowest raster \u2014 switch some stages out", true);
+    return false;
+  }
+  degrading = true;
+  try{
+    if(typeof toast === "function")
+      toast("Out of graphics memory" + (why ? " ("+why+")" : "") + " \u2014 dropped to " + next + "p", true);
+    setProcRes(next, procAR);
+  } finally { degrading = false; }
+  return true;
+}
 function allocChan(ch){
   const c = chanRT[ch];
   for(const k of CH_RTS) freeRT(c[k]);
@@ -5179,7 +5249,9 @@ function allocChan(ch){
      another 33 MB each. It has to be dropped here so a resolution change does
      not leave a target of the wrong size behind. */
   freeRT(c.glslPrev); c.glslPrev = null;
+  rtFailed = false;
   for(const k of CH_RTS) c[k] = makeRT(procW, procH);
+  if(rtFailed){ c.allocated = false; degradeRes("channel "+ch); return; }
   c.allocated = true;
 }
 function ensureChanRT(ch){
@@ -6427,8 +6499,95 @@ const panel = document.getElementById("panel");
 const uiRefs = {};   // id -> {slider, val, tick, row, label}
 let midiLearnMode = false, midiLearnTarget = null;
 const midiMap = {};  // "ch:cc" -> paramId
+/* after a patch is loaded the labels know nothing about what is mapped */
+function markMappedLabels(){
+  const mapped = new Set(Object.values(midiMap));
+  for(const id in uiRefs){
+    const r = uiRefs[id];
+    if(r && r.label) r.label.classList.toggle("mapped", mapped.has(id));
+  }
+}
 /* Mapping worked; knowing what you had mapped did not. The only trace was a
    dot appended to a label somewhere in a seven-screen column. */
+/* ---- the map as a file ----
+   A patch carries everything: the look, the sources, the levels. That is the
+   right default and it is the wrong thing to move between patches. What you
+   built with your hands - which controller moves what, and which modulator
+   drives what - is worth hours and belongs to you rather than to one look, so
+   it saves and loads on its own and drops onto any patch without touching a
+   single picture setting. */
+function mapPayload(){
+  return {
+    kind: "bendr-map", version: BENDR_VERSION, saved: new Date().toISOString(),
+    midiMap: {...midiMap},
+    routes: routes.map(r=>({...r})),
+    /* the modulators the routes point at, or half the routes would land on
+       sources that do not exist in the patch it is dropped onto */
+    mods: JSON.parse(JSON.stringify(mods)),
+    audioTaps: audioTaps.map(t=>({id:t.id, name:t.name, chan:t.chan, lo:t.lo, hi:t.hi, gain:t.gain, resp:t.resp})),
+    stems: stems.map(x=>({id:x.id, name:x.name, level:x.level})),
+  };
+}
+function saveMapFile(){
+  const n = Object.keys(midiMap).length, r = routes.length;
+  if(!n && !r){ toast("Nothing mapped or patched yet", true); return; }
+  const blob = new Blob([JSON.stringify(mapPayload(), null, 1)], {type:"application/json"});
+  dl(URL.createObjectURL(blob), "bendr-map-" + stamp() + ".json");
+  toast("Saved " + n + " MIDI mapping" + (n===1?"":"s") + " and " + r + " route" + (r===1?"":"s"));
+}
+function applyMapPayload(m, mode){
+  if(!m || m.kind !== "bendr-map"){ toast("That is not a BENDR map file", true); return false; }
+  pushHistory();
+  const add = mode === "merge";
+  if(!add){ for(const k in midiMap) delete midiMap[k]; }
+  Object.assign(midiMap, m.midiMap || {});
+  /* the sources first, so the routes have something to point at */
+  if(m.mods){
+    const have = new Set(mods.map(x=>x.id));
+    for(const x of m.mods) if(!add || !have.has(x.id)) {
+      const i = mods.findIndex(y=>y.id===x.id);
+      if(i >= 0) mods[i] = JSON.parse(JSON.stringify(x)); else mods.push(JSON.parse(JSON.stringify(x)));
+    }
+  }
+  if(m.audioTaps){
+    for(const t of m.audioTaps) if(!audioTaps.some(x=>x.id===t.id)) audioTaps.push(mkAudTap({...t}));
+    if(typeof wireTaps === "function") wireTaps();
+  }
+  if(m.stems){
+    for(const x of m.stems) if(!stems.some(y=>y.id===x.id))
+      stems.push({id:x.id, name:x.name, level:(x.level===undefined?1:x.level), buf:null, missing:true,
+                  val:0, raw:0, peak:0.05, avg:0.02, hit:0, src:null, lv:null, an:null, data:null});
+  }
+  if(m.routes){
+    if(!add) routes = [];
+    /* merging the same file twice should leave you where you were, not with
+       every route in it a second time */
+    const seen = new Set(routes.map(r=>r.src+">"+r.dst+">"+(r.ch||"A")));
+    for(const r of m.routes){
+      const k = r.src+">"+r.dst+">"+(r.ch||"A");
+      if(add && seen.has(k)) continue;
+      seen.add(k); routes.push({...r});
+    }
+  }
+  rebuildMODSRC(); renderRoutes(); renderMidiMap(); markMappedLabels();
+  if(typeof buildModPage === "function") buildModPage();
+  if(typeof buildAudTapList === "function") buildAudTapList();
+  if(typeof buildStemList === "function"){ buildStemList(); refreshStemUI(); }
+  toast((add ? "Merged " : "Loaded ") + Object.keys(m.midiMap||{}).length + " mapping" +
+        (Object.keys(m.midiMap||{}).length===1?"":"s") + " and " + (m.routes||[]).length + " route" +
+        ((m.routes||[]).length===1?"":"s") + (m.version ? "  \u00b7  saved from " + m.version : ""));
+  return true;
+}
+function loadMapFile(f, mode){
+  if(!f) return;
+  const fr = new FileReader();
+  fr.onload = ()=>{
+    let m = null;
+    try{ m = JSON.parse(fr.result); }catch(e){ toast("That file will not parse as JSON", true); return; }
+    applyMapPayload(m, mode);
+  };
+  fr.readAsText(f);
+}
 function renderMidiMap(){
   const host = document.getElementById("midimap");
   if(!host) return;
@@ -9407,9 +9566,12 @@ function onMidi(e){
   if(midiLearnMode && midiLearnTarget){
     midiMap[key] = midiLearnTarget;
     renderMidiMap();
-    uiRefs[midiLearnTarget].label.classList.remove("learn");
-    uiRefs[midiLearnTarget].label.classList.add("mapped");
-    toast("Mapped CC"+d1+" → "+P[midiLearnTarget].name);
+    /* the three bus faders live on the strip and have no row in the panel, so
+       this used to throw on the way to mapping one and leave learn mode stuck */
+    const lr = uiRefs[midiLearnTarget];
+    if(lr && lr.label){ lr.label.classList.remove("learn"); lr.label.classList.add("mapped"); }
+    const lp = P[midiLearnTarget];
+    toast("Mapped CC"+d1+" \u2192 "+(lp ? lp.name : midiLearnTarget));
     midiLearnTarget = null;
     return;
   }
@@ -9916,6 +10078,11 @@ function captureState(){
      called, how loud each sat - and that is enough for the routes patched to
      them to survive, so a reloaded patch comes back wired up and waiting for
      the files rather than quietly missing half its modulation. */
+  /* The MIDI map was never in here. Somebody who had learned ninety
+     controllers, saved the patch and saved a file still lost every one of
+     them, because the only copy lived in a variable. It is part of the patch:
+     it is where your hands are. */
+  st.midiMap = {...midiMap};
   st.stems = stems.map(x=>({id:x.id, name:x.name, level:x.level}));
   st.stemLoop = stemLoop; st.stemResp = stemResp;
   /* the shape of the frame is part of the piece, not a machine setting: a patch
@@ -9983,7 +10150,7 @@ function restoreState(st){
       if(st.chan[ch][p.id] !== undefined) chanBase[ch][p.id] = st.chan[ch][p.id];
     if(st.master) for(const p of MLIST) if(st.master[p.id] !== undefined) mBase[p.id] = st.master[p.id];
     routes = (st.routes||[]).map(r=>({ch:"A", ...r}));
-    if(st.mods || st.lfo1 || st.audioCfg || st.audioTaps || st.stems) applyExtras(st);
+    if(st.mods || st.lfo1 || st.audioCfg || st.audioTaps || st.stems || st.midiMap) applyExtras(st);
     refreshUI(); renderRoutes(); refreshLfoUI(); refreshAudioUI();
   } else {
     applyState(st.bases||{}, st.routes||[], st);   /* legacy single-channel state */
@@ -10056,6 +10223,12 @@ function applyExtras(extra){
     rebuildMODSRC();
     if(typeof buildAudTapList === "function") buildAudTapList();
     buildModPage();
+  }
+  if(extra.midiMap){
+    for(const k in midiMap) delete midiMap[k];
+    Object.assign(midiMap, extra.midiMap);
+    if(typeof renderMidiMap === "function") renderMidiMap();
+    if(typeof markMappedLabels === "function") markMappedLabels();
   }
   if(extra.stems){
     /* An undo is a restore, and restoring should not throw away a couple of
@@ -10296,6 +10469,15 @@ fileIn.onchange = ()=>{ if(fileIn.files[0]) handleFile(fileIn.files[0], fileIn.d
   /* stems arrive several at a time, which is the only way anybody has them */
   const sfi = document.getElementById("stemFileIn");
   if(sfi) sfi.onchange = ()=>{ if(sfi.files && sfi.files.length) addStemFiles(sfi.files); sfi.value=""; };
+  const mfi = document.getElementById("mapFileIn");
+  if(mfi) mfi.onchange = ()=>{ if(mfi.files[0]) loadMapFile(mfi.files[0], mfi.dataset.mode || "replace"); mfi.value=""; };
+  {
+    const pick = m => ()=>{ const e = document.getElementById("mapFileIn");
+                            if(e){ e.dataset.mode = m; e.value = ""; e.click(); } };
+    const sv = document.getElementById("btnMapSave"); if(sv) sv.onclick = saveMapFile;
+    const ld = document.getElementById("btnMapLoad"); if(ld) ld.onclick = pick("replace");
+    const mg = document.getElementById("btnMapMerge"); if(mg) mg.onclick = pick("merge");
+  }
 }
 
 const IMG_RE = /\.(jpe?g|png|gif|webp|bmp|avif|apng|svg)$/i;
@@ -12689,6 +12871,9 @@ function runStage(id, inTex, dstRT, now, ch){
     if(!C.hist || C.hist.w !== procW || C.hist.h !== procH){
       if(C.hist){ gl.deleteTexture(C.hist.tex); gl.deleteFramebuffer(C.hist.fbo); }
       C.hist = makeHistArray(procW, procH, TD_LAYERS);
+      /* refused: let the picture through untouched rather than drawing this
+         stage into a handle that points at nothing */
+      if(!C.hist){ if(typeof degradeRes === "function") degradeRes("time displace"); return inTex; }
       /* prime every layer with the live picture, or the stage fades up out of
          black for the first half second while the ring fills */
       const HP = C.hist;

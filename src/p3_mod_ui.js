@@ -1062,8 +1062,95 @@ const panel = document.getElementById("panel");
 const uiRefs = {};   // id -> {slider, val, tick, row, label}
 let midiLearnMode = false, midiLearnTarget = null;
 const midiMap = {};  // "ch:cc" -> paramId
+/* after a patch is loaded the labels know nothing about what is mapped */
+function markMappedLabels(){
+  const mapped = new Set(Object.values(midiMap));
+  for(const id in uiRefs){
+    const r = uiRefs[id];
+    if(r && r.label) r.label.classList.toggle("mapped", mapped.has(id));
+  }
+}
 /* Mapping worked; knowing what you had mapped did not. The only trace was a
    dot appended to a label somewhere in a seven-screen column. */
+/* ---- the map as a file ----
+   A patch carries everything: the look, the sources, the levels. That is the
+   right default and it is the wrong thing to move between patches. What you
+   built with your hands - which controller moves what, and which modulator
+   drives what - is worth hours and belongs to you rather than to one look, so
+   it saves and loads on its own and drops onto any patch without touching a
+   single picture setting. */
+function mapPayload(){
+  return {
+    kind: "bendr-map", version: BENDR_VERSION, saved: new Date().toISOString(),
+    midiMap: {...midiMap},
+    routes: routes.map(r=>({...r})),
+    /* the modulators the routes point at, or half the routes would land on
+       sources that do not exist in the patch it is dropped onto */
+    mods: JSON.parse(JSON.stringify(mods)),
+    audioTaps: audioTaps.map(t=>({id:t.id, name:t.name, chan:t.chan, lo:t.lo, hi:t.hi, gain:t.gain, resp:t.resp})),
+    stems: stems.map(x=>({id:x.id, name:x.name, level:x.level})),
+  };
+}
+function saveMapFile(){
+  const n = Object.keys(midiMap).length, r = routes.length;
+  if(!n && !r){ toast("Nothing mapped or patched yet", true); return; }
+  const blob = new Blob([JSON.stringify(mapPayload(), null, 1)], {type:"application/json"});
+  dl(URL.createObjectURL(blob), "bendr-map-" + stamp() + ".json");
+  toast("Saved " + n + " MIDI mapping" + (n===1?"":"s") + " and " + r + " route" + (r===1?"":"s"));
+}
+function applyMapPayload(m, mode){
+  if(!m || m.kind !== "bendr-map"){ toast("That is not a BENDR map file", true); return false; }
+  pushHistory();
+  const add = mode === "merge";
+  if(!add){ for(const k in midiMap) delete midiMap[k]; }
+  Object.assign(midiMap, m.midiMap || {});
+  /* the sources first, so the routes have something to point at */
+  if(m.mods){
+    const have = new Set(mods.map(x=>x.id));
+    for(const x of m.mods) if(!add || !have.has(x.id)) {
+      const i = mods.findIndex(y=>y.id===x.id);
+      if(i >= 0) mods[i] = JSON.parse(JSON.stringify(x)); else mods.push(JSON.parse(JSON.stringify(x)));
+    }
+  }
+  if(m.audioTaps){
+    for(const t of m.audioTaps) if(!audioTaps.some(x=>x.id===t.id)) audioTaps.push(mkAudTap({...t}));
+    if(typeof wireTaps === "function") wireTaps();
+  }
+  if(m.stems){
+    for(const x of m.stems) if(!stems.some(y=>y.id===x.id))
+      stems.push({id:x.id, name:x.name, level:(x.level===undefined?1:x.level), buf:null, missing:true,
+                  val:0, raw:0, peak:0.05, avg:0.02, hit:0, src:null, lv:null, an:null, data:null});
+  }
+  if(m.routes){
+    if(!add) routes = [];
+    /* merging the same file twice should leave you where you were, not with
+       every route in it a second time */
+    const seen = new Set(routes.map(r=>r.src+">"+r.dst+">"+(r.ch||"A")));
+    for(const r of m.routes){
+      const k = r.src+">"+r.dst+">"+(r.ch||"A");
+      if(add && seen.has(k)) continue;
+      seen.add(k); routes.push({...r});
+    }
+  }
+  rebuildMODSRC(); renderRoutes(); renderMidiMap(); markMappedLabels();
+  if(typeof buildModPage === "function") buildModPage();
+  if(typeof buildAudTapList === "function") buildAudTapList();
+  if(typeof buildStemList === "function"){ buildStemList(); refreshStemUI(); }
+  toast((add ? "Merged " : "Loaded ") + Object.keys(m.midiMap||{}).length + " mapping" +
+        (Object.keys(m.midiMap||{}).length===1?"":"s") + " and " + (m.routes||[]).length + " route" +
+        ((m.routes||[]).length===1?"":"s") + (m.version ? "  \u00b7  saved from " + m.version : ""));
+  return true;
+}
+function loadMapFile(f, mode){
+  if(!f) return;
+  const fr = new FileReader();
+  fr.onload = ()=>{
+    let m = null;
+    try{ m = JSON.parse(fr.result); }catch(e){ toast("That file will not parse as JSON", true); return; }
+    applyMapPayload(m, mode);
+  };
+  fr.readAsText(f);
+}
 function renderMidiMap(){
   const host = document.getElementById("midimap");
   if(!host) return;
@@ -4042,9 +4129,12 @@ function onMidi(e){
   if(midiLearnMode && midiLearnTarget){
     midiMap[key] = midiLearnTarget;
     renderMidiMap();
-    uiRefs[midiLearnTarget].label.classList.remove("learn");
-    uiRefs[midiLearnTarget].label.classList.add("mapped");
-    toast("Mapped CC"+d1+" → "+P[midiLearnTarget].name);
+    /* the three bus faders live on the strip and have no row in the panel, so
+       this used to throw on the way to mapping one and leave learn mode stuck */
+    const lr = uiRefs[midiLearnTarget];
+    if(lr && lr.label){ lr.label.classList.remove("learn"); lr.label.classList.add("mapped"); }
+    const lp = P[midiLearnTarget];
+    toast("Mapped CC"+d1+" \u2192 "+(lp ? lp.name : midiLearnTarget));
     midiLearnTarget = null;
     return;
   }

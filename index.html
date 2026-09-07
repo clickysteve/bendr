@@ -3725,7 +3725,7 @@ const FS_GEN = COMMON +
 "  return h21(vec2(floor(x*48.0), 7.31));\n}\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
-"  float t = u_time*u_genRate;\n" +
+"  float t = u_time*u_genRate*0.5;\n" +
 "  float ar = u_res.x/u_res.y;\n" +
 "  vec2 p = uv - 0.5 - vec2(u_genCX, u_genCY)*0.5;\n" +
 "  p.x *= ar;\n" +
@@ -3893,7 +3893,7 @@ const FS_TILE = COMMON +
 /* The build version, in exactly one place. It used to be typed into two spots
    in the markup, which is a guarantee that one day it will say the wrong
    thing on a build that shipped. build.py reads this and prints it. */
-const BENDR_VERSION = "v38.3";
+const BENDR_VERSION = "v38.4";
 
 /* ---------------- parameter registry ---------------- */
 /* The panel is laid out in four zones. MIX sits under the channel buttons and

@@ -2003,7 +2003,7 @@ const FS_GEN = COMMON +
 "  return h21(vec2(floor(x*48.0), 7.31));\n}\n" +
 "void main(){\n" +
 "  vec2 uv = gl_FragCoord.xy/u_res;\n" +
-"  float t = u_time*u_genRate;\n" +
+"  float t = u_time*u_genRate*0.5;\n" +
 "  float ar = u_res.x/u_res.y;\n" +
 "  vec2 p = uv - 0.5 - vec2(u_genCX, u_genCY)*0.5;\n" +
 "  p.x *= ar;\n" +

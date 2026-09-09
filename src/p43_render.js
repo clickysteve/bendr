@@ -1242,7 +1242,6 @@ function frameEnd(now, dt){
   if(fpsN>=30){ fpsShow = Math.round(fpsAcc/fpsN); fpsAcc=0; fpsN=0;
     osd.textContent = procH+"p \u00b7 "+fpsShow+" fps"+(" \u00b7 "+liveList)+(multiView?" \u00b7 MULTI":"")+(recorder?" \u00b7 REC":"")+(perfRec.mode!=="off"?" \u00b7 "+perfRec.mode.toUpperCase():"")+(audioMode!=="off"?" \u00b7 AUD":"")+(rescanMode?" \u00b7 RESCAN":"");
     updateTempoUI();
-  }
     if(perfModeOn && !perfFloorHit){
       const target = engineRate > 0 ? engineRate : 30;
       const threshold = Math.max(15, target*0.75);

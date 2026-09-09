@@ -1038,9 +1038,9 @@ canvas.addEventListener("webglcontextrestored", ()=>{
   ctxLost = false;
   toast("Graphics context restored \u2014 reload if the picture does not come back", true);
 }, false);
-/* Live thumbnails on the channel buttons. A readback stalls the pipeline, so
-   this happens twice a second at 48x27 - about five kilobytes a second in
-   total - rather than every frame. */
+/* Live thumbnails on the channel buttons. Twice a second at 48x27, about five
+   kilobytes a second, and the read that brings them across is queued rather
+   than waited on, so the frame that issues it does not pay for it. */
 /* The scopes read the finished picture back at a low resolution and draw it as
    a waveform and a vectorscope. Both are what an engineer would put on a bench
    next to this, and both are the most honest thing you can show: they say what
@@ -1137,6 +1137,9 @@ function setThumbSize(){
   ATLAS_W = THUMB_W*2; ATLAS_H = THUMB_H*2;
   thumbPix = new Uint8Array(ATLAS_W*ATLAS_H*4);
   thumbImg = null;
+  /* the pixel buffer is sized to the old atlas and anything in flight is
+     writing the old shape into an array that no longer exists, so both go */
+  thumbDrop();
   if(thumbRT){ freeRT(thumbRT); thumbRT = null; }
   if(typeof chanThumbs !== "undefined"){
     for(const ch of CHANNELS){
@@ -1152,15 +1155,112 @@ let ATLAS_W = THUMB_W*2, ATLAS_H = THUMB_H*2;
 const THUMB_SLOT = {A:[0,1], B:[1,1], C:[0,0], D:[1,0]};
 let thumbPix = new Uint8Array(ATLAS_W*ATLAS_H*4);
 let thumbAt = 0, thumbRT = null, thumbImg = null;
+/* The atlas used to come back through a plain readPixels, which blocks until
+   the GPU has finished everything queued ahead of it. With a full chain running
+   that was hundreds of milliseconds, twice a second, and because it sits in
+   frameEnd rather than in the chain, bypassing every stage did not shift it.
+   The read goes into a pixel buffer now and a fence says when it has actually
+   landed, so the tiles are painted a frame or two later and nothing waits.
+   Two frames of latency on a 48x27 tile is invisible. The stall was not. */
+let thumbPBO = null, thumbPend = null, thumbFenceFails = 0, thumbNoFence = false;
+function thumbDrop(){
+  if(thumbPend){ try{ gl.deleteSync(thumbPend.sync); }catch(e){} thumbPend = null; }
+  if(thumbPBO){ try{ gl.deleteBuffer(thumbPBO); }catch(e){} thumbPBO = null; }
+}
+function thumbPaint(drawn){
+  for(const ch of CHANNELS){
+    if(!drawn[ch]) continue;
+    const g = chanThumbs[ch];
+    if(!g) continue;
+    if(!thumbImg) thumbImg = g.createImageData(THUMB_W, THUMB_H);
+    const d = thumbImg.data;
+    const sl = THUMB_SLOT[ch], ox = sl[0]*THUMB_W, oy = sl[1]*THUMB_H;
+    /* readPixels is bottom-up, so the tile's top row is its last one */
+    for(let y=0;y<THUMB_H;y++){
+      const s = ((oy + THUMB_H-1-y)*ATLAS_W + ox)*4, dst = y*THUMB_W*4;
+      for(let i=0;i<THUMB_W*4;i++) d[dst+i] = thumbPix[s+i];
+    }
+    g.putImageData(thumbImg, 0, 0);
+  }
+}
+/* paint whatever the GPU has finished with. Called every frame, and it is a
+   null check on the frames where there is nothing outstanding. */
+function thumbPoll(now){
+  if(!thumbPend) return;
+  let st;
+  /* SYNC_FLUSH_COMMANDS_BIT is not optional: without it the fence can sit
+     unsubmitted and every poll returns TIMEOUT_EXPIRED for ever, which shows
+     up as thumbnails that never paint at all */
+  try{ st = gl.clientWaitSync(thumbPend.sync, gl.SYNC_FLUSH_COMMANDS_BIT, 0); }
+  catch(e){ thumbDrop(); thumbNoFence = true; return; }
+  if(st === gl.TIMEOUT_EXPIRED){
+    /* a fence that never signals would leave the tiles frozen for good, so
+       give up on one still outstanding after two seconds and start again. If
+       that keeps happening the fences on this machine cannot be trusted, so
+       take the blocking read from here on: slow tiles beat no tiles. */
+    if(now - thumbPend.at > 5){
+      thumbDrop();
+      /* deliberately hard to reach. Falling back means reinstating the stall
+         this whole path exists to remove, and a machine that is already
+         struggling polls rarely enough to look slow without being broken, so
+         it takes about half a minute of solid failure to give up. */
+      if(++thumbFenceFails >= 5) thumbNoFence = true;
+    }
+    return;
+  }
+  thumbFenceFails = 0;
+  const pend = thumbPend;
+  thumbPend = null;
+  try{ gl.deleteSync(pend.sync); }catch(e){}
+  if(st === gl.WAIT_FAILED || !thumbPBO) return;  /* the next tick draws it again */
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, thumbPBO);
+  gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, thumbPix);
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  thumbPaint(pend.drawn);
+}
+/* issue the read against whatever framebuffer is bound and return immediately */
+function thumbStart(drawn, now){
+  const blocking = ()=>{
+    gl.readPixels(0,0,ATLAS_W,ATLAS_H, gl.RGBA, gl.UNSIGNED_BYTE, thumbPix);
+    thumbPaint(drawn);
+  };
+  if(thumbNoFence || !gl.fenceSync || !gl.getBufferSubData) return blocking();
+  if(!thumbPBO){
+    thumbPBO = gl.createBuffer();
+    if(!thumbPBO) return blocking();
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, thumbPBO);
+    gl.bufferData(gl.PIXEL_PACK_BUFFER, thumbPix.byteLength, gl.STREAM_READ);
+  } else {
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, thumbPBO);
+  }
+  gl.readPixels(0,0,ATLAS_W,ATLAS_H, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+  /* the scopes read into an array from this same loop, and a pack buffer left
+     bound would make that call fail outright, so it never stays bound */
+  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+  const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  if(!sync){
+    /* nothing to wait on: take it now rather than strand it in the buffer */
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, thumbPBO);
+    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, thumbPix);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    thumbPaint(drawn);
+    return;
+  }
+  /* the fence has to be submitted or clientWaitSync will never see it signal */
+  gl.flush();
+  thumbPend = {sync:sync, drawn:drawn, at:now};
+}
 function updateThumbs(now){
   /* The tiles live in the channel bar inside #panel, and hide-panel takes that
      out of the document entirely. The work behind them is not small: a
-     full-raster redraw and upload for every idle source, then a synchronous
-     readback that waits for the GPU to drain. None of it is worth doing for
+     full-raster redraw and upload for every idle source, then a readback and
+     four canvas paints. None of it is worth doing for
      something nobody can see. Bail before the throttle is stamped, so the
      first tick after the panel comes back is a refresh and not a wait. */
+  thumbPoll(now);
   if(document.body.classList.contains("hide-panel")) return;
   if(now - thumbAt < 0.5) return;
+  if(thumbPend) return;              /* one still in flight; do not stack them */
   thumbAt = now;
   if(typeof chanThumbs === "undefined") return;
   if(!thumbRT) thumbRT = makeRT(ATLAS_W, ATLAS_H);
@@ -1215,22 +1315,7 @@ function updateThumbs(now){
     draw();
     drawn[ch] = true; any = true;
   }
-  if(any){
-    gl.readPixels(0,0,ATLAS_W,ATLAS_H, gl.RGBA, gl.UNSIGNED_BYTE, thumbPix);
-    for(const ch of CHANNELS){
-      if(!drawn[ch]) continue;
-      const g = chanThumbs[ch];
-      if(!thumbImg) thumbImg = g.createImageData(THUMB_W, THUMB_H);
-      const d = thumbImg.data;
-      const sl = THUMB_SLOT[ch], ox = sl[0]*THUMB_W, oy = sl[1]*THUMB_H;
-      /* readPixels is bottom-up, so the tile's top row is its last one */
-      for(let y=0;y<THUMB_H;y++){
-        const src = ((oy + THUMB_H-1-y)*ATLAS_W + ox)*4, dst = y*THUMB_W*4;
-        for(let i=0;i<THUMB_W*4;i++) d[dst+i] = thumbPix[src+i];
-      }
-      g.putImageData(thumbImg, 0, 0);
-    }
-  }
+  if(any) thumbStart(drawn, now);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 function frameEnd(now, dt){

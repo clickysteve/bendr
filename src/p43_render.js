@@ -138,6 +138,15 @@ function updateSyncModel(dt, t, live){
 /* ---------------- main loop ---------------- */
 const osd = document.getElementById("osd");
 let lastT = performance.now()/1000, fpsAcc=0, fpsN=0, fpsShow=0;
+
+/* PERFORMANCE MODE: a one-way safety net for a machine that can't keep up.
+   It only ever steps settings down, never back up — the point is to turn a
+   permanent stutter into something steady enough to work with, not to run
+   the show. Rate goes first (one step, FREE to 30, since a free-running loop
+   on a fast display is the single biggest hidden cost) and resolution
+   follows the existing ladder if that alone isn't enough. */
+let perfModeOn = false, perfStruggleWindows = 0, perfLastActionT = -999, perfFloorHit = false;
+function setPerfMode(v){ perfModeOn = !!v; perfStruggleWindows = 0; perfFloorHit = false; }
 const stutterHeld = {}, stutterT = {};
 for(const ch of CHANNELS){ stutterHeld[ch]=false; stutterT[ch]=0; }
 /* STILL freezes a channel's source outright; STROBE holds each frame for a
@@ -1233,6 +1242,32 @@ function frameEnd(now, dt){
   if(fpsN>=30){ fpsShow = Math.round(fpsAcc/fpsN); fpsAcc=0; fpsN=0;
     osd.textContent = procH+"p \u00b7 "+fpsShow+" fps"+(" \u00b7 "+liveList)+(multiView?" \u00b7 MULTI":"")+(recorder?" \u00b7 REC":"")+(perfRec.mode!=="off"?" \u00b7 "+perfRec.mode.toUpperCase():"")+(audioMode!=="off"?" \u00b7 AUD":"")+(rescanMode?" \u00b7 RESCAN":"");
     updateTempoUI();
+  }
+    if(perfModeOn && !perfFloorHit){
+      const target = engineRate > 0 ? engineRate : 30;
+      const threshold = Math.max(15, target*0.75);
+      if(fpsShow < threshold) perfStruggleWindows++; else perfStruggleWindows = 0;
+      if(perfStruggleWindows >= 3 && now - perfLastActionT > 4){
+        perfStruggleWindows = 0; perfLastActionT = now;
+        if(engineRate === 0){
+          engineRate = 30; rateAcc = 0;
+          const rt = document.getElementById("selRate"); if(rt) rt.value = "30";
+          toast("Performance mode \u2014 frame rate capped at 30 fps to keep up");
+        } else {
+          const ladder = [360,540,720,1080,1440,2160];
+          const idx = ladder.indexOf(procRes);
+          if(idx > 0){
+            setProcRes(ladder[idx-1]);
+            sizeCanvas();
+            const rs = document.getElementById("selRes"); if(rs) rs.value = String(procRes);
+            toast("Performance mode \u2014 processing resolution dropped to "+procW+"\u00d7"+procH+" to keep up");
+          } else {
+            perfFloorHit = true;
+            toast("Performance mode \u2014 already at the lowest resolution and frame rate this patch supports");
+          }
+        }
+      }
+    }
   }
 }
 

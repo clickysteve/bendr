@@ -475,6 +475,25 @@ if(OUTPUT_MODE){
        handler and nothing anywhere ever turned MIDI on, and the AUDIO REACT
        selector had no onchange — it was a mirror of the one on the AUDIO tab
        and changing it did nothing. */
+    { const pm = document.getElementById("btnPerfMode");
+      if(pm){
+        let perfPref = false;
+        try{ perfPref = localStorage.getItem("bendr.perfmode") === "1"; }catch(e){}
+        pm.classList.toggle("on", perfPref);
+        pm.textContent = "PERFORMANCE MODE: " + (perfPref ? "ON" : "OFF");
+        setPerfMode(perfPref);
+        pm.onclick = ()=>{
+          perfPref = !perfPref;
+          pm.classList.toggle("on", perfPref);
+          pm.textContent = "PERFORMANCE MODE: " + (perfPref ? "ON" : "OFF");
+          try{ localStorage.setItem("bendr.perfmode", perfPref ? "1" : "0"); }catch(e){}
+          setPerfMode(perfPref);
+          toast(perfPref
+            ? "Performance mode on \u2014 resolution and rate will step down on their own if frames fall behind"
+            : "Performance mode off");
+        };
+      }
+    }
     { const fb = document.getElementById("btnFlush");
       if(fb) fb.onclick = ()=>{ flushBuffers(); toast("Buffers flushed \u2014 feedback, flow, persistence and the frame ring"); }; }
     { const mb = document.getElementById("btnMidi");

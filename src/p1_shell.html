@@ -1269,6 +1269,7 @@ audio,video{display:none;}
         <option value="25">25 fps</option>
         <option value="24">24 fps</option>
       </select>
+      <button id="btnPerfMode" data-tip="Watches the actual frame rate against RESOLUTION and RATE above. If the machine can't keep up it steps things down on its own - engine rate to 30 fps first, then resolution one rung at a time - until it settles, and says so each time. It only ever steps down; put RESOLUTION and RATE back yourself once you want them higher. Meant for troubleshooting a machine that's struggling, not for everyday use.">PERFORMANCE MODE: OFF</button>
       <button id="btnFlush" data-tip="Empties every buffer that feeds itself - the feedback store, the flow stage's frame store, the phosphor persistence and the frame ring - without touching a single parameter. If a bad frame gets caught circulating in one of those it will sit there until you reload; this is the way out.">FLUSH BUFFERS</button>
       <button id="btnMidi" data-tip="MIDI learn. Turn it on, click a parameter name, then move a hardware knob to map it. MIDI clock overrides tap tempo; notes C1-F1 fire the bend pads.">MIDI LEARN</button>
     </div>

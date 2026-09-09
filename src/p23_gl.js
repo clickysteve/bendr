@@ -4,7 +4,7 @@ const canvas = document.getElementById("glcanvas");
    framebuffer every single frame, and the only thing that wanted it was reading
    the canvas back for a still. Stills are captured inside the frame callback
    instead, which is where the buffer is valid anyway. */
-const gl = canvas.getContext("webgl2", {preserveDrawingBuffer:false, antialias:false, alpha:false});
+const gl = canvas.getContext("webgl2", {preserveDrawingBuffer:false, antialias:false, alpha:false, powerPreference:"high-performance"});
 if(!gl){ document.body.innerHTML = "<p style='padding:40px;font-family:monospace'>WebGL2 not available in this browser.</p>"; throw new Error("no webgl2"); }
 
 /* Asking for COMPILE_STATUS immediately after each compileShader forces the

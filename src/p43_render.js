@@ -1153,6 +1153,13 @@ const THUMB_SLOT = {A:[0,1], B:[1,1], C:[0,0], D:[1,0]};
 let thumbPix = new Uint8Array(ATLAS_W*ATLAS_H*4);
 let thumbAt = 0, thumbRT = null, thumbImg = null;
 function updateThumbs(now){
+  /* The tiles live in the channel bar inside #panel, and hide-panel takes that
+     out of the document entirely. The work behind them is not small: a
+     full-raster redraw and upload for every idle source, then a synchronous
+     readback that waits for the GPU to drain. None of it is worth doing for
+     something nobody can see. Bail before the throttle is stamped, so the
+     first tick after the panel comes back is a refresh and not a wait. */
+  if(document.body.classList.contains("hide-panel")) return;
   if(now - thumbAt < 0.5) return;
   thumbAt = now;
   if(typeof chanThumbs === "undefined") return;

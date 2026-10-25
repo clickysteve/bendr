@@ -2523,7 +2523,7 @@ function buildZones(){
 }
 /* default: source, framing, frame store, feedback, then the chain stages in
    rail order, then the keyer */
-const CHAIN_HEAD = ["gen","frame","time","feedback"];
+const CHAIN_HEAD = ["gen","txt","frame","time","feedback"];
 const CHAIN_TAIL = ["keyer"];
 function chainZoneOrder(followRail){
   const stageSecs = followRail
@@ -2766,7 +2766,7 @@ function resetChannelFX(){
   pushHistory();
   const targets = linkChans ? CHANNELS : [activeChan];
   for(const p of CLIST){
-    if(p.sec === "gen") continue;
+    if(p.sec === "gen" || p.sec === "txt") continue;
     for(const ch of targets){ chanBase[ch][p.id] = p.def; morphOverride.add(ch+":"+p.id); }
   }
   /* the per-channel mode switches are part of "what I have done to it" */
@@ -3773,6 +3773,7 @@ function refreshLfoUI(){
 }
 function refreshUI(){
   bumpParams();
+  if(typeof syncTextEditor === "function") syncTextEditor();
   for(const p of PLIST){
     const r = uiRefs[p.id]; if(!r) continue;
     const v = getBase(p.id);

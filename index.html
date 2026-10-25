@@ -3907,6 +3907,7 @@ const SECTIONS = [
   {id:"layers",   name:"LAYER STACK",          cls:"cyan", zone:"layerdock"},
 
   {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan", zone:"chain"},
+  {id:"txt",      name:"TEXT / SHAPES",    cls:"cyan", zone:"chain"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag",  zone:"chain"},
   {id:"time",     name:"TIME BASE",         cls:"mag",  zone:"chain"},
   {id:"feedback", name:"FEEDBACK / RESCAN", cls:"mag",  zone:"chain"},
@@ -4095,6 +4096,26 @@ const PDEF = [
   ["genSat","SATURATION","gen",0,1,0.9],
   ["genBright","BRIGHTNESS","gen",0,1.5,1],
   ["genBands","COLOUR BANDS","gen",2,16,6],
+
+  /* the numeric half of the TEXT source, so a modulator can reach it. The
+     colours, the font and the string itself stay on the TEXT tab: they are
+     not numbers a route can move */
+  ["txtSize","TEXT SIZE","txt",0.03,0.6,0.2],
+  ["txtTrack","TRACKING","txt",-0.1,0.5,0],
+  ["txtX","TEXT X","txt",0,1,0.5],
+  ["txtY","TEXT Y","txt",0,1,0.5],
+  ["txtRot","TEXT ROTATE","txt",-180,180,0],
+  ["txtScrollX","SCROLL X","txt",-1,1,0],
+  ["txtScrollY","SCROLL Y","txt",-1,1,0],
+  ["txtRepeat","REPEAT","txt",1,8,1],
+  ["txtOutline","OUTLINE","txt",0,20,0],
+  ["shpCount","SHAPE COUNT","txt",1,24,1],
+  ["shpSize","SHAPE SIZE","txt",0.02,1,0.3],
+  ["shpX","SHAPE X","txt",0,1,0.5],
+  ["shpY","SHAPE Y","txt",0,1,0.5],
+  ["shpSpin","SHAPE SPIN","txt",-2,2,0],
+  ["shpStroke","SHAPE STROKE","txt",0,40,0],
+  ["shpPulse","SHAPE PULSE","txt",0,1,0],
 
   ["flipMode","FLIP","frame",0,3,0],
   ["mirrorMode","MIRROR","frame",0,3,0],
@@ -4835,6 +4856,7 @@ for(const [suffix, note] of [["2"," (bus 2: channels C and D)"], ["M"," (master:
 
 /* ---------------- per-section help ---------------- */
 const SECHELP = {
+  txt:"The numbers behind the TEXT source: size, tracking, position, rotation, scroll, repeat and outline for the lettering, and count, size, position, spin, stroke and pulse for the shapes underneath. They are ordinary parameters, so any modulator can be patched to them, and they only show in the picture on a channel whose source is TEXT. The string, the font and the colours are not numbers and stay on the TEXT tab.",
   stems:"A track pulled apart into its parts, all playing together, each part driving something different. Load the stems of one song and the kick moves one thing, the bass another, the vocal a third, and because they came out of the same session they are already separated in a way no amount of filtering a finished mix can match. They start together and stay together: each one is decoded into memory and every source in the set is scheduled at a single instant on the audio clock, rather than started at roughly the same moment and nudged towards each other afterwards, which is what drifts. The price is memory, about a megabyte a second for a stereo stem, and the panel says what it is holding. There is no EQ on a stem and that is the point rather than an omission: a band control exists to find the kick inside a mix, and a kick stem is already the kick. Level is only about what you hear, so a part pulled right down still drives whatever it is patched to at full range, which is how you use a stem nobody is meant to listen to. The audio cannot travel in a saved patch, but the shape of the set does: reopen one and the stems are there by name with their routes intact, waiting for the files to be dropped back on.",
   layers:"The other way to wire four channels together. The mixer is a tree: two pictures into a bus, two buses into the master, everything arriving through a fader. That is how a bench mixer is built and it is the right shape for cutting and wiping between sources, but it is the wrong shape for building one picture out of four, because every layer past the second has to come in through a fader that is already carrying something else. The stack is the other topology. Four layers, bottom to top, each landing on everything under it with its own blend mode, its own level and its own key, and a crosspoint matrix deciding which channel feeds which layer. Each layer is a row: its blend, its key and its level, with the threshold, softness and hue appearing beside them only once a key is chosen. The same channel can feed more than one layer, which is how you put a picture over a treated copy of itself. Switching to LAYERS leaves the three transitions dimmed but intact: nothing is lost, and the master melt still runs on the finished stack, so the whole thing can still feed back into itself.",
   mixer:"Bus 1 of three. Combines the two finished channels A and B with a fader, twenty transition modes, a keyer and the melt stage that softens the seam between them.",
@@ -7961,7 +7983,7 @@ function buildZones(){
 }
 /* default: source, framing, frame store, feedback, then the chain stages in
    rail order, then the keyer */
-const CHAIN_HEAD = ["gen","frame","time","feedback"];
+const CHAIN_HEAD = ["gen","txt","frame","time","feedback"];
 const CHAIN_TAIL = ["keyer"];
 function chainZoneOrder(followRail){
   const stageSecs = followRail
@@ -8204,7 +8226,7 @@ function resetChannelFX(){
   pushHistory();
   const targets = linkChans ? CHANNELS : [activeChan];
   for(const p of CLIST){
-    if(p.sec === "gen") continue;
+    if(p.sec === "gen" || p.sec === "txt") continue;
     for(const ch of targets){ chanBase[ch][p.id] = p.def; morphOverride.add(ch+":"+p.id); }
   }
   /* the per-channel mode switches are part of "what I have done to it" */
@@ -9211,6 +9233,7 @@ function refreshLfoUI(){
 }
 function refreshUI(){
   bumpParams();
+  if(typeof syncTextEditor === "function") syncTextEditor();
   for(const p of PLIST){
     const r = uiRefs[p.id]; if(!r) continue;
     const v = getBase(p.id);
@@ -10156,7 +10179,16 @@ function restoreState(st){
   } else {
     applyState(st.bases||{}, st.routes||[], st);   /* legacy single-channel state */
   }
-  if(st.srcText){ for(const ch of CHANNELS) if(st.srcText[ch]) Object.assign(SRC[ch].text, st.srcText[ch]); }
+  if(st.srcText){
+    for(const ch of CHANNELS){
+      const t = st.srcText[ch]; if(!t) continue;
+      Object.assign(SRC[ch].text, t);
+      /* a patch saved before the text numbers were parameters keeps them here */
+      const had = st.chan && st.chan[ch];
+      for(const k in TXT_PARAM) if(t[k] !== undefined && !(had && had[TXT_PARAM[k]] !== undefined)) setBase(TXT_PARAM[k], t[k], ch);
+    }
+    refreshUI();
+  }
   if(st.busSrc){ if(st.busSrc.b1) busSrc.b1 = st.busSrc.b1.slice(); if(st.busSrc.b2) busSrc.b2 = st.busSrc.b2.slice(); refreshBusUI(); }
   /* a patch saved before the stack existed is a tree, and has to stay one */
   mixTopo = (st.mixTopo === undefined) ? 0 : st.mixTopo;
@@ -10449,10 +10481,8 @@ function newSource(ch){
           patCanvas:pc, pat:pc.getContext("2d"), patClock:0,
           aspect:16/9, has:0, speed:1, tpRate:1, feed:"PGM", name:"", audioHooked:false,
           glsl:"", glslProg:null, glslErr:"", glslF0:"none", glslF2:"none", glslFrame:0,
-          text:{body:"BENDR", font:"mono", size:0.2, track:0, x:0.5, y:0.5, rot:0,
-                scrollX:0, scrollY:0, repeat:1, ink:"#ffffff", bg:"#000000", outline:0,
-                shape:"none", shpCount:1, shpSize:0.3, shpX:0.5, shpY:0.5,
-                shpSpin:0, shpFill:"#ff2fa0", shpStroke:0, shpPulse:0}};
+          text:{body:"BENDR", font:"mono", ink:"#ffffff", bg:"#000000",
+                shape:"none", shpFill:"#ff2fa0"}};
 }
 const SRC = {};
 for(const ch of CHANNELS) SRC[ch] = newSource(ch);
@@ -10811,8 +10841,17 @@ const FONTS = {
   fantasy:'fantasy',
   system:'system-ui, -apple-system, sans-serif'
 };
+/* text field -> parameter id. The numeric fields are parameters, so they can
+   be modulated; S.text keeps only what a route cannot move */
+const TXT_PARAM = {size:"txtSize", track:"txtTrack", x:"txtX", y:"txtY", rot:"txtRot",
+  scrollX:"txtScrollX", scrollY:"txtScrollY", repeat:"txtRepeat", outline:"txtOutline",
+  shpCount:"shpCount", shpSize:"shpSize", shpX:"shpX", shpY:"shpY", shpSpin:"shpSpin",
+  shpStroke:"shpStroke", shpPulse:"shpPulse"};
 function drawTextSource(S, t){
-  const g = S.pat, W = S.patCanvas.width, H = S.patCanvas.height, T = S.text;
+  const g = S.pat, W = S.patCanvas.width, H = S.patCanvas.height;
+  const cc = chanCur[S.ch], T = S.textLive || (S.textLive = {});
+  Object.assign(T, S.text);
+  for(const k in TXT_PARAM) T[k] = cc[TXT_PARAM[k]];
   g.setTransform(1,0,0,1,0,0);
   g.fillStyle = T.bg; g.fillRect(0,0,W,H);
 
@@ -10949,14 +10988,18 @@ function syncTextEditor(){
   if(ce) ce.textContent = "\u2014 CHANNEL "+activeChan;
   for(const [id,key,kind] of TXT_CTRL){
     const el = document.getElementById(id); if(!el) continue;
-    el.value = T[key];
+    el.value = TXT_PARAM[key] ? getBase(TXT_PARAM[key], activeChan) : T[key];
   }
 }
 for(const [id,key,kind] of TXT_CTRL){
   const el = document.getElementById(id); if(!el) continue;
   const handler = ()=>{
     const T = cur().text;
-    T[key] = (kind==="f") ? parseFloat(el.value) : el.value;
+    if(TXT_PARAM[key]){
+      setBase(TXT_PARAM[key], parseFloat(el.value), activeChan);
+      const r = uiRefs[TXT_PARAM[key]];
+      if(r){ r.slider.value = getBase(TXT_PARAM[key], activeChan); setReadout(r.val, fmt(P[TXT_PARAM[key]], getBase(TXT_PARAM[key], activeChan))); }
+    } else T[key] = (kind==="f") ? parseFloat(el.value) : el.value;
     const S = cur();
     if(S.mode !== "text"){ stopCam(activeChan); S.mode = "text"; S.name = "text"; syncChanInputUI(); }
   };

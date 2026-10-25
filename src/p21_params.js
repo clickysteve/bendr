@@ -14,6 +14,7 @@ const SECTIONS = [
   {id:"layers",   name:"LAYER STACK",          cls:"cyan", zone:"layerdock"},
 
   {id:"gen",      name:"PATTERN SYNTH",     cls:"cyan", zone:"chain"},
+  {id:"txt",      name:"TEXT / SHAPES",    cls:"cyan", zone:"chain"},
   {id:"frame",    name:"FRAME / POSITION",  cls:"mag",  zone:"chain"},
   {id:"time",     name:"TIME BASE",         cls:"mag",  zone:"chain"},
   {id:"feedback", name:"FEEDBACK / RESCAN", cls:"mag",  zone:"chain"},
@@ -202,6 +203,26 @@ const PDEF = [
   ["genSat","SATURATION","gen",0,1,0.9],
   ["genBright","BRIGHTNESS","gen",0,1.5,1],
   ["genBands","COLOUR BANDS","gen",2,16,6],
+
+  /* the numeric half of the TEXT source, so a modulator can reach it. The
+     colours, the font and the string itself stay on the TEXT tab: they are
+     not numbers a route can move */
+  ["txtSize","TEXT SIZE","txt",0.03,0.6,0.2],
+  ["txtTrack","TRACKING","txt",-0.1,0.5,0],
+  ["txtX","TEXT X","txt",0,1,0.5],
+  ["txtY","TEXT Y","txt",0,1,0.5],
+  ["txtRot","TEXT ROTATE","txt",-180,180,0],
+  ["txtScrollX","SCROLL X","txt",-1,1,0],
+  ["txtScrollY","SCROLL Y","txt",-1,1,0],
+  ["txtRepeat","REPEAT","txt",1,8,1],
+  ["txtOutline","OUTLINE","txt",0,20,0],
+  ["shpCount","SHAPE COUNT","txt",1,24,1],
+  ["shpSize","SHAPE SIZE","txt",0.02,1,0.3],
+  ["shpX","SHAPE X","txt",0,1,0.5],
+  ["shpY","SHAPE Y","txt",0,1,0.5],
+  ["shpSpin","SHAPE SPIN","txt",-2,2,0],
+  ["shpStroke","SHAPE STROKE","txt",0,40,0],
+  ["shpPulse","SHAPE PULSE","txt",0,1,0],
 
   ["flipMode","FLIP","frame",0,3,0],
   ["mirrorMode","MIRROR","frame",0,3,0],

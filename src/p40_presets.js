@@ -569,7 +569,16 @@ function restoreState(st){
   } else {
     applyState(st.bases||{}, st.routes||[], st);   /* legacy single-channel state */
   }
-  if(st.srcText){ for(const ch of CHANNELS) if(st.srcText[ch]) Object.assign(SRC[ch].text, st.srcText[ch]); }
+  if(st.srcText){
+    for(const ch of CHANNELS){
+      const t = st.srcText[ch]; if(!t) continue;
+      Object.assign(SRC[ch].text, t);
+      /* a patch saved before the text numbers were parameters keeps them here */
+      const had = st.chan && st.chan[ch];
+      for(const k in TXT_PARAM) if(t[k] !== undefined && !(had && had[TXT_PARAM[k]] !== undefined)) setBase(TXT_PARAM[k], t[k], ch);
+    }
+    refreshUI();
+  }
   if(st.busSrc){ if(st.busSrc.b1) busSrc.b1 = st.busSrc.b1.slice(); if(st.busSrc.b2) busSrc.b2 = st.busSrc.b2.slice(); refreshBusUI(); }
   /* a patch saved before the stack existed is a tree, and has to stay one */
   mixTopo = (st.mixTopo === undefined) ? 0 : st.mixTopo;

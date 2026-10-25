@@ -33,10 +33,8 @@ function newSource(ch){
           patCanvas:pc, pat:pc.getContext("2d"), patClock:0,
           aspect:16/9, has:0, speed:1, tpRate:1, feed:"PGM", name:"", audioHooked:false,
           glsl:"", glslProg:null, glslErr:"", glslF0:"none", glslF2:"none", glslFrame:0,
-          text:{body:"BENDR", font:"mono", size:0.2, track:0, x:0.5, y:0.5, rot:0,
-                scrollX:0, scrollY:0, repeat:1, ink:"#ffffff", bg:"#000000", outline:0,
-                shape:"none", shpCount:1, shpSize:0.3, shpX:0.5, shpY:0.5,
-                shpSpin:0, shpFill:"#ff2fa0", shpStroke:0, shpPulse:0}};
+          text:{body:"BENDR", font:"mono", ink:"#ffffff", bg:"#000000",
+                shape:"none", shpFill:"#ff2fa0"}};
 }
 const SRC = {};
 for(const ch of CHANNELS) SRC[ch] = newSource(ch);
@@ -395,8 +393,17 @@ const FONTS = {
   fantasy:'fantasy',
   system:'system-ui, -apple-system, sans-serif'
 };
+/* text field -> parameter id. The numeric fields are parameters, so they can
+   be modulated; S.text keeps only what a route cannot move */
+const TXT_PARAM = {size:"txtSize", track:"txtTrack", x:"txtX", y:"txtY", rot:"txtRot",
+  scrollX:"txtScrollX", scrollY:"txtScrollY", repeat:"txtRepeat", outline:"txtOutline",
+  shpCount:"shpCount", shpSize:"shpSize", shpX:"shpX", shpY:"shpY", shpSpin:"shpSpin",
+  shpStroke:"shpStroke", shpPulse:"shpPulse"};
 function drawTextSource(S, t){
-  const g = S.pat, W = S.patCanvas.width, H = S.patCanvas.height, T = S.text;
+  const g = S.pat, W = S.patCanvas.width, H = S.patCanvas.height;
+  const cc = chanCur[S.ch], T = S.textLive || (S.textLive = {});
+  Object.assign(T, S.text);
+  for(const k in TXT_PARAM) T[k] = cc[TXT_PARAM[k]];
   g.setTransform(1,0,0,1,0,0);
   g.fillStyle = T.bg; g.fillRect(0,0,W,H);
 
@@ -533,14 +540,18 @@ function syncTextEditor(){
   if(ce) ce.textContent = "\u2014 CHANNEL "+activeChan;
   for(const [id,key,kind] of TXT_CTRL){
     const el = document.getElementById(id); if(!el) continue;
-    el.value = T[key];
+    el.value = TXT_PARAM[key] ? getBase(TXT_PARAM[key], activeChan) : T[key];
   }
 }
 for(const [id,key,kind] of TXT_CTRL){
   const el = document.getElementById(id); if(!el) continue;
   const handler = ()=>{
     const T = cur().text;
-    T[key] = (kind==="f") ? parseFloat(el.value) : el.value;
+    if(TXT_PARAM[key]){
+      setBase(TXT_PARAM[key], parseFloat(el.value), activeChan);
+      const r = uiRefs[TXT_PARAM[key]];
+      if(r){ r.slider.value = getBase(TXT_PARAM[key], activeChan); setReadout(r.val, fmt(P[TXT_PARAM[key]], getBase(TXT_PARAM[key], activeChan))); }
+    } else T[key] = (kind==="f") ? parseFloat(el.value) : el.value;
     const S = cur();
     if(S.mode !== "text"){ stopCam(activeChan); S.mode = "text"; S.name = "text"; syncChanInputUI(); }
   };
